@@ -196,7 +196,7 @@ require_once 'geral/header.php';
                         </div>
 
                         <div class="mb-5 d-flex align-items-center justify-content-center pb-3 auralis-line-input">
-                            <input type="number" step="0.01" min="0.01" name="valor" id="valor"
+                            <input type="number" step="0.01" min="0.01" name="valor" id="valor" onkeydown="return !['e', 'E', '+', '-'].includes(event.key);"
                                 class="form-control form-control-lg bg-transparent border-0 text-gold-analysis fw-bold text-center fs-1-large p-0 p-lg-1 no-spinners"
                                 placeholder="Valor:" required autofocus
                                 value="<?= htmlspecialchars($val_valor) ?>">   

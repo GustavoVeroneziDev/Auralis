@@ -42,12 +42,47 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action']) && $_POST['
         $erro = "Erro ao tentar excluir a carteira.";
     }
 }
+// --- PROCESSA A MESCLA DE CARTEIRAS ---
+if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action']) && $_POST['action'] === 'mesclar_carteira') {
+    $carteira_origem = $_POST['carteira_origem'];
+    $carteira_destino = $_POST['carteira_destino'];
 
+    if (empty($carteira_destino) || $carteira_origem === $carteira_destino) {
+        $erro = "Escolha uma carteira de destino válida e diferente da origem.";
+    } else {
+        try {
+            $pdo->beginTransaction(); // Inicia uma transação segura
+
+            // 1. Transfere todos os registros da carteira Velha para a Nova
+            $sqlTransfer = 'UPDATE "Registro" SET "FKCarteira" = :destino WHERE "FKCarteira" = :origem AND "FKUsuario" = :uid';
+            $stmtTransfer = $pdo->prepare($sqlTransfer);
+            $stmtTransfer->execute([
+                ':destino' => $carteira_destino,
+                ':origem' => $carteira_origem,
+                ':uid' => $usuario_id
+            ]);
+
+            // 2. Apaga a carteira Velha (que agora está vazia)
+            $sqlDel = 'DELETE FROM "Carteira" WHERE "IDCarteira" = :cid AND "FKUsuarioDono" = :uid';
+            $stmtDel = $pdo->prepare($sqlDel);
+            $stmtDel->execute([':cid' => $carteira_origem, ':uid' => $usuario_id]);
+
+            $pdo->commit(); // Confirma as alterações
+
+            header("Location: listar_carteiras.php?sucesso=mesclada");
+            exit;
+        } catch (PDOException $e) {
+            $pdo->rollBack(); // Se der erro no meio, desfaz tudo
+            $erro = "Erro ao mesclar as carteiras.";
+        }
+    }
+}
 // Mensagens de sucesso vindas da URL
 if (isset($_GET['sucesso'])) {
     if ($_GET['sucesso'] === 'excluida') $sucesso = "Carteira excluída com sucesso!";
     if ($_GET['sucesso'] === 'criada') $sucesso = "Nova carteira criada com sucesso!";
     if ($_GET['sucesso'] === 'editada') $sucesso = "Carteira atualizada com sucesso!";
+    if ($_GET['sucesso'] === 'mesclada') $sucesso = "Carteiras mescladas com sucesso!";
 }
 
 // --- BUSCA AS CARTEIRAS E CALCULA O SALDO DE CADA UMA ---
@@ -106,10 +141,6 @@ require_once '../geral/header.php';
         <?php foreach ($carteiras as $cart): ?>
             <div class="col-md-6 col-lg-4">
                 <div class="card bg-body-tertiary border-secondary-subtle shadow-sm h-100 rounded-4 auralis-wallet-card position-relative overflow-hidden">
-                    
-                    <div class="position-absolute top-0 end-0 mt-n3 me-n3 opacity-10" style="pointer-events: none;">
-                        <i class="bi bi-wallet2 text-light" style="font-size: 8rem;"></i>
-                    </div>
 
                     <div class="card-body p-4 position-relative z-1 d-flex flex-column">
                         <div class="d-flex justify-content-between align-items-start mb-4">
@@ -127,10 +158,15 @@ require_once '../geral/header.php';
                                 <ul class="dropdown-menu dropdown-menu-end bg-dark border-secondary-subtle shadow-lg">
                                     <li>
                                         <a class="dropdown-item text-light d-flex align-items-center transition-hover py-2" href="nova_carteira.php?editar=<?= $cart['IDCarteira'] ?>">
-                                            <i class="bi bi-pencil-square me-2 text-warning"></i> Editar Nome
+                                            <i class="bi bi-pencil-square me-2 text-warning"></i> <span class="text-warning">Editar Nome</span>
                                         </a>
                                     </li>
-                                    <li><hr class="dropdown-divider border-secondary-subtle"></li>
+                                    <li>
+                                        <button type="button" class="dropdown-item text-info d-flex align-items-center transition-hover py-2" 
+                                                onclick="abrirModalMescla('<?= $cart['IDCarteira'] ?>', '<?= htmlspecialchars($cart['TipoCarteira']) ?>')">
+                                            <i class="bi bi-shuffle me-2"></i> Mesclar / Transferir
+                                        </button>
+                                    </li>
                                     <li>
                                         <form method="POST" action="" class="m-0" onsubmit="return confirm('Deseja realmente excluir a carteira \'<?= htmlspecialchars($cart['TipoCarteira']) ?>\'?');">
                                             <input type="hidden" name="action" value="excluir_carteira">
@@ -170,6 +206,67 @@ require_once '../geral/header.php';
 
     </div>
 </main>
+
+<div class="modal fade" id="modalMesclar" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content bg-dark border-info border-opacity-50 shadow-lg rounded-4">
+            <div class="modal-header border-bottom border-secondary-subtle">
+                <h5 class="modal-title text-info fw-bold"><i class="bi bi-shuffle me-2"></i> Mesclar Carteira</h5>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <form method="POST" action="">
+                <div class="modal-body p-4">
+                    <input type="hidden" name="action" value="mesclar_carteira">
+                    <input type="hidden" name="carteira_origem" id="id_carteira_origem">
+                    
+                    <p class="text-light mb-4">
+                        Todas as transações da carteira <strong class="text-warning" id="nome_carteira_origem"></strong> serão movidas. A carteira original será <strong>excluída</strong> após a transferência.
+                    </p>
+                    
+                    <div class="mb-3">
+                        <label for="carteira_destino" class="form-label text-secondary small">Transferir tudo para:</label>
+                        <select name="carteira_destino" id="carteira_destino" class="form-select form-select-lg bg-transparent border-secondary-subtle text-light shadow-none" required>
+                            <option value="" class="bg-dark text-secondary">Selecione o destino...</option>
+                            <?php foreach ($carteiras as $c): ?>
+                                <option value="<?= $c['IDCarteira'] ?>" class="bg-dark text-light">
+                                    <?= htmlspecialchars($c['TipoCarteira']) ?>
+                                </option>
+                            <?php endforeach; ?>
+                        </select>
+                    </div>
+                </div>
+                <div class="modal-footer border-top border-secondary-subtle">
+                    <button type="button" class="btn btn-secondary rounded-pill px-4 fw-semibold" data-bs-dismiss="modal">Cancelar</button>
+                    <button type="submit" class="btn btn-info rounded-pill px-4 fw-bold text-dark">Confirmar Mescla</button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+<script>
+    function abrirModalMescla(idOrigem, nomeOrigem) {
+        // Preenche os dados ocultos no formulário do Modal
+        document.getElementById('id_carteira_origem').value = idOrigem;
+        document.getElementById('nome_carteira_origem').textContent = nomeOrigem;
+
+        const selectDestino = document.getElementById('carteira_destino');
+        
+        // Garante que todas as opções estão visíveis
+        Array.from(selectDestino.options).forEach(opt => opt.style.display = 'block');
+
+        // Esconde a própria carteira de origem (não faz sentido transferir pra ela mesma)
+        Array.from(selectDestino.options).forEach(opt => {
+            if (opt.value === idOrigem) {
+                opt.style.display = 'none';
+            }
+        });
+
+        // Reseta o campo e abre o modal
+        selectDestino.value = '';
+        new bootstrap.Modal(document.getElementById('modalMesclar')).show();
+    }
+</script>
 
 <style>
     :root {
