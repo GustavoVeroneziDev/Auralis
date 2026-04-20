@@ -513,7 +513,7 @@ require_once 'geral/header.php';
                                                     <div>
                                                         <span class="d-block text-secondary small text-uppercase mb-1"><?= $labelData ?></span>
                                                         <span class="text-light fs-6">
-                                                            <?= !empty($t['DataVencimento']) ? date('d/m/Y', strtotime($t['DataVencimento'])) : '<span class="text-muted">Não definido</span>' ?>
+                                                            <?= (!empty($t['DataVencimento']) && strtotime($t['DataVencimento'])) ? date('d/m/Y', strtotime($t['DataVencimento'])) : '<span class="text-muted">Não definido</span>' ?>
                                                         </span>
                                                     </div>
                                                 <div>
@@ -699,7 +699,7 @@ require_once 'geral/header.php';
     }
 
     // Acionamento Automático do Modal de Boas Vindas se for o primeiro acesso
-    <?php if ($is_primeiro_acesso): ?>
+   <?php if ($is_primeiro_acesso && $totalCarteiras > 0): ?>
     document.addEventListener("DOMContentLoaded", function() {
         var modalBoasVindas = new bootstrap.Modal(document.getElementById('modalBoasVindas'), {
             backdrop: 'static', // Impede de fechar clicando fora sem querer
