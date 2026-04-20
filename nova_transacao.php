@@ -178,8 +178,7 @@ require_once 'geral/header.php';
             <?php else: ?>
 
                 <div class="card bg-body-tertiary border-secondary-subtle shadow-sm rounded-4">
-                    <form method="POST" action="" novalidate class="auralis-premium-form p-4">
-
+                    <form id="formTransacao" method="POST" action="" novalidate class="auralis-premium-form p-4">
                         <input type="hidden" name="tipo_registro" value="<?= htmlspecialchars($tipo_sugerido) ?>">
                         <?php if ($id_editar): ?>
                             <input type="hidden" name="id_editar" value="<?= htmlspecialchars($id_editar) ?>">
@@ -286,14 +285,13 @@ require_once 'geral/header.php';
                         </div>
 
                         <div class="d-grid mt-2">
-                            <button type="submit" class="btn btn-gold fw-bold text-dark py-3 rounded-pill fs-6 shadow-lg d-flex align-items-center justify-content-center transition-hover">
+                            <button id="btnSalvar" type="submit" class="btn btn-gold fw-bold text-dark py-3 rounded-pill fs-6 shadow-lg d-flex align-items-center justify-content-center transition-hover">
                                 <?= $id_editar ? 'Salvar Alterações' : 'Salvar Transação' ?>
                             </button>
                         </div>
 
                     </form>
                 </div>
-
             <?php endif; ?>
         </div>
     </div>
@@ -385,7 +383,9 @@ require_once 'geral/header.php';
 </style>
 
 <script>
-    // Lógica do Switch de Status
+    // ==========================================
+    // 1. LÓGICA DO SWITCH DE STATUS
+    // ==========================================
     const toggleStatus = document.getElementById('toggle_status');
     const inputReal = document.getElementById('status_real');
     const textoStatus = document.getElementById('texto_status');
@@ -405,18 +405,53 @@ require_once 'geral/header.php';
         }
     }
 
-    toggleStatus.addEventListener('change', atualizarTextoToggle);
-    atualizarTextoToggle(); // Roda ao carregar a página para já ficar com a cor certa
+    if (toggleStatus) {
+        toggleStatus.addEventListener('change', atualizarTextoToggle);
+        atualizarTextoToggle(); // Roda ao carregar a página
+    }
 
-    // Lógica da Recorrência
+    // ==========================================
+    // 2. LÓGICA DA RECORRÊNCIA
+    // ==========================================
     const checkRecorrente = document.getElementById('recorrente');
     const blocoRecorrencia = document.getElementById('bloco_recorrencia');
     const inputDia = document.getElementById('dia_vencimento');
 
-    checkRecorrente.addEventListener('change', function () {
-        blocoRecorrencia.style.display = this.checked ? 'block' : 'none';
-        inputDia.required = this.checked;
-    });
-</script>
+    if (checkRecorrente) {
+        checkRecorrente.addEventListener('change', function () {
+            blocoRecorrencia.style.display = this.checked ? 'block' : 'none';
+            inputDia.required = this.checked;
+        });
+    }
 
+// ==========================================
+    // TRAVA ANTI-SPAM (BLINDAGEM ABSOLUTA)
+    // ==========================================
+    const formTransacao = document.getElementById('formTransacao');
+    const btnSalvar = document.getElementById('btnSalvar');
+    
+    // O nosso "Trinco" lógico
+    let enviando = false; 
+
+    if (formTransacao) {
+        formTransacao.addEventListener('submit', function(event) {
+            
+            // Se o trinco já estiver trancado, bloqueia a tentativa e para tudo!
+            if (enviando) {
+                event.preventDefault(); // Cancela o 2º, 3º, 4º Enter...
+                return false;
+            }
+
+            // Tranca o trinco na primeira vez que passa
+            enviando = true;
+
+            // Feedback visual no botão
+            if (btnSalvar) {
+                btnSalvar.innerHTML = '<span class="spinner-border spinner-border-sm me-2" role="status" aria-hidden="true"></span> Salvando...';
+                btnSalvar.style.pointerEvents = 'none'; // Impede novos cliques via CSS
+                btnSalvar.classList.add('opacity-75');  // Deixa o botão meio transparente
+            }
+        });
+    }
+</script>
 <?php require_once 'geral/footer.php'; ?>

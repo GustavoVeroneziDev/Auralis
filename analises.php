@@ -321,8 +321,9 @@ require_once 'geral/header.php';
 
         let htmlLista = '<div class="list-group list-group-flush">';
         transacoesFiltradas.forEach(t => {
-            const dataStr = new Date(t.MomentoRegistro + 'T00:00:00').toLocaleDateString('pt-BR');
-            const valorFormatado = new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(t.Valor);
+            // Corta a string no espaço vazio, pegando só o "YYYY-MM-DD", e adiciona o meio-dia para evitar bugs de fuso horário
+            const dataApenas = t.MomentoRegistro.split(' ')[0];
+            const dataStr = new Date(dataApenas + 'T12:00:00').toLocaleDateString('pt-BR');            const valorFormatado = new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(t.Valor);
             const corValor = tipo === 'despesa' ? 'text-danger' : 'text-success';
             const sinalValor = tipo === 'despesa' ? '-' : '+';
 
