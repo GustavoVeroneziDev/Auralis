@@ -306,15 +306,17 @@ $listaIcones = [
     .bg-charcoal-analysis { background-color: #1a1d21 !important; }
     .fs-7 { font-size: 0.85rem; }
 
-    /* Estilos do Grid de Ícones Premium */
 .icon-selector-grid {
-        display: grid;
-        grid-template-columns: repeat(5, 1fr);
-        gap: 8px;
-        /* ADICIONE ESTAS DUAS LINHAS SE QUISER SCROLL: */
-        max-height: 250px; 
-        overflow-y: auto;
-    }
+    display: grid;
+    grid-template-columns: repeat(5, 1fr);
+    gap: 8px;
+    max-height: 300px; 
+    width: 100%;
+    overflow-y: auto;
+    padding: 10px; 
+    margin: 0 auto; 
+    box-sizing: border-box; 
+}
     .btn-icon-select {
         display: flex;
         align-items: center;
