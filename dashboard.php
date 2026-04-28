@@ -1,40 +1,40 @@
 <?php
 
-//Documentação do Dashboard - Auralis (utilizando IA para comentar e organizar o código para visibilidade e manutenção)
+    //Documentação do Dashboard - Auralis (utilizando IA para comentar e organizar o código para visibilidade e manutenção)
 
-// 1. Inicia a sessão e verifica a segurança
-session_start();
+    // 1. Inicia a sessão e verifica a segurança
+    session_start();
 
-if (!isset($_SESSION['usuario_id'])) {
+    if (! isset($_SESSION['usuario_id'])) {
     header("Location: usuario/login.php");
     exit;
-}
+    }
 
-// 2. Conecta ao banco de dados
-require_once 'config/conexao.php';
+    // 2. Conecta ao banco de dados
+    require_once 'config/conexao.php';
 
-$usuario_id = $_SESSION['usuario_id'];
-$carteiras = [];
+    $usuario_id = $_SESSION['usuario_id'];
+    $carteiras  = [];
 
-try {
-    $sql = 'SELECT "IDCarteira", "TipoCarteira" FROM "Carteira" WHERE "FKUsuarioDono" = :usuario_id ORDER BY "TipoCarteira" ASC';
+    try {
+    $sql  = 'SELECT "IDCarteira", "TipoCarteira" FROM "Carteira" WHERE "FKUsuarioDono" = :usuario_id ORDER BY "TipoCarteira" ASC';
     $stmt = $pdo->prepare($sql);
     $stmt->execute([':usuario_id' => $usuario_id]);
     $carteiras = $stmt->fetchAll();
-} catch (PDOException $e) {
+    } catch (PDOException $e) {
     $carteiras = [];
-}
+    }
 
-$totalCarteiras = count($carteiras);
+    $totalCarteiras = count($carteiras);
 
-// ==============================================================================
-// MOTOR DE RECORRÊNCIA AURALIS (Executado no carregamento do Dashboard)
-// ==============================================================================
-$mesAnoAtual = date('Y-m');
+    // ==============================================================================
+    // MOTOR DE RECORRÊNCIA AURALIS (Executado no carregamento do Dashboard)
+    // ==============================================================================
+    $mesAnoAtual = date('Y-m');
 
-try {
+    try {
     // 1. Verifica se o sistema já rodou este mês
-    $sqlConfig = 'SELECT "Valor" FROM "ConfiguracaoSistema" WHERE "Chave" = \'ultima_recorrencia\' AND "FKUsuario" = :uid';
+    $sqlConfig  = 'SELECT "Valor" FROM "ConfiguracaoSistema" WHERE "Chave" = \'ultima_recorrencia\' AND "FKUsuario" = :uid';
     $stmtConfig = $pdo->prepare($sqlConfig);
     $stmtConfig->execute([':uid' => $usuario_id]);
     $ultimaExecucao = $stmtConfig->fetchColumn();
@@ -42,31 +42,31 @@ try {
     if ($ultimaExecucao !== $mesAnoAtual) {
         // 2. Busca contas recorrentes do mês passado (para evitar gaps)
         $mesAnterior = date('Y-m', strtotime('-1 month'));
-        
-        $sqlRec = 'SELECT * FROM "Registro" WHERE "FKUsuario" = :uid AND "Recorrente" = true AND TO_CHAR("MomentoRegistro", \'YYYY-MM\') = :mes_ant';
+
+        $sqlRec  = 'SELECT * FROM "Registro" WHERE "FKUsuario" = :uid AND "Recorrente" = true AND TO_CHAR("MomentoRegistro", \'YYYY-MM\') = :mes_ant';
         $stmtRec = $pdo->prepare($sqlRec);
         $stmtRec->execute([':uid' => $usuario_id, ':mes_ant' => $mesAnterior]);
         $contas = $stmtRec->fetchAll();
 
-        if (!empty($contas)) {
-            $sqlInsert = 'INSERT INTO "Registro" ("TipoRegistro", "Valor", "Descricao", "MomentoRegistro", "DataVencimento", "StatusRegistro", "Recorrente", "DiaVencimento", "FKCarteira", "FKUsuario", "FKCategoria") 
+        if (! empty($contas)) {
+            $sqlInsert = 'INSERT INTO "Registro" ("TipoRegistro", "Valor", "Descricao", "MomentoRegistro", "DataVencimento", "StatusRegistro", "Recorrente", "DiaVencimento", "FKCarteira", "FKUsuario", "FKCategoria")
                           VALUES (:tipo, :valor, :desc, :momento, :venc, \'pendente\', true, :dia, :cart, :uid, :cat)';
             $stmtInsert = $pdo->prepare($sqlInsert);
 
             foreach ($contas as $c) {
                 // Ajusta a data para o dia de vencimento no mês atual
                 $novaData = date('Y-m') . '-' . str_pad($c['DiaVencimento'], 2, '0', STR_PAD_LEFT);
-                
+
                 $stmtInsert->execute([
-                    ':tipo' => $c['TipoRegistro'],
-                    ':valor' => $c['Valor'],
-                    ':desc' => $c['Descricao'],
+                    ':tipo'    => $c['TipoRegistro'],
+                    ':valor'   => $c['Valor'],
+                    ':desc'    => $c['Descricao'],
                     ':momento' => $novaData,
-                    ':venc' => $novaData,
-                    ':dia' => $c['DiaVencimento'],
-                    ':cart' => $c['FKCarteira'],
-                    ':uid' => $usuario_id,
-                    ':cat' => $c['FKCategoria']
+                    ':venc'    => $novaData,
+                    ':dia'     => $c['DiaVencimento'],
+                    ':cart'    => $c['FKCarteira'],
+                    ':uid'     => $usuario_id,
+                    ':cat'     => $c['FKCategoria'],
                 ]);
             }
         }
@@ -79,39 +79,42 @@ try {
         }
         $pdo->prepare($sqlUpd)->execute([':v' => $mesAnoAtual, ':uid' => $usuario_id]);
     }
-} catch (PDOException $e) {
+    } catch (PDOException $e) {
     // Falha silenciosa para não quebrar o dashboard caso dê algum erro de banco
-}
-// ==============================================================================
+    }
+    // ==============================================================================
 
-// --- VERIFICA SE É O PRIMEIRO ACESSO (Zero Transações) ---
-$is_primeiro_acesso = false;
-try {
+    // --- VERIFICA SE É O PRIMEIRO ACESSO (Zero Transações) ---
+    $is_primeiro_acesso = false;
+    try {
     $sqlTotalTrans = 'SELECT COUNT(*) FROM "Registro" WHERE "FKUsuario" = :uid';
-    $stmtTotal = $pdo->prepare($sqlTotalTrans);
+    $stmtTotal     = $pdo->prepare($sqlTotalTrans);
     $stmtTotal->execute([':uid' => $usuario_id]);
     if ($stmtTotal->fetchColumn() == 0) {
         $is_primeiro_acesso = true;
     }
-} catch (PDOException $e) {}
+    } catch (PDOException $e) {}
 
-// --- LÓGICA DE NAVEGAÇÃO DE TEMPO (MESES) ---
-$mes_atual = isset($_GET['mes']) ? (int)$_GET['mes'] : (int)date('m');
-$ano_atual = isset($_GET['ano']) ? (int)$_GET['ano'] : (int)date('Y');
+    // --- LÓGICA DE NAVEGAÇÃO DE TEMPO (MESES) ---
+    $mes_atual = isset($_GET['mes']) ? (int) $_GET['mes'] : (int) date('m');
+    $ano_atual = isset($_GET['ano']) ? (int) $_GET['ano'] : (int) date('Y');
 
-$mes_ant = $mes_atual - 1; $ano_ant = $ano_atual;
-if ($mes_ant < 1) { $mes_ant = 12; $ano_ant--; }
+    $mes_ant = $mes_atual - 1;
+    $ano_ant = $ano_atual;
+    if ($mes_ant < 1) {$mes_ant = 12;
+    $ano_ant--;}
 
-$mes_prox = $mes_atual + 1; $ano_prox = $ano_atual;
-if ($mes_prox > 12) { $mes_prox = 1; $ano_prox++; }
+    $mes_prox = $mes_atual + 1;
+    $ano_prox = $ano_atual;
+    if ($mes_prox > 12) {$mes_prox = 1;
+    $ano_prox++;}
 
-$meses_pt = [1 => 'Janeiro', 2 => 'Fevereiro', 3 => 'Março', 4 => 'Abril', 5 => 'Maio', 6 => 'Junho', 7 => 'Julho', 8 => 'Agosto', 9 => 'Setembro', 10 => 'Outubro', 11 => 'Novembro', 12 => 'Dezembro'];
-$nome_mes = $meses_pt[$mes_atual];
+    $meses_pt = [1 => 'Janeiro', 2 => 'Fevereiro', 3 => 'Março', 4 => 'Abril', 5 => 'Maio', 6 => 'Junho', 7 => 'Julho', 8 => 'Agosto', 9 => 'Setembro', 10 => 'Outubro', 11 => 'Novembro', 12 => 'Dezembro'];
+    $nome_mes = $meses_pt[$mes_atual];
 
+    // --- LÓGICA DE AÇÃO: ALTERAR STATUS, EXCLUIR OU AJUSTAR SALDO ---
+    if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'])) {
 
-// --- LÓGICA DE AÇÃO: ALTERAR STATUS, EXCLUIR OU AJUSTAR SALDO ---
-if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'])) {
-    
     $carteira_url = isset($_GET['carteira']) ? "&carteira=" . $_GET['carteira'] : "";
     $redirectBase = "dashboard.php?mes={$mes_atual}&ano={$ano_atual}{$carteira_url}";
 
@@ -121,7 +124,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'])) {
         $novo_status = $_POST['novo_status'];
         if (in_array($novo_status, ['pendente', 'efetivado'])) {
             try {
-                $sqlToggle = 'UPDATE "Registro" SET "StatusRegistro" = :status WHERE "IDRegistro" = :id AND "FKUsuario" = :uid';
+                $sqlToggle  = 'UPDATE "Registro" SET "StatusRegistro" = :status WHERE "IDRegistro" = :id AND "FKUsuario" = :uid';
                 $stmtToggle = $pdo->prepare($sqlToggle);
                 $stmtToggle->execute([':status' => $novo_status, ':id' => $id_registro, ':uid' => $usuario_id]);
                 header("Location: " . $redirectBase);
@@ -134,7 +137,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'])) {
     if ($_POST['action'] === 'excluir_registro') {
         $id_registro = $_POST['registro_id'];
         try {
-            $sqlDel = 'DELETE FROM "Registro" WHERE "IDRegistro" = :id AND "FKUsuario" = :uid';
+            $sqlDel  = 'DELETE FROM "Registro" WHERE "IDRegistro" = :id AND "FKUsuario" = :uid';
             $stmtDel = $pdo->prepare($sqlDel);
             $stmtDel->execute([':id' => $id_registro, ':uid' => $usuario_id]);
             header("Location: " . $redirectBase . "&sucesso=excluido");
@@ -144,30 +147,30 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'])) {
 
     // LÓGICA DO AJUSTE DE SALDO INTELIGENTE
     if ($_POST['action'] === 'ajustar_saldo') {
-        $saldo_informado = (float) str_replace(',', '.', $_POST['saldo_real']);
-        $saldo_sistema = (float) $_POST['saldo_sistema_atual'];
+        $saldo_informado    = (float) str_replace(',', '.', $_POST['saldo_real']);
+        $saldo_sistema      = (float) $_POST['saldo_sistema_atual'];
         $carteira_id_ajuste = $_POST['carteira_id_ajuste'];
 
         $diferenca = $saldo_informado - $saldo_sistema;
 
-        if (abs($diferenca) > 0.009) { 
-            $tipoRegistro = ($diferenca > 0) ? 'receita' : 'despesa';
+        if (abs($diferenca) > 0.009) {
+            $tipoRegistro  = ($diferenca > 0) ? 'receita' : 'despesa';
             $valorRegistro = abs($diferenca);
-            $descricao = ($saldo_sistema == 0) ? 'Saldo Inicial' : 'Ajuste de Saldo';
-            
+            $descricao     = ($saldo_sistema == 0) ? 'Saldo Inicial' : 'Ajuste de Saldo';
+
             try {
                 // Procura categoria de Ajuste
-                $sqlCat = 'SELECT "IDCategoria" FROM "Categoria" WHERE "FKUsuario" = :uid AND "NomeCategoria" = \'Ajuste de Saldo\' AND "TipoCategoria" = :tipo LIMIT 1';
+                $sqlCat  = 'SELECT "IDCategoria" FROM "Categoria" WHERE "FKUsuario" = :uid AND "NomeCategoria" = \'Ajuste de Saldo\' AND "TipoCategoria" = :tipo LIMIT 1';
                 $stmtCat = $pdo->prepare($sqlCat);
                 $stmtCat->execute([':uid' => $usuario_id, ':tipo' => $tipoRegistro]);
                 $catId = $stmtCat->fetchColumn();
 
                 // Cria categoria de Ajuste com engrenagem se não existir
-                if (!$catId) {
-                    $sqlNovaCat = 'INSERT INTO "Categoria" ("NomeCategoria", "TipoCategoria", "IconeCategoria", "FKUsuario") VALUES (\'Ajuste de Saldo\', :tipo, \'bi-gear-fill\', :uid)';
+                if (! $catId) {
+                    $sqlNovaCat  = 'INSERT INTO "Categoria" ("NomeCategoria", "TipoCategoria", "IconeCategoria", "FKUsuario") VALUES (\'Ajuste de Saldo\', :tipo, \'bi-gear-fill\', :uid)';
                     $stmtNovaCat = $pdo->prepare($sqlNovaCat);
                     $stmtNovaCat->execute([':tipo' => $tipoRegistro, ':uid' => $usuario_id]);
-                    
+
                     $stmtCat->execute([':uid' => $usuario_id, ':tipo' => $tipoRegistro]);
                     $catId = $stmtCat->fetchColumn();
                 }
@@ -183,12 +186,12 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'])) {
                 ';
                 $stmtAjuste = $pdo->prepare($sqlAjuste);
                 $stmtAjuste->execute([
-                    ':tipo' => $tipoRegistro,
-                    ':valor' => $valorRegistro,
+                    ':tipo'      => $tipoRegistro,
+                    ':valor'     => $valorRegistro,
                     ':descricao' => $descricao,
-                    ':carteira' => $carteira_id_ajuste,
-                    ':usuario' => $usuario_id,
-                    ':categoria' => $catId
+                    ':carteira'  => $carteira_id_ajuste,
+                    ':usuario'   => $usuario_id,
+                    ':categoria' => $catId,
                 ]);
                 header("Location: " . $redirectBase . "&sucesso=ajustado");
                 exit;
@@ -198,57 +201,57 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'])) {
             exit;
         }
     }
-}
+    }
 
-// --- LÓGICA DO FILTRO DE CARTEIRA ---
-if (isset($_GET['carteira'])) {
+    // --- LÓGICA DO FILTRO DE CARTEIRA ---
+    if (isset($_GET['carteira'])) {
     $carteira_selecionada = $_GET['carteira'];
-} else {
+    } else {
     $carteira_selecionada = ($totalCarteiras > 0) ? $carteiras[0]['IDCarteira'] : null;
-}
+    }
 
-$nome_carteira_atual = "Carteira";
-foreach ($carteiras as $cart) {
+    $nome_carteira_atual = "Carteira";
+    foreach ($carteiras as $cart) {
     if ($cart['IDCarteira'] == $carteira_selecionada) {
         $nome_carteira_atual = $cart['TipoCarteira'];
         break;
     }
-}
+    }
 
-$link_ant = "?mes={$mes_ant}&ano={$ano_ant}" . ($carteira_selecionada ? "&carteira={$carteira_selecionada}" : "");
-$link_prox = "?mes={$mes_prox}&ano={$ano_prox}" . ($carteira_selecionada ? "&carteira={$carteira_selecionada}" : "");
+    $link_ant  = "?mes={$mes_ant}&ano={$ano_ant}" . ($carteira_selecionada ? "&carteira={$carteira_selecionada}" : "");
+    $link_prox = "?mes={$mes_prox}&ano={$ano_prox}" . ($carteira_selecionada ? "&carteira={$carteira_selecionada}" : "");
 
-// --- LÓGICA DE DADOS REAIS DO DASHBOARD ---
-$saldoAtual = 0.00;
-$receitasMes = 0.00;
-$despesasMes = 0.00;
-$transacoes = [];
+    // --- LÓGICA DE DADOS REAIS DO DASHBOARD ---
+    $saldoAtual  = 0.00;
+    $receitasMes = 0.00;
+    $despesasMes = 0.00;
+    $transacoes  = [];
 
-if ($carteira_selecionada) {
+    if ($carteira_selecionada) {
     try {
         $sqlSaldo = '
-            SELECT 
+            SELECT
                 COALESCE(SUM(CASE WHEN "TipoRegistro" = \'receita\' THEN "Valor" ELSE 0 END), 0) as total_rec_hist,
                 COALESCE(SUM(CASE WHEN "TipoRegistro" = \'despesa\' THEN "Valor" ELSE 0 END), 0) as total_des_hist
             FROM "Registro"
-            WHERE "FKCarteira" = :carteira_id 
+            WHERE "FKCarteira" = :carteira_id
               AND "FKUsuario" = :usuario_id
               AND "StatusRegistro" = \'efetivado\'
         ';
         $stmtSaldo = $pdo->prepare($sqlSaldo);
         $stmtSaldo->execute([':carteira_id' => $carteira_selecionada, ':usuario_id' => $usuario_id]);
         $resultSaldo = $stmtSaldo->fetch();
-        
+
         if ($resultSaldo) {
-            $saldoAtual = (float)$resultSaldo['total_rec_hist'] - (float)$resultSaldo['total_des_hist'];
+            $saldoAtual = (float) $resultSaldo['total_rec_hist'] - (float) $resultSaldo['total_des_hist'];
         }
 
         $sqlMes = '
-            SELECT 
+            SELECT
                 COALESCE(SUM(CASE WHEN "TipoRegistro" = \'receita\' THEN "Valor" ELSE 0 END), 0) as total_receitas,
                 COALESCE(SUM(CASE WHEN "TipoRegistro" = \'despesa\' THEN "Valor" ELSE 0 END), 0) as total_despesas
             FROM "Registro"
-            WHERE "FKCarteira" = :carteira_id 
+            WHERE "FKCarteira" = :carteira_id
               AND "FKUsuario" = :usuario_id
               AND "StatusRegistro" = \'efetivado\'
               AND EXTRACT(MONTH FROM "MomentoRegistro") = :mes
@@ -256,10 +259,10 @@ if ($carteira_selecionada) {
         ';
         $stmtMes = $pdo->prepare($sqlMes);
         $stmtMes->execute([
-            ':carteira_id' => $carteira_selecionada, 
-            ':usuario_id' => $usuario_id,
-            ':mes' => $mes_atual,
-            ':ano' => $ano_atual
+            ':carteira_id' => $carteira_selecionada,
+            ':usuario_id'  => $usuario_id,
+            ':mes'         => $mes_atual,
+            ':ano'         => $ano_atual,
         ]);
         $resultMes = $stmtMes->fetch();
 
@@ -269,13 +272,13 @@ if ($carteira_selecionada) {
         }
 
         $sqlTransacoes = '
-            SELECT 
+            SELECT
                 r."IDRegistro", r."MomentoRegistro", r."Valor", r."Descricao", r."TipoRegistro", r."StatusRegistro",
                 r."DataVencimento", r."Recorrente", r."DiaVencimento",
                 c."NomeCategoria", c."IconeCategoria"
             FROM "Registro" r
             LEFT JOIN "Categoria" c ON r."FKCategoria" = c."IDCategoria"
-            WHERE r."FKCarteira" = :carteira_id 
+            WHERE r."FKCarteira" = :carteira_id
               AND r."FKUsuario" = :usuario_id
               AND EXTRACT(MONTH FROM r."MomentoRegistro") = :mes
               AND EXTRACT(YEAR FROM r."MomentoRegistro") = :ano
@@ -285,16 +288,16 @@ if ($carteira_selecionada) {
         $stmtTrans = $pdo->prepare($sqlTransacoes);
         $stmtTrans->execute([
             ':carteira_id' => $carteira_selecionada,
-            ':usuario_id' => $usuario_id,
-            ':mes' => $mes_atual,
-            ':ano' => $ano_atual
+            ':usuario_id'  => $usuario_id,
+            ':mes'         => $mes_atual,
+            ':ano'         => $ano_atual,
         ]);
         $transacoes = $stmtTrans->fetchAll();
 
     } catch (PDOException $e) {}
-}
+    }
 
-require_once 'geral/header.php';
+    require_once 'geral/header.php';
 ?>
 
 <main class="container py-4 mt-3 flex-grow-1" style="min-height: 100vh;">
@@ -317,16 +320,28 @@ require_once 'geral/header.php';
     <?php else: ?>
 
         <?php if (isset($_GET['sucesso'])): ?>
-            <?php 
+            <?php
                 $msg = '';
-                if ($_GET['sucesso'] === 'registro') $msg = 'Transação salva com sucesso!';
-                if ($_GET['sucesso'] === 'editado') $msg = 'Transação atualizada com sucesso!';
-                if ($_GET['sucesso'] === 'excluido') $msg = 'Transação excluída!';
-                if ($_GET['sucesso'] === 'ajustado') $msg = 'Prontinho! Seu saldo foi ajustado e agora está real.';
+                if ($_GET['sucesso'] === 'registro') {
+                    $msg = 'Transação salva com sucesso!';
+                }
+
+                if ($_GET['sucesso'] === 'editado') {
+                    $msg = 'Transação atualizada com sucesso!';
+                }
+
+                if ($_GET['sucesso'] === 'excluido') {
+                    $msg = 'Transação excluída!';
+                }
+
+                if ($_GET['sucesso'] === 'ajustado') {
+                    $msg = 'Prontinho! Seu saldo foi ajustado e agora está real.';
+                }
+
             ?>
-            <?php if($msg): ?>
+            <?php if ($msg): ?>
             <div class="alert alert-success d-flex align-items-center gap-2 rounded-3 shadow-sm border-0 bg-success bg-opacity-10 text-success fw-semibold alert-dismissible fade show" role="alert">
-                <i class="bi bi-check-circle-fill"></i> <span><?= $msg ?></span>
+                <i class="bi bi-check-circle-fill"></i> <span><?php echo $msg ?></span>
                 <button type="button" class="btn-close btn-close-white opacity-50" data-bs-dismiss="alert" aria-label="Close"></button>
             </div>
             <?php endif; ?>
@@ -335,17 +350,20 @@ require_once 'geral/header.php';
         <div class="d-flex justify-content-between align-items-center mb-4 border-bottom border-secondary-subtle pb-3 flex-wrap gap-3">
             <div class="d-flex align-items-center gap-4">
                 <h2 class="fw-bold text-light mb-0">Visão Geral</h2>
-                
+
                 <div class="d-flex align-items-center bg-dark border border-secondary-subtle rounded-pill px-2 py-1 shadow-sm">
-                    <a href="<?= $link_ant ?>" class="btn btn-sm btn-link text-light opacity-75 transition-hover text-decoration-none fs-5 d-flex align-items-center justify-content-center" style="width: 35px; height: 35px;">
+                    <a href="<?php echo $link_ant ?>" class="btn btn-sm btn-link text-light opacity-75 transition-hover text-decoration-none fs-5 d-flex align-items-center justify-content-center" style="width: 35px; height: 35px;">
                         <i class="bi bi-caret-left-fill"></i>
                     </a>
-                    
-                    <span class="text-light fw-bold px-2" style="min-width: 140px; text-align: center; font-size: 0.95rem;">
-                        <?= $nome_mes ?> <?= $ano_atual ?>
-                    </span>
-                    
-                    <a href="<?= $link_prox ?>" class="btn btn-sm btn-link text-light opacity-75 transition-hover text-decoration-none fs-5 d-flex align-items-center justify-content-center" style="width: 35px; height: 35px;">
+
+                    <button type="button" class="btn btn-link text-light text-decoration-none fw-bold px-2 transition-hover d-flex align-items-center justify-content-center"
+                            style="min-width: 140px; font-size: 0.95rem;"
+                            data-bs-toggle="modal" data-bs-target="#modalSeletorMes">
+                        <?php echo $nome_mes ?> <?php echo $ano_atual ?>
+                        <i class="bi bi-chevron-down ms-2 fs-7 opacity-75"></i>
+                    </button>
+
+                    <a href="<?php echo $link_prox ?>" class="btn btn-sm btn-link text-light opacity-75 transition-hover text-decoration-none fs-5 d-flex align-items-center justify-content-center" style="width: 35px; height: 35px;">
                         <i class="bi bi-caret-right-fill"></i>
                     </a>
                 </div>
@@ -353,25 +371,51 @@ require_once 'geral/header.php';
 
             <div class="d-flex gap-2">
                 <div class="d-flex align-items-center gap-3">
-                    <select class="form-select bg-dark border-secondary text-light shadow-sm fw-semibold" style="width: 200px;"
-                        id="seletor_carteira" onchange="window.location.href='?mes=<?= $mes_atual ?>&ano=<?= $ano_atual ?>&carteira=' + this.value;">
-                        <?php foreach ($carteiras as $cart): ?>
-                            <option value="<?= htmlspecialchars($cart['IDCarteira']); ?>"
-                                <?= $carteira_selecionada == $cart['IDCarteira'] ? 'selected' : '' ?>>
-                                <?= htmlspecialchars($cart['TipoCarteira']); ?>
-                            </option>
-                        <?php endforeach; ?>
-                    </select>
+<div class="dropdown">
+    <button class="btn border-secondary-subtle text-light shadow-sm fw-semibold dropdown-toggle d-flex justify-content-between align-items-center rounded-3 transition-hover"
+            type="button"
+            data-bs-toggle="dropdown"
+            aria-expanded="false"
+            style="width: 220px; background-color: var(--bg-charcoal-analysis);">
+
+        <span class="text-truncate d-flex align-items-center">
+            <i class="bi bi-wallet2 me-2" style="color: var(--primary-gold-analysis);"></i>
+            <?php echo htmlspecialchars($nome_carteira_atual); ?>
+        </span>
+    </button>
+
+    <ul class="dropdown-menu dropdown-menu-dark shadow-lg border-secondary-subtle mt-2 w-100" style="background-color: #1a1d21;">
+        <li class="px-3 py-1 text-secondary small text-uppercase fw-bold tracking-wide">Alternar Carteira</li>
+        <li><hr class="dropdown-divider border-secondary-subtle"></li>
+
+        <?php foreach ($carteiras as $cart): ?>
+            <li>
+                <a class="dropdown-item d-flex align-items-center py-2 transition-hover <?php echo $carteira_selecionada == $cart['IDCarteira'] ? 'active' : '' ?>"
+                   href="?mes=<?php echo $mes_atual ?>&ano=<?php echo $ano_atual ?>&carteira=<?php echo htmlspecialchars($cart['IDCarteira']) ?>">
+
+                    <?php if ($carteira_selecionada == $cart['IDCarteira']): ?>
+                        <i class="bi bi-check-circle-fill me-2" style="color: var(--primary-gold-analysis);"></i>
+                        <span class="fw-bold" style="color: var(--primary-gold-analysis);"><?php echo htmlspecialchars($cart['TipoCarteira']); ?></span>
+                    <?php else: ?>
+                        <i class="bi bi-circle me-2 text-secondary opacity-50"></i>
+                        <span class="text-light"><?php echo htmlspecialchars($cart['TipoCarteira']); ?></span>
+                    <?php endif; ?>
+
+                </a>
+            </li>
+        <?php endforeach; ?>
+    </ul>
+</div>
 
                     <div class="vr bg-secondary opacity-25 mx-1 d-none d-md-block"></div>
 
                     <div class="d-flex gap-2">
-                        <a href="nova_transacao.php?carteira_id=<?= urlencode($carteira_selecionada) ?>&tipo=receita"
+                        <a href="nova_transacao.php?carteira_id=<?php echo urlencode($carteira_selecionada) ?>&tipo=receita"
                             class="btn btn-outline-success fw-bold d-flex align-items-center px-3 rounded-pill transition-hover shadow-sm">
                             <i class="bi bi-arrow-up-short fs-5"></i> <span class="d-none d-sm-inline ms-1">Receita</span>
                         </a>
 
-                        <a href="nova_transacao.php?carteira_id=<?= urlencode($carteira_selecionada) ?>&tipo=despesa"
+                        <a href="nova_transacao.php?carteira_id=<?php echo urlencode($carteira_selecionada) ?>&tipo=despesa"
                             class="btn btn-outline-danger fw-bold d-flex align-items-center px-3 rounded-pill transition-hover shadow-sm">
                             <i class="bi bi-arrow-down-short fs-5"></i> <span class="d-none d-sm-inline ms-1">Despesa</span>
                         </a>
@@ -391,19 +435,19 @@ require_once 'geral/header.php';
                                 right: 10px;
                             }
                         </style>
-                        <button class="btn btn-sm btn-outline-secondary position-absolute inferiorDireito m-3 rounded-pill transition-hover border-0 shadow-none" 
+                        <button class="btn btn-sm btn-outline-secondary position-absolute inferiorDireito m-3 rounded-pill transition-hover border-0 shadow-none"
                                 data-bs-toggle="modal" data-bs-target="#modalAjusteSaldo" title="Ajustar Saldo Real">
                             <i class="bi bi-pencil-square fs-5"></i>
                         </button>
 
                         <div class="d-flex justify-content-between align-items-center mb-3">
-                            <h6 class="card-title text-secondary mb-0 fw-semibold pe-4">Saldo: <?= htmlspecialchars($nome_carteira_atual); ?></h6>
+                            <h6 class="card-title text-secondary mb-0 fw-semibold pe-4">Saldo: <?php echo htmlspecialchars($nome_carteira_atual); ?></h6>
                             <div class="p-2 bg-primary bg-opacity-10 rounded-3">
                                 <i class="bi bi-wallet2 text-primary fs-5"></i>
                             </div>
                         </div>
-                        <h3 class="fw-bold mb-1 <?= $saldoAtual < 0 ? 'text-danger' : 'text-light' ?>">
-                            R$ <?= number_format($saldoAtual, 2, ',', '.') ?>
+                        <h3 class="fw-bold mb-1 <?php echo $saldoAtual < 0 ? 'text-danger' : 'text-light' ?>">
+                            R$ <?php echo number_format($saldoAtual, 2, ',', '.') ?>
                         </h3>
                         <p class="text-secondary small mb-0">Total disponível hoje</p>
                     </div>
@@ -414,13 +458,13 @@ require_once 'geral/header.php';
                 <div class="card bg-body-tertiary border-secondary-subtle shadow-sm h-100 rounded-4">
                     <div class="card-body p-4">
                         <div class="d-flex justify-content-between align-items-center mb-3">
-                            <h6 class="card-title text-secondary mb-0 fw-semibold">Receitas (<?= $nome_mes ?>)</h6>
+                            <h6 class="card-title text-secondary mb-0 fw-semibold">Receitas (<?php echo $nome_mes ?>)</h6>
                             <div class="p-2 bg-success bg-opacity-10 rounded-3">
                                 <i class="bi bi-graph-up-arrow text-success fs-5"></i>
                             </div>
                         </div>
                         <h3 class="fw-bold text-success mb-1">
-                            R$ <?= number_format($receitasMes, 2, ',', '.') ?>
+                            R$ <?php echo number_format($receitasMes, 2, ',', '.') ?>
                         </h3>
                     </div>
                 </div>
@@ -430,26 +474,26 @@ require_once 'geral/header.php';
                 <div class="card bg-body-tertiary border-secondary-subtle shadow-sm h-100 rounded-4">
                     <div class="card-body p-4">
                         <div class="d-flex justify-content-between align-items-center mb-3">
-                            <h6 class="card-title text-secondary mb-0 fw-semibold">Despesas (<?= $nome_mes ?>)</h6>
+                            <h6 class="card-title text-secondary mb-0 fw-semibold">Despesas (<?php echo $nome_mes ?>)</h6>
                             <div class="p-2 bg-danger bg-opacity-10 rounded-3">
                                 <i class="bi bi-graph-down-arrow text-danger fs-5"></i>
                             </div>
                         </div>
                         <h3 class="fw-bold text-danger mb-1">
-                            R$ <?= number_format($despesasMes, 2, ',', '.') ?>
+                            R$ <?php echo number_format($despesasMes, 2, ',', '.') ?>
                         </h3>
                     </div>
                 </div>
             </div>
         </div>
 
-        <h4 class="fw-bold text-light mb-4">Transações de <?= $nome_mes ?></h4>
+        <h4 class="fw-bold text-light mb-4">Transações de <?php echo $nome_mes ?></h4>
         <div class="card bg-dark border-secondary-subtle shadow-sm rounded-4 overflow-hidden">
-            
+
             <?php if (empty($transacoes)): ?>
                 <div class="card-body p-5 text-center">
                     <i class="bi bi-receipt text-secondary opacity-50 display-1 mb-3"></i>
-                    <h5 class="text-light fw-bold">Nenhum registro em <?= $nome_mes ?></h5>
+                    <h5 class="text-light fw-bold">Nenhum registro em <?php echo $nome_mes ?></h5>
                     <p class="text-secondary mb-0">Esta carteira não tem movimentações neste mês.</p>
                 </div>
             <?php else: ?>
@@ -465,33 +509,33 @@ require_once 'geral/header.php';
                             </tr>
                         </thead>
                         <tbody class="border-top-0">
-                            <?php foreach ($transacoes as $index => $t): 
-                                $isDespesa = ($t['TipoRegistro'] === 'despesa');
-                                $sinalValor = $isDespesa ? '-' : '+';
-                                $corValor = $isDespesa ? 'text-danger' : 'text-success';
-                                $dataFormatada = date('d/m/Y', strtotime($t['MomentoRegistro']));
-                                $iconeTipo = $isDespesa ? '<i class="bi bi-arrow-down-short fs-5 text-danger bg-danger bg-opacity-10 rounded-circle p-1 me-3"></i>' 
-                                                        : '<i class="bi bi-arrow-up-short fs-5 text-success bg-success bg-opacity-10 rounded-circle p-1 me-3"></i>';
-                                
-                                $rowId = "transacao-" . $index;
-                                $isPendente = ($t['StatusRegistro'] === 'pendente');
-                                $textoAcaoStatus = $isDespesa ? 'Marcar como Pago' : 'Marcar como Recebido';
+                            <?php foreach ($transacoes as $index => $t):
+                                    $isDespesa     = ($t['TipoRegistro'] === 'despesa');
+                                    $sinalValor    = $isDespesa ? '-' : '+';
+                                    $corValor      = $isDespesa ? 'text-danger' : 'text-success';
+                                    $dataFormatada = date('d/m/Y', strtotime($t['MomentoRegistro']));
+                                    $iconeTipo     = $isDespesa ? '<i class="bi bi-arrow-down-short fs-5 text-danger bg-danger bg-opacity-10 rounded-circle p-1 me-3"></i>'
+                                        : '<i class="bi bi-arrow-up-short fs-5 text-success bg-success bg-opacity-10 rounded-circle p-1 me-3"></i>';
+
+                                    $rowId           = "transacao-" . $index;
+                                    $isPendente      = ($t['StatusRegistro'] === 'pendente');
+                                    $textoAcaoStatus = $isDespesa ? 'Marcar como Pago' : 'Marcar como Recebido';
                             ?>
-                            <tr data-bs-toggle="collapse" data-bs-target="#<?= $rowId ?>" class="cursor-pointer transition-hover" style="cursor: pointer;">
+                            <tr data-bs-toggle="collapse" data-bs-target="#<?php echo $rowId ?>" class="cursor-pointer transition-hover" style="cursor: pointer;">
                                 <td class="ps-4 py-3 border-secondary-subtle">
                                     <div class="d-flex align-items-center">
-                                        <?= $iconeTipo ?>
-                                        <span class="text-light fw-semibold"><?= htmlspecialchars($t['Descricao']) ?></span>
+                                        <?php echo $iconeTipo ?>
+                                        <span class="text-light fw-semibold"><?php echo htmlspecialchars($t['Descricao']) ?></span>
                                     </div>
                                 </td>
                                 <td class="py-3 border-secondary-subtle text-secondary small">
                                     <div class="d-flex align-items-center">
-                                        <i class="bi <?= htmlspecialchars($t['IconeCategoria'] ?? 'bi-tag') ?> me-2 fs-6"></i>
-                                        <span><?= htmlspecialchars($t['NomeCategoria'] ?? 'Sem categoria') ?></span>
+                                        <i class="bi <?php echo htmlspecialchars($t['IconeCategoria'] ?? 'bi-tag') ?> me-2 fs-6"></i>
+                                        <span><?php echo htmlspecialchars($t['NomeCategoria'] ?? 'Sem categoria') ?></span>
                                     </div>
                                 </td>
                                 <td class="py-3 border-secondary-subtle text-secondary small">
-                                    <?= $dataFormatada ?>
+                                    <?php echo $dataFormatada ?>
                                 </td>
                                 <td class="py-3 border-secondary-subtle">
                                     <?php if ($isPendente): ?>
@@ -500,38 +544,38 @@ require_once 'geral/header.php';
                                         <span class="badge bg-secondary bg-opacity-25 text-light px-2 py-1 rounded-pill"><i class="bi bi-check2-circle me-1"></i> Efetivado</span>
                                     <?php endif; ?>
                                 </td>
-                                <td class="text-end pe-4 py-3 border-secondary-subtle fw-bold <?= $corValor ?>">
-                                    <?= $sinalValor ?> R$ <?= number_format($t['Valor'], 2, ',', '.') ?>
+                                <td class="text-end pe-4 py-3 border-secondary-subtle fw-bold <?php echo $corValor ?>">
+                                    <?php echo $sinalValor ?> R$ <?php echo number_format($t['Valor'], 2, ',', '.') ?>
                                 </td>
                             </tr>
                             <tr>
                                 <td colspan="5" class="p-0 border-0">
-                                    <div class="collapse" id="<?= $rowId ?>">
+                                    <div class="collapse" id="<?php echo $rowId ?>">
                                         <div class="p-4 bg-charcoal-analysis border-bottom border-secondary-subtle d-flex justify-content-between align-items-start">
                                             <div class="d-flex gap-4">
                                                 <?php $labelData = $isDespesa ? 'Vencimento' : 'Recebimento'; ?>
                                                     <div>
-                                                        <span class="d-block text-secondary small text-uppercase mb-1"><?= $labelData ?></span>
+                                                        <span class="d-block text-secondary small text-uppercase mb-1"><?php echo $labelData ?></span>
                                                         <span class="text-light fs-6">
-                                                            <?= (!empty($t['DataVencimento']) && strtotime($t['DataVencimento'])) ? date('d/m/Y', strtotime($t['DataVencimento'])) : '<span class="text-muted">Não definido</span>' ?>
+                                                            <?php echo(! empty($t['DataVencimento']) && strtotime($t['DataVencimento'])) ? date('d/m/Y', strtotime($t['DataVencimento'])) : '<span class="text-muted">Não definido</span>' ?>
                                                         </span>
                                                     </div>
                                                 <div>
                                                     <span class="d-block text-secondary small text-uppercase mb-1">Recorrência</span>
                                                     <span class="text-light fs-6">
-                                                        <?= $t['Recorrente'] ? 'Sim (Dia ' . htmlspecialchars($t['DiaVencimento']) . ')' : 'Não' ?>
+                                                        <?php echo $t['Recorrente'] ? 'Sim (Dia ' . htmlspecialchars($t['DiaVencimento']) . ')' : 'Não' ?>
                                                     </span>
                                                 </div>
                                             </div>
-                                            
+
                                             <div class="d-flex gap-2">
                                                 <form method="POST" action="" class="m-0">
                                                     <input type="hidden" name="action" value="toggle_status">
-                                                    <input type="hidden" name="registro_id" value="<?= $t['IDRegistro'] ?>">
+                                                    <input type="hidden" name="registro_id" value="<?php echo $t['IDRegistro'] ?>">
                                                     <?php if ($isPendente): ?>
                                                         <input type="hidden" name="novo_status" value="efetivado">
                                                         <button type="submit" class="btn btn-sm btn-outline-success rounded-pill fw-semibold px-3 d-inline-flex align-items-center gap-1">
-                                                            <i class="bi bi-check-circle"></i> <?= $textoAcaoStatus ?>
+                                                            <i class="bi bi-check-circle"></i> <?php echo $textoAcaoStatus ?>
                                                         </button>
                                                     <?php else: ?>
                                                         <input type="hidden" name="novo_status" value="pendente">
@@ -541,13 +585,13 @@ require_once 'geral/header.php';
                                                     <?php endif; ?>
                                                 </form>
 
-                                                <a href="nova_transacao.php?editar=<?= $t['IDRegistro'] ?>" class="btn btn-sm btn-outline-warning rounded-pill fw-semibold px-3 d-inline-flex align-items-center gap-1 transition-hover">
+                                                <a href="nova_transacao.php?editar=<?php echo $t['IDRegistro'] ?>" class="btn btn-sm btn-outline-warning rounded-pill fw-semibold px-3 d-inline-flex align-items-center gap-1 transition-hover">
                                                     <i class="bi bi-pencil-square"></i> Editar
                                                 </a>
-                                                
+
                                                 <form method="POST" action="" class="m-0" onsubmit="return confirm('Tem certeza que deseja excluir esta transação? A ação não pode ser desfeita.');">
                                                     <input type="hidden" name="action" value="excluir_registro">
-                                                    <input type="hidden" name="registro_id" value="<?= $t['IDRegistro'] ?>">
+                                                    <input type="hidden" name="registro_id" value="<?php echo $t['IDRegistro'] ?>">
                                                     <button type="submit" class="btn btn-sm btn-outline-danger rounded-pill fw-semibold px-3 d-inline-flex align-items-center gap-1 transition-hover">
                                                         <i class="bi bi-trash3"></i> Excluir
                                                     </button>
@@ -582,16 +626,16 @@ require_once 'geral/header.php';
                     <p class="text-secondary small mb-4">
                         Se o saldo do aplicativo estiver diferente do saldo do seu banco, informe o valor real abaixo. O Auralis criará um registro de ajuste automático para corrigir a diferença.
                     </p>
-                    
+
                     <input type="hidden" name="action" value="ajustar_saldo">
-                    <input type="hidden" name="carteira_id_ajuste" value="<?= $carteira_selecionada ?>">
-                    <input type="hidden" name="saldo_sistema_atual" value="<?= $saldoAtual ?>">
+                    <input type="hidden" name="carteira_id_ajuste" value="<?php echo $carteira_selecionada ?>">
+                    <input type="hidden" name="saldo_sistema_atual" value="<?php echo $saldoAtual ?>">
 
                     <div class="mb-3">
                         <label class="form-label text-secondary small">Qual o seu saldo exato hoje?</label>
                         <div class="input-group input-group-lg">
                             <span class="input-group-text bg-transparent border-secondary-subtle text-light fw-bold">R$</span>
-                            <input type="number" step="0.01" name="saldo_real" class="form-control bg-transparent border-secondary-subtle text-light fw-bold shadow-none no-spinners" required placeholder="0,00" value="<?= number_format($saldoAtual, 2, '.', '') ?>" autofocus>
+                            <input type="number" step="0.01" name="saldo_real" class="form-control bg-transparent border-secondary-subtle text-light fw-bold shadow-none no-spinners" required placeholder="0,00" value="<?php echo number_format($saldoAtual, 2, '.', '') ?>" autofocus>
                         </div>
                     </div>
                 </div>
@@ -609,18 +653,18 @@ require_once 'geral/header.php';
 <div class="modal fade" id="modalBoasVindas" tabindex="-1" aria-hidden="true">
     <div class="modal-dialog modal-dialog-centered modal-lg">
         <div class="modal-content modal-boas-vindas-content border-0 rounded-4 overflow-hidden position-relative">
-            
+
             <div class="position-absolute top-0 start-0 w-100 h-100" style="background: radial-gradient(circle at top right, rgba(170, 140, 44, 0.15), transparent 60%); pointer-events: none;"></div>
 
             <div class="modal-body p-5 text-center position-relative z-index-1">
-                
+
                 <div class="mb-4 d-inline-flex justify-content-center align-items-center bg-dark border border-secondary-subtle rounded-circle shadow-lg" style="width: 90px; height: 90px;">
                     <i class="bi bi-rocket-takeoff text-primary" style="color: var(--primary-gold-analysis) !important; font-size: 2.5rem;"></i>
                 </div>
 
                 <?php $primeiroNome = explode(' ', $_SESSION['usuario_nome'] ?? 'Visitante')[0]; ?>
-                <h2 class="text-light fw-bold mb-3">Bem-vindo(a) ao Auralis, <?= htmlspecialchars($primeiroNome) ?>!</h2>
-                
+                <h2 class="text-light fw-bold mb-3">Bem-vindo(a) ao Auralis, <?php echo htmlspecialchars($primeiroNome) ?>!</h2>
+
                 <p class="text-secondary fs-5 mb-5 mx-auto" style="max-width: 600px;">
                     Sua jornada para o controle financeiro absoluto começa aqui. Para que o seu painel funcione perfeitamente, precisamos dar o nosso primeiro passo juntos.
                 </p>
@@ -629,21 +673,21 @@ require_once 'geral/header.php';
                     <label class="form-label text-light fw-semibold mb-3 fs-5 d-block text-center">
                         Somando suas contas bancárias e reservas, qual o seu saldo total hoje?
                     </label>
-                    
+
                     <form method="POST" action="">
                         <input type="hidden" name="action" value="ajustar_saldo">
-                        <input type="hidden" name="carteira_id_ajuste" value="<?= $carteira_selecionada ?>">
+                        <input type="hidden" name="carteira_id_ajuste" value="<?php echo $carteira_selecionada ?>">
                         <input type="hidden" name="saldo_sistema_atual" value="0">
-                        
+
                         <div class="input-group input-group-lg mb-4 shadow-sm">
                             <span class="input-group-text bg-body-tertiary border-secondary-subtle text-primary fw-bold border-end-0 fs-4" style="color: var(--primary-gold-analysis) !important;">R$</span>
                             <input type="number" step="0.01" name="saldo_real" class="form-control bg-body-tertiary border-secondary-subtle border-start-0 text-light fw-bold shadow-none no-spinners fs-3 py-3" required placeholder="0,00" autofocus>
                         </div>
-                        
+
                         <button type="submit" class="btn btn-gold btn-lg w-100 fw-bold text-dark rounded-pill py-3 shadow-lg transition-hover">
                             Iniciar Minha Jornada
                         </button>
-                        
+
                         <div class="text-center mt-3">
                             <button type="button" class="btn btn-link text-secondary text-decoration-none small" data-bs-dismiss="modal">
                                 Pular por enquanto, configuro depois.
@@ -661,7 +705,7 @@ require_once 'geral/header.php';
     .bg-charcoal-analysis { background-color: #1a1d21; }
     .auralis-table > tbody > tr.cursor-pointer:hover > td { background-color: rgba(255, 255, 255, 0.03) !important; }
     .table-active { background-color: #1a1d21 !important; }
-    
+
     .no-spinners::-webkit-outer-spin-button,
     .no-spinners::-webkit-inner-spin-button { -webkit-appearance: none; margin: 0; }
     .no-spinners { -moz-appearance: textfield; }
@@ -703,11 +747,69 @@ require_once 'geral/header.php';
     document.addEventListener("DOMContentLoaded", function() {
         var modalBoasVindas = new bootstrap.Modal(document.getElementById('modalBoasVindas'), {
             backdrop: 'static', // Impede de fechar clicando fora sem querer
-            keyboard: false 
+            keyboard: false
         });
         modalBoasVindas.show();
     });
     <?php endif; ?>
+</script>
+<div class="modal fade" id="modalSeletorMes" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered modal-sm">
+        <div class="modal-content bg-dark border-secondary-subtle shadow-lg rounded-4">
+            <div class="modal-header border-bottom border-secondary-subtle p-3">
+                <h6 class="modal-title text-light fw-bold">
+                    <i class="bi bi-calendar3 me-2" style="color: var(--primary-gold-analysis);"></i> Selecionar Período
+                </h6>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body p-4 text-center">
+                
+                <div class="d-flex justify-content-center align-items-center mb-4 bg-charcoal-analysis rounded-pill p-1 border border-secondary-subtle">
+                    <button type="button" class="btn btn-sm btn-link text-secondary shadow-none" onclick="mudarAnoModal(-1)">
+                        <i class="bi bi-chevron-left fs-5"></i>
+                    </button>
+                    
+                    <input type="number" id="anoModalInput" class="form-control bg-transparent border-0 text-light fw-bold text-center fs-4 mx-2 no-spinners shadow-none" style="width: 90px;" value="<?= $ano_atual ?>" readonly>
+                    
+                    <button type="button" class="btn btn-sm btn-link text-secondary shadow-none" onclick="mudarAnoModal(1)">
+                        <i class="bi bi-chevron-right fs-5"></i>
+                    </button>
+                </div>
+                
+                <div class="row g-2">
+                    <?php 
+                    $mesesAbrev = [1=>'Jan', 2=>'Fev', 3=>'Mar', 4=>'Abr', 5=>'Mai', 6=>'Jun', 7=>'Jul', 8=>'Ago', 9=>'Set', 10=>'Out', 11=>'Nov', 12=>'Dez'];
+                    foreach($mesesAbrev as $num => $nome): 
+                        $isAtual = ($num == $mes_atual) ? 'btn-gold text-dark' : 'btn-outline-secondary text-light';
+                    ?>
+                        <div class="col-4">
+                            <button type="button" class="btn w-100 <?= $isAtual ?> fw-semibold py-2 transition-hover" onclick="irParaMes(<?= $num ?>)">
+                                <?= $nome ?>
+                            </button>
+                        </div>
+                    <?php endforeach; ?>
+                </div>
+
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+    function mudarAnoModal(delta) {
+        const inputAno = document.getElementById('anoModalInput');
+        inputAno.value = parseInt(inputAno.value) + delta;
+    }
+
+    function irParaMes(mes) {
+        const ano = document.getElementById('anoModalInput').value;
+        const urlParams = new URLSearchParams(window.location.search);
+        
+        urlParams.set('mes', mes);
+        urlParams.set('ano', ano);
+        
+        window.location.search = urlParams.toString();
+    }
 </script>
 
 <?php require_once 'geral/footer.php'; ?>
