@@ -1,7 +1,8 @@
 <?php
-if (session_status() === PHP_SESSION_NONE) {
+    if (session_status() === PHP_SESSION_NONE) {
     session_start();
-}
+    }
+    $paginaAtual = basename($_SERVER['PHP_SELF']);
 ?>
 <!DOCTYPE html>
 <html lang="pt-BR" data-bs-theme="dark">
@@ -18,7 +19,7 @@ if (session_status() === PHP_SESSION_NONE) {
     <link href="/Auralis/geral/css/bootstrap.min.css" rel="stylesheet">
 
     <link href="/Auralis/geral/css/bootstrap-icons.css" rel="stylesheet">
-    
+
     <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.css" rel="stylesheet">
 
     <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.css" rel="stylesheet">
@@ -47,14 +48,34 @@ if (session_status() === PHP_SESSION_NONE) {
             <div class="collapse navbar-collapse" id="navbarNav">
 
                 <ul class="navbar-nav mx-auto mb-2 mb-lg-0 fw-medium gap-2 mt-3 mt-lg-0 text-center">
-                    
+
                     <?php if (isset($_SESSION['usuario_id'])): ?>
+
                         <li class="nav-item">
-                            <a class="nav-link custom-link px-3" href="/Auralis/dashboard.php">Dashboard</a>
+                            <a class="nav-link custom-link px-3 <?php if ($paginaAtual == 'dashboard.php') {
+                                                                        echo 'text-warning active';
+                                                                }
+                                                                ?>" href="/Auralis/dashboard.php">Dashboard</a>
                         </li>
                         <li class="nav-item">
-                            <a class="nav-link custom-link px-3" href="/Auralis/gerenciar_categorias.php">Categorias</a>
+                            <a class="nav-link custom-link px-3 <?php if ($paginaAtual == 'gerenciar_categorias.php') {
+                                                                        echo 'text-warning active';
+                                                                }
+                                                                ?>" href="/Auralis/gerenciar_categorias.php">Categorias</a>
                         </li>
+                        <li class="nav-item">
+                            <a class="nav-link custom-link px-3 <?php if ($paginaAtual == 'analises.php') {
+                                                                        echo 'text-warning active';
+                                                                }
+                                                                ?>" href="/Auralis/analises.php">Análises</a>
+                        </li>
+                          <li class="nav-item">
+                            <a class="nav-link custom-link px-3 <?php if ($paginaAtual == 'listar_carteiras.php') {
+                                                                        echo 'text-warning active';
+                                                                }
+                                                                ?>" href="/Auralis/carteira/listar_carteiras.php">Carteiras</a>
+                        </li>
+
                     <?php else: ?>
                         <li class="nav-item">
                             <a class="nav-link custom-link px-3" href="/Auralis/geral/index.php">Início</a>
@@ -70,14 +91,14 @@ if (session_status() === PHP_SESSION_NONE) {
 
                     <?php if (isset($_SESSION['usuario_id'])): ?>
                         <?php
-                        $primeiroNome = explode(' ', $_SESSION['usuario_nome'])[0];
+                            $primeiroNome = explode(' ', $_SESSION['usuario_nome'])[0];
                         ?>
                         <div class="dropdown w-100 text-center text-lg-start">
                             <a href="#"
                                 class="d-flex align-items-center justify-content-center justify-content-lg-start text-light text-decoration-none dropdown-toggle custom-link py-2"
                                 id="menuUsuario" data-bs-toggle="dropdown" aria-expanded="false">
                                 <span class="me-2 d-none d-md-inline text-muted">Olá,
-                                    <strong class="text-light"><?= htmlspecialchars($primeiroNome); ?></strong>
+                                    <strong class="text-light"><?php echo htmlspecialchars($primeiroNome); ?></strong>
                                 </span>
                                 <i style="color: gold !important;" class="bi bi-person-circle fs-4 cardCentral"></i>
                             </a>

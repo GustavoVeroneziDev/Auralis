@@ -143,3 +143,40 @@ html {
 .navbar-brand i {
     filter: drop-shadow(0 0 5px rgba(212, 175, 55, 0.4));
 }
+/* Animação suave para o menu Dropdown do usuário */
+.dropdown-menu {
+    animation: slideDropdown 0.3s cubic-bezier(0.25, 0.8, 0.25, 1) forwards;
+    transform-origin: top center;
+}
+
+@keyframes slideDropdown {
+    0% {
+        opacity: 0;
+        transform: translateY(-10px) scale(0.95);
+    }
+    100% {
+        opacity: 1;
+        transform: translateY(0) scale(1);
+    }
+}
+/* Efeito de sublinhado animado nos links da Navbar */
+.navbar-nav .custom-link {
+    position: relative;
+}
+
+.navbar-nav .custom-link::after {
+    content: '';
+    position: absolute;
+    width: 0;
+    height: 2px;
+    bottom: 0;
+    left: 50%;
+    background-color: gold; /* ou var(--primary-gold-analysis) */
+    transition: all 0.3s ease-in-out;
+    transform: translateX(-50%);
+}
+
+.navbar-nav .custom-link:hover::after,
+.navbar-nav .custom-link.active::after {
+    width: 80%; /* O traço vai crescer até 80% do tamanho da palavra */
+}
