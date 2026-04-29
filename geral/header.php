@@ -55,25 +55,25 @@
                             <a class="nav-link custom-link px-3 <?php if ($paginaAtual == 'dashboard.php') {
                                                                         echo 'text-warning active';
                                                                 }
-                                                                ?>" href="/Auralis/dashboard.php">Dashboard</a>
+                                                                ?>" href="/Auralis/dashboard.php"> <i class="bi bi-speedometer2 me-2"></i>  Dashboard</a>
                         </li>
                         <li class="nav-item">
                             <a class="nav-link custom-link px-3 <?php if ($paginaAtual == 'gerenciar_categorias.php') {
                                                                         echo 'text-warning active';
                                                                 }
-                                                                ?>" href="/Auralis/gerenciar_categorias.php">Categorias</a>
+                                                                ?>" href="/Auralis/gerenciar_categorias.php"> <i class="bi bi-list-task me-2"></i> Categorias</a>
                         </li>
                         <li class="nav-item">
                             <a class="nav-link custom-link px-3 <?php if ($paginaAtual == 'analises.php') {
                                                                         echo 'text-warning active';
                                                                 }
-                                                                ?>" href="/Auralis/analises.php">Análises</a>
+                                                                ?>" href="/Auralis/analises.php"> <i class="bi bi-graph-up-arrow me-2"></i> Análises</a>
                         </li>
                           <li class="nav-item">
                             <a class="nav-link custom-link px-3 <?php if ($paginaAtual == 'listar_carteiras.php') {
                                                                         echo 'text-warning active';
                                                                 }
-                                                                ?>" href="/Auralis/carteira/listar_carteiras.php">Carteiras</a>
+                                                                ?>" href="/Auralis/carteira/listar_carteiras.php"> <i class="bi bi-wallet me-2"></i> Carteiras</a>
                         </li>
 
                     <?php else: ?>
@@ -105,16 +105,6 @@
 
                             <ul class="dropdown-menu dropdown-menu-end shadow-lg border border-secondary-subtle mt-2 bg-dark"
                                 aria-labelledby="menuUsuario">
-                                <li>
-                                    <a class="dropdown-item text-light d-flex align-items-center py-2 transition-hover" href="/Auralis/analises.php">
-                                        <i class="bi bi-speedometer2 me-2" style="color: gold;"></i> Análises
-                                    </a>
-                                </li>
-                                <li>
-                                    <a class="dropdown-item text-light d-flex align-items-center py-2 transition-hover" href="/Auralis/carteira/listar_carteiras.php">
-                                        <i class="bi bi-wallet2 me-2" style="color: gold;"></i> Minhas Carteiras
-                                    </a>
-                                </li>
                                 <li>
                                     <a class="dropdown-item text-light d-flex align-items-center py-2 transition-hover" href="/Auralis/configuracoes.php">
                                         <i class="bi bi-gear me-2" style="color: gold;"></i> Configurações

@@ -4,11 +4,15 @@
     <div class="col-md-6 text-center text-md-start mb-3 mb-md-0">
         <p class="text-light opacity-50 mb-0 small">
             &copy;
-            <?= date('Y'); ?> Auralis. Todos os direitos reservados.
+            <?php echo date('Y'); ?> Auralis. Todos os direitos reservados.
+        </p>
+        <p class="text-light opacity-50 mb-0 small mt-1">
+             Versão - 0.8.0
         </p>
         <p class="text-light opacity-50 mb-0 small mt-1">
             Desenvolvido por <strong class="text-primary">Gustavo Veronezi</strong>.
         </p>
+
     </div>
     <div class="col-md-6 text-center text-md-end">
         <a href="#" class="text-light opacity-50 text-decoration-none me-3 small custom-link">Termos de Uso</a>
