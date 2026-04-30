@@ -7,6 +7,6 @@ $_SESSION = array();
 session_destroy();
 
 // Redireciona o usuário de volta para a página inicial (vitrine)
-header("Location: /Auralis/geral/index.php");
+header("Location: /auralis/geral/index.php");
 exit;
 ?>

@@ -159,7 +159,7 @@
         <h2 class="fw-bold mb-3 text-light">Pronto para assumir o controle?</h2>
         <p class="text-light opacity-75 mb-4">Junte-se ao Auralis e transforme a maneira como sua família lida com o
             dinheiro.</p>
-        <a href="/Auralis/usuario/cadastro.php"
+        <a href="/auralis/usuario/cadastro.php"
             class="btn btn-primary btn-lg px-5 rounded-pill fw-bold shadow-sm cardCentral">
             Criar Minha Conta Grátis
         </a>
