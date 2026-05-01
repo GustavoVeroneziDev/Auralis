@@ -1,8 +1,9 @@
 <?php
 
-    //Documentação do Dashboard - Auralis (utilizando IA para comentar e organizar o código para visibilidade e manutenção)
-
-    // 1. Inicia a sessão e verifica a segurança
+// MODO DEBUG: LIGA A LANTERNA PARA VER O ERRO REAL
+ini_set('display_errors', 1);
+ini_set('display_startup_errors', 1);
+error_reporting(E_ALL);
     session_start();
 
     if (!isset($_SESSION['usuario_id'])) {
