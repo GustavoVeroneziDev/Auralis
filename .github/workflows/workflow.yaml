@@ -2,7 +2,7 @@ name: Deploy Auralis HostGator
 
 on:
   push:
-    branches: [ main ] # Só faz o deploy quando você jogar código na branch main
+    branches: [ main ] 
 
 jobs:
   web-deploy:
