@@ -12,18 +12,16 @@ function obterNivelAcesso() {
         return 0; 
     }
     
-    // 2. Verifica se o usuário logado é o Criador do Sistema (Nível 3)
-    // Usando o nome exato do seu cadastro para blindar o acesso supremo
-    $nome_usuario = $_SESSION['usuario_nome'] ?? '';
-    if (strtolower($nome_usuario) === 'gustavo veronezi de carvalho') {
-        return 3; 
-    }
     
     // 3. Lê o nível salvo no banco/sessão para os meros mortais
     $nivel_banco = strtolower($_SESSION['nivel_acesso'] ?? 'titular');
     
     if ($nivel_banco === 'admin') {
         return 2; // Administrador (Nível 2)
+    }
+    
+    if ($nivel_banco === 'supremo') {
+        return 3; // Supremo (Nível 3)
     }
     
     // 4. Se passou por tudo e está logado, é um usuário comum (Nível 1)
