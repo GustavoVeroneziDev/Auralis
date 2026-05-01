@@ -750,9 +750,9 @@ error_reporting(E_ALL);
                 </div>
 
                 <h2 class="text-light fw-bold mb-3">Tudo pronto, <?php echo htmlspecialchars($primeiroNome) ?>!</h2>
-                <p class="text-secondary fs-5 mb-5 mx-auto" style="max-width: 600px;">
-                    Sua carteira <strong>"<?php echo htmlspecialchars($nome_carteira_atual ?? ''); ?>"</strong> foi criada. Para que seus gráficos funcionem perfeitamente, precisamos do seu ponto de partida.
-                </p>
+<p class="text-secondary fs-5 mb-5 mx-auto" style="max-width: 650px;">
+    Sua carteira <strong>"<?php echo htmlspecialchars($nome_carteira_atual ?? ''); ?>"</strong> está pronta! Para que o Auralis calcule tudo com precisão desde o primeiro dia, precisamos conhecer a sua realidade hoje. <strong>Some todo o dinheiro que você tem agora</strong> (seja no saldo do banco, na gaveta ou na carteira física) e insira o valor total abaixo. Esse será o nosso ponto de partida.
+</p>
 
                 <div class="bg-dark border border-secondary-subtle rounded-4 p-4 text-start mx-auto shadow-sm" style="max-width: 500px;">
                     <label class="form-label text-light fw-semibold mb-3 fs-5 d-block text-center">

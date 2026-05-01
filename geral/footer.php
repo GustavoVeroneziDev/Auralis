@@ -7,7 +7,7 @@
             <?php echo date('Y'); ?> Auralis. Todos os direitos reservados.
         </p>
         <p class="text-light opacity-50 mb-0 small mt-1">
-             Versão - 0.8.0
+             Versão - 0.9.1
         </p>
         <p class="text-light opacity-50 mb-0 small mt-1">
             Desenvolvido por <strong class="text-primary">Gustavo Veronezi</strong>.
