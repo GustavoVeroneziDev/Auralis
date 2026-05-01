@@ -1,10 +1,13 @@
 <?php
-// 1. Puxa a conexão com o banco
 require_once '../config/conexao.php';
+
+// Função rápida para o PHP gerar UUIDs no padrão correto (Já que o MySQL não vai mais gerar sozinho)
+function gerarUuid() {
+    return sprintf('%04x%04x-%04x-%04x-%04x-%04x%04x%04x', mt_rand(0, 0xffff), mt_rand(0, 0xffff), mt_rand(0, 0xffff), mt_rand(0, 0x0fff) | 0x4000, mt_rand(0, 0x3fff) | 0x8000, mt_rand(0, 0xffff), mt_rand(0, 0xffff), mt_rand(0, 0xffff));
+}
 
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     try {
-        // 2. Receber e limpar os dados
         $nome           = trim($_POST['nome']);
         $documento      = trim($_POST['documento']);
         $nascimento     = trim($_POST['nascimento']);
@@ -20,16 +23,20 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $tipoPessoa = (strlen($documento) > 14) ? 'PJ' : 'PF';
         $senhaHash = password_hash($senha, PASSWORD_DEFAULT);
         $nivelAcesso = 'Titular';
+        
+        // CORREÇÃO 2: Geramos o ID no PHP antes de salvar
+        $id_novo_usuario = gerarUuid();
 
-        // 3. Inserção do Usuário com RETURNING para pegar o ID gerado na hora
-        $sql = "INSERT INTO \"Usuario\" (
-                    \"Nome\", \"Documento\", \"DataNascimento\", \"Telefone\", \"Email\", \"Senha\", \"TipoPessoa\", \"NivelAcesso\"
+        // CORREÇÃO 3: Limpeza das aspas, injeção do campo IDUsuario e remoção do RETURNING
+        $sql = "INSERT INTO Usuario (
+                    IDUsuario, Nome, Documento, DataNascimento, Telefone, Email, Senha, TipoPessoa, NivelAcesso
                 ) VALUES (
-                    :nome, :documento, :nascimento, :telefone, :email, :senha, :tipoPessoa, :nivelAcesso
-                ) RETURNING \"IDUsuario\"";
+                    :id_usuario, :nome, :documento, :nascimento, :telefone, :email, :senha, :tipoPessoa, :nivelAcesso
+                )";
 
         $stmt = $pdo->prepare($sql);
         $stmt->execute([
+            ':id_usuario'   => $id_novo_usuario, // Passando o ID gerado pelo PHP
             ':nome'         => $nome,
             ':documento'    => $documento,
             ':nascimento'   => $nascimento,
@@ -40,13 +47,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             ':nivelAcesso'  => $nivelAcesso
         ]);
 
-        // 4. Recupera o ID gerado pelo banco
-        $id_novo_usuario = $stmt->fetchColumn();
-
         if ($id_novo_usuario) {
-            // ==============================================================================
-            // LÓGICA DE NEGÓCIO: INJEÇÃO DO KIT INICIAL DE CATEGORIAS
-            // ==============================================================================
             $kitInicial = [
                 ['nome' => 'Alimentação', 'tipo' => 'despesa', 'icone' => 'bi-cart3'],
                 ['nome' => 'Moradia',     'tipo' => 'despesa', 'icone' => 'bi-house-door'],
@@ -58,19 +59,20 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 ['nome' => 'Outros',      'tipo' => 'receita', 'icone' => 'bi-plus-circle-dotted']
             ];
 
-            $sqlCat = "INSERT INTO \"Categoria\" (\"NomeCategoria\", \"TipoCategoria\", \"IconeCategoria\", \"FKUsuario\") 
-                       VALUES (:nome, :tipo, :icone, :uid)";
+            // CORREÇÃO 4: Adicionado IDCategoria (As categorias também precisam de UUID!)
+            $sqlCat = "INSERT INTO Categoria (IDCategoria, NomeCategoria, TipoCategoria, IconeCategoria, FKUsuario) 
+                       VALUES (:id_categoria, :nome, :tipo, :icone, :uid)";
             $stmtCat = $pdo->prepare($sqlCat);
 
             foreach ($kitInicial as $cat) {
                 $stmtCat->execute([
+                    ':id_categoria' => gerarUuid(), // Cada categoria ganha seu próprio ID
                     ':nome'  => $cat['nome'],
                     ':tipo'  => $cat['tipo'],
                     ':icone' => $cat['icone'],
-                    ':uid'   => $id_novo_usuario
+                    ':uid'   => $id_novo_usuario // Vinculado ao ID que geramos lá em cima
                 ]);
             }
-            // ==============================================================================
         }
 
         header("Location: login.php?cadastro=sucesso");
@@ -83,3 +85,4 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     header("Location: cadastro.php");
     exit;
 }
+?>
