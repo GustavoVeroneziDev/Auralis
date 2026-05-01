@@ -20,7 +20,7 @@ $transacao_edit = null;
 
 if ($id_editar) {
     // Busca os dados da transação específica para preencher o formulário
-    $sqlEdit = 'SELECT * FROM "Registro" WHERE "IDRegistro" = :id AND "FKUsuario" = :uid';
+    $sqlEdit = 'SELECT * FROM Registro WHERE "IDRegistro" = :id AND "FKUsuario" = :uid';
     $stmtEdit = $pdo->prepare($sqlEdit);
     $stmtEdit->execute([':id' => $id_editar, ':uid' => $usuario_id]);
     $transacao_edit = $stmtEdit->fetch();
@@ -39,7 +39,7 @@ try {
     // Busca carteiras
     $sqlCarteiras = '
         SELECT DISTINCT c."IDCarteira", c."TipoCarteira"
-        FROM "Carteira" c
+        FROM Carteira c
         LEFT JOIN "MembroCarteira" mc ON mc."FKCarteira" = c."IDCarteira" AND mc."FKUsuario" = :uid_membro AND mc."StatusConvite" = true
         WHERE c."FKUsuarioDono" = :uid_dono OR mc."FKCarteira" IS NOT NULL
         ORDER BY c."TipoCarteira" ASC
@@ -51,7 +51,7 @@ try {
     // Busca APENAS as categorias do tipo sugerido
     $sqlCategorias = '
         SELECT "IDCategoria", "NomeCategoria" 
-        FROM "Categoria" 
+        FROM Categoria 
         WHERE "FKUsuario" = :uid AND "TipoCategoria" = :tipo 
         ORDER BY "NomeCategoria" ASC
     ';
@@ -96,7 +96,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             if (isset($_POST['id_editar']) && !empty($_POST['id_editar'])) {
                 // É UMA ATUALIZAÇÃO (UPDATE)
                 $sql = '
-                    UPDATE "Registro" SET 
+                    UPDATE Registro SET 
                         "TipoRegistro" = :tipo, "Valor" = :valor, "Descricao" = :descricao,
                         "MomentoRegistro" = :momento, "DataVencimento" = :vencimento,
                         "StatusRegistro" = :status, "Recorrente" = :recorrente, "DiaVencimento" = :dia,
@@ -115,7 +115,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             } else {
                 // É UMA CRIAÇÃO (INSERT)
                 $sql = '
-                    INSERT INTO "Registro" (
+                    INSERT INTO Registro (
                         "TipoRegistro", "Valor", "Descricao", "MomentoRegistro", "DataVencimento",
                         "StatusRegistro", "Recorrente", "DiaVencimento", "FKCarteira", "FKUsuario", "FKCategoria", "FKSubCategoria"
                     ) VALUES (

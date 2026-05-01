@@ -17,7 +17,7 @@
     $carteiras  = [];
 
     try {
-    $sql  = 'SELECT "IDCarteira", "TipoCarteira" FROM "Carteira" WHERE "FKUsuarioDono" = :usuario_id ORDER BY "TipoCarteira" ASC';
+    $sql  = 'SELECT "IDCarteira", "TipoCarteira" FROM Carteira WHERE "FKUsuarioDono" = :usuario_id ORDER BY "TipoCarteira" ASC';
     $stmt = $pdo->prepare($sql);
     $stmt->execute([':usuario_id' => $usuario_id]);
     $carteiras = $stmt->fetchAll();
@@ -43,13 +43,13 @@
         // 2. Busca contas recorrentes do mês passado (para evitar gaps)
         $mesAnterior = date('Y-m', strtotime('-1 month'));
 
-        $sqlRec  = 'SELECT * FROM "Registro" WHERE "FKUsuario" = :uid AND "Recorrente" = true AND TO_CHAR("MomentoRegistro", \'YYYY-MM\') = :mes_ant';
+        $sqlRec  = 'SELECT * FROM Registro WHERE "FKUsuario" = :uid AND "Recorrente" = true AND TO_CHAR("MomentoRegistro", \'YYYY-MM\') = :mes_ant';
         $stmtRec = $pdo->prepare($sqlRec);
         $stmtRec->execute([':uid' => $usuario_id, ':mes_ant' => $mesAnterior]);
         $contas = $stmtRec->fetchAll();
 
         if (! empty($contas)) {
-            $sqlInsert = 'INSERT INTO "Registro" ("TipoRegistro", "Valor", "Descricao", "MomentoRegistro", "DataVencimento", "StatusRegistro", "Recorrente", "DiaVencimento", "FKCarteira", "FKUsuario", "FKCategoria")
+            $sqlInsert = 'INSERT INTO Registro ("TipoRegistro", "Valor", "Descricao", "MomentoRegistro", "DataVencimento", "StatusRegistro", "Recorrente", "DiaVencimento", "FKCarteira", "FKUsuario", "FKCategoria")
                           VALUES (:tipo, :valor, :desc, :momento, :venc, \'pendente\', true, :dia, :cart, :uid, :cat)';
             $stmtInsert = $pdo->prepare($sqlInsert);
 
@@ -87,7 +87,7 @@
     // --- VERIFICA SE É O PRIMEIRO ACESSO (Zero Transações) ---
     $is_primeiro_acesso = false;
     try {
-    $sqlTotalTrans = 'SELECT COUNT(*) FROM "Registro" WHERE "FKUsuario" = :uid';
+    $sqlTotalTrans = 'SELECT COUNT(*) FROM Registro WHERE "FKUsuario" = :uid';
     $stmtTotal     = $pdo->prepare($sqlTotalTrans);
     $stmtTotal->execute([':uid' => $usuario_id]);
     if ($stmtTotal->fetchColumn() == 0) {
@@ -124,7 +124,7 @@
         $novo_status = $_POST['novo_status'];
         if (in_array($novo_status, ['pendente', 'efetivado'])) {
             try {
-                $sqlToggle  = 'UPDATE "Registro" SET "StatusRegistro" = :status WHERE "IDRegistro" = :id AND "FKUsuario" = :uid';
+                $sqlToggle  = 'UPDATE Registro SET "StatusRegistro" = :status WHERE "IDRegistro" = :id AND "FKUsuario" = :uid';
                 $stmtToggle = $pdo->prepare($sqlToggle);
                 $stmtToggle->execute([':status' => $novo_status, ':id' => $id_registro, ':uid' => $usuario_id]);
                 header("Location: " . $redirectBase);
@@ -137,7 +137,7 @@
     if ($_POST['action'] === 'excluir_registro') {
         $id_registro = $_POST['registro_id'];
         try {
-            $sqlDel  = 'DELETE FROM "Registro" WHERE "IDRegistro" = :id AND "FKUsuario" = :uid';
+            $sqlDel  = 'DELETE FROM Registro WHERE "IDRegistro" = :id AND "FKUsuario" = :uid';
             $stmtDel = $pdo->prepare($sqlDel);
             $stmtDel->execute([':id' => $id_registro, ':uid' => $usuario_id]);
             header("Location: " . $redirectBase . "&sucesso=excluido");
@@ -160,14 +160,14 @@
 
             try {
                 // Procura categoria de Ajuste
-                $sqlCat  = 'SELECT "IDCategoria" FROM "Categoria" WHERE "FKUsuario" = :uid AND "NomeCategoria" = \'Ajuste de Saldo\' AND "TipoCategoria" = :tipo LIMIT 1';
+                $sqlCat  = 'SELECT "IDCategoria" FROM Categoria WHERE "FKUsuario" = :uid AND "NomeCategoria" = \'Ajuste de Saldo\' AND "TipoCategoria" = :tipo LIMIT 1';
                 $stmtCat = $pdo->prepare($sqlCat);
                 $stmtCat->execute([':uid' => $usuario_id, ':tipo' => $tipoRegistro]);
                 $catId = $stmtCat->fetchColumn();
 
                 // Cria categoria de Ajuste com engrenagem se não existir
                 if (! $catId) {
-                    $sqlNovaCat  = 'INSERT INTO "Categoria" ("NomeCategoria", "TipoCategoria", "IconeCategoria", "FKUsuario") VALUES (\'Ajuste de Saldo\', :tipo, \'bi-gear-fill\', :uid)';
+                    $sqlNovaCat  = 'INSERT INTO Categoria ("NomeCategoria", "TipoCategoria", "IconeCategoria", "FKUsuario") VALUES (\'Ajuste de Saldo\', :tipo, \'bi-gear-fill\', :uid)';
                     $stmtNovaCat = $pdo->prepare($sqlNovaCat);
                     $stmtNovaCat->execute([':tipo' => $tipoRegistro, ':uid' => $usuario_id]);
 
@@ -176,7 +176,7 @@
                 }
 
                 $sqlAjuste = '
-                    INSERT INTO "Registro" (
+                    INSERT INTO Registro (
                         "TipoRegistro", "Valor", "Descricao", "MomentoRegistro",
                         "StatusRegistro", "FKCarteira", "FKUsuario", "FKCategoria"
                     ) VALUES (
@@ -210,7 +210,7 @@
     $carteira_selecionada = ($totalCarteiras > 0) ? $carteiras[0]['IDCarteira'] : null;
     }
 
-    $nome_carteira_atual = "Carteira";
+    $nome_carteira_atual = Carteira;
     foreach ($carteiras as $cart) {
     if ($cart['IDCarteira'] == $carteira_selecionada) {
         $nome_carteira_atual = $cart['TipoCarteira'];
@@ -233,7 +233,7 @@
             SELECT
                 COALESCE(SUM(CASE WHEN "TipoRegistro" = \'receita\' THEN "Valor" ELSE 0 END), 0) as total_rec_hist,
                 COALESCE(SUM(CASE WHEN "TipoRegistro" = \'despesa\' THEN "Valor" ELSE 0 END), 0) as total_des_hist
-            FROM "Registro"
+            FROM Registro
             WHERE "FKCarteira" = :carteira_id
               AND "FKUsuario" = :usuario_id
               AND "StatusRegistro" = \'efetivado\'
@@ -250,7 +250,7 @@
             SELECT
                 COALESCE(SUM(CASE WHEN "TipoRegistro" = \'receita\' THEN "Valor" ELSE 0 END), 0) as total_receitas,
                 COALESCE(SUM(CASE WHEN "TipoRegistro" = \'despesa\' THEN "Valor" ELSE 0 END), 0) as total_despesas
-            FROM "Registro"
+            FROM Registro
             WHERE "FKCarteira" = :carteira_id
               AND "FKUsuario" = :usuario_id
               AND "StatusRegistro" = \'efetivado\'
@@ -276,8 +276,8 @@
                 r."IDRegistro", r."MomentoRegistro", r."Valor", r."Descricao", r."TipoRegistro", r."StatusRegistro",
                 r."DataVencimento", r."Recorrente", r."DiaVencimento",
                 c."NomeCategoria", c."IconeCategoria"
-            FROM "Registro" r
-            LEFT JOIN "Categoria" c ON r."FKCategoria" = c."IDCategoria"
+            FROM Registro r
+            LEFT JOIN Categoria c ON r."FKCategoria" = c."IDCategoria"
             WHERE r."FKCarteira" = :carteira_id
               AND r."FKUsuario" = :usuario_id
               AND EXTRACT(MONTH FROM r."MomentoRegistro") = :mes

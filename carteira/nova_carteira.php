@@ -17,7 +17,7 @@ $is_edit = false;
 if ($id_carteira) {
     try {
         // Busca a carteira, garantindo que ela pertence a este usuário
-        $sql = 'SELECT "TipoCarteira" FROM "Carteira" WHERE "IDCarteira" = :id AND "FKUsuarioDono" = :uid LIMIT 1';
+        $sql = 'SELECT "TipoCarteira" FROM Carteira WHERE "IDCarteira" = :id AND "FKUsuarioDono" = :uid LIMIT 1';
         $stmt = $pdo->prepare($sql);
         $stmt->execute([':id' => $id_carteira, ':uid' => $usuario_id]);
         $resultado = $stmt->fetch();

@@ -31,7 +31,7 @@ if (isset($_COOKIE['auralis_remember'])) {
             
             try {
                 // Busca o usuário no banco para ter certeza que a conta ainda existe
-                $sql = 'SELECT "Nome", "NivelAcesso" FROM "Usuario" WHERE "IDUsuario" = :id LIMIT 1';
+                $sql = 'SELECT "Nome", "NivelAcesso" FROM usuario WHERE "IDUsuario" = :id LIMIT 1';
                 $stmt = $pdo->prepare($sql);
                 $stmt->execute([':id' => $usuario_id]);
                 $usuario = $stmt->fetch();

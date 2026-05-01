@@ -74,13 +74,13 @@ require_once '../geral/header.php';
                         </div>
 
                         <div class="col-md-6 mb-4">
-                            <label for="email" class="form-label text-light opacity-75 fw-semibold">E-mail</label>
+                            <label for=email class="form-label text-light opacity-75 fw-semibold">E-mail</label>
                             <div class="input-group">
                                 <span class="input-group-text bg-dark border-secondary text-secondary"><i
                                         class="bi bi-envelope-fill"></i></span>
-                                <input type="email"
-                                    class="form-control form-control-lg bg-dark border-secondary text-light" id="email"
-                                    name="email" required placeholder="seu@email.com">
+                                <input type=email
+                                    class="form-control form-control-lg bg-dark border-secondary text-light" id=email
+                                    name=email required placeholder="seu@email.com">
                             </div>
                         </div>
                     </div>
