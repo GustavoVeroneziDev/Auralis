@@ -17,6 +17,28 @@ require_once '../geral/header.php';
                     <p class="text-light opacity-75 fs-5">Seja bem-vindo ao futuro do seu controle financeiro.</p>
                 </div>
 
+                <?php if (isset($_GET['erro'])): ?>
+    <?php 
+        $mensagemErro = "Ocorreu um erro ao processar seu cadastro."; // Mensagem padrão
+        
+        if ($_GET['erro'] === 'email_existe') {
+            $mensagemErro = "Este e-mail já está cadastrado. Tente fazer login ou recupere sua senha.";
+        } elseif ($_GET['erro'] === 'doc_existe') {
+            $mensagemErro = "Este CPF/CNPJ já possui uma conta no Auralis.";
+        } elseif ($_GET['erro'] === 'tel_existe') {
+            $mensagemErro = "Este número de telefone ou WhatsApp já está vinculado a outra conta.";
+        } elseif ($_GET['erro'] === 'senhas_diferentes') {
+            $mensagemErro = "As senhas digitadas não conferem. Digite novamente com atenção.";
+        } elseif ($_GET['erro'] === 'banco') {
+            $mensagemErro = "Ops! Nossos servidores estão um pouco lentos agora. Tente novamente em instantes.";
+        }
+    ?>
+    <div class="alert alert-danger d-flex align-items-center gap-2 rounded-3 shadow-sm border-0 mb-4">
+        <i class="bi bi-exclamation-triangle-fill"></i>
+        <span><?php echo $mensagemErro; ?></span>
+    </div>
+<?php endif; ?>
+
                 <form action="processa_cadastro.php" method="POST" id="formCadastro">
 
                     <div class="mb-4">
