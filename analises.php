@@ -4,8 +4,8 @@
     // ==============================================================================
     session_start();
     if (! isset($_SESSION['usuario_id'])) {
-    header("Location: usuario/login.php");
-    exit;
+        header("Location: usuario/login.php");
+        exit;
     }
     require_once 'config/conexao.php';
 
@@ -17,13 +17,11 @@
 
     $mes_ant = $mes_atual - 1;
     $ano_ant = $ano_atual;
-    if ($mes_ant < 1) {$mes_ant = 12;
-    $ano_ant--;}
+    if ($mes_ant < 1) {$mes_ant = 12; $ano_ant--;}
 
     $mes_prox = $mes_atual + 1;
     $ano_prox = $ano_atual;
-    if ($mes_prox > 12) {$mes_prox = 1;
-    $ano_prox++;}
+    if ($mes_prox > 12) {$mes_prox = 1; $ano_prox++;}
 
     $meses_pt = [1 => 'Janeiro', 2 => 'Fevereiro', 3 => 'Março', 4 => 'Abril', 5 => 'Maio', 6 => 'Junho', 7 => 'Julho', 8 => 'Agosto', 9 => 'Setembro', 10 => 'Outubro', 11 => 'Novembro', 12 => 'Dezembro'];
     $nome_mes = $meses_pt[$mes_atual];
@@ -39,43 +37,41 @@
     $receitasPorCategoria = [];
 
     try {
-    $sql = '
-        SELECT
-            r."Valor", r."Descricao", r."TipoRegistro", r."MomentoRegistro",
-            COALESCE(c."NomeCategoria", \'Sem Categoria\') as Categoria,
-            COALESCE(c."IconeCategoria", \'bi-tag\') as "Icone"
-        FROM Registro r
-        LEFT JOIN Categoria c ON r."FKCategoria" = c."IDCategoria"
-        WHERE r."FKUsuario" = :uid
-          AND r."StatusRegistro" = \'efetivado\'
-          AND EXTRACT(MONTH FROM r."MomentoRegistro") = :mes
-          AND EXTRACT(YEAR FROM r."MomentoRegistro") = :ano
-        ORDER BY r."MomentoRegistro" DESC
-    ';
-    $stmt = $pdo->prepare($sql);
-    $stmt->execute([':uid' => $usuario_id, ':mes' => $mes_atual, ':ano' => $ano_atual]);
-    $transacoes = $stmt->fetchAll(PDO::FETCH_ASSOC);
+        $sql = "
+            SELECT
+                r.Valor, r.Descricao, r.TipoRegistro, r.MomentoRegistro,
+                COALESCE(c.NomeCategoria, 'Sem Categoria') as Categoria,
+                COALESCE(c.IconeCategoria, 'bi-tag') as Icone
+            FROM Registro r
+            LEFT JOIN Categoria c ON r.FKCategoria = c.IDCategoria
+            WHERE r.FKUsuario = :uid
+              AND r.StatusRegistro = 'efetivado'
+              AND MONTH(r.MomentoRegistro) = :mes
+              AND YEAR(r.MomentoRegistro) = :ano
+            ORDER BY r.MomentoRegistro DESC
+        ";
+        $stmt = $pdo->prepare($sql);
+        $stmt->execute([':uid' => $usuario_id, ':mes' => $mes_atual, ':ano' => $ano_atual]);
+        $transacoes = $stmt->fetchAll(PDO::FETCH_ASSOC);
 
-    foreach ($transacoes as $t) {
-        $valor = (float) $t['Valor'];
-        $cat   = $t['Categoria'];
+        foreach ($transacoes as $t) {
+            $valor = (float) $t['Valor'];
+            $cat   = $t['Categoria'];
 
-        if ($t['TipoRegistro'] === 'despesa') {
-            $totalDespesas += $valor;
-            if (! isset($gastosPorCategoria[$cat])) {
-                $gastosPorCategoria[$cat] = 0;
+            if ($t['TipoRegistro'] === 'despesa') {
+                $totalDespesas += $valor;
+                if (!isset($gastosPorCategoria[$cat])) {
+                    $gastosPorCategoria[$cat] = 0;
+                }
+                $gastosPorCategoria[$cat] += $valor;
+            } else {
+                $totalReceitas += $valor;
+                if (!isset($receitasPorCategoria[$cat])) {
+                    $receitasPorCategoria[$cat] = 0;
+                }
+                $receitasPorCategoria[$cat] += $valor;
             }
-
-            $gastosPorCategoria[$cat] += $valor;
-        } else {
-            $totalReceitas += $valor;
-            if (! isset($receitasPorCategoria[$cat])) {
-                $receitasPorCategoria[$cat] = 0;
-            }
-
-            $receitasPorCategoria[$cat] += $valor;
         }
-    }
     } catch (PDOException $e) {}
 
     arsort($gastosPorCategoria);
@@ -301,7 +297,6 @@
 </div>
 
 <script>
-    // Javascript levemente ajustado para funcionar com o novo visual do ano
     function mudarAnoModal(delta) {
         const inputAno = document.getElementById('anoModalInput');
         const displayAno = document.getElementById('anoModalDisplay');
@@ -309,7 +304,7 @@
         let novoAno = parseInt(inputAno.value) + delta;
         
         inputAno.value = novoAno;
-        displayAno.innerText = novoAno; // Atualiza o texto na tela
+        displayAno.innerText = novoAno;
     }
 
     function irParaMes(mes) {
@@ -325,11 +320,9 @@
 <script>
     const transacoesBrutas = <?php echo $dadosJsonTransacoes ?>;
 
-    // Paletas de Cores (Despesas = Quentes/Terrosas | Receitas = Frias/Verdes)
     const coresDespesas = ['#AA8C2C', '#D4AF37', '#E7C665', '#E63946', '#F4A261', '#E9C46A', '#9C6644'];
     const coresReceitas = ['#06D6A0', '#118AB2', '#2A9D8F', '#264653', '#457B9D', '#1D3557', '#0077B6'];
 
-    // GRÁFICO DE DESPESAS
     if (document.getElementById('graficoDespesas')) {
         const ctxDespesas = document.getElementById('graficoDespesas').getContext('2d');
         const chartDespesas = new Chart(ctxDespesas, {
@@ -345,7 +338,7 @@
             },
             options: {
                 responsive: true,
-                maintainAspectRatio: false, // Permite que o CSS assuma o controle do tamanho perfeito
+                maintainAspectRatio: false,
                 cutout: '75%',
                 plugins: { legend: { display: false } },
                 onClick: (event, elements) => {
@@ -359,7 +352,6 @@
         });
     }
 
-    // GRÁFICO DE RECEITAS
     if (document.getElementById('graficoReceitas')) {
         const ctxReceitas = document.getElementById('graficoReceitas').getContext('2d');
         const chartReceitas = new Chart(ctxReceitas, {
@@ -389,13 +381,11 @@
         });
     }
 
-    // FUNÇÃO ÚNICA PARA ATUALIZAR QUALQUER LISTA
     function atualizarListaDetalhes(categoriaFiltro, tipo) {
         const containerLista = document.getElementById(`lista-detalhes-${tipo}`);
         const badgeCategoria = document.getElementById(`badge-categoria-${tipo}`);
 
         badgeCategoria.innerText = categoriaFiltro;
-        // Muda a cor da badge dependendo do tipo
         badgeCategoria.className = tipo === 'despesa' ? 'badge bg-warning text-dark' : 'badge bg-info text-dark';
 
         const transacoesFiltradas = transacoesBrutas.filter(t =>
@@ -404,9 +394,9 @@
 
         let htmlLista = '<div class="list-group list-group-flush">';
         transacoesFiltradas.forEach(t => {
-            // Corta a string no espaço vazio, pegando só o "YYYY-MM-DD", e adiciona o meio-dia para evitar bugs de fuso horário
             const dataApenas = t.MomentoRegistro.split(' ')[0];
-            const dataStr = new Date(dataApenas + 'T12:00:00').toLocaleDateString('pt-BR');            const valorFormatado = new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(t.Valor);
+            const dataStr = new Date(dataApenas + 'T12:00:00').toLocaleDateString('pt-BR');            
+            const valorFormatado = new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(t.Valor);
             const corValor = tipo === 'despesa' ? 'text-danger' : 'text-success';
             const sinalValor = tipo === 'despesa' ? '-' : '+';
 

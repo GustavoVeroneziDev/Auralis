@@ -9,6 +9,13 @@ if (!isset($_SESSION['usuario_id'])) {
 }
 require_once 'config/conexao.php';
 
+// Função auxiliar para gerar UUID no padrão MySQL
+if (!function_exists('gerarUuid')) {
+    function gerarUuid() {
+        return sprintf('%04x%04x-%04x-%04x-%04x-%04x%04x%04x', mt_rand(0, 0xffff), mt_rand(0, 0xffff), mt_rand(0, 0xffff), mt_rand(0, 0x0fff) | 0x4000, mt_rand(0, 0x3fff) | 0x8000, mt_rand(0, 0xffff), mt_rand(0, 0xffff), mt_rand(0, 0xffff));
+    }
+}
+
 $usuario_id = $_SESSION['usuario_id'];
 $carteiras = [];
 $categorias = [];
@@ -20,7 +27,7 @@ $transacao_edit = null;
 
 if ($id_editar) {
     // Busca os dados da transação específica para preencher o formulário
-    $sqlEdit = 'SELECT * FROM Registro WHERE "IDRegistro" = :id AND "FKUsuario" = :uid';
+    $sqlEdit = "SELECT * FROM Registro WHERE IDRegistro = :id AND FKUsuario = :uid";
     $stmtEdit = $pdo->prepare($sqlEdit);
     $stmtEdit->execute([':id' => $id_editar, ':uid' => $usuario_id]);
     $transacao_edit = $stmtEdit->fetch();
@@ -36,25 +43,25 @@ if ($id_editar) {
 $tipo_sugerido = $_POST['tipo_registro'] ?? ($transacao_edit ? $transacao_edit['TipoRegistro'] : ($_GET['tipo'] ?? 'despesa')); 
 
 try {
-    // Busca carteiras
-    $sqlCarteiras = '
-        SELECT DISTINCT c."IDCarteira", c."TipoCarteira"
+    // Busca carteiras (Lembrete: Mudei para a sintaxe do MySQL puro)
+    $sqlCarteiras = "
+        SELECT DISTINCT c.IDCarteira, c.TipoCarteira
         FROM Carteira c
-        LEFT JOIN "MembroCarteira" mc ON mc."FKCarteira" = c."IDCarteira" AND mc."FKUsuario" = :uid_membro AND mc."StatusConvite" = true
-        WHERE c."FKUsuarioDono" = :uid_dono OR mc."FKCarteira" IS NOT NULL
-        ORDER BY c."TipoCarteira" ASC
-    ';
+        LEFT JOIN MembroCarteira mc ON mc.FKCarteira = c.IDCarteira AND mc.FKUsuario = :uid_membro AND mc.StatusConvite = 1
+        WHERE c.FKUsuarioDono = :uid_dono OR mc.FKCarteira IS NOT NULL
+        ORDER BY c.TipoCarteira ASC
+    ";
     $stmtC = $pdo->prepare($sqlCarteiras);
     $stmtC->execute([':uid_dono' => $usuario_id, ':uid_membro' => $usuario_id]);
     $carteiras = $stmtC->fetchAll();
 
     // Busca APENAS as categorias do tipo sugerido
-    $sqlCategorias = '
-        SELECT "IDCategoria", "NomeCategoria" 
+    $sqlCategorias = "
+        SELECT IDCategoria, NomeCategoria 
         FROM Categoria 
-        WHERE "FKUsuario" = :uid AND "TipoCategoria" = :tipo 
-        ORDER BY "NomeCategoria" ASC
-    ';
+        WHERE FKUsuario = :uid AND TipoCategoria = :tipo 
+        ORDER BY NomeCategoria ASC
+    ";
     $stmtCat = $pdo->prepare($sqlCategorias);
     $stmtCat->execute([':uid' => $usuario_id, ':tipo' => $tipo_sugerido]);
     $categorias = $stmtCat->fetchAll();
@@ -95,14 +102,14 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         try {
             if (isset($_POST['id_editar']) && !empty($_POST['id_editar'])) {
                 // É UMA ATUALIZAÇÃO (UPDATE)
-                $sql = '
+                $sql = "
                     UPDATE Registro SET 
-                        "TipoRegistro" = :tipo, "Valor" = :valor, "Descricao" = :descricao,
-                        "MomentoRegistro" = :momento, "DataVencimento" = :vencimento,
-                        "StatusRegistro" = :status, "Recorrente" = :recorrente, "DiaVencimento" = :dia,
-                        "FKCarteira" = :carteira, "FKCategoria" = :categoria, "FKSubCategoria" = :subcategoria
-                    WHERE "IDRegistro" = :id_editar AND "FKUsuario" = :usuario
-                ';
+                        TipoRegistro = :tipo, Valor = :valor, Descricao = :descricao,
+                        MomentoRegistro = :momento, DataVencimento = :vencimento,
+                        StatusRegistro = :status, Recorrente = :recorrente, DiaVencimento = :dia,
+                        FKCarteira = :carteira, FKCategoria = :categoria, FKSubCategoria = :subcategoria
+                    WHERE IDRegistro = :id_editar AND FKUsuario = :usuario
+                ";
                 $stmt = $pdo->prepare($sql);
                 $stmt->execute([
                     ':tipo' => $tipoRegistro, ':valor' => $valor, ':descricao' => $descricao,
@@ -114,18 +121,18 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 header("Location: dashboard.php?sucesso=editado");
             } else {
                 // É UMA CRIAÇÃO (INSERT)
-                $sql = '
+                $sql = "
                     INSERT INTO Registro (
-                        "TipoRegistro", "Valor", "Descricao", "MomentoRegistro", "DataVencimento",
-                        "StatusRegistro", "Recorrente", "DiaVencimento", "FKCarteira", "FKUsuario", "FKCategoria", "FKSubCategoria"
+                        IDRegistro, TipoRegistro, Valor, Descricao, MomentoRegistro, DataVencimento,
+                        StatusRegistro, Recorrente, DiaVencimento, FKCarteira, FKUsuario, FKCategoria, FKSubCategoria
                     ) VALUES (
-                        :tipo, :valor, :descricao, :momento, :vencimento,
+                        :id, :tipo, :valor, :descricao, :momento, :vencimento,
                         :status, :recorrente, :dia, :carteira, :usuario, :categoria, :subcategoria
                     )
-                ';
+                ";
                 $stmt = $pdo->prepare($sql);
                 $stmt->execute([
-                    ':tipo' => $tipoRegistro, ':valor' => $valor, ':descricao' => $descricao,
+                    ':id' => gerarUuid(), ':tipo' => $tipoRegistro, ':valor' => $valor, ':descricao' => $descricao,
                     ':momento' => $dataRegistro, ':vencimento' => $dataVencimento, ':status' => $statusRegistro,
                     ':recorrente' => $recorrente, ':dia' => $diaVencimento, ':carteira' => $carteiraId,
                     ':usuario' => $usuario_id, ':categoria' => $categoriaId, ':subcategoria' => $subCategoriaId,
@@ -139,7 +146,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     }
 }
 
-// Valores Iniciais do Formulário (Puxa do POST em caso de erro, ou do Banco em caso de Edição, ou Vazio)
+// Valores Iniciais do Formulário
 $val_valor  = $_POST['valor'] ?? ($transacao_edit ? $transacao_edit['Valor'] : '');
 $val_desc   = $_POST['descricao'] ?? ($transacao_edit ? $transacao_edit['Descricao'] : '');
 $val_data   = $_POST['data_registro'] ?? ($transacao_edit ? date('Y-m-d', strtotime($transacao_edit['MomentoRegistro'])) : date('Y-m-d'));

@@ -9,11 +9,16 @@ if (!isset($_SESSION['usuario_id'])) {
 }
 require_once 'config/conexao.php';
 
+// Função auxiliar para gerar UUID no padrão MySQL
+if (!function_exists('gerarUuid')) {
+    function gerarUuid() {
+        return sprintf('%04x%04x-%04x-%04x-%04x-%04x%04x%04x', mt_rand(0, 0xffff), mt_rand(0, 0xffff), mt_rand(0, 0xffff), mt_rand(0, 0x0fff) | 0x4000, mt_rand(0, 0x3fff) | 0x8000, mt_rand(0, 0xffff), mt_rand(0, 0xffff), mt_rand(0, 0xffff));
+    }
+}
+
 $usuario_id = $_SESSION['usuario_id'];
 $sucesso = null;
 $erro = null;
-
-
 
 // Mensagens de Sucesso da URL
 if (isset($_GET['sucesso'])) {
@@ -26,15 +31,16 @@ if (isset($_GET['sucesso'])) {
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action']) && $_POST['action'] === 'nova_categoria') {
     $nomeCategoria  = trim($_POST['nome_categoria'] ?? '');
     $tipoCategoria  = $_POST['tipo_categoria'] ?? 'despesa';
-    $iconeCategoria = $_POST['icone_categoria'] ?? 'bi-tag'; // Padrão se não escolher
+    $iconeCategoria = $_POST['icone_categoria'] ?? 'bi-tag'; 
     
     if (empty($nomeCategoria)) {
         $erro = "O nome da categoria não pode estar vazio.";
     } else {
         try {
-            $sqlInsert = 'INSERT INTO Categoria ("NomeCategoria", "TipoCategoria", "IconeCategoria", "FKUsuario") VALUES (:nome, :tipo, :icone, :uid)';
+            $sqlInsert = "INSERT INTO Categoria (IDCategoria, NomeCategoria, TipoCategoria, IconeCategoria, FKUsuario) VALUES (:id, :nome, :tipo, :icone, :uid)";
             $stmtInsert = $pdo->prepare($sqlInsert);
             $stmtInsert->execute([
+                ':id'    => gerarUuid(),
                 ':nome'  => $nomeCategoria, 
                 ':tipo'  => $tipoCategoria, 
                 ':icone' => $iconeCategoria, 
@@ -54,7 +60,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action']) && $_POST['
 if (isset($_GET['excluir'])) {
     $idExcluir = $_GET['excluir'];
     try {
-        $sqlDelete = 'DELETE FROM Categoria WHERE "IDCategoria" = :id AND "FKUsuario" = :uid';
+        $sqlDelete = "DELETE FROM Categoria WHERE IDCategoria = :id AND FKUsuario = :uid";
         $stmtDelete = $pdo->prepare($sqlDelete);
         $stmtDelete->execute([':id' => $idExcluir, ':uid' => $usuario_id]);
         header("Location: gerenciar_categorias.php?sucesso=excluida");
@@ -69,14 +75,14 @@ $categorias_receita = [];
 $categorias_despesa = [];
 
 try {
-    $sqlBusca = '
-        SELECT c."IDCategoria", c."NomeCategoria", c."TipoCategoria", c."IconeCategoria", COUNT(r."IDRegistro") as total_usos
+    $sqlBusca = "
+        SELECT c.IDCategoria, c.NomeCategoria, c.TipoCategoria, c.IconeCategoria, COUNT(r.IDRegistro) as total_usos
         FROM Categoria c
-        LEFT JOIN Registro r ON c."IDCategoria" = r."FKCategoria"
-        WHERE c."FKUsuario" = :uid
-        GROUP BY c."IDCategoria", c."NomeCategoria", c."TipoCategoria", c."IconeCategoria"
-        ORDER BY c."NomeCategoria" ASC
-    ';
+        LEFT JOIN Registro r ON c.IDCategoria = r.FKCategoria
+        WHERE c.FKUsuario = :uid
+        GROUP BY c.IDCategoria, c.NomeCategoria, c.TipoCategoria, c.IconeCategoria
+        ORDER BY c.NomeCategoria ASC
+    ";
     $stmtBusca = $pdo->prepare($sqlBusca);
     $stmtBusca->execute([':uid' => $usuario_id]);
     $todas = $stmtBusca->fetchAll();
@@ -94,26 +100,14 @@ try {
 
 require_once 'geral/header.php';
 
-// Lista de ícones disponíveis para o usuário escolher manualmente
-// Lista de ícones premium expandida (40 ícones para um grid 8x5 perfeito)
+// Lista de ícones disponíveis
 $listaIcones = [
-    // 1. Alimentação e Casa
     'bi-cart3', 'bi-basket', 'bi-cup-hot', 'bi-shop', 'bi-house-door',
     'bi-lightning-charge', 'bi-droplet', 'bi-wifi', 'bi-wrench', 'bi-tools',
-
-    // 2. Transporte e Viagens
     'bi-car-front', 'bi-fuel-pump', 'bi-bus-front', 'bi-bicycle', 'bi-airplane',
-
-    // 3. Saúde e Lazer
     'bi-heart-pulse', 'bi-capsule', 'bi-controller', 'bi-film', 'bi-music-note-beamed',
-
-    // 4. Pessoal e Educação
     'bi-bag-heart', 'bi-scissors', 'bi-sunglasses', 'bi-book', 'bi-mortarboard',
-
-    // 5. Família, Pets e Tech
     'bi-people', 'bi-gift', 'bi-balloon', 'bi-laptop', 'bi-phone',
-
-    // 6. Finanças e Trabalho
     'bi-briefcase', 'bi-bank', 'bi-cash-stack', 'bi-coin', 'bi-piggy-bank',
     'bi-wallet2', 'bi-graph-up-arrow', 'bi-shield-check', 'bi-gear-fill', 'bi-three-dots'
 ];

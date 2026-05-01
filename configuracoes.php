@@ -24,7 +24,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
         if (!empty($nome)) {
             try {
-                $sqlUpd = 'UPDATE usuario SET "Nome" = :nome, "Telefone" = :telefone WHERE "IDUsuario" = :uid';
+                $sqlUpd = "UPDATE Usuario SET Nome = :nome, Telefone = :telefone WHERE IDUsuario = :uid";
                 $stmtUpd = $pdo->prepare($sqlUpd);
                 $stmtUpd->execute([
                     ':nome' => $nome,
@@ -53,14 +53,14 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             $tipo_mensagem = "warning";
         } else {
             try {
-                $sqlSenha = 'SELECT "Senha" FROM usuario WHERE "IDUsuario" = :uid';
+                $sqlSenha = "SELECT Senha FROM Usuario WHERE IDUsuario = :uid";
                 $stmtSenha = $pdo->prepare($sqlSenha);
                 $stmtSenha->execute([':uid' => $usuario_id]);
                 $hashBanco = $stmtSenha->fetchColumn();
 
                 if (password_verify($senha_atual, $hashBanco)) {
                     $novoHash = password_hash($nova_senha, PASSWORD_DEFAULT);
-                    $sqlUpdSenha = 'UPDATE usuario SET "Senha" = :senha WHERE "IDUsuario" = :uid';
+                    $sqlUpdSenha = "UPDATE Usuario SET Senha = :senha WHERE IDUsuario = :uid";
                     $stmtUpdSenha = $pdo->prepare($sqlUpdSenha);
                     $stmtUpdSenha->execute([':senha' => $novoHash, ':uid' => $usuario_id]);
 
@@ -83,15 +83,17 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
         try {
             // Verifica a senha antes de qualquer loucura
-            $sqlSenha = 'SELECT "Senha" FROM usuario WHERE "IDUsuario" = :uid';
+            $sqlSenha = "SELECT Senha FROM Usuario WHERE IDUsuario = :uid";
             $stmtSenha = $pdo->prepare($sqlSenha);
             $stmtSenha->execute([':uid' => $usuario_id]);
             $hashBanco = $stmtSenha->fetchColumn();
 
             if (password_verify($senha_confirmacao, $hashBanco)) {
-                // Senha bateu. Exterminar o usuário!
-                // O banco PostgreSQL (com "ON DELETE CASCADE") apagará junto as carteiras, transações e configurações dele.
-                $sqlDel = 'DELETE FROM usuario WHERE "IDUsuario" = :uid';
+                
+                // IMPORTANTE: Como tiramos o PostgreSQL, o MySQL só vai apagar o usuário em cascata
+                // se as Foreign Keys tiverem "ON DELETE CASCADE". Se der erro aqui, é porque você
+                // precisa apagar as carteiras/registros dele primeiro antes do usuário.
+                $sqlDel = "DELETE FROM Usuario WHERE IDUsuario = :uid";
                 $stmtDel = $pdo->prepare($sqlDel);
                 $stmtDel->execute([':uid' => $usuario_id]);
 
@@ -119,7 +121,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 // 2. BUSCA OS DADOS ATUAIS PARA PREENCHER O FORMULÁRIO
 // ==============================================================================
 try {
-    $sqlBusca = 'SELECT "Nome", email, "Documento", "Telefone" FROM usuario WHERE "IDUsuario" = :uid LIMIT 1';
+    $sqlBusca = "SELECT Nome, Email, Documento, Telefone FROM Usuario WHERE IDUsuario = :uid LIMIT 1";
     $stmtBusca = $pdo->prepare($sqlBusca);
     $stmtBusca->execute([':uid' => $usuario_id]);
     $dadosUsuario = $stmtBusca->fetch(PDO::FETCH_ASSOC);
