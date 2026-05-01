@@ -1,0 +1,20 @@
+name: Deploy Auralis HostGator
+
+on:
+  push:
+    branches: [ main ] # Só faz o deploy quando você jogar código na branch main
+
+jobs:
+  web-deploy:
+    runs-on: ubuntu-latest
+    steps:
+    - name: 🚚 Puxando o código do repositório
+      uses: actions/checkout@v3
+
+    - name: 📂 Sincronizando arquivos com a HostGator via FTP
+      uses: SamKirkland/FTP-Deploy-Action@v4.3.4
+      with:
+        server: ${{ secrets.FTP_SERVER }}
+        username: ${{ secrets.FTP_USERNAME }}
+        password: ${{ secrets.FTP_PASSWORD }}
+        server-dir: /meuauralis.com/ # AQUI VAI O CAMINHO EXATO DA SUA PASTA NA HOSTGATOR
