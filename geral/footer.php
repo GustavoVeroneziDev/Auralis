@@ -22,7 +22,7 @@
 </div>
 </footer>
 
-<script src="/auralis/geral/js/bootstrap.bundle.min.js"></script>
+<script src="/geral/js/bootstrap.bundle.min.js"></script>
 
 <script>
     document.addEventListener("DOMContentLoaded", function () {
