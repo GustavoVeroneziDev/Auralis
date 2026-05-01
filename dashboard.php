@@ -620,6 +620,11 @@ error_reporting(E_ALL);
 
 </main>
 
+<!-- ======================================================================= -->
+<!-- TODOS OS MODAIS DO DASHBOARD -->
+<!-- ======================================================================= -->
+
+<!-- MODAL: AJUSTE DE SALDO -->
 <div class="modal fade" id="modalAjusteSaldo" tabindex="-1" aria-hidden="true">
     <div class="modal-dialog modal-dialog-centered">
         <div class="modal-content bg-dark border-secondary-subtle shadow-lg rounded-4">
@@ -636,14 +641,14 @@ error_reporting(E_ALL);
                     </p>
 
                     <input type="hidden" name="action" value="ajustar_saldo">
-                    <input type="hidden" name="carteira_id_ajuste" value="<?php echo $carteira_selecionada ?>">
-                    <input type="hidden" name="saldo_sistema_atual" value="<?php echo $saldoAtual ?>">
+                    <input type="hidden" name="carteira_id_ajuste" value="<?php echo htmlspecialchars($carteira_selecionada ?? ''); ?>">
+                    <input type="hidden" name="saldo_sistema_atual" value="<?php echo htmlspecialchars($saldoAtual ?? 0); ?>">
 
                     <div class="mb-3">
                         <label class="form-label text-secondary small">Qual o seu saldo exato hoje?</label>
                         <div class="input-group input-group-lg">
                             <span class="input-group-text bg-transparent border-secondary-subtle text-light fw-bold">R$</span>
-                            <input type="number" step="0.01" name="saldo_real" class="form-control bg-transparent border-secondary-subtle text-light fw-bold shadow-none no-spinners" required placeholder="0,00" value="<?php echo number_format($saldoAtual, 2, '.', '') ?>" autofocus>
+                            <input type="number" step="0.01" name="saldo_real" class="form-control bg-transparent border-secondary-subtle text-light fw-bold shadow-none no-spinners" required placeholder="0,00" value="<?php echo number_format($saldoAtual ?? 0, 2, '.', '') ?>" autofocus>
                         </div>
                     </div>
                 </div>
@@ -658,33 +663,105 @@ error_reporting(E_ALL);
     </div>
 </div>
 
-<div class="modal fade" id="modalBoasVindas" tabindex="-1" aria-hidden="true">
+<!-- MODAL: SELETOR DE MÊS -->
+<div class="modal fade" id="modalSeletorMes" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered modal-sm">
+        <div class="modal-content bg-dark border-secondary-subtle shadow-lg rounded-4">
+            <div class="modal-header border-bottom border-secondary-subtle p-3">
+                <h6 class="modal-title text-light fw-bold">
+                    <i class="bi bi-calendar3 me-2" style="color: var(--primary-gold-analysis);"></i> Selecionar Período
+                </h6>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body p-4 text-center">
+                <div class="d-flex justify-content-center align-items-center mb-4 bg-charcoal-analysis rounded-pill p-1 border border-secondary-subtle">
+                    <button type="button" class="btn btn-sm btn-link text-secondary shadow-none" onclick="mudarAnoModal(-1)">
+                        <i class="bi bi-chevron-left fs-5"></i>
+                    </button>
+                    <input type="number" id="anoModalInput" class="form-control bg-transparent border-0 text-light fw-bold text-center fs-4 mx-2 no-spinners shadow-none" style="width: 90px;" value="<?= $ano_atual ?>" readonly>
+                    <button type="button" class="btn btn-sm btn-link text-secondary shadow-none" onclick="mudarAnoModal(1)">
+                        <i class="bi bi-chevron-right fs-5"></i>
+                    </button>
+                </div>
+                <div class="row g-2">
+                    <?php 
+                    $mesesAbrev = [1=>'Jan', 2=>'Fev', 3=>'Mar', 4=>'Abr', 5=>'Mai', 6=>'Jun', 7=>'Jul', 8=>'Ago', 9=>'Set', 10=>'Out', 11=>'Nov', 12=>'Dez'];
+                    foreach($mesesAbrev as $num => $nome): 
+                        $isAtual = ($num == $mes_atual) ? 'btn-gold text-dark' : 'btn-outline-secondary text-light';
+                    ?>
+                        <div class="col-4">
+                            <button type="button" class="btn w-100 <?= $isAtual ?> fw-semibold py-2 transition-hover" onclick="irParaMes(<?= $num ?>)">
+                                <?= $nome ?>
+                            </button>
+                        </div>
+                    <?php endforeach; ?>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- ======================================================================= -->
+<!-- MODAIS DE ONBOARDING (PRIMEIRO ACESSO) -->
+<!-- ======================================================================= -->
+
+<?php $primeiroNome = explode(' ', $_SESSION['usuario_nome'] ?? 'Visitante')[0]; ?>
+
+<!-- ONBOARDING 1: CRIAR CARTEIRA -->
+<div class="modal fade" id="modalPrimeiraCarteira" tabindex="-1" aria-hidden="true" data-bs-backdrop="static" data-bs-keyboard="false">
     <div class="modal-dialog modal-dialog-centered modal-lg">
         <div class="modal-content modal-boas-vindas-content border-0 rounded-4 overflow-hidden position-relative">
+            <div class="position-absolute top-0 start-0 w-100 h-100" style="background: radial-gradient(circle at top left, rgba(170, 140, 44, 0.15), transparent 60%); pointer-events: none;"></div>
+            
+            <div class="modal-body p-5 text-center position-relative z-1">
+                <div class="mb-4 d-inline-flex justify-content-center align-items-center bg-dark border border-secondary-subtle rounded-circle shadow-lg" style="width: 90px; height: 90px;">
+                    <i class="bi bi-wallet2 text-primary" style="color: var(--primary-gold-analysis) !important; font-size: 2.5rem;"></i>
+                </div>
 
+                <h2 class="text-light fw-bold mb-3">Bem-vindo(a) ao Auralis, <?php echo htmlspecialchars($primeiroNome) ?>!</h2>
+                <p class="text-secondary fs-5 mb-5 mx-auto" style="max-width: 600px;">
+                    O primeiro passo para o controle absoluto é organizar onde o seu dinheiro fica. Vamos criar o seu primeiro espaço financeiro.
+                </p>
+
+                <form method="POST" action="carteira/processa_carteira.php" class="bg-dark border border-secondary-subtle rounded-4 p-4 text-start mx-auto shadow-sm" style="max-width: 500px;">
+                    <label class="form-label text-light fw-semibold mb-2 fs-5">Como quer chamar sua conta principal?</label>
+                    <div class="input-group input-group-lg mb-4 shadow-sm">
+                        <span class="input-group-text bg-body-tertiary border-secondary-subtle text-secondary border-end-0"><i class="bi bi-tag-fill"></i></span>
+                        <input type="text" name="tipo_carteira" class="form-control bg-body-tertiary border-secondary-subtle border-start-0 text-light fw-bold shadow-none fs-5 py-3" required value="Minha Carteira" autofocus>
+                    </div>
+                    <button type="submit" class="btn btn-gold btn-lg w-100 fw-bold text-dark rounded-pill py-3 shadow-lg transition-hover">
+                        Criar Conta e Avançar <i class="bi bi-arrow-right ms-2"></i>
+                    </button>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- ONBOARDING 2: SALDO INICIAL -->
+<div class="modal fade" id="modalBoasVindas" tabindex="-1" aria-hidden="true" data-bs-backdrop="static" data-bs-keyboard="false">
+    <div class="modal-dialog modal-dialog-centered modal-lg">
+        <div class="modal-content modal-boas-vindas-content border-0 rounded-4 overflow-hidden position-relative">
             <div class="position-absolute top-0 start-0 w-100 h-100" style="background: radial-gradient(circle at top right, rgba(170, 140, 44, 0.15), transparent 60%); pointer-events: none;"></div>
-
-            <div class="modal-body p-5 text-center position-relative z-index-1">
-
+            
+            <div class="modal-body p-5 text-center position-relative z-1">
                 <div class="mb-4 d-inline-flex justify-content-center align-items-center bg-dark border border-secondary-subtle rounded-circle shadow-lg" style="width: 90px; height: 90px;">
                     <i class="bi bi-rocket-takeoff text-primary" style="color: var(--primary-gold-analysis) !important; font-size: 2.5rem;"></i>
                 </div>
 
-                <?php $primeiroNome = explode(' ', $_SESSION['usuario_nome'] ?? 'Visitante')[0]; ?>
-                <h2 class="text-light fw-bold mb-3">Bem-vindo(a) ao Auralis, <?php echo htmlspecialchars($primeiroNome) ?>!</h2>
-
+                <h2 class="text-light fw-bold mb-3">Tudo pronto, <?php echo htmlspecialchars($primeiroNome) ?>!</h2>
                 <p class="text-secondary fs-5 mb-5 mx-auto" style="max-width: 600px;">
-                    Sua jornada para o controle financeiro absoluto começa aqui. Para que o seu painel funcione perfeitamente, precisamos dar o nosso primeiro passo juntos.
+                    Sua carteira <strong>"<?php echo htmlspecialchars($nome_carteira_atual ?? ''); ?>"</strong> foi criada. Para que seus gráficos funcionem perfeitamente, precisamos do seu ponto de partida.
                 </p>
 
                 <div class="bg-dark border border-secondary-subtle rounded-4 p-4 text-start mx-auto shadow-sm" style="max-width: 500px;">
                     <label class="form-label text-light fw-semibold mb-3 fs-5 d-block text-center">
-                        Somando suas contas bancárias e reservas, qual o seu saldo total hoje?
+                        Qual o seu saldo total exato hoje nesta conta?
                     </label>
 
                     <form method="POST" action="">
                         <input type="hidden" name="action" value="ajustar_saldo">
-                        <input type="hidden" name="carteira_id_ajuste" value="<?php echo $carteira_selecionada ?>">
+                        <input type="hidden" name="carteira_id_ajuste" value="<?php echo htmlspecialchars($carteira_selecionada ?? ''); ?>">
                         <input type="hidden" name="saldo_sistema_atual" value="0">
 
                         <div class="input-group input-group-lg mb-4 shadow-sm">
@@ -695,15 +772,8 @@ error_reporting(E_ALL);
                         <button type="submit" class="btn btn-gold btn-lg w-100 fw-bold text-dark rounded-pill py-3 shadow-lg transition-hover">
                             Iniciar Minha Jornada
                         </button>
-
-                        <div class="text-center mt-3">
-                            <button type="button" class="btn btn-link text-secondary text-decoration-none small" data-bs-dismiss="modal">
-                                Pular por enquanto, configuro depois.
-                            </button>
-                        </div>
                     </form>
                 </div>
-
             </div>
         </div>
     </div>
@@ -713,13 +783,11 @@ error_reporting(E_ALL);
     .bg-charcoal-analysis { background-color: #1a1d21; }
     .auralis-table > tbody > tr.cursor-pointer:hover > td { background-color: rgba(255, 255, 255, 0.03) !important; }
     .table-active { background-color: #1a1d21 !important; }
-
-    .no-spinners::-webkit-outer-spin-button,
-    .no-spinners::-webkit-inner-spin-button { -webkit-appearance: none; margin: 0; }
+    .no-spinners::-webkit-outer-spin-button, .no-spinners::-webkit-inner-spin-button { -webkit-appearance: none; margin: 0; }
     .no-spinners { -moz-appearance: textfield; }
 
-    /* Estilos do Modal de Boas-Vindas Acrílico */
-    #modalBoasVindas {
+    /* Estilos Acrílicos do Onboarding */
+    #modalPrimeiraCarteira, #modalBoasVindas {
         backdrop-filter: blur(12px);
         -webkit-backdrop-filter: blur(12px);
         background-color: rgba(0, 0, 0, 0.65);
@@ -750,74 +818,33 @@ error_reporting(E_ALL);
         }
     }
 
-    // Acionamento Automático do Modal de Boas Vindas se for o primeiro acesso
-   <?php if ($is_primeiro_acesso && $totalCarteiras > 0): ?>
-    document.addEventListener("DOMContentLoaded", function() {
-        var modalBoasVindas = new bootstrap.Modal(document.getElementById('modalBoasVindas'), {
-            backdrop: 'static', // Impede de fechar clicando fora sem querer
-            keyboard: false
-        });
-        modalBoasVindas.show();
-    });
-    <?php endif; ?>
-</script>
-<div class="modal fade" id="modalSeletorMes" tabindex="-1" aria-hidden="true">
-    <div class="modal-dialog modal-dialog-centered modal-sm">
-        <div class="modal-content bg-dark border-secondary-subtle shadow-lg rounded-4">
-            <div class="modal-header border-bottom border-secondary-subtle p-3">
-                <h6 class="modal-title text-light fw-bold">
-                    <i class="bi bi-calendar3 me-2" style="color: var(--primary-gold-analysis);"></i> Selecionar Período
-                </h6>
-                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
-            </div>
-            <div class="modal-body p-4 text-center">
-                
-                <div class="d-flex justify-content-center align-items-center mb-4 bg-charcoal-analysis rounded-pill p-1 border border-secondary-subtle">
-                    <button type="button" class="btn btn-sm btn-link text-secondary shadow-none" onclick="mudarAnoModal(-1)">
-                        <i class="bi bi-chevron-left fs-5"></i>
-                    </button>
-                    
-                    <input type="number" id="anoModalInput" class="form-control bg-transparent border-0 text-light fw-bold text-center fs-4 mx-2 no-spinners shadow-none" style="width: 90px;" value="<?= $ano_atual ?>" readonly>
-                    
-                    <button type="button" class="btn btn-sm btn-link text-secondary shadow-none" onclick="mudarAnoModal(1)">
-                        <i class="bi bi-chevron-right fs-5"></i>
-                    </button>
-                </div>
-                
-                <div class="row g-2">
-                    <?php 
-                    $mesesAbrev = [1=>'Jan', 2=>'Fev', 3=>'Mar', 4=>'Abr', 5=>'Mai', 6=>'Jun', 7=>'Jul', 8=>'Ago', 9=>'Set', 10=>'Out', 11=>'Nov', 12=>'Dez'];
-                    foreach($mesesAbrev as $num => $nome): 
-                        $isAtual = ($num == $mes_atual) ? 'btn-gold text-dark' : 'btn-outline-secondary text-light';
-                    ?>
-                        <div class="col-4">
-                            <button type="button" class="btn w-100 <?= $isAtual ?> fw-semibold py-2 transition-hover" onclick="irParaMes(<?= $num ?>)">
-                                <?= $nome ?>
-                            </button>
-                        </div>
-                    <?php endforeach; ?>
-                </div>
-
-            </div>
-        </div>
-    </div>
-</div>
-
-<script>
+    // Scripts do Seletor de Mês
     function mudarAnoModal(delta) {
         const inputAno = document.getElementById('anoModalInput');
         inputAno.value = parseInt(inputAno.value) + delta;
     }
-
     function irParaMes(mes) {
         const ano = document.getElementById('anoModalInput').value;
         const urlParams = new URLSearchParams(window.location.search);
-        
         urlParams.set('mes', mes);
         urlParams.set('ano', ano);
-        
         window.location.search = urlParams.toString();
     }
+
+    // =======================================================================
+    // MOTOR DE DISPARO DO ONBOARDING
+    // =======================================================================
+    document.addEventListener("DOMContentLoaded", function() {
+        <?php if ($totalCarteiras == 0): ?>
+            // Cena 1: Se não tem carteira, mostra Modal de Criar
+            var modal1 = new bootstrap.Modal(document.getElementById('modalPrimeiraCarteira'), { backdrop: 'static', keyboard: false });
+            modal1.show();
+        <?php elseif ($is_primeiro_acesso): ?>
+            // Cena 2: Já tem carteira, mas não tem saldo inicial? Mostra Modal de Boas Vindas
+            var modal2 = new bootstrap.Modal(document.getElementById('modalBoasVindas'), { backdrop: 'static', keyboard: false });
+            modal2.show();
+        <?php endif; ?>
+    });
 </script>
 
 <?php require_once 'geral/footer.php'; ?>
