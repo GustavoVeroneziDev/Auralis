@@ -5,24 +5,31 @@
     // 1. Inicia a sessão e verifica a segurança
     session_start();
 
-    if (! isset($_SESSION['usuario_id'])) {
-    header("Location: usuario/login.php");
-    exit;
+    if (!isset($_SESSION['usuario_id'])) {
+        header("Location: usuario/login.php");
+        exit;
     }
 
     // 2. Conecta ao banco de dados
     require_once 'config/conexao.php';
 
+    // Função auxiliar para gerar UUID no padrão MySQL
+    if (!function_exists('gerarUuid')) {
+        function gerarUuid() {
+            return sprintf('%04x%04x-%04x-%04x-%04x-%04x%04x%04x', mt_rand(0, 0xffff), mt_rand(0, 0xffff), mt_rand(0, 0xffff), mt_rand(0, 0x0fff) | 0x4000, mt_rand(0, 0x3fff) | 0x8000, mt_rand(0, 0xffff), mt_rand(0, 0xffff), mt_rand(0, 0xffff));
+        }
+    }
+
     $usuario_id = $_SESSION['usuario_id'];
     $carteiras  = [];
 
     try {
-    $sql  = 'SELECT "IDCarteira", "TipoCarteira" FROM Carteira WHERE "FKUsuarioDono" = :usuario_id ORDER BY "TipoCarteira" ASC';
-    $stmt = $pdo->prepare($sql);
-    $stmt->execute([':usuario_id' => $usuario_id]);
-    $carteiras = $stmt->fetchAll();
+        $sql  = "SELECT IDCarteira, TipoCarteira FROM Carteira WHERE FKUsuarioDono = :usuario_id ORDER BY TipoCarteira ASC";
+        $stmt = $pdo->prepare($sql);
+        $stmt->execute([':usuario_id' => $usuario_id]);
+        $carteiras = $stmt->fetchAll();
     } catch (PDOException $e) {
-    $carteiras = [];
+        $carteiras = [];
     }
 
     $totalCarteiras = count($carteiras);
@@ -33,81 +40,81 @@
     $mesAnoAtual = date('Y-m');
 
     try {
-    // 1. Verifica se o sistema já rodou este mês
-    $sqlConfig  = 'SELECT "Valor" FROM "ConfiguracaoSistema" WHERE "Chave" = \'ultima_recorrencia\' AND "FKUsuario" = :uid';
-    $stmtConfig = $pdo->prepare($sqlConfig);
-    $stmtConfig->execute([':uid' => $usuario_id]);
-    $ultimaExecucao = $stmtConfig->fetchColumn();
+        // 1. Verifica se o sistema já rodou este mês
+        $sqlConfig  = "SELECT Valor FROM ConfiguracaoSistema WHERE Chave = 'ultima_recorrencia' AND FKUsuario = :uid";
+        $stmtConfig = $pdo->prepare($sqlConfig);
+        $stmtConfig->execute([':uid' => $usuario_id]);
+        $ultimaExecucao = $stmtConfig->fetchColumn();
 
-    if ($ultimaExecucao !== $mesAnoAtual) {
-        // 2. Busca contas recorrentes do mês passado (para evitar gaps)
-        $mesAnterior = date('Y-m', strtotime('-1 month'));
+        if ($ultimaExecucao !== $mesAnoAtual) {
+            // 2. Busca contas recorrentes do mês passado (para evitar gaps)
+            $mesAnterior = date('Y-m', strtotime('-1 month'));
 
-        $sqlRec  = 'SELECT * FROM Registro WHERE "FKUsuario" = :uid AND "Recorrente" = true AND TO_CHAR("MomentoRegistro", \'YYYY-MM\') = :mes_ant';
-        $stmtRec = $pdo->prepare($sqlRec);
-        $stmtRec->execute([':uid' => $usuario_id, ':mes_ant' => $mesAnterior]);
-        $contas = $stmtRec->fetchAll();
+            // CORREÇÃO: TO_CHAR trocado por DATE_FORMAT e booleano para 1
+            $sqlRec  = "SELECT * FROM Registro WHERE FKUsuario = :uid AND Recorrente = 1 AND DATE_FORMAT(MomentoRegistro, '%Y-%m') = :mes_ant";
+            $stmtRec = $pdo->prepare($sqlRec);
+            $stmtRec->execute([':uid' => $usuario_id, ':mes_ant' => $mesAnterior]);
+            $contas = $stmtRec->fetchAll();
 
-        if (! empty($contas)) {
-            $sqlInsert = 'INSERT INTO Registro ("TipoRegistro", "Valor", "Descricao", "MomentoRegistro", "DataVencimento", "StatusRegistro", "Recorrente", "DiaVencimento", "FKCarteira", "FKUsuario", "FKCategoria")
-                          VALUES (:tipo, :valor, :desc, :momento, :venc, \'pendente\', true, :dia, :cart, :uid, :cat)';
-            $stmtInsert = $pdo->prepare($sqlInsert);
+            if (!empty($contas)) {
+                // CORREÇÃO: Adicionado IDRegistro manual
+                $sqlInsert = "INSERT INTO Registro (IDRegistro, TipoRegistro, Valor, Descricao, MomentoRegistro, DataVencimento, StatusRegistro, Recorrente, DiaVencimento, FKCarteira, FKUsuario, FKCategoria)
+                              VALUES (:id, :tipo, :valor, :desc, :momento, :venc, 'pendente', 1, :dia, :cart, :uid, :cat)";
+                $stmtInsert = $pdo->prepare($sqlInsert);
 
-            foreach ($contas as $c) {
-                // Ajusta a data para o dia de vencimento no mês atual
-                $novaData = date('Y-m') . '-' . str_pad($c['DiaVencimento'], 2, '0', STR_PAD_LEFT);
+                foreach ($contas as $c) {
+                    $novaData = date('Y-m') . '-' . str_pad($c['DiaVencimento'], 2, '0', STR_PAD_LEFT);
 
-                $stmtInsert->execute([
-                    ':tipo'    => $c['TipoRegistro'],
-                    ':valor'   => $c['Valor'],
-                    ':desc'    => $c['Descricao'],
-                    ':momento' => $novaData,
-                    ':venc'    => $novaData,
-                    ':dia'     => $c['DiaVencimento'],
-                    ':cart'    => $c['FKCarteira'],
-                    ':uid'     => $usuario_id,
-                    ':cat'     => $c['FKCategoria'],
-                ]);
+                    $stmtInsert->execute([
+                        ':id'       => gerarUuid(),
+                        ':tipo'     => $c['TipoRegistro'],
+                        ':valor'    => $c['Valor'],
+                        ':desc'     => $c['Descricao'],
+                        ':momento'  => $novaData,
+                        ':venc'     => $novaData,
+                        ':dia'      => $c['DiaVencimento'],
+                        ':cart'     => $c['FKCarteira'],
+                        ':uid'      => $usuario_id,
+                        ':cat'      => $c['FKCategoria'],
+                    ]);
+                }
             }
-        }
 
-        // 3. Atualiza a "memória" do sistema
-        if ($ultimaExecucao === false) {
-            $sqlUpd = 'INSERT INTO "ConfiguracaoSistema" ("Chave", "Valor", "FKUsuario") VALUES (\'ultima_recorrencia\', :v, :uid)';
-        } else {
-            $sqlUpd = 'UPDATE "ConfiguracaoSistema" SET "Valor" = :v WHERE "Chave" = \'ultima_recorrencia\' AND "FKUsuario" = :uid';
+            // 3. Atualiza a "memória" do sistema
+            if ($ultimaExecucao === false) {
+                $sqlUpd = "INSERT INTO ConfiguracaoSistema (Chave, Valor, FKUsuario) VALUES ('ultima_recorrencia', :v, :uid)";
+            } else {
+                $sqlUpd = "UPDATE ConfiguracaoSistema SET Valor = :v WHERE Chave = 'ultima_recorrencia' AND FKUsuario = :uid";
+            }
+            $pdo->prepare($sqlUpd)->execute([':v' => $mesAnoAtual, ':uid' => $usuario_id]);
         }
-        $pdo->prepare($sqlUpd)->execute([':v' => $mesAnoAtual, ':uid' => $usuario_id]);
-    }
     } catch (PDOException $e) {
-    // Falha silenciosa para não quebrar o dashboard caso dê algum erro de banco
+        // Falha silenciosa
     }
     // ==============================================================================
 
-    // --- VERIFICA SE É O PRIMEIRO ACESSO (Zero Transações) ---
+    // --- VERIFICA SE É O PRIMEIRO ACESSO ---
     $is_primeiro_acesso = false;
     try {
-    $sqlTotalTrans = 'SELECT COUNT(*) FROM Registro WHERE "FKUsuario" = :uid';
-    $stmtTotal     = $pdo->prepare($sqlTotalTrans);
-    $stmtTotal->execute([':uid' => $usuario_id]);
-    if ($stmtTotal->fetchColumn() == 0) {
-        $is_primeiro_acesso = true;
-    }
+        $sqlTotalTrans = "SELECT COUNT(*) FROM Registro WHERE FKUsuario = :uid";
+        $stmtTotal     = $pdo->prepare($sqlTotalTrans);
+        $stmtTotal->execute([':uid' => $usuario_id]);
+        if ($stmtTotal->fetchColumn() == 0) {
+            $is_primeiro_acesso = true;
+        }
     } catch (PDOException $e) {}
 
-    // --- LÓGICA DE NAVEGAÇÃO DE TEMPO (MESES) ---
+    // --- LÓGICA DE NAVEGAÇÃO DE TEMPO ---
     $mes_atual = isset($_GET['mes']) ? (int) $_GET['mes'] : (int) date('m');
     $ano_atual = isset($_GET['ano']) ? (int) $_GET['ano'] : (int) date('Y');
 
     $mes_ant = $mes_atual - 1;
     $ano_ant = $ano_atual;
-    if ($mes_ant < 1) {$mes_ant = 12;
-    $ano_ant--;}
+    if ($mes_ant < 1) { $mes_ant = 12; $ano_ant--; }
 
     $mes_prox = $mes_atual + 1;
     $ano_prox = $ano_atual;
-    if ($mes_prox > 12) {$mes_prox = 1;
-    $ano_prox++;}
+    if ($mes_prox > 12) { $mes_prox = 1; $ano_prox++; }
 
     $meses_pt = [1 => 'Janeiro', 2 => 'Fevereiro', 3 => 'Março', 4 => 'Abril', 5 => 'Maio', 6 => 'Junho', 7 => 'Julho', 8 => 'Agosto', 9 => 'Setembro', 10 => 'Outubro', 11 => 'Novembro', 12 => 'Dezembro'];
     $nome_mes = $meses_pt[$mes_atual];
@@ -115,107 +122,105 @@
     // --- LÓGICA DE AÇÃO: ALTERAR STATUS, EXCLUIR OU AJUSTAR SALDO ---
     if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'])) {
 
-    $carteira_url = isset($_GET['carteira']) ? "&carteira=" . $_GET['carteira'] : "";
-    $redirectBase = "dashboard.php?mes={$mes_atual}&ano={$ano_atual}{$carteira_url}";
+        $carteira_url = isset($_GET['carteira']) ? "&carteira=" . $_GET['carteira'] : "";
+        $redirectBase = "dashboard.php?mes={$mes_atual}&ano={$ano_atual}{$carteira_url}";
 
-    // LÓGICA DE STATUS
-    if ($_POST['action'] === 'toggle_status') {
-        $id_registro = $_POST['registro_id'];
-        $novo_status = $_POST['novo_status'];
-        if (in_array($novo_status, ['pendente', 'efetivado'])) {
+        if ($_POST['action'] === 'toggle_status') {
+            $id_registro = $_POST['registro_id'];
+            $novo_status = $_POST['novo_status'];
+            if (in_array($novo_status, ['pendente', 'efetivado'])) {
+                try {
+                    $sqlToggle  = "UPDATE Registro SET StatusRegistro = :status WHERE IDRegistro = :id AND FKUsuario = :uid";
+                    $stmtToggle = $pdo->prepare($sqlToggle);
+                    $stmtToggle->execute([':status' => $novo_status, ':id' => $id_registro, ':uid' => $usuario_id]);
+                    header("Location: " . $redirectBase);
+                    exit;
+                } catch (PDOException $e) {}
+            }
+        }
+
+        if ($_POST['action'] === 'excluir_registro') {
+            $id_registro = $_POST['registro_id'];
             try {
-                $sqlToggle  = 'UPDATE Registro SET "StatusRegistro" = :status WHERE "IDRegistro" = :id AND "FKUsuario" = :uid';
-                $stmtToggle = $pdo->prepare($sqlToggle);
-                $stmtToggle->execute([':status' => $novo_status, ':id' => $id_registro, ':uid' => $usuario_id]);
-                header("Location: " . $redirectBase);
+                $sqlDel  = "DELETE FROM Registro WHERE IDRegistro = :id AND FKUsuario = :uid";
+                $stmtDel = $pdo->prepare($sqlDel);
+                $stmtDel->execute([':id' => $id_registro, ':uid' => $usuario_id]);
+                header("Location: " . $redirectBase . "&sucesso=excluido");
                 exit;
             } catch (PDOException $e) {}
         }
-    }
 
-    // LÓGICA DE EXCLUSÃO
-    if ($_POST['action'] === 'excluir_registro') {
-        $id_registro = $_POST['registro_id'];
-        try {
-            $sqlDel  = 'DELETE FROM Registro WHERE "IDRegistro" = :id AND "FKUsuario" = :uid';
-            $stmtDel = $pdo->prepare($sqlDel);
-            $stmtDel->execute([':id' => $id_registro, ':uid' => $usuario_id]);
-            header("Location: " . $redirectBase . "&sucesso=excluido");
-            exit;
-        } catch (PDOException $e) {}
-    }
+        if ($_POST['action'] === 'ajustar_saldo') {
+            $saldo_informado    = (float) str_replace(',', '.', $_POST['saldo_real']);
+            $saldo_sistema      = (float) $_POST['saldo_sistema_atual'];
+            $carteira_id_ajuste = $_POST['carteira_id_ajuste'];
 
-    // LÓGICA DO AJUSTE DE SALDO INTELIGENTE
-    if ($_POST['action'] === 'ajustar_saldo') {
-        $saldo_informado    = (float) str_replace(',', '.', $_POST['saldo_real']);
-        $saldo_sistema      = (float) $_POST['saldo_sistema_atual'];
-        $carteira_id_ajuste = $_POST['carteira_id_ajuste'];
+            $diferenca = $saldo_informado - $saldo_sistema;
 
-        $diferenca = $saldo_informado - $saldo_sistema;
+            if (abs($diferenca) > 0.009) {
+                $tipoRegistro  = ($diferenca > 0) ? 'receita' : 'despesa';
+                $valorRegistro = abs($diferenca);
+                $descricao     = ($saldo_sistema == 0) ? 'Saldo Inicial' : 'Ajuste de Saldo';
 
-        if (abs($diferenca) > 0.009) {
-            $tipoRegistro  = ($diferenca > 0) ? 'receita' : 'despesa';
-            $valorRegistro = abs($diferenca);
-            $descricao     = ($saldo_sistema == 0) ? 'Saldo Inicial' : 'Ajuste de Saldo';
-
-            try {
-                // Procura categoria de Ajuste
-                $sqlCat  = 'SELECT "IDCategoria" FROM Categoria WHERE "FKUsuario" = :uid AND "NomeCategoria" = \'Ajuste de Saldo\' AND "TipoCategoria" = :tipo LIMIT 1';
-                $stmtCat = $pdo->prepare($sqlCat);
-                $stmtCat->execute([':uid' => $usuario_id, ':tipo' => $tipoRegistro]);
-                $catId = $stmtCat->fetchColumn();
-
-                // Cria categoria de Ajuste com engrenagem se não existir
-                if (! $catId) {
-                    $sqlNovaCat  = 'INSERT INTO Categoria ("NomeCategoria", "TipoCategoria", "IconeCategoria", "FKUsuario") VALUES (\'Ajuste de Saldo\', :tipo, \'bi-gear-fill\', :uid)';
-                    $stmtNovaCat = $pdo->prepare($sqlNovaCat);
-                    $stmtNovaCat->execute([':tipo' => $tipoRegistro, ':uid' => $usuario_id]);
-
+                try {
+                    $sqlCat  = "SELECT IDCategoria FROM Categoria WHERE FKUsuario = :uid AND NomeCategoria = 'Ajuste de Saldo' AND TipoCategoria = :tipo LIMIT 1";
+                    $stmtCat = $pdo->prepare($sqlCat);
                     $stmtCat->execute([':uid' => $usuario_id, ':tipo' => $tipoRegistro]);
                     $catId = $stmtCat->fetchColumn();
-                }
 
-                $sqlAjuste = '
-                    INSERT INTO Registro (
-                        "TipoRegistro", "Valor", "Descricao", "MomentoRegistro",
-                        "StatusRegistro", "FKCarteira", "FKUsuario", "FKCategoria"
-                    ) VALUES (
-                        :tipo, :valor, :descricao, CURRENT_DATE,
-                        \'efetivado\', :carteira, :usuario, :categoria
-                    )
-                ';
-                $stmtAjuste = $pdo->prepare($sqlAjuste);
-                $stmtAjuste->execute([
-                    ':tipo'      => $tipoRegistro,
-                    ':valor'     => $valorRegistro,
-                    ':descricao' => $descricao,
-                    ':carteira'  => $carteira_id_ajuste,
-                    ':usuario'   => $usuario_id,
-                    ':categoria' => $catId,
-                ]);
-                header("Location: " . $redirectBase . "&sucesso=ajustado");
+                    if (!$catId) {
+                        // CORREÇÃO: Adicionado IDCategoria
+                        $sqlNovaCat  = "INSERT INTO Categoria (IDCategoria, NomeCategoria, TipoCategoria, IconeCategoria, FKUsuario) VALUES (:id, 'Ajuste de Saldo', :tipo, 'bi-gear-fill', :uid)";
+                        $stmtNovaCat = $pdo->prepare($sqlNovaCat);
+                        $stmtNovaCat->execute([':id' => gerarUuid(), ':tipo' => $tipoRegistro, ':uid' => $usuario_id]);
+
+                        $stmtCat->execute([':uid' => $usuario_id, ':tipo' => $tipoRegistro]);
+                        $catId = $stmtCat->fetchColumn();
+                    }
+
+                    // CORREÇÃO: Adicionado IDRegistro
+                    $sqlAjuste = "
+                        INSERT INTO Registro (
+                            IDRegistro, TipoRegistro, Valor, Descricao, MomentoRegistro,
+                            StatusRegistro, FKCarteira, FKUsuario, FKCategoria
+                        ) VALUES (
+                            :id, :tipo, :valor, :descricao, CURRENT_DATE,
+                            'efetivado', :carteira, :usuario, :categoria
+                        )
+                    ";
+                    $stmtAjuste = $pdo->prepare($sqlAjuste);
+                    $stmtAjuste->execute([
+                        ':id'        => gerarUuid(),
+                        ':tipo'      => $tipoRegistro,
+                        ':valor'     => $valorRegistro,
+                        ':descricao' => $descricao,
+                        ':carteira'  => $carteira_id_ajuste,
+                        ':usuario'   => $usuario_id,
+                        ':categoria' => $catId,
+                    ]);
+                    header("Location: " . $redirectBase . "&sucesso=ajustado");
+                    exit;
+                } catch (PDOException $e) {}
+            } else {
+                header("Location: " . $redirectBase);
                 exit;
-            } catch (PDOException $e) {}
-        } else {
-            header("Location: " . $redirectBase);
-            exit;
+            }
         }
-    }
     }
 
     // --- LÓGICA DO FILTRO DE CARTEIRA ---
     if (isset($_GET['carteira'])) {
-    $carteira_selecionada = $_GET['carteira'];
+        $carteira_selecionada = $_GET['carteira'];
     } else {
-    $carteira_selecionada = ($totalCarteiras > 0) ? $carteiras[0]['IDCarteira'] : null;
+        $carteira_selecionada = ($totalCarteiras > 0) ? $carteiras[0]['IDCarteira'] : null;
     }
 
-    $nome_carteira_atual = Carteira;
+    $nome_carteira_atual = 'Carteira';
     foreach ($carteiras as $cart) {
-    if ($cart['IDCarteira'] == $carteira_selecionada) {
-        $nome_carteira_atual = $cart['TipoCarteira'];
-        break;
-    }
+        if ($cart['IDCarteira'] == $carteira_selecionada) {
+            $nome_carteira_atual = $cart['TipoCarteira'];
+            break;
+        }
     }
 
     $link_ant  = "?mes={$mes_ant}&ano={$ano_ant}" . ($carteira_selecionada ? "&carteira={$carteira_selecionada}" : "");
@@ -228,73 +233,75 @@
     $transacoes  = [];
 
     if ($carteira_selecionada) {
-    try {
-        $sqlSaldo = '
-            SELECT
-                COALESCE(SUM(CASE WHEN "TipoRegistro" = \'receita\' THEN "Valor" ELSE 0 END), 0) as total_rec_hist,
-                COALESCE(SUM(CASE WHEN "TipoRegistro" = \'despesa\' THEN "Valor" ELSE 0 END), 0) as total_des_hist
-            FROM Registro
-            WHERE "FKCarteira" = :carteira_id
-              AND "FKUsuario" = :usuario_id
-              AND "StatusRegistro" = \'efetivado\'
-        ';
-        $stmtSaldo = $pdo->prepare($sqlSaldo);
-        $stmtSaldo->execute([':carteira_id' => $carteira_selecionada, ':usuario_id' => $usuario_id]);
-        $resultSaldo = $stmtSaldo->fetch();
+        try {
+            $sqlSaldo = "
+                SELECT
+                    COALESCE(SUM(CASE WHEN TipoRegistro = 'receita' THEN Valor ELSE 0 END), 0) as total_rec_hist,
+                    COALESCE(SUM(CASE WHEN TipoRegistro = 'despesa' THEN Valor ELSE 0 END), 0) as total_des_hist
+                FROM Registro
+                WHERE FKCarteira = :carteira_id
+                  AND FKUsuario = :usuario_id
+                  AND StatusRegistro = 'efetivado'
+            ";
+            $stmtSaldo = $pdo->prepare($sqlSaldo);
+            $stmtSaldo->execute([':carteira_id' => $carteira_selecionada, ':usuario_id' => $usuario_id]);
+            $resultSaldo = $stmtSaldo->fetch();
 
-        if ($resultSaldo) {
-            $saldoAtual = (float) $resultSaldo['total_rec_hist'] - (float) $resultSaldo['total_des_hist'];
-        }
+            if ($resultSaldo) {
+                $saldoAtual = (float) $resultSaldo['total_rec_hist'] - (float) $resultSaldo['total_des_hist'];
+            }
 
-        $sqlMes = '
-            SELECT
-                COALESCE(SUM(CASE WHEN "TipoRegistro" = \'receita\' THEN "Valor" ELSE 0 END), 0) as total_receitas,
-                COALESCE(SUM(CASE WHEN "TipoRegistro" = \'despesa\' THEN "Valor" ELSE 0 END), 0) as total_despesas
-            FROM Registro
-            WHERE "FKCarteira" = :carteira_id
-              AND "FKUsuario" = :usuario_id
-              AND "StatusRegistro" = \'efetivado\'
-              AND EXTRACT(MONTH FROM "MomentoRegistro") = :mes
-              AND EXTRACT(YEAR FROM "MomentoRegistro") = :ano
-        ';
-        $stmtMes = $pdo->prepare($sqlMes);
-        $stmtMes->execute([
-            ':carteira_id' => $carteira_selecionada,
-            ':usuario_id'  => $usuario_id,
-            ':mes'         => $mes_atual,
-            ':ano'         => $ano_atual,
-        ]);
-        $resultMes = $stmtMes->fetch();
+            // CORREÇÃO: EXTRACT trocado por MONTH() e YEAR()
+            $sqlMes = "
+                SELECT
+                    COALESCE(SUM(CASE WHEN TipoRegistro = 'receita' THEN Valor ELSE 0 END), 0) as total_receitas,
+                    COALESCE(SUM(CASE WHEN TipoRegistro = 'despesa' THEN Valor ELSE 0 END), 0) as total_despesas
+                FROM Registro
+                WHERE FKCarteira = :carteira_id
+                  AND FKUsuario = :usuario_id
+                  AND StatusRegistro = 'efetivado'
+                  AND MONTH(MomentoRegistro) = :mes
+                  AND YEAR(MomentoRegistro) = :ano
+            ";
+            $stmtMes = $pdo->prepare($sqlMes);
+            $stmtMes->execute([
+                ':carteira_id' => $carteira_selecionada,
+                ':usuario_id'  => $usuario_id,
+                ':mes'         => $mes_atual,
+                ':ano'         => $ano_atual,
+            ]);
+            $resultMes = $stmtMes->fetch();
 
-        if ($resultMes) {
-            $receitasMes = (float) $resultMes['total_receitas'];
-            $despesasMes = (float) $resultMes['total_despesas'];
-        }
+            if ($resultMes) {
+                $receitasMes = (float) $resultMes['total_receitas'];
+                $despesasMes = (float) $resultMes['total_despesas'];
+            }
 
-        $sqlTransacoes = '
-            SELECT
-                r."IDRegistro", r."MomentoRegistro", r."Valor", r."Descricao", r."TipoRegistro", r."StatusRegistro",
-                r."DataVencimento", r."Recorrente", r."DiaVencimento",
-                c."NomeCategoria", c."IconeCategoria"
-            FROM Registro r
-            LEFT JOIN Categoria c ON r."FKCategoria" = c."IDCategoria"
-            WHERE r."FKCarteira" = :carteira_id
-              AND r."FKUsuario" = :usuario_id
-              AND EXTRACT(MONTH FROM r."MomentoRegistro") = :mes
-              AND EXTRACT(YEAR FROM r."MomentoRegistro") = :ano
-            ORDER BY r."MomentoRegistro" DESC, r."created_at" DESC
-            LIMIT 50
-        ';
-        $stmtTrans = $pdo->prepare($sqlTransacoes);
-        $stmtTrans->execute([
-            ':carteira_id' => $carteira_selecionada,
-            ':usuario_id'  => $usuario_id,
-            ':mes'         => $mes_atual,
-            ':ano'         => $ano_atual,
-        ]);
-        $transacoes = $stmtTrans->fetchAll();
+            // CORREÇÃO: EXTRACT trocado por MONTH() e YEAR()
+            $sqlTransacoes = "
+                SELECT
+                    r.IDRegistro, r.MomentoRegistro, r.Valor, r.Descricao, r.TipoRegistro, r.StatusRegistro,
+                    r.DataVencimento, r.Recorrente, r.DiaVencimento,
+                    c.NomeCategoria, c.IconeCategoria
+                FROM Registro r
+                LEFT JOIN Categoria c ON r.FKCategoria = c.IDCategoria
+                WHERE r.FKCarteira = :carteira_id
+                  AND r.FKUsuario = :usuario_id
+                  AND MONTH(r.MomentoRegistro) = :mes
+                  AND YEAR(r.MomentoRegistro) = :ano
+                ORDER BY r.MomentoRegistro DESC, r.created_at DESC
+                LIMIT 50
+            ";
+            $stmtTrans = $pdo->prepare($sqlTransacoes);
+            $stmtTrans->execute([
+                ':carteira_id' => $carteira_selecionada,
+                ':usuario_id'  => $usuario_id,
+                ':mes'         => $mes_atual,
+                ':ano'         => $ano_atual,
+            ]);
+            $transacoes = $stmtTrans->fetchAll();
 
-    } catch (PDOException $e) {}
+        } catch (PDOException $e) {}
     }
 
     require_once 'geral/header.php';
