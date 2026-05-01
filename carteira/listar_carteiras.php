@@ -21,7 +21,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action']) && $_POST['
     
     try {
         // Trava de Segurança: Verifica se a carteira tem transações atreladas
-        $sqlCheck = 'SELECT COUNT(*) FROM Registro WHERE "FKCarteira" = :cid';
+        $sqlCheck = "SELECT COUNT(*) FROM Registro WHERE FKCarteira = :cid";
         $stmtCheck = $pdo->prepare($sqlCheck);
         $stmtCheck->execute([':cid' => $id_carteira]);
         $qtdRegistros = $stmtCheck->fetchColumn();
@@ -30,7 +30,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action']) && $_POST['
             $erro = "Não é possível excluir esta carteira pois ela possui {$qtdRegistros} transação(ões) registrada(s). Exclua ou transfira os registros antes de apagar a carteira.";
         } else {
             // Se estiver vazia, pode deletar
-            $sqlDel = 'DELETE FROM Carteira WHERE "IDCarteira" = :cid AND "FKUsuarioDono" = :uid';
+            $sqlDel = "DELETE FROM Carteira WHERE IDCarteira = :cid AND FKUsuarioDono = :uid";
             $stmtDel = $pdo->prepare($sqlDel);
             $stmtDel->execute([':cid' => $id_carteira, ':uid' => $usuario_id]);
             
@@ -42,6 +42,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action']) && $_POST['
         $erro = "Erro ao tentar excluir a carteira.";
     }
 }
+
 // --- PROCESSA A MESCLA DE CARTEIRAS ---
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action']) && $_POST['action'] === 'mesclar_carteira') {
     $carteira_origem = $_POST['carteira_origem'];
@@ -54,7 +55,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action']) && $_POST['
             $pdo->beginTransaction(); // Inicia uma transação segura
 
             // 1. Transfere todos os registros da carteira Velha para a Nova
-            $sqlTransfer = 'UPDATE Registro SET "FKCarteira" = :destino WHERE "FKCarteira" = :origem AND "FKUsuario" = :uid';
+            $sqlTransfer = "UPDATE Registro SET FKCarteira = :destino WHERE FKCarteira = :origem AND FKUsuario = :uid";
             $stmtTransfer = $pdo->prepare($sqlTransfer);
             $stmtTransfer->execute([
                 ':destino' => $carteira_destino,
@@ -63,7 +64,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action']) && $_POST['
             ]);
 
             // 2. Apaga a carteira Velha (que agora está vazia)
-            $sqlDel = 'DELETE FROM Carteira WHERE "IDCarteira" = :cid AND "FKUsuarioDono" = :uid';
+            $sqlDel = "DELETE FROM Carteira WHERE IDCarteira = :cid AND FKUsuarioDono = :uid";
             $stmtDel = $pdo->prepare($sqlDel);
             $stmtDel->execute([':cid' => $carteira_origem, ':uid' => $usuario_id]);
 
@@ -77,6 +78,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action']) && $_POST['
         }
     }
 }
+
 // Mensagens de sucesso vindas da URL
 if (isset($_GET['sucesso'])) {
     if ($_GET['sucesso'] === 'excluida') $sucesso = "Carteira excluída com sucesso!";
@@ -89,16 +91,16 @@ if (isset($_GET['sucesso'])) {
 $carteiras = [];
 try {
     // SQL Inteligente: Já calcula o saldo exato de cada carteira direto no banco
-    $sqlCarteiras = '
-        SELECT c."IDCarteira", c."TipoCarteira",
-               COALESCE(SUM(CASE WHEN r."TipoRegistro" = \'receita\' THEN r."Valor" ELSE 0 END), 0) -
-               COALESCE(SUM(CASE WHEN r."TipoRegistro" = \'despesa\' THEN r."Valor" ELSE 0 END), 0) as "SaldoAtual"
+    $sqlCarteiras = "
+        SELECT c.IDCarteira, c.TipoCarteira,
+               COALESCE(SUM(CASE WHEN r.TipoRegistro = 'receita' THEN r.Valor ELSE 0 END), 0) -
+               COALESCE(SUM(CASE WHEN r.TipoRegistro = 'despesa' THEN r.Valor ELSE 0 END), 0) as SaldoAtual
         FROM Carteira c
-        LEFT JOIN Registro r ON c."IDCarteira" = r."FKCarteira" AND r."StatusRegistro" = \'efetivado\'
-        WHERE c."FKUsuarioDono" = :uid
-        GROUP BY c."IDCarteira", c."TipoCarteira"
-        ORDER BY c."TipoCarteira" ASC
-    ';
+        LEFT JOIN Registro r ON c.IDCarteira = r.FKCarteira AND r.StatusRegistro = 'efetivado'
+        WHERE c.FKUsuarioDono = :uid
+        GROUP BY c.IDCarteira, c.TipoCarteira
+        ORDER BY c.TipoCarteira ASC
+    ";
     $stmt = $pdo->prepare($sqlCarteiras);
     $stmt->execute([':uid' => $usuario_id]);
     $carteiras = $stmt->fetchAll();
@@ -246,23 +248,18 @@ require_once '../geral/header.php';
 
 <script>
     function abrirModalMescla(idOrigem, nomeOrigem) {
-        // Preenche os dados ocultos no formulário do Modal
         document.getElementById('id_carteira_origem').value = idOrigem;
         document.getElementById('nome_carteira_origem').textContent = nomeOrigem;
 
         const selectDestino = document.getElementById('carteira_destino');
-        
-        // Garante que todas as opções estão visíveis
         Array.from(selectDestino.options).forEach(opt => opt.style.display = 'block');
 
-        // Esconde a própria carteira de origem (não faz sentido transferir pra ela mesma)
         Array.from(selectDestino.options).forEach(opt => {
             if (opt.value === idOrigem) {
                 opt.style.display = 'none';
             }
         });
 
-        // Reseta o campo e abre o modal
         selectDestino.value = '';
         new bootstrap.Modal(document.getElementById('modalMesclar')).show();
     }
@@ -320,7 +317,6 @@ require_once '../geral/header.php';
 </style>
 
 <script>
-    // Limpeza da URL para não repetir alertas no F5
     if (window.history.replaceState) {
         const url = new URL(window.location);
         if (url.searchParams.has('sucesso')) {
