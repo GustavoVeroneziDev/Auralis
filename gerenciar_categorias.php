@@ -32,7 +32,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action']) && $_POST['
         $erro = "O nome da categoria não pode estar vazio.";
     } else {
         try {
-            $sqlInsert = 'INSERT INTO "Categoria" ("NomeCategoria", "TipoCategoria", "IconeCategoria", "FKUsuario") VALUES (:nome, :tipo, :icone, :uid)';
+            $sqlInsert = 'INSERT INTO Categoria ("NomeCategoria", "TipoCategoria", "IconeCategoria", "FKUsuario") VALUES (:nome, :tipo, :icone, :uid)';
             $stmtInsert = $pdo->prepare($sqlInsert);
             $stmtInsert->execute([
                 ':nome'  => $nomeCategoria, 
@@ -54,7 +54,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action']) && $_POST['
 if (isset($_GET['excluir'])) {
     $idExcluir = $_GET['excluir'];
     try {
-        $sqlDelete = 'DELETE FROM "Categoria" WHERE "IDCategoria" = :id AND "FKUsuario" = :uid';
+        $sqlDelete = 'DELETE FROM Categoria WHERE "IDCategoria" = :id AND "FKUsuario" = :uid';
         $stmtDelete = $pdo->prepare($sqlDelete);
         $stmtDelete->execute([':id' => $idExcluir, ':uid' => $usuario_id]);
         header("Location: gerenciar_categorias.php?sucesso=excluida");
@@ -71,8 +71,8 @@ $categorias_despesa = [];
 try {
     $sqlBusca = '
         SELECT c."IDCategoria", c."NomeCategoria", c."TipoCategoria", c."IconeCategoria", COUNT(r."IDRegistro") as total_usos
-        FROM "Categoria" c
-        LEFT JOIN "Registro" r ON c."IDCategoria" = r."FKCategoria"
+        FROM Categoria c
+        LEFT JOIN Registro r ON c."IDCategoria" = r."FKCategoria"
         WHERE c."FKUsuario" = :uid
         GROUP BY c."IDCategoria", c."NomeCategoria", c."TipoCategoria", c."IconeCategoria"
         ORDER BY c."NomeCategoria" ASC

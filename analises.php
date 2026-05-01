@@ -42,10 +42,10 @@
     $sql = '
         SELECT
             r."Valor", r."Descricao", r."TipoRegistro", r."MomentoRegistro",
-            COALESCE(c."NomeCategoria", \'Sem Categoria\') as "Categoria",
+            COALESCE(c."NomeCategoria", \'Sem Categoria\') as Categoria,
             COALESCE(c."IconeCategoria", \'bi-tag\') as "Icone"
-        FROM "Registro" r
-        LEFT JOIN "Categoria" c ON r."FKCategoria" = c."IDCategoria"
+        FROM Registro r
+        LEFT JOIN Categoria c ON r."FKCategoria" = c."IDCategoria"
         WHERE r."FKUsuario" = :uid
           AND r."StatusRegistro" = \'efetivado\'
           AND EXTRACT(MONTH FROM r."MomentoRegistro") = :mes

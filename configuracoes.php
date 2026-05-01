@@ -24,7 +24,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
         if (!empty($nome)) {
             try {
-                $sqlUpd = 'UPDATE "Usuario" SET "Nome" = :nome, "Telefone" = :telefone WHERE "IDUsuario" = :uid';
+                $sqlUpd = 'UPDATE usuario SET "Nome" = :nome, "Telefone" = :telefone WHERE "IDUsuario" = :uid';
                 $stmtUpd = $pdo->prepare($sqlUpd);
                 $stmtUpd->execute([
                     ':nome' => $nome,
@@ -53,14 +53,14 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             $tipo_mensagem = "warning";
         } else {
             try {
-                $sqlSenha = 'SELECT "Senha" FROM "Usuario" WHERE "IDUsuario" = :uid';
+                $sqlSenha = 'SELECT "Senha" FROM usuario WHERE "IDUsuario" = :uid';
                 $stmtSenha = $pdo->prepare($sqlSenha);
                 $stmtSenha->execute([':uid' => $usuario_id]);
                 $hashBanco = $stmtSenha->fetchColumn();
 
                 if (password_verify($senha_atual, $hashBanco)) {
                     $novoHash = password_hash($nova_senha, PASSWORD_DEFAULT);
-                    $sqlUpdSenha = 'UPDATE "Usuario" SET "Senha" = :senha WHERE "IDUsuario" = :uid';
+                    $sqlUpdSenha = 'UPDATE usuario SET "Senha" = :senha WHERE "IDUsuario" = :uid';
                     $stmtUpdSenha = $pdo->prepare($sqlUpdSenha);
                     $stmtUpdSenha->execute([':senha' => $novoHash, ':uid' => $usuario_id]);
 
@@ -83,7 +83,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
         try {
             // Verifica a senha antes de qualquer loucura
-            $sqlSenha = 'SELECT "Senha" FROM "Usuario" WHERE "IDUsuario" = :uid';
+            $sqlSenha = 'SELECT "Senha" FROM usuario WHERE "IDUsuario" = :uid';
             $stmtSenha = $pdo->prepare($sqlSenha);
             $stmtSenha->execute([':uid' => $usuario_id]);
             $hashBanco = $stmtSenha->fetchColumn();
@@ -91,7 +91,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             if (password_verify($senha_confirmacao, $hashBanco)) {
                 // Senha bateu. Exterminar o usuário!
                 // O banco PostgreSQL (com "ON DELETE CASCADE") apagará junto as carteiras, transações e configurações dele.
-                $sqlDel = 'DELETE FROM "Usuario" WHERE "IDUsuario" = :uid';
+                $sqlDel = 'DELETE FROM usuario WHERE "IDUsuario" = :uid';
                 $stmtDel = $pdo->prepare($sqlDel);
                 $stmtDel->execute([':uid' => $usuario_id]);
 
@@ -119,7 +119,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 // 2. BUSCA OS DADOS ATUAIS PARA PREENCHER O FORMULÁRIO
 // ==============================================================================
 try {
-    $sqlBusca = 'SELECT "Nome", "Email", "Documento", "Telefone" FROM "Usuario" WHERE "IDUsuario" = :uid LIMIT 1';
+    $sqlBusca = 'SELECT "Nome", email, "Documento", "Telefone" FROM usuario WHERE "IDUsuario" = :uid LIMIT 1';
     $stmtBusca = $pdo->prepare($sqlBusca);
     $stmtBusca->execute([':uid' => $usuario_id]);
     $dadosUsuario = $stmtBusca->fetch(PDO::FETCH_ASSOC);
@@ -158,7 +158,7 @@ require_once 'geral/header.php';
                         <div class="row mb-3">
                             <div class="col-md-6">
                                 <label class="form-label text-secondary small mb-1">E-mail de Acesso</label>
-                                <input type="email" class="form-control bg-body-tertiary border-secondary-subtle text-secondary shadow-none" value="<?= htmlspecialchars($dadosUsuario['Email']) ?>" disabled>
+                                <input type=email class="form-control bg-body-tertiary border-secondary-subtle text-secondary shadow-none" value="<?= htmlspecialchars($dadosUsuario['Email']) ?>" disabled>
                             </div>
                             <div class="col-md-6">
                                 <label class="form-label text-secondary small mb-1">Documento (CPF/CNPJ)</label>

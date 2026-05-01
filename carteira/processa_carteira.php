@@ -29,7 +29,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     // ==========================================================
     try {
         // Checa se o usuário já tem uma carteira com ESSE nome exato
-        $sqlCheck = 'SELECT COUNT(*) FROM "Carteira" WHERE "TipoCarteira" = :tipoCarteira AND "FKUsuarioDono" = :usuarioId';
+        $sqlCheck = 'SELECT COUNT(*) FROM Carteira WHERE "TipoCarteira" = :tipoCarteira AND "FKUsuarioDono" = :usuarioId';
         // Se for edição, temos que ignorar a própria carteira que estamos editando
         if ($id_carteira) {
             $sqlCheck .= ' AND "IDCarteira" != :idCarteira';
@@ -65,7 +65,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             // MODO EDIÇÃO (UPDATE)
             // ==========================================
             // A trava "FKUsuarioDono = :usuarioId" garante que ele só edita se a carteira for dele
-            $sql = 'UPDATE "Carteira" SET "TipoCarteira" = :tipoCarteira WHERE "IDCarteira" = :idCarteira AND "FKUsuarioDono" = :usuarioId';
+            $sql = 'UPDATE Carteira SET "TipoCarteira" = :tipoCarteira WHERE "IDCarteira" = :idCarteira AND "FKUsuarioDono" = :usuarioId';
             $stmt = $pdo->prepare($sql);
             $stmt->execute([
                 ':tipoCarteira' => $tipoCarteira,
@@ -77,7 +77,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             // ==========================================
             // MODO CRIAÇÃO (INSERT)
             // ==========================================
-            $sql = 'INSERT INTO "Carteira" ("TipoCarteira", "FKUsuarioDono") VALUES (:tipoCarteira, :usuarioId)';
+            $sql = 'INSERT INTO Carteira ("TipoCarteira", "FKUsuarioDono") VALUES (:tipoCarteira, :usuarioId)';
             $stmt = $pdo->prepare($sql);
             $stmt->execute([
                 ':tipoCarteira' => $tipoCarteira,

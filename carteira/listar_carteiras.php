@@ -21,7 +21,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action']) && $_POST['
     
     try {
         // Trava de Segurança: Verifica se a carteira tem transações atreladas
-        $sqlCheck = 'SELECT COUNT(*) FROM "Registro" WHERE "FKCarteira" = :cid';
+        $sqlCheck = 'SELECT COUNT(*) FROM Registro WHERE "FKCarteira" = :cid';
         $stmtCheck = $pdo->prepare($sqlCheck);
         $stmtCheck->execute([':cid' => $id_carteira]);
         $qtdRegistros = $stmtCheck->fetchColumn();
@@ -30,7 +30,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action']) && $_POST['
             $erro = "Não é possível excluir esta carteira pois ela possui {$qtdRegistros} transação(ões) registrada(s). Exclua ou transfira os registros antes de apagar a carteira.";
         } else {
             // Se estiver vazia, pode deletar
-            $sqlDel = 'DELETE FROM "Carteira" WHERE "IDCarteira" = :cid AND "FKUsuarioDono" = :uid';
+            $sqlDel = 'DELETE FROM Carteira WHERE "IDCarteira" = :cid AND "FKUsuarioDono" = :uid';
             $stmtDel = $pdo->prepare($sqlDel);
             $stmtDel->execute([':cid' => $id_carteira, ':uid' => $usuario_id]);
             
@@ -54,7 +54,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action']) && $_POST['
             $pdo->beginTransaction(); // Inicia uma transação segura
 
             // 1. Transfere todos os registros da carteira Velha para a Nova
-            $sqlTransfer = 'UPDATE "Registro" SET "FKCarteira" = :destino WHERE "FKCarteira" = :origem AND "FKUsuario" = :uid';
+            $sqlTransfer = 'UPDATE Registro SET "FKCarteira" = :destino WHERE "FKCarteira" = :origem AND "FKUsuario" = :uid';
             $stmtTransfer = $pdo->prepare($sqlTransfer);
             $stmtTransfer->execute([
                 ':destino' => $carteira_destino,
@@ -63,7 +63,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action']) && $_POST['
             ]);
 
             // 2. Apaga a carteira Velha (que agora está vazia)
-            $sqlDel = 'DELETE FROM "Carteira" WHERE "IDCarteira" = :cid AND "FKUsuarioDono" = :uid';
+            $sqlDel = 'DELETE FROM Carteira WHERE "IDCarteira" = :cid AND "FKUsuarioDono" = :uid';
             $stmtDel = $pdo->prepare($sqlDel);
             $stmtDel->execute([':cid' => $carteira_origem, ':uid' => $usuario_id]);
 
@@ -93,8 +93,8 @@ try {
         SELECT c."IDCarteira", c."TipoCarteira",
                COALESCE(SUM(CASE WHEN r."TipoRegistro" = \'receita\' THEN r."Valor" ELSE 0 END), 0) -
                COALESCE(SUM(CASE WHEN r."TipoRegistro" = \'despesa\' THEN r."Valor" ELSE 0 END), 0) as "SaldoAtual"
-        FROM "Carteira" c
-        LEFT JOIN "Registro" r ON c."IDCarteira" = r."FKCarteira" AND r."StatusRegistro" = \'efetivado\'
+        FROM Carteira c
+        LEFT JOIN Registro r ON c."IDCarteira" = r."FKCarteira" AND r."StatusRegistro" = \'efetivado\'
         WHERE c."FKUsuarioDono" = :uid
         GROUP BY c."IDCarteira", c."TipoCarteira"
         ORDER BY c."TipoCarteira" ASC
