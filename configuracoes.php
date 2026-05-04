@@ -95,7 +95,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
                 // 1. Limpa os "NETOS" (Tabelas que dependem do Registro ou Categoria do usuário)
                 $pdo->prepare("DELETE FROM RateioRegistro WHERE FKRegistro IN (SELECT IDRegistro FROM Registro WHERE FKUsuario = :uid)")->execute([':uid' => $usuario_id]);
-                $pdo->prepare("DELETE FROM SubCategoria WHERE FKCategoria IN (SELECT IDCategoria FROM Categoria WHERE FKUsuario = :uid)")->execute([':uid' => $usuario_id]);
+                $pdo->prepare("DELETE FROM SubCategoria WHERE FKCategoriaPai IN (SELECT IDCategoria FROM Categoria WHERE FKUsuario = :uid)")->execute([':uid' => $usuario_id]);
 
                 // 2. Limpa os "FILHOS DIRETOS" do usuário
                 $pdo->prepare("DELETE FROM Registro WHERE FKUsuario = :uid")->execute([':uid' => $usuario_id]);
