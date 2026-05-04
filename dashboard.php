@@ -772,6 +772,14 @@ error_reporting(E_ALL);
                         <button type="submit" class="btn btn-gold btn-lg w-100 fw-bold text-dark rounded-pill py-3 shadow-lg transition-hover">
                             Iniciar Minha Jornada
                         </button>
+
+                        <div class="text-center mt-4">
+                            <!-- O TRUQUE: Esse botão preenche "0" invisivelmente e salva, libertando o usuário! -->
+                            <button type="button" class="btn btn-link text-secondary text-decoration-none small transition-hover" 
+                                    onclick="document.querySelector('input[name=\'saldo_real\']').value = '0'; this.closest('form').submit();">
+                                Pular por enquanto (Começar zerado)
+                            </button>
+                        </div>
                     </form>
                 </div>
             </div>

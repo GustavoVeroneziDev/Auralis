@@ -77,7 +77,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         }
     }
 
-    // AÇÃO 3: EXCLUIR CONTA (A ZONA DE PERIGO)
+// AÇÃO 3: EXCLUIR CONTA (A ZONA DE PERIGO E LIMPEZA TOTAL)
     if (isset($_POST['action']) && $_POST['action'] === 'delete_account') {
         $senha_confirmacao = $_POST['senha_confirmacao'];
 
@@ -90,28 +90,39 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
             if (password_verify($senha_confirmacao, $hashBanco)) {
                 
-                // IMPORTANTE: Como tiramos o PostgreSQL, o MySQL só vai apagar o usuário em cascata
-                // se as Foreign Keys tiverem "ON DELETE CASCADE". Se der erro aqui, é porque você
-                // precisa apagar as carteiras/registros dele primeiro antes do usuário.
-                $sqlDel = "DELETE FROM Usuario WHERE IDUsuario = :uid";
-                $stmtDel = $pdo->prepare($sqlDel);
-                $stmtDel->execute([':uid' => $usuario_id]);
+                // Inicia uma transação segura: se algo der erro no meio, ele desfaz tudo.
+                $pdo->beginTransaction();
 
-                // Destrói a sessão atual
-                session_destroy();
+                // 1. O grande expurgo! Apaga todos os dados do usuário, dos filhos para os pais.
+                $pdo->prepare("DELETE FROM Registro WHERE FKUsuario = :uid")->execute([':uid' => $usuario_id]);
+                $pdo->prepare("DELETE FROM MembroCarteira WHERE FKUsuario = :uid")->execute([':uid' => $usuario_id]);
+                $pdo->prepare("DELETE FROM SubCategoria WHERE FKUsuario = :uid")->execute([':uid' => $usuario_id]);
+                $pdo->prepare("DELETE FROM Categoria WHERE FKUsuario = :uid")->execute([':uid' => $usuario_id]);
+                $pdo->prepare("DELETE FROM ConfiguracaoSistema WHERE FKUsuario = :uid")->execute([':uid' => $usuario_id]);
+                $pdo->prepare("DELETE FROM Carteira WHERE FKUsuarioDono = :uid")->execute([':uid' => $usuario_id]);
                 
-                // Exclui o Cookie do Lembrar-me
-                setcookie('auralis_remember', '', time() - 3600, '/');
+                // 2. Com a casa totalmente limpa, apaga o usuário final
+                $pdo->prepare("DELETE FROM Usuario WHERE IDUsuario = :uid")->execute([':uid' => $usuario_id]);
 
-                // Manda para o login com uma mensagem secreta pela URL
+                // Salva tudo no banco
+                $pdo->commit(); 
+
+                // Destrói a sessão e manda embora
+                session_destroy();
+                setcookie('auralis_remember', '', time() - 3600, '/');
                 header("Location: usuario/login.php?conta=excluida");
                 exit;
+                
             } else {
                 $mensagem = "Senha incorreta. A exclusão foi cancelada para sua segurança.";
                 $tipo_mensagem = "danger";
             }
         } catch (PDOException $e) {
-            $mensagem = "Erro ao excluir conta. Verifique se há dados pendentes.";
+            // Se der erro, desfaz a transação para não corromper o banco
+            if ($pdo->inTransaction()) {
+                $pdo->rollBack();
+            }
+            $mensagem = "Erro ao limpar dados do usuário: " . $e->getMessage();
             $tipo_mensagem = "danger";
         }
     }
