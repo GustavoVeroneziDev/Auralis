@@ -1,0 +1,3 @@
+<IfModule mod_security2.c>
+    SecRuleEngine Off
+</IfModule>
