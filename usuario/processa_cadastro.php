@@ -9,7 +9,6 @@ if (!function_exists('gerarUuid')) {
 
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     
-    // Pegamos APENAS o essencial agora
     $nome           = trim($_POST['nome']);
     $email          = trim($_POST['email']);
     $senha          = $_POST['senha'];
@@ -21,9 +20,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     }
 
     try {
-        // ==============================================================================
-        // BLINDAGEM EXPRESS - Verifica APENAS se o E-mail já existe
-        // ==============================================================================
+        // Verifica se o E-mail já existe
         $sqlCheck = "SELECT Email FROM Usuario WHERE Email = :email LIMIT 1";
         $stmtCheck = $pdo->prepare($sqlCheck);
         $stmtCheck->execute([':email' => $email]);
@@ -32,16 +29,18 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             header("Location: cadastro.php?erro=email_existe");
             exit;
         }
-        // ==============================================================================
 
         $senhaHash = password_hash($senha, PASSWORD_DEFAULT);
         $id_novo_usuario = gerarUuid();
+        
+        // GERA O TOKEN SECRETO DE 64 CARACTERES
+        $token_ativacao = bin2hex(random_bytes(32));
 
-        // O SQL agora insere "NULL" nos campos que deixamos para o futuro e força 'PF' no TipoPessoa
+        // Insere com Status = 'pendente' e salva o Token
         $sql = "INSERT INTO Usuario (
-                    IDUsuario, Nome, Email, Senha, TipoPessoa, NivelAcesso, Documento, DataNascimento, Telefone
+                    IDUsuario, Nome, Email, Senha, TipoPessoa, NivelAcesso, StatusConta, TokenAtivacao
                 ) VALUES (
-                    :id_usuario, :nome, :email, :senha, 'PF', 'Titular', NULL, NULL, NULL
+                    :id_usuario, :nome, :email, :senha, 'PF', 'Titular', 'pendente', :token
                 )";
 
         $stmt = $pdo->prepare($sql);
@@ -49,7 +48,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             ':id_usuario'   => $id_novo_usuario,
             ':nome'         => $nome,
             ':email'        => $email,
-            ':senha'        => $senhaHash
+            ':senha'        => $senhaHash,
+            ':token'        => $token_ativacao
         ]);
 
         // Injeção do Kit Inicial de Categorias
@@ -78,8 +78,29 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             ]);
         }
 
-        // Deu tudo certo, manda pro login!
-        header("Location: login.php?cadastro=sucesso");
+        // ==============================================================================
+        // DISPARO DO E-MAIL DE ATIVAÇÃO
+        // ==============================================================================
+        $para = $email;
+        $assunto = "Ative sua conta no Auralis";
+        
+        $link_ativacao = "https://meuauralis.com/usuario/ativar_conta.php?token=" . $token_ativacao;
+        
+        $mensagem = "Olá, " . explode(' ', $nome)[0] . "!\n\n";
+        $mensagem .= "Falta apenas um passo para você assumir o controle da sua vida financeira.\n";
+        $mensagem .= "Clique no link abaixo para ativar sua conta no Auralis:\n\n";
+        $mensagem .= $link_ativacao . "\n\n";
+        $mensagem .= "Se você não se cadastrou no Auralis, apenas ignore este e-mail.";
+
+        $cabecalhos = "From: nao-responda@meuauralis.com\r\n" .
+                      "Reply-To: suporte@meuauralis.com\r\n" .
+                      "X-Mailer: PHP/" . phpversion();
+
+        // Envia o e-mail
+        mail($para, $assunto, $mensagem, $cabecalhos);
+
+        // Manda o usuário para a tela de aviso!
+        header("Location: aviso_ativacao.php");
         exit;
 
     } catch (PDOException $e) {
