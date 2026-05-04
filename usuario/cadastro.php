@@ -50,7 +50,7 @@ require_once '../geral/header.php';
                         <div class="input-group">
                             <span class="input-group-text bg-dark border-secondary text-secondary"><i class="bi bi-envelope-fill"></i></span>
                             <input type="email" class="form-control form-control-lg bg-dark border-secondary text-light" 
-                                id="email" name="email" required placeholder="seu@email.com">
+                                id="email" name="email" required>
                         </div>
                     </div>
 
