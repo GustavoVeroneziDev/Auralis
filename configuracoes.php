@@ -17,18 +17,16 @@ $tipo_mensagem = '';
 // ==============================================================================
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     
-    // AÇÃO 1: ATUALIZAR DADOS PESSOAIS
+    // AÇÃO 1: ATUALIZAR DADOS PESSOAIS (Agora apenas o Nome)
     if (isset($_POST['action']) && $_POST['action'] === 'update_profile') {
         $nome = trim($_POST['nome']);
-        $telefone = trim($_POST['telefone']);
 
         if (!empty($nome)) {
             try {
-                $sqlUpd = "UPDATE Usuario SET Nome = :nome, Telefone = :telefone WHERE IDUsuario = :uid";
+                $sqlUpd = "UPDATE Usuario SET Nome = :nome WHERE IDUsuario = :uid";
                 $stmtUpd = $pdo->prepare($sqlUpd);
                 $stmtUpd->execute([
                     ':nome' => $nome,
-                    ':telefone' => $telefone,
                     ':uid' => $usuario_id
                 ]);
                 
@@ -77,12 +75,11 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         }
     }
 
-// AÇÃO 3: EXCLUIR CONTA (A ZONA DE PERIGO E LIMPEZA TOTAL)
+    // AÇÃO 3: EXCLUIR CONTA (A ZONA DE PERIGO E LIMPEZA TOTAL)
     if (isset($_POST['action']) && $_POST['action'] === 'delete_account') {
         $senha_confirmacao = $_POST['senha_confirmacao'];
 
         try {
-            // Verifica a senha antes de qualquer loucura
             $sqlSenha = "SELECT Senha FROM Usuario WHERE IDUsuario = :uid";
             $stmtSenha = $pdo->prepare($sqlSenha);
             $stmtSenha->execute([':uid' => $usuario_id]);
@@ -90,27 +87,21 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
             if (password_verify($senha_confirmacao, $hashBanco)) {
                 
-                // Inicia uma transação segura: se algo der erro no meio, ele desfaz tudo.
                 $pdo->beginTransaction();
 
-                // 1. Limpa os "NETOS" (Tabelas que dependem do Registro ou Categoria do usuário)
                 $pdo->prepare("DELETE FROM RateioRegistro WHERE FKRegistro IN (SELECT IDRegistro FROM Registro WHERE FKUsuario = :uid)")->execute([':uid' => $usuario_id]);
                 $pdo->prepare("DELETE FROM SubCategoria WHERE FKCategoriaPai IN (SELECT IDCategoria FROM Categoria WHERE FKUsuario = :uid)")->execute([':uid' => $usuario_id]);
 
-                // 2. Limpa os "FILHOS DIRETOS" do usuário
                 $pdo->prepare("DELETE FROM Registro WHERE FKUsuario = :uid")->execute([':uid' => $usuario_id]);
                 $pdo->prepare("DELETE FROM MembroCarteira WHERE FKUsuario = :uid")->execute([':uid' => $usuario_id]);
                 $pdo->prepare("DELETE FROM Categoria WHERE FKUsuario = :uid")->execute([':uid' => $usuario_id]);
                 $pdo->prepare("DELETE FROM ConfiguracaoSistema WHERE FKUsuario = :uid")->execute([':uid' => $usuario_id]);
                 $pdo->prepare("DELETE FROM Carteira WHERE FKUsuarioDono = :uid")->execute([':uid' => $usuario_id]);
                 
-                // 3. Com a casa totalmente limpa, apaga o USUÁRIO final
                 $pdo->prepare("DELETE FROM Usuario WHERE IDUsuario = :uid")->execute([':uid' => $usuario_id]);
 
-                // Salva tudo no banco
                 $pdo->commit(); 
 
-                // Destrói a sessão e manda embora
                 session_destroy();
                 setcookie('auralis_remember', '', time() - 3600, '/');
                 header("Location: usuario/login.php?conta=excluida");
@@ -121,7 +112,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 $tipo_mensagem = "danger";
             }
         } catch (PDOException $e) {
-            // Se der erro, desfaz a transação para não corromper o banco
             if ($pdo->inTransaction()) {
                 $pdo->rollBack();
             }
@@ -132,10 +122,10 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 }
 
 // ==============================================================================
-// 2. BUSCA OS DADOS ATUAIS PARA PREENCHER O FORMULÁRIO
+// 2. BUSCA OS DADOS ATUAIS PARA PREENCHER O FORMULÁRIO (Apenas Nome e Email)
 // ==============================================================================
 try {
-    $sqlBusca = "SELECT Nome, Email, Documento, Telefone FROM Usuario WHERE IDUsuario = :uid LIMIT 1";
+    $sqlBusca = "SELECT Nome, Email FROM Usuario WHERE IDUsuario = :uid LIMIT 1";
     $stmtBusca = $pdo->prepare($sqlBusca);
     $stmtBusca->execute([':uid' => $usuario_id]);
     $dadosUsuario = $stmtBusca->fetch(PDO::FETCH_ASSOC);
@@ -171,25 +161,14 @@ require_once 'geral/header.php';
                     <form method="POST" action="">
                         <input type="hidden" name="action" value="update_profile">
                         
-                        <div class="row mb-3">
-                            <div class="col-md-6">
-                                <label class="form-label text-secondary small mb-1">E-mail de Acesso</label>
-                                <input type=email class="form-control bg-body-tertiary border-secondary-subtle text-secondary shadow-none" value="<?= htmlspecialchars($dadosUsuario['Email']) ?>" disabled>
-                            </div>
-                            <div class="col-md-6">
-                                <label class="form-label text-secondary small mb-1">Documento (CPF/CNPJ)</label>
-                                <input type="text" class="form-control bg-body-tertiary border-secondary-subtle text-secondary shadow-none" value="<?= htmlspecialchars($dadosUsuario['Documento']) ?>" disabled>
-                            </div>
-                        </div>
-
                         <div class="mb-3">
-                            <label for="nome" class="form-label text-light fw-semibold mb-1">Nome Completo</label>
-                            <input type="text" name="nome" id="nome" class="form-control form-control-lg bg-transparent border-secondary-subtle text-light shadow-none" value="<?= htmlspecialchars($dadosUsuario['Nome']) ?>" required>
+                            <label class="form-label text-secondary small mb-1">E-mail de Acesso</label>
+                            <input type="email" class="form-control bg-body-tertiary border-secondary-subtle text-secondary shadow-none" value="<?= htmlspecialchars($dadosUsuario['Email']) ?>" disabled>
                         </div>
 
                         <div class="mb-4">
-                            <label for="telefone" class="form-label text-light fw-semibold mb-1">Telefone / WhatsApp</label>
-                            <input type="text" name="telefone" id="telefone" class="form-control form-control-lg bg-transparent border-secondary-subtle text-light shadow-none" value="<?= htmlspecialchars($dadosUsuario['Telefone']) ?>">
+                            <label for="nome" class="form-label text-light fw-semibold mb-1">Nome Completo</label>
+                            <input type="text" name="nome" id="nome" class="form-control form-control-lg bg-transparent border-secondary-subtle text-light shadow-none" value="<?= htmlspecialchars($dadosUsuario['Nome']) ?>" required>
                         </div>
 
                         <div class="text-end">
@@ -286,26 +265,7 @@ require_once 'geral/header.php';
 </div>
 
 <script>
-    // 1. Máscara Inteligente de Telefone
-    const inputTelefone = document.getElementById('telefone');
-    if(inputTelefone) {
-        inputTelefone.addEventListener('input', function (e) {
-            let v = e.target.value.replace(/\D/g, ""); 
-            v = v.substring(0, 11); 
-            
-            if (v.length > 2) {
-                v = v.replace(/^(\d{2})(\d)/g, "($1) $2"); 
-            }
-            if (v.length > 9) {
-                v = v.replace(/(\d{5})(\d)/, "$1-$2"); 
-            } else if (v.length > 6) {
-                v = v.replace(/(\d{4})(\d)/, "$1-$2"); 
-            }
-            e.target.value = v;
-        });
-    }
-
-    // 2. Validação Front-End da Nova Senha
+    // Validação Front-End da Nova Senha
     const formSenha = document.getElementById('formSenha');
     const inputNovaSenha = document.getElementById('nova_senha');
     const inputConfirmaSenha = document.getElementById('confirma_senha');
