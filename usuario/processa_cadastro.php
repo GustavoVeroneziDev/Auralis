@@ -1,7 +1,6 @@
 <?php
 require_once '../config/conexao.php';
 
-// Função rápida para o PHP gerar UUIDs
 if (!function_exists('gerarUuid')) {
     function gerarUuid() {
         return sprintf('%04x%04x-%04x-%04x-%04x-%04x%04x%04x', mt_rand(0, 0xffff), mt_rand(0, 0xffff), mt_rand(0, 0xffff), mt_rand(0, 0x0fff) | 0x4000, mt_rand(0, 0x3fff) | 0x8000, mt_rand(0, 0xffff), mt_rand(0, 0xffff), mt_rand(0, 0xffff));
@@ -10,10 +9,8 @@ if (!function_exists('gerarUuid')) {
 
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     
+    // Pegamos APENAS o essencial agora
     $nome           = trim($_POST['nome']);
-    $documento      = trim($_POST['documento']);
-    $nascimento     = trim($_POST['nascimento']);
-    $telefone       = trim($_POST['telefone']);
     $email          = trim($_POST['email']);
     $senha          = $_POST['senha'];
     $confirma_senha = $_POST['confirma_senha'];
@@ -25,59 +22,37 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
     try {
         // ==============================================================================
-        // A BLINDAGEM (UX) - Verifica se os dados únicos já existem antes de tentar salvar
+        // BLINDAGEM EXPRESS - Verifica APENAS se o E-mail já existe
         // ==============================================================================
-        $sqlCheck = "SELECT Email, Documento, Telefone FROM Usuario WHERE Email = :email OR Documento = :documento OR Telefone = :telefone LIMIT 1";
+        $sqlCheck = "SELECT Email FROM Usuario WHERE Email = :email LIMIT 1";
         $stmtCheck = $pdo->prepare($sqlCheck);
-        $stmtCheck->execute([
-            ':email'     => $email,
-            ':documento' => $documento,
-            ':telefone'  => $telefone
-        ]);
+        $stmtCheck->execute([':email' => $email]);
         
-        $duplicado = $stmtCheck->fetch(PDO::FETCH_ASSOC);
-
-        if ($duplicado) {
-            if ($duplicado['Email'] === $email) {
-                header("Location: cadastro.php?erro=email_existe");
-                exit;
-            }
-            if ($duplicado['Documento'] === $documento) {
-                header("Location: cadastro.php?erro=doc_existe");
-                exit;
-            }
-            if ($duplicado['Telefone'] === $telefone) {
-                header("Location: cadastro.php?erro=tel_existe");
-                exit;
-            }
+        if ($stmtCheck->fetch()) {
+            header("Location: cadastro.php?erro=email_existe");
+            exit;
         }
         // ==============================================================================
 
-        $tipoPessoa = (strlen($documento) > 14) ? 'PJ' : 'PF';
         $senhaHash = password_hash($senha, PASSWORD_DEFAULT);
-        $nivelAcesso = 'Titular';
         $id_novo_usuario = gerarUuid();
 
+        // O SQL agora insere "NULL" nos campos que deixamos para o futuro e força 'PF' no TipoPessoa
         $sql = "INSERT INTO Usuario (
-                    IDUsuario, Nome, Documento, DataNascimento, Telefone, Email, Senha, TipoPessoa, NivelAcesso
+                    IDUsuario, Nome, Email, Senha, TipoPessoa, NivelAcesso, Documento, DataNascimento, Telefone
                 ) VALUES (
-                    :id_usuario, :nome, :documento, :nascimento, :telefone, :email, :senha, :tipoPessoa, :nivelAcesso
+                    :id_usuario, :nome, :email, :senha, 'PF', 'Titular', NULL, NULL, NULL
                 )";
 
         $stmt = $pdo->prepare($sql);
         $stmt->execute([
             ':id_usuario'   => $id_novo_usuario,
             ':nome'         => $nome,
-            ':documento'    => $documento,
-            ':nascimento'   => $nascimento,
-            ':telefone'     => $telefone,
             ':email'        => $email,
-            ':senha'        => $senhaHash,
-            ':tipoPessoa'   => $tipoPessoa,
-            ':nivelAcesso'  => $nivelAcesso
+            ':senha'        => $senhaHash
         ]);
 
-        // Injeção do Kit Inicial
+        // Injeção do Kit Inicial de Categorias
         $kitInicial = [
             ['nome' => 'Alimentação', 'tipo' => 'despesa', 'icone' => 'bi-cart3'],
             ['nome' => 'Moradia',     'tipo' => 'despesa', 'icone' => 'bi-house-door'],
@@ -103,12 +78,11 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             ]);
         }
 
-        // Deu tudo certo, manda pro login com sucesso!
+        // Deu tudo certo, manda pro login!
         header("Location: login.php?cadastro=sucesso");
         exit;
 
     } catch (PDOException $e) {
-        // Se der algum erro bizarro de banco que não previmos, ele volta com um erro genérico bonitinho em vez de tela branca.
         header("Location: cadastro.php?erro=banco");
         exit;
     }
