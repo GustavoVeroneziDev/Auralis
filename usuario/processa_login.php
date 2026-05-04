@@ -16,14 +16,26 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     }
 
     try {
-        // CORREÇÃO 1: Aspas duplas removidas do SQL
-        $sql = "SELECT IDUsuario, Nome, Senha, NivelAcesso FROM Usuario WHERE Email = :email LIMIT 1";
+        // CORREÇÃO: Adicionado o StatusConta na busca
+        $sql = "SELECT IDUsuario, Nome, Senha, NivelAcesso, StatusConta FROM Usuario WHERE Email = :email LIMIT 1";
         $stmt = $pdo->prepare($sql);
         $stmt->execute([':email' => $email]);
         
         $usuario = $stmt->fetch();
 
+        // Se o usuário existir e a senha bater...
         if ($usuario && password_verify($senha, $usuario['Senha'])) {
+            
+            // =========================================================
+            // A PORTA DE SEGURANÇA (VERIFICAÇÃO DE E-MAIL)
+            // =========================================================
+            if (isset($usuario['StatusConta']) && $usuario['StatusConta'] === 'pendente') {
+                // Barra a entrada e devolve para o login com aviso!
+                header("Location: login.php?erro=pendente");
+                exit;
+            }
+            // =========================================================
+
             session_regenerate_id(true);
 
             $_SESSION['usuario_id']   = $usuario['IDUsuario'];
@@ -34,18 +46,22 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 $chave_secreta = "Auralis2026_UltraSecretKey";
                 $assinatura = hash_hmac('sha256', $usuario['IDUsuario'], $chave_secreta);
                 $conteudo_cookie = $usuario['IDUsuario'] . ':' . $assinatura;
+                // Cookie válido por 30 dias
                 setcookie('auralis_remember', $conteudo_cookie, time() + (86400 * 30), "/");
             }
 
             header("Location: ../dashboard.php"); 
             exit;
         } else {
+            // E-mail ou senha errados
             header("Location: login.php?erro=invalido");
             exit;
         }
 
     } catch (PDOException $e) {
-        die("Erro ao tentar fazer login: " . $e->getMessage());
+        // Redireciona com erro amigável ao invés de morrer a página com erro de banco
+        header("Location: login.php?erro=banco");
+        exit;
     }
 
 } else {
