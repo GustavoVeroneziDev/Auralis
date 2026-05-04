@@ -43,7 +43,22 @@ require_once '../geral/header.php';
                         <div>Sua conta foi excluída permanentemente. Sentiremos sua falta no Auralis!</div>
                     </div>
                 <?php endif; ?>
+<?php if (isset($_GET['erro']) && $_GET['erro'] === 'pendente'): ?>
+    <div class="alert alert-warning d-flex align-items-center gap-2 rounded-3 shadow-sm border-0 mb-4">
+        <i class="bi bi-envelope-exclamation-fill text-warning fs-4"></i>
+        <div>
+            <strong>Quase lá!</strong><br>
+            Sua conta está inativa. Verifique a caixa de entrada do seu e-mail e clique no link de ativação para liberar seu acesso.
+        </div>
+    </div>
+<?php endif; ?>
 
+<?php if (isset($_GET['ativacao']) && $_GET['ativacao'] === 'sucesso'): ?>
+    <div class="alert alert-success d-flex align-items-center gap-2 rounded-3 shadow-sm border-0 mb-4">
+        <i class="bi bi-check-circle-fill text-success fs-4"></i>
+        <span><strong>Conta ativada com sucesso!</strong> Seja bem-vindo ao Auralis. Faça seu login abaixo.</span>
+    </div>
+<?php endif; ?>
                 <form action="processa_login.php" method="POST">
 
                     <div class="mb-4">
