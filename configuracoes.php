@@ -93,15 +93,18 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 // Inicia uma transação segura: se algo der erro no meio, ele desfaz tudo.
                 $pdo->beginTransaction();
 
-                // 1. O grande expurgo! Apaga todos os dados do usuário, dos filhos para os pais.
+                // 1. Limpa os "NETOS" (Tabelas que dependem do Registro ou Categoria do usuário)
+                $pdo->prepare("DELETE FROM RateioRegistro WHERE FKRegistro IN (SELECT IDRegistro FROM Registro WHERE FKUsuario = :uid)")->execute([':uid' => $usuario_id]);
+                $pdo->prepare("DELETE FROM SubCategoria WHERE FKCategoria IN (SELECT IDCategoria FROM Categoria WHERE FKUsuario = :uid)")->execute([':uid' => $usuario_id]);
+
+                // 2. Limpa os "FILHOS DIRETOS" do usuário
                 $pdo->prepare("DELETE FROM Registro WHERE FKUsuario = :uid")->execute([':uid' => $usuario_id]);
                 $pdo->prepare("DELETE FROM MembroCarteira WHERE FKUsuario = :uid")->execute([':uid' => $usuario_id]);
-                $pdo->prepare("DELETE FROM SubCategoria WHERE FKUsuario = :uid")->execute([':uid' => $usuario_id]);
                 $pdo->prepare("DELETE FROM Categoria WHERE FKUsuario = :uid")->execute([':uid' => $usuario_id]);
                 $pdo->prepare("DELETE FROM ConfiguracaoSistema WHERE FKUsuario = :uid")->execute([':uid' => $usuario_id]);
                 $pdo->prepare("DELETE FROM Carteira WHERE FKUsuarioDono = :uid")->execute([':uid' => $usuario_id]);
                 
-                // 2. Com a casa totalmente limpa, apaga o usuário final
+                // 3. Com a casa totalmente limpa, apaga o USUÁRIO final
                 $pdo->prepare("DELETE FROM Usuario WHERE IDUsuario = :uid")->execute([':uid' => $usuario_id]);
 
                 // Salva tudo no banco
