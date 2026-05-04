@@ -12,7 +12,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <meta name="theme-color" content="#121418">
     <title>Auralis | Gestão Financeira</title>
-    <link rel="shortcut icon" href="img/hexagono.ico" type="image/x-icon">
+    <link rel="shortcut icon" href="/geral/img/Auralis-SemFundo.ico" type="image/x-icon">
 
     <link href="/geral/fonts/inter.css" rel="stylesheet">
 
