@@ -41,7 +41,7 @@ require_once '../geral/header.php';
                         <div class="input-group">
                             <span class="input-group-text bg-dark border-secondary text-secondary"><i class="bi bi-person-fill"></i></span>
                             <input type="text" class="form-control form-control-lg bg-dark border-secondary text-light"
-                                id="nome" name="nome" required placeholder="Ex: Gustavo Veronezi">
+                                id="nome" name="nome" required>
                         </div>
                     </div>
 
