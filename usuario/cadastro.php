@@ -17,16 +17,16 @@ require_once '../geral/header.php';
                 </div>
 
                 <?php if (isset($_GET['erro'])): ?>
-                    <?php 
-                        $mensagemErro = "Ocorreu um erro ao processar seu cadastro."; // Mensagem padrão
-                        
-                        if ($_GET['erro'] === 'email_existe') {
-                            $mensagemErro = "Este e-mail já está cadastrado. Tente fazer login ou recupere sua senha.";
-                        } elseif ($_GET['erro'] === 'senhas_diferentes') {
-                            $mensagemErro = "As senhas digitadas não conferem. Digite novamente com atenção.";
-                        } elseif ($_GET['erro'] === 'banco') {
-                            $mensagemErro = "Ops! Nossos servidores estão um pouco lentos agora. Tente novamente em instantes.";
-                        }
+                    <?php
+                    $mensagemErro = "Ocorreu um erro ao processar seu cadastro."; // Mensagem padrão
+                
+                    if ($_GET['erro'] === 'email_existe') {
+                        $mensagemErro = "Este e-mail já está cadastrado. Tente fazer login ou recupere sua senha.";
+                    } elseif ($_GET['erro'] === 'senhas_diferentes') {
+                        $mensagemErro = "As senhas digitadas não conferem. Digite novamente com atenção.";
+                    } elseif ($_GET['erro'] === 'banco') {
+                        $mensagemErro = "Ops! Nossos servidores estão um pouco lentos agora. Tente novamente em instantes.";
+                    }
                     ?>
                     <div class="alert alert-danger d-flex align-items-center gap-2 rounded-3 shadow-sm border-0 mb-4">
                         <i class="bi bi-exclamation-triangle-fill"></i>
@@ -39,7 +39,8 @@ require_once '../geral/header.php';
                     <div class="mb-4">
                         <label for="nome" class="form-label text-light opacity-75 fw-semibold">Nome Completo</label>
                         <div class="input-group">
-                            <span class="input-group-text bg-dark border-secondary text-secondary"><i class="bi bi-person-fill"></i></span>
+                            <span class="input-group-text bg-dark border-secondary text-secondary"><i
+                                    class="bi bi-person-fill"></i></span>
                             <input type="text" class="form-control form-control-lg bg-dark border-secondary text-light"
                                 id="nome" name="nome" required>
                         </div>
@@ -48,8 +49,9 @@ require_once '../geral/header.php';
                     <div class="mb-4">
                         <label for="email" class="form-label text-light opacity-75 fw-semibold">E-mail</label>
                         <div class="input-group">
-                            <span class="input-group-text bg-dark border-secondary text-secondary"><i class="bi bi-envelope-fill"></i></span>
-                            <input type="email" class="form-control form-control-lg bg-dark border-secondary text-light" 
+                            <span class="input-group-text bg-dark border-secondary text-secondary"><i
+                                    class="bi bi-envelope-fill"></i></span>
+                            <input type="email" class="form-control form-control-lg bg-dark border-secondary text-light"
                                 id="email" name="email" required>
                         </div>
                     </div>
@@ -57,13 +59,17 @@ require_once '../geral/header.php';
                     <div class="row mb-4">
                         <div class="col-md-6 mb-4 mb-md-0">
                             <label for="senha" class="form-label text-light opacity-75 fw-semibold">Senha</label>
-                            <input type="password" class="form-control form-control-lg bg-dark border-secondary text-light" 
-                                id="senha" name="senha" required minlength="8" placeholder="Mínimo 8 caracteres">
+                            <input type="password"
+                                class="form-control form-control-lg bg-dark border-secondary text-light" id="senha"
+                                name="senha" required minlength="8" placeholder="Mínimo 8 caracteres">
                         </div>
                         <div class="col-md-6">
-                            <label for="confirma_senha" class="form-label text-light opacity-75 fw-semibold">Confirmar Senha</label>
-                            <input type="password" class="form-control form-control-lg bg-dark border-secondary text-light"
-                                id="confirma_senha" name="confirma_senha" required minlength="8" placeholder="Repita a senha">
+                            <label for="confirma_senha" class="form-label text-light opacity-75 fw-semibold">Confirmar
+                                Senha</label>
+                            <input type="password"
+                                class="form-control form-control-lg bg-dark border-secondary text-light"
+                                id="confirma_senha" name="confirma_senha" required minlength="8"
+                                placeholder="Repita a senha">
                             <div class="invalid-feedback fw-bold">
                                 As senhas não conferem!
                             </div>
@@ -71,7 +77,8 @@ require_once '../geral/header.php';
                     </div>
 
                     <div class="d-grid mt-4">
-                        <button type="submit" class="btn btn-primary btn-lg fw-bold text-dark fs-5 cardCentral py-3 shadow-lg transition-hover">
+                        <button type="submit"
+                            class="btn btn-primary btn-lg fw-bold text-dark fs-5 cardCentral py-3 shadow-lg transition-hover">
                             Criar Minha Conta
                         </button>
                     </div>
@@ -82,21 +89,24 @@ require_once '../geral/header.php';
                     <div class="mt-4 mb-2">
                         <div class="d-flex align-items-center mb-4">
                             <hr class="flex-grow-1 border-secondary opacity-25">
-                            <span class="mx-3 text-secondary small text-uppercase" style="letter-spacing: 1px;">Ou entre com</span>
+                            <span class="mx-3 text-secondary small text-uppercase" style="letter-spacing: 1px;">Ou entre
+                                com</span>
                             <hr class="flex-grow-1 border-secondary opacity-25">
                         </div>
-                        
+
                         <!-- Botão desativado temporariamente. Vamos ativar quando fizermos a integração OAuth -->
-                        <button type="button" class="btn btn-outline-secondary btn-lg w-100 d-flex align-items-center justify-content-center transition-hover border-secondary-subtle" disabled title="Em breve na Fase 4!">
-                            <i class="bi bi-google text-light me-3 fs-5"></i> 
+                        <a href="https://accounts.google.com/o/oauth2/auth?client_id=808511905880-4l0raul5fuf3rkukms9easdq65375o2t.apps.googleusercontent.com&redirect_uri=https://meuauralis.com/usuario/login_google.php&response_type=code&scope=email%20profile"
+                            class="btn btn-outline-secondary btn-lg w-100 d-flex align-items-center justify-content-center transition-hover border-secondary-subtle text-decoration-none">
+                            <i class="bi bi-google text-light me-3 fs-5"></i>
                             <span class="text-light fw-semibold fs-6">Continuar com o Google</span>
-                        </button>
+                        </a>
                     </div>
                     <!-- ========================================== -->
 
                     <div class="text-center mt-5">
-                        <p class="text-light opacity-75 mb-0">Já faz parte do Auralis? 
-                            <a href="login.php" class="text-primary text-decoration-none fw-semibold custom-link">Acesse sua conta</a>
+                        <p class="text-light opacity-75 mb-0">Já faz parte do Auralis?
+                            <a href="login.php" class="text-primary text-decoration-none fw-semibold custom-link">Acesse
+                                sua conta</a>
                         </p>
                     </div>
 
