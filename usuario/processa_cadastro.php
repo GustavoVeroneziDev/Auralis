@@ -79,25 +79,66 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         }
 
         // ==============================================================================
-        // DISPARO DO E-MAIL DE ATIVAÇÃO
+        // DISPARO DO E-MAIL DE ATIVAÇÃO (HTML)
         // ==============================================================================
         $para = $email;
-        $assunto = "Ative sua conta no Auralis";
+        $assunto = "Confirme sua conta no Auralis";
         
         $link_ativacao = "https://meuauralis.com/usuario/ativar_conta.php?token=" . $token_ativacao;
+        $primeiro_nome = explode(' ', $nome)[0];
         
-        $mensagem = "Olá, " . explode(' ', $nome)[0] . "!\n\n";
-        $mensagem .= "Falta apenas um passo para você assumir o controle da sua vida financeira.\n";
-        $mensagem .= "Clique no link abaixo para ativar sua conta no Auralis:\n\n";
-        $mensagem .= $link_ativacao . "\n\n";
-        $mensagem .= "Se você não se cadastrou no Auralis, apenas ignore este e-mail.";
+        // Template HTML do E-mail com a Logo
+        $mensagemHTML = "
+        <!DOCTYPE html>
+        <html lang='pt-BR'>
+        <head>
+            <meta charset='UTF-8'>
+            <style>
+                body { font-family: Arial, sans-serif; background-color: #f4f7f6; margin: 0; padding: 0; }
+                .container { max-width: 600px; margin: 40px auto; background-color: #ffffff; border-radius: 8px; overflow: hidden; box-shadow: 0 4px 10px rgba(0,0,0,0.05); }
+                .header { background-color: #1a1a2e; padding: 25px; text-align: center; }
+                .header img { max-height: 60px; }
+                .content { padding: 40px 30px; color: #333333; line-height: 1.6; }
+                .content h2 { color: #1a1a2e; font-size: 20px; margin-top: 0; }
+                .btn-container { text-align: center; margin: 35px 0; }
+                .btn { background-color: #0d6efd; color: #ffffff; padding: 14px 28px; text-decoration: none; border-radius: 6px; font-weight: bold; display: inline-block; }
+                .footer { background-color: #f9fafb; padding: 20px; text-align: center; font-size: 12px; color: #888888; border-top: 1px solid #eeeeee; }
+            </style>
+        </head>
+        <body>
+            <div class='container'>
+                <div class='header'>
+                    <img src='https://meuauralis.com/geral/img/logoAuralis-SemFundo.png' alt='Auralis'>
+                </div>
+                <div class='content'>
+                    <h2>Olá, " . htmlspecialchars($primeiro_nome) . "!</h2>
+                    <p>Falta apenas um passo para você assumir o controle da sua vida financeira. Para garantir a segurança dos seus dados e liberar seu acesso ao painel de controle, confirme seu endereço de e-mail.</p>
+                    
+                    <div class='btn-container'>
+                        <a href='" . $link_ativacao . "' class='btn'>Ativar Minha Conta</a>
+                    </div>
+                    
+                    <p>Se o botão não funcionar, copie e cole o link abaixo no seu navegador:</p>
+                    <p style='font-size: 13px; color: #0d6efd; word-break: break-all;'>" . $link_ativacao . "</p>
+                </div>
+                <div class='footer'>
+                    <p>Este é um e-mail automático, por favor não responda.</p>
+                    <p>&copy; " . date('Y') . " Auralis. Todos os direitos reservados.</p>
+                </div>
+            </div>
+        </body>
+        </html>
+        ";
 
-        $cabecalhos = "From: nao-responda@meuauralis.com\r\n" .
-                      "Reply-To: suporte@meuauralis.com\r\n" .
-                      "X-Mailer: PHP/" . phpversion();
+        // Headers essenciais para envio de HTML
+        $cabecalhos  = "MIME-Version: 1.0\r\n";
+        $cabecalhos .= "Content-type: text/html; charset=UTF-8\r\n";
+        $cabecalhos .= "From: Auralis <nao-responda@meuauralis.com>\r\n";
+        $cabecalhos .= "Reply-To: suporte@meuauralis.com\r\n";
+        $cabecalhos .= "X-Mailer: PHP/" . phpversion() . "\r\n";
 
-        // Envia o e-mail
-        mail($para, $assunto, $mensagem, $cabecalhos);
+        // Envia o e-mail HTML
+        mail($para, $assunto, $mensagemHTML, $cabecalhos);
 
         // Manda o usuário para a tela de aviso!
         header("Location: aviso_ativacao.php");
