@@ -32,6 +32,7 @@ O **Auralis** é um ecossistema de gestão financeira pessoal desenvolvido para 
 
 ## 📦 Estrutura do Projeto
 
+```text
 /Auralis
 ├── config/             # Configurações globais e de conexão com o banco (PDO)
 ├── geral/              # Componentes estruturais (Header, Footer, CSS, Imagens)
@@ -40,8 +41,7 @@ O **Auralis** é um ecossistema de gestão financeira pessoal desenvolvido para 
 ├── dashboard.php       # Painel central, Onboarding e Motor de Recorrência
 ├── analises.php        # Processamento de estatísticas e renderização de gráficos
 └── configuracoes.php   # Perfil do usuário, troca de senha e Zona de Exclusão
-
----
+```
 
 ## 🧠 Arquitetura e Regras de Negócio (Para Desenvolvedores)
 
