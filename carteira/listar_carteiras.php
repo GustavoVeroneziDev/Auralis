@@ -112,7 +112,7 @@ try {
 require_once '../geral/header.php';
 ?>
 
-<main class="container py-4 mt-3 flex-grow-1" style="min-height: 100vh;">
+<main class="container-fluid px-3 px-xl-5 py-4 mt-3 flex-grow-1" style="max-width: 1500px; min-height: 100vh;">
     
     <div class="d-flex justify-content-between align-items-center mb-4 border-bottom border-secondary-subtle pb-3 flex-wrap gap-3">
         <h2 class="fw-bold text-light mb-0">Minhas Carteiras</h2>

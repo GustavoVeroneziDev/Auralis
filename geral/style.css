@@ -50,6 +50,8 @@
     --bs-primary-rgb: 212, 175, 55;
     --bs-link-color: var(--accent);
     --bs-link-hover-color: var(--accent-light);
+    
+    --gold-primary: #FFB800; /* Ajuste para o Hex exato do protótipo se necessário */
 }
 
 body {
@@ -126,14 +128,12 @@ html {
     opacity: 1 !important;
     transform: translate(0, 0) !important;
 }
-:root {
-    --gold-primary: #FFB800; /* Ajuste para o Hex exato do protótipo se necessário */
-}
 
 .text-gold {
     color: var(--gold-primary) !important; 
     /* Aqui o !important é aceitável por ser uma classe utilitária atômica */
 }
+
 /* Garante que o dourado funcione em qualquer ícone ou texto com as classes abaixo */
 .text-primary, .text-gold {
     color: var(--accent) !important; /* var(--accent) é o seu dourado #d4af37 */
@@ -143,6 +143,7 @@ html {
 .navbar-brand i {
     filter: drop-shadow(0 0 5px rgba(212, 175, 55, 0.4));
 }
+
 /* Animação suave para o menu Dropdown do usuário */
 .dropdown-menu {
     animation: slideDropdown 0.3s cubic-bezier(0.25, 0.8, 0.25, 1) forwards;
@@ -159,6 +160,7 @@ html {
         transform: translateY(0) scale(1);
     }
 }
+
 /* Efeito de sublinhado animado nos links da Navbar */
 .navbar-nav .custom-link {
     position: relative;
@@ -179,4 +181,33 @@ html {
 .navbar-nav .custom-link:hover::after,
 .navbar-nav .custom-link.active::after {
     width: 80%; /* O traço vai crescer até 80% do tamanho da palavra */
+}
+
+/* ==========================================
+   AJUSTES RESPONSIVOS (MOBILE)
+   ========================================== */
+@media (max-width: 991.98px) {
+    /* Ajusta o espaçamento do menu quando aberto no celular */
+    .navbar-collapse {
+        background-color: rgba(18, 20, 24, 0.95);
+        border-radius: 12px;
+        padding: 1rem;
+        margin-top: 1rem;
+        border: 1px solid rgba(255, 255, 255, 0.05);
+    }
+    
+    /* Remove a animação do sublinhado no celular para evitar bugs de toque */
+    .navbar-nav .custom-link::after {
+        display: none;
+    }
+    
+    /* Dropdown do usuário não precisa flutuar no celular, ele empurra o conteúdo */
+    .dropdown-menu {
+        position: static !important;
+        transform: none !important;
+        background-color: transparent !important;
+        border: none !important;
+        box-shadow: none !important;
+        padding-left: 1rem;
+    }
 }

@@ -134,7 +134,7 @@
 
 <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 
-<main class="container py-4 mt-3 flex-grow-1" style="min-height: 100vh;">
+<main class="container-fluid px-3 px-xl-5 py-4 mt-3 flex-grow-1" style="max-width: 1500px; min-height: 100vh;">
 
     <div class="d-flex justify-content-between align-items-center mb-4 border-bottom border-secondary-subtle pb-3 flex-wrap gap-3">
         <h2 class="fw-bold text-light mb-0"><i class="bi bi-pie-chart text-primary me-2" style="color: var(--primary-gold-analysis) !important;"></i> Análises</h2>

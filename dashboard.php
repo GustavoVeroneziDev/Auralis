@@ -314,7 +314,7 @@ error_reporting(E_ALL);
     require_once 'geral/header.php';
 ?>
 
-<main class="container py-4 mt-3 flex-grow-1" style="min-height: 100vh;">
+<main class="container-fluid px-3 px-xl-5 py-4 mt-3 flex-grow-1" style="max-width: 1500px; min-height: 100vh;">
 
     <?php if ($totalCarteiras == 0): ?>
         <div class="row justify-content-center mt-5 pt-5">
