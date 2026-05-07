@@ -62,7 +62,7 @@
     <div class="text-center mb-4">
         <img src="https://meuauralis.com/geral/img/logoAuralis-SemFundo.png" alt="Auralis" style="max-height: 45px;" class="mb-3">
         <h4 class="fw-bold text-white">Recuperar Acesso</h4>
-        <p class="text-muted small">Insira seu e-mail para receber um link de redefinição de senha.</p>
+        <p class=" small">Insira seu e-mail para receber um link de redefinição de senha.</p>
     </div>
 
     <?php if (isset($_GET['status']) && $_GET['status'] === 'enviado'): ?>
