@@ -26,53 +26,91 @@
     $meses_pt = [1 => 'Janeiro', 2 => 'Fevereiro', 3 => 'Março', 4 => 'Abril', 5 => 'Maio', 6 => 'Junho', 7 => 'Julho', 8 => 'Agosto', 9 => 'Setembro', 10 => 'Outubro', 11 => 'Novembro', 12 => 'Dezembro'];
     $nome_mes = $meses_pt[$mes_atual];
 
-    $link_ant  = "?mes={$mes_ant}&ano={$ano_ant}";
-    $link_prox = "?mes={$mes_prox}&ano={$ano_prox}";
 
-    // --- BUSCA DE DADOS ---
+    // ==============================================================================
+    // LÓGICA DO SELETOR DE CARTEIRAS (Deve vir ANTES da busca de transações)
+    // ==============================================================================
+    $carteiras = [];
+    try {
+        $sqlCart = "SELECT IDCarteira, TipoCarteira FROM Carteira WHERE FKUsuarioDono = :usuario_id ORDER BY TipoCarteira ASC";
+        $stmtCart = $pdo->prepare($sqlCart);
+        $stmtCart->execute([':usuario_id' => $usuario_id]);
+        $carteiras = $stmtCart->fetchAll();
+    } catch (PDOException $e) {}
+
+    // Descobre qual carteira está selecionada na URL (ou pega a primeira por padrão)
+    if (isset($_GET['carteira'])) {
+        $carteira_selecionada = $_GET['carteira'];
+    } else {
+        $carteira_selecionada = (count($carteiras) > 0) ? $carteiras[0]['IDCarteira'] : null;
+    }
+
+    // Pega o nome da carteira atual para exibir no botão
+    $nome_carteira_atual = 'Carteira Geral';
+    foreach ($carteiras as $cart) {
+        if ($cart['IDCarteira'] == $carteira_selecionada) {
+            $nome_carteira_atual = $cart['TipoCarteira'];
+            break;
+        }
+    }
+
+    // Atualiza os links de voltar/avançar mês para não perder a carteira atual
+    $link_ant  = "?mes={$mes_ant}&ano={$ano_ant}" . ($carteira_selecionada ? "&carteira={$carteira_selecionada}" : "");
+    $link_prox = "?mes={$mes_prox}&ano={$ano_prox}" . ($carteira_selecionada ? "&carteira={$carteira_selecionada}" : "");
+
+
+    // --- BUSCA DE DADOS (Agora filtrando pela Carteira Selecionada!) ---
     $transacoes           = [];
     $totalDespesas        = 0;
     $totalReceitas        = 0;
     $gastosPorCategoria   = [];
     $receitasPorCategoria = [];
 
-    try {
-        $sql = "
-            SELECT
-                r.Valor, r.Descricao, r.TipoRegistro, r.MomentoRegistro,
-                COALESCE(c.NomeCategoria, 'Sem Categoria') as Categoria,
-                COALESCE(c.IconeCategoria, 'bi-tag') as Icone
-            FROM Registro r
-            LEFT JOIN Categoria c ON r.FKCategoria = c.IDCategoria
-            WHERE r.FKUsuario = :uid
-              AND r.StatusRegistro = 'efetivado'
-              AND MONTH(r.MomentoRegistro) = :mes
-              AND YEAR(r.MomentoRegistro) = :ano
-            ORDER BY r.MomentoRegistro DESC
-        ";
-        $stmt = $pdo->prepare($sql);
-        $stmt->execute([':uid' => $usuario_id, ':mes' => $mes_atual, ':ano' => $ano_atual]);
-        $transacoes = $stmt->fetchAll(PDO::FETCH_ASSOC);
+    if ($carteira_selecionada) {
+        try {
+            $sql = "
+                SELECT
+                    r.Valor, r.Descricao, r.TipoRegistro, r.MomentoRegistro,
+                    COALESCE(c.NomeCategoria, 'Sem Categoria') as Categoria,
+                    COALESCE(c.IconeCategoria, 'bi-tag') as Icone
+                FROM Registro r
+                LEFT JOIN Categoria c ON r.FKCategoria = c.IDCategoria
+                WHERE r.FKUsuario = :uid
+                  AND r.FKCarteira = :carteira_id
+                  AND r.StatusRegistro = 'efetivado'
+                  AND MONTH(r.MomentoRegistro) = :mes
+                  AND YEAR(r.MomentoRegistro) = :ano
+                ORDER BY r.MomentoRegistro DESC
+            ";
+            $stmt = $pdo->prepare($sql);
+            $stmt->execute([
+                ':uid' => $usuario_id, 
+                ':carteira_id' => $carteira_selecionada, 
+                ':mes' => $mes_atual, 
+                ':ano' => $ano_atual
+            ]);
+            $transacoes = $stmt->fetchAll(PDO::FETCH_ASSOC);
 
-        foreach ($transacoes as $t) {
-            $valor = (float) $t['Valor'];
-            $cat   = $t['Categoria'];
+            foreach ($transacoes as $t) {
+                $valor = (float) $t['Valor'];
+                $cat   = $t['Categoria'];
 
-            if ($t['TipoRegistro'] === 'despesa') {
-                $totalDespesas += $valor;
-                if (!isset($gastosPorCategoria[$cat])) {
-                    $gastosPorCategoria[$cat] = 0;
+                if ($t['TipoRegistro'] === 'despesa') {
+                    $totalDespesas += $valor;
+                    if (!isset($gastosPorCategoria[$cat])) {
+                        $gastosPorCategoria[$cat] = 0;
+                    }
+                    $gastosPorCategoria[$cat] += $valor;
+                } else {
+                    $totalReceitas += $valor;
+                    if (!isset($receitasPorCategoria[$cat])) {
+                        $receitasPorCategoria[$cat] = 0;
+                    }
+                    $receitasPorCategoria[$cat] += $valor;
                 }
-                $gastosPorCategoria[$cat] += $valor;
-            } else {
-                $totalReceitas += $valor;
-                if (!isset($receitasPorCategoria[$cat])) {
-                    $receitasPorCategoria[$cat] = 0;
-                }
-                $receitasPorCategoria[$cat] += $valor;
             }
-        }
-    } catch (PDOException $e) {}
+        } catch (PDOException $e) {}
+    }
 
     arsort($gastosPorCategoria);
     $maiorGastoCat   = key($gastosPorCategoria);
@@ -101,19 +139,59 @@
     <div class="d-flex justify-content-between align-items-center mb-4 border-bottom border-secondary-subtle pb-3 flex-wrap gap-3">
         <h2 class="fw-bold text-light mb-0"><i class="bi bi-pie-chart text-primary me-2" style="color: var(--primary-gold-analysis) !important;"></i> Análises</h2>
 
-        <div class="d-flex align-items-center bg-dark border border-secondary-subtle rounded-pill px-2 py-1 shadow-sm">
-            <a href="<?php echo $link_ant ?>" class="btn btn-sm btn-link text-light opacity-75 transition-hover text-decoration-none fs-5 d-flex align-items-center justify-content-center" style="width: 35px; height: 35px;">
-                <i class="bi bi-caret-left-fill"></i>
-            </a>
-            <button type="button" class="btn btn-link text-light text-decoration-none fw-bold px-2 transition-hover d-flex align-items-center justify-content-center"
-        style="min-width: 140px; font-size: 0.95rem;"
-        data-bs-toggle="modal" data-bs-target="#modalSeletorMes">
-    <?php echo $nome_mes ?> <?php echo $ano_atual ?>
-    <i class="bi bi-chevron-down ms-2 fs-7 opacity-75"></i>
-</button>
-            <a href="<?php echo $link_prox ?>" class="btn btn-sm btn-link text-light opacity-75 transition-hover text-decoration-none fs-5 d-flex align-items-center justify-content-center" style="width: 35px; height: 35px;">
-                <i class="bi bi-caret-right-fill"></i>
-            </a>
+        <div class="d-flex flex-wrap gap-2">
+            
+            <div class="dropdown">
+                <button class="btn border-secondary-subtle text-light shadow-sm fw-semibold dropdown-toggle d-flex justify-content-between align-items-center rounded-3 transition-hover"
+                        type="button"
+                        data-bs-toggle="dropdown"
+                        aria-expanded="false"
+                        style="width: 220px; background-color: var(--bg-charcoal-analysis);">
+
+                    <span class="text-truncate d-flex align-items-center">
+                        <i class="bi bi-wallet2 me-2" style="color: var(--primary-gold-analysis);"></i>
+                        <?php echo htmlspecialchars($nome_carteira_atual); ?>
+                    </span>
+                </button>
+
+                <ul class="dropdown-menu dropdown-menu-dark shadow-lg border-secondary-subtle mt-2 w-100" style="background-color: #1a1d21;">
+                    <li class="px-3 py-1 text-secondary small text-uppercase fw-bold tracking-wide">Alternar Carteira</li>
+                    <li><hr class="dropdown-divider border-secondary-subtle"></li>
+
+                    <?php foreach ($carteiras as $cart): ?>
+                        <li>
+                            <a class="dropdown-item d-flex align-items-center py-2 transition-hover <?php echo $carteira_selecionada == $cart['IDCarteira'] ? 'active' : '' ?>"
+                               href="?mes=<?php echo $mes_atual ?>&ano=<?php echo $ano_atual ?>&carteira=<?php echo htmlspecialchars($cart['IDCarteira']) ?>">
+
+                                <?php if ($carteira_selecionada == $cart['IDCarteira']): ?>
+                                    <i class="bi bi-check-circle-fill me-2" style="color: var(--primary-gold-analysis);"></i>
+                                    <span class="fw-bold" style="color: var(--primary-gold-analysis);"><?php echo htmlspecialchars($cart['TipoCarteira']); ?></span>
+                                <?php else: ?>
+                                    <i class="bi bi-circle me-2 text-secondary opacity-50"></i>
+                                    <span class="text-light"><?php echo htmlspecialchars($cart['TipoCarteira']); ?></span>
+                                <?php endif; ?>
+
+                            </a>
+                        </li>
+                    <?php endforeach; ?>
+                </ul>
+            </div>
+
+            <div class="d-flex align-items-center bg-dark border border-secondary-subtle rounded-3 px-2 py-1 shadow-sm h-100">
+                <a href="<?php echo $link_ant ?>" class="btn btn-sm btn-link text-light opacity-75 transition-hover text-decoration-none fs-5 d-flex align-items-center justify-content-center" style="width: 35px; height: 35px;">
+                    <i class="bi bi-caret-left-fill"></i>
+                </a>
+                <button type="button" class="btn btn-link text-light text-decoration-none fw-bold px-2 transition-hover d-flex align-items-center justify-content-center h-100"
+                        style="min-width: 140px; font-size: 0.95rem;"
+                        data-bs-toggle="modal" data-bs-target="#modalSeletorMes">
+                    <?php echo $nome_mes ?> <?php echo $ano_atual ?>
+                    <i class="bi bi-chevron-down ms-2 fs-7 opacity-75"></i>
+                </button>
+                <a href="<?php echo $link_prox ?>" class="btn btn-sm btn-link text-light opacity-75 transition-hover text-decoration-none fs-5 d-flex align-items-center justify-content-center" style="width: 35px; height: 35px;">
+                    <i class="bi bi-caret-right-fill"></i>
+                </a>
+            </div>
+
         </div>
     </div>
 
@@ -233,7 +311,7 @@
         <div class="text-center py-5">
             <i class="bi bi-bar-chart text-secondary opacity-50 mb-3" style="font-size: 4rem;"></i>
             <h4 class="text-light fw-bold">Nenhum dado para este período</h4>
-            <p class="text-secondary">Parece que você não tem transações efetivadas em <?php echo $nome_mes ?>.</p>
+            <p class="text-secondary">Parece que a carteira "<?php echo htmlspecialchars($nome_carteira_atual); ?>" não tem transações efetivadas em <?php echo $nome_mes ?>.</p>
         </div>
     <?php endif; ?>
 
@@ -313,6 +391,7 @@
         
         urlParams.set('mes', mes);
         urlParams.set('ano', ano);
+        // O URLSearchParams mantém a ?carteira=... intacta, não precisa se preocupar!
         
         window.location.search = urlParams.toString();
     }
@@ -394,8 +473,10 @@
 
         let htmlLista = '<div class="list-group list-group-flush">';
         transacoesFiltradas.forEach(t => {
-            const dataApenas = t.MomentoRegistro.split(' ')[0];
-            const dataStr = new Date(dataApenas + 'T12:00:00').toLocaleDateString('pt-BR');            
+            // Ajuste no fuso horário para evitar bugs de exibição de data (-1 dia)
+            const [ano, mes, dia] = t.MomentoRegistro.split(' ')[0].split('-');
+            const dataStr = `${dia}/${mes}/${ano}`;
+            
             const valorFormatado = new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(t.Valor);
             const corValor = tipo === 'despesa' ? 'text-danger' : 'text-success';
             const sinalValor = tipo === 'despesa' ? '-' : '+';
