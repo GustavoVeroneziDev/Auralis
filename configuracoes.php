@@ -17,7 +17,7 @@ $tipo_mensagem = '';
 // ==============================================================================
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     
-    // AÇÃO 1: ATUALIZAR DADOS PESSOAIS (Agora apenas o Nome)
+    // AÇÃO 1: ATUALIZAR DADOS PESSOAIS
     if (isset($_POST['action']) && $_POST['action'] === 'update_profile') {
         $nome = trim($_POST['nome']);
 
@@ -42,9 +42,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
     // AÇÃO 2: ATUALIZAR SENHA
     if (isset($_POST['action']) && $_POST['action'] === 'update_password') {
-        $senha_atual = $_POST['senha_atual'];
-        $nova_senha = $_POST['nova_senha'];
-        $confirma_senha = $_POST['confirma_senha'];
+        $senha_atual = $_POST['senha_atual'] ?? '';
+        $nova_senha = $_POST['nova_senha'] ?? '';
+        $confirma_senha = $_POST['confirma_senha'] ?? '';
 
         if ($nova_senha !== $confirma_senha) {
             $mensagem = "As novas senhas não conferem!";
@@ -56,13 +56,24 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 $stmtSenha->execute([':uid' => $usuario_id]);
                 $hashBanco = $stmtSenha->fetchColumn();
 
-                if (password_verify($senha_atual, $hashBanco)) {
+                $autorizado_senha = false;
+
+                // Se for Google e mandou o código oculto, autoriza a criação da senha
+                if ($hashBanco === 'GOOGLE_SSO' && $senha_atual === 'GOOGLE_SSO') {
+                    $autorizado_senha = true;
+                } 
+                // Se for usuário comum, verifica a senha digitada
+                elseif (password_verify($senha_atual, $hashBanco)) {
+                    $autorizado_senha = true;
+                }
+
+                if ($autorizado_senha) {
                     $novoHash = password_hash($nova_senha, PASSWORD_DEFAULT);
                     $sqlUpdSenha = "UPDATE Usuario SET Senha = :senha WHERE IDUsuario = :uid";
                     $stmtUpdSenha = $pdo->prepare($sqlUpdSenha);
                     $stmtUpdSenha->execute([':senha' => $novoHash, ':uid' => $usuario_id]);
 
-                    $mensagem = "Senha alterada com segurança!";
+                    $mensagem = "Senha definida/alterada com segurança!";
                     $tipo_mensagem = "success";
                 } else {
                     $mensagem = "A senha atual está incorreta.";
@@ -75,9 +86,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         }
     }
 
-    // AÇÃO 3: EXCLUIR CONTA (A ZONA DE PERIGO E LIMPEZA TOTAL)
+    // AÇÃO 3: EXCLUIR CONTA (A ZONA DE PERIGO)
     if (isset($_POST['action']) && $_POST['action'] === 'delete_account') {
-        $senha_confirmacao = $_POST['senha_confirmacao'];
+        $senha_confirmacao = $_POST['senha_confirmacao'] ?? '';
 
         try {
             $sqlSenha = "SELECT Senha FROM Usuario WHERE IDUsuario = :uid";
@@ -85,7 +96,26 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             $stmtSenha->execute([':uid' => $usuario_id]);
             $hashBanco = $stmtSenha->fetchColumn();
 
-            if (password_verify($senha_confirmacao, $hashBanco)) {
+            $autorizado_exclusao = false;
+
+            // Verificação Inteligente
+            if ($hashBanco === 'GOOGLE_SSO') {
+                if ($senha_confirmacao === 'EXCLUIR') {
+                    $autorizado_exclusao = true;
+                } else {
+                    $mensagem = "Palavra de segurança incorreta. Exclusão cancelada.";
+                    $tipo_mensagem = "danger";
+                }
+            } else {
+                if (password_verify($senha_confirmacao, $hashBanco)) {
+                    $autorizado_exclusao = true;
+                } else {
+                    $mensagem = "Senha incorreta. A exclusão foi cancelada para sua segurança.";
+                    $tipo_mensagem = "danger";
+                }
+            }
+
+            if ($autorizado_exclusao) {
                 
                 $pdo->beginTransaction();
 
@@ -106,10 +136,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 setcookie('auralis_remember', '', time() - 3600, '/');
                 header("Location: usuario/login.php?conta=excluida");
                 exit;
-                
-            } else {
-                $mensagem = "Senha incorreta. A exclusão foi cancelada para sua segurança.";
-                $tipo_mensagem = "danger";
             }
         } catch (PDOException $e) {
             if ($pdo->inTransaction()) {
@@ -122,13 +148,17 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 }
 
 // ==============================================================================
-// 2. BUSCA OS DADOS ATUAIS PARA PREENCHER O FORMULÁRIO (Apenas Nome e Email)
+// 2. BUSCA OS DADOS ATUAIS (Incluindo Senha para a lógica do Front-end)
 // ==============================================================================
 try {
-    $sqlBusca = "SELECT Nome, Email FROM Usuario WHERE IDUsuario = :uid LIMIT 1";
+    $sqlBusca = "SELECT Nome, Email, Senha FROM Usuario WHERE IDUsuario = :uid LIMIT 1";
     $stmtBusca = $pdo->prepare($sqlBusca);
     $stmtBusca->execute([':uid' => $usuario_id]);
     $dadosUsuario = $stmtBusca->fetch(PDO::FETCH_ASSOC);
+    
+    // Descobre se é usuário Google para o HTML
+    $isGoogleUser = ($dadosUsuario['Senha'] === 'GOOGLE_SSO');
+    
 } catch (PDOException $e) {
     die("Erro ao carregar dados do usuário.");
 }
@@ -190,12 +220,18 @@ require_once 'geral/header.php';
                     <form method="POST" action="" id="formSenha">
                         <input type="hidden" name="action" value="update_password">
 
-                        <div class="mb-4">
-                            <label for="senha_atual" class="form-label text-light fw-semibold mb-1">Senha Atual</label>
-                            <input type="password" name="senha_atual" id="senha_atual" class="form-control form-control-lg bg-transparent border-secondary-subtle text-light shadow-none" required placeholder="Digite sua senha atual">
-                        </div>
-
-                        <hr class="border-secondary-subtle opacity-50 mb-4">
+                        <?php if ($isGoogleUser): ?>
+                            <div class="alert alert-info border-0 small bg-info bg-opacity-10 text-info mb-4">
+                                <i class="bi bi-google me-2"></i> Sua conta é vinculada ao Google. Crie uma senha abaixo caso queira acessar com seu e-mail manualmente.
+                            </div>
+                            <input type="hidden" name="senha_atual" value="GOOGLE_SSO">
+                        <?php else: ?>
+                            <div class="mb-4">
+                                <label for="senha_atual" class="form-label text-light fw-semibold mb-1">Senha Atual</label>
+                                <input type="password" name="senha_atual" id="senha_atual" class="form-control form-control-lg bg-transparent border-secondary-subtle text-light shadow-none" required placeholder="Digite sua senha atual">
+                            </div>
+                            <hr class="border-secondary-subtle opacity-50 mb-4">
+                        <?php endif; ?>
 
                         <div class="mb-3">
                             <label for="nova_senha" class="form-label text-light fw-semibold mb-1">Nova Senha</label>
@@ -212,7 +248,7 @@ require_once 'geral/header.php';
 
                         <div class="text-end">
                             <button type="submit" class="btn btn-outline-warning rounded-pill px-4 fw-semibold transition-hover">
-                                Atualizar Senha
+                                <?= $isGoogleUser ? 'Criar Senha' : 'Atualizar Senha' ?>
                             </button>
                         </div>
                     </form>
@@ -248,12 +284,21 @@ require_once 'geral/header.php';
             <form method="POST" action="">
                 <div class="modal-body p-4">
                     <input type="hidden" name="action" value="delete_account">
-                    <p class="text-light mb-4">Para confirmar que é você mesmo e excluir definitivamente o seu Auralis, digite sua senha abaixo:</p>
                     
-                    <div class="mb-3">
-                        <label for="senha_confirmacao" class="form-label text-secondary small">Sua Senha</label>
-                        <input type="password" name="senha_confirmacao" id="senha_confirmacao" class="form-control form-control-lg bg-transparent border-secondary-subtle text-light shadow-none" required placeholder="Digite sua senha">
-                    </div>
+                    <?php if ($isGoogleUser): ?>
+                        <p class="text-light mb-4">Como você acessa o sistema via Google, digite a palavra <strong class="text-danger">EXCLUIR</strong> abaixo para confirmar a exclusão definitiva da conta:</p>
+                        <div class="mb-3">
+                            <label for="senha_confirmacao" class="form-label text-secondary small">Palavra de Confirmação</label>
+                            <input type="text" name="senha_confirmacao" id="senha_confirmacao" class="form-control form-control-lg bg-transparent border-secondary-subtle text-light shadow-none" required placeholder="Digite EXCLUIR" pattern="EXCLUIR">
+                        </div>
+                    <?php else: ?>
+                        <p class="text-light mb-4">Para confirmar que é você mesmo e excluir definitivamente o seu Auralis, digite sua senha abaixo:</p>
+                        <div class="mb-3">
+                            <label for="senha_confirmacao" class="form-label text-secondary small">Sua Senha</label>
+                            <input type="password" name="senha_confirmacao" id="senha_confirmacao" class="form-control form-control-lg bg-transparent border-secondary-subtle text-light shadow-none" required placeholder="Digite sua senha">
+                        </div>
+                    <?php endif; ?>
+                    
                 </div>
                 <div class="modal-footer border-top border-secondary-subtle">
                     <button type="button" class="btn btn-secondary rounded-pill px-4 fw-semibold" data-bs-dismiss="modal">Cancelar</button>
