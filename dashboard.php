@@ -362,17 +362,17 @@ error_reporting(E_ALL);
             <?php endif; ?>
         <?php endif; ?>
 
-        <div class="d-flex justify-content-between align-items-center mb-4 border-bottom border-secondary-subtle pb-3 flex-wrap gap-3">
-            <div class="d-flex align-items-center gap-4">
+        <div class="d-flex flex-column flex-xl-row justify-content-between align-items-start align-items-xl-center mb-4 border-bottom border-secondary-subtle pb-3 gap-3">
+            
+            <div class="d-flex flex-column flex-md-row align-items-start align-items-md-center gap-3 w-100 w-xl-auto">
                 <h2 class="fw-bold text-light mb-0">Visão Geral</h2>
 
-                <div class="d-flex align-items-center bg-dark border border-secondary-subtle rounded-pill px-2 py-1 shadow-sm">
+                <div class="d-flex align-items-center bg-dark border border-secondary-subtle rounded-pill px-2 py-1 shadow-sm w-100 w-md-auto justify-content-between">
                     <a href="<?php echo $link_ant ?>" class="btn btn-sm btn-link text-light opacity-75 transition-hover text-decoration-none fs-5 d-flex align-items-center justify-content-center" style="width: 35px; height: 35px;">
                         <i class="bi bi-caret-left-fill"></i>
                     </a>
 
-                    <button type="button" class="btn btn-link text-light text-decoration-none fw-bold px-2 transition-hover d-flex align-items-center justify-content-center"
-                            style="min-width: 140px; font-size: 0.95rem;"
+                    <button type="button" class="btn btn-link text-light text-decoration-none fw-bold px-2 transition-hover d-flex align-items-center justify-content-center flex-grow-1"
                             data-bs-toggle="modal" data-bs-target="#modalSeletorMes">
                         <?php echo $nome_mes ?> <?php echo $ano_atual ?>
                         <i class="bi bi-chevron-down ms-2 fs-7 opacity-75"></i>
@@ -384,145 +384,71 @@ error_reporting(E_ALL);
                 </div>
             </div>
 
-            <div class="d-flex gap-2">
-                <div class="d-flex align-items-center gap-3">
-<div class="dropdown">
-    <button class="btn border-secondary-subtle text-light shadow-sm fw-semibold dropdown-toggle d-flex justify-content-between align-items-center rounded-3 transition-hover"
-            type="button"
-            data-bs-toggle="dropdown"
-            aria-expanded="false"
-            style="width: 220px; background-color: var(--bg-charcoal-analysis);">
+            <div class="d-flex flex-column flex-md-row gap-2 w-100 w-xl-auto">
+                
+                <div class="dropdown w-100 w-md-auto">
+                    <button class="btn border-secondary-subtle text-light shadow-sm fw-semibold dropdown-toggle d-flex justify-content-between align-items-center rounded-3 transition-hover w-100"
+                            type="button" data-bs-toggle="dropdown" aria-expanded="false"
+                            style="min-width: 220px; background-color: var(--bg-charcoal-analysis);">
+                        <span class="text-truncate d-flex align-items-center">
+                            <i class="bi bi-wallet2 me-2" style="color: var(--primary-gold-analysis);"></i>
+                            <?php echo htmlspecialchars($nome_carteira_atual); ?>
+                        </span>
+                    </button>
 
-        <span class="text-truncate d-flex align-items-center">
-            <i class="bi bi-wallet2 me-2" style="color: var(--primary-gold-analysis);"></i>
-            <?php echo htmlspecialchars($nome_carteira_atual); ?>
-        </span>
-    </button>
+                    <ul class="dropdown-menu dropdown-menu-dark shadow-lg border-secondary-subtle mt-2 w-100" style="background-color: #1a1d21;">
+                        <li class="px-3 py-1 text-secondary small text-uppercase fw-bold tracking-wide">Alternar Carteira</li>
+                        <li><hr class="dropdown-divider border-secondary-subtle"></li>
+                        <?php foreach ($carteiras as $cart): ?>
+                            <li>
+                                <a class="dropdown-item d-flex align-items-center py-2 transition-hover <?php echo $carteira_selecionada == $cart['IDCarteira'] ? 'active' : '' ?>"
+                                   href="?mes=<?php echo $mes_atual ?>&ano=<?php echo $ano_atual ?>&carteira=<?php echo htmlspecialchars($cart['IDCarteira']) ?>">
+                                    <?php if ($carteira_selecionada == $cart['IDCarteira']): ?>
+                                        <i class="bi bi-check-circle-fill me-2" style="color: var(--primary-gold-analysis);"></i>
+                                        <span class="fw-bold" style="color: var(--primary-gold-analysis);"><?php echo htmlspecialchars($cart['TipoCarteira']); ?></span>
+                                    <?php else: ?>
+                                        <i class="bi bi-circle me-2 text-secondary opacity-50"></i>
+                                        <span class="text-light"><?php echo htmlspecialchars($cart['TipoCarteira']); ?></span>
+                                    <?php endif; ?>
+                                </a>
+                            </li>
+                        <?php endforeach; ?>
+                    </ul>
+                </div>
 
-    <ul class="dropdown-menu dropdown-menu-dark shadow-lg border-secondary-subtle mt-2 w-100" style="background-color: #1a1d21;">
-        <li class="px-3 py-1 text-secondary small text-uppercase fw-bold tracking-wide">Alternar Carteira</li>
-        <li><hr class="dropdown-divider border-secondary-subtle"></li>
+                <div class="vr bg-secondary opacity-25 mx-1 d-none d-md-block"></div>
 
-        <?php foreach ($carteiras as $cart): ?>
-            <li>
-                <a class="dropdown-item d-flex align-items-center py-2 transition-hover <?php echo $carteira_selecionada == $cart['IDCarteira'] ? 'active' : '' ?>"
-                   href="?mes=<?php echo $mes_atual ?>&ano=<?php echo $ano_atual ?>&carteira=<?php echo htmlspecialchars($cart['IDCarteira']) ?>">
+                <div class="d-flex gap-2 w-100 w-md-auto mt-2 mt-md-0">
+                    <a href="nova_transacao.php?carteira_id=<?php echo urlencode($carteira_selecionada) ?>&tipo=receita"
+                        class="btn btn-outline-success fw-bold d-flex align-items-center justify-content-center flex-grow-1 px-3 rounded-pill transition-hover shadow-sm">
+                        <i class="bi bi-arrow-up-short fs-5"></i> <span>Receita</span>
+                    </a>
 
-                    <?php if ($carteira_selecionada == $cart['IDCarteira']): ?>
-                        <i class="bi bi-check-circle-fill me-2" style="color: var(--primary-gold-analysis);"></i>
-                        <span class="fw-bold" style="color: var(--primary-gold-analysis);"><?php echo htmlspecialchars($cart['TipoCarteira']); ?></span>
-                    <?php else: ?>
-                        <i class="bi bi-circle me-2 text-secondary opacity-50"></i>
-                        <span class="text-light"><?php echo htmlspecialchars($cart['TipoCarteira']); ?></span>
-                    <?php endif; ?>
-
-                </a>
-            </li>
-        <?php endforeach; ?>
-    </ul>
-</div>
-
-                    <div class="vr bg-secondary opacity-25 mx-1 d-none d-md-block"></div>
-
-                    <div class="d-flex gap-2">
-                        <a href="nova_transacao.php?carteira_id=<?php echo urlencode($carteira_selecionada) ?>&tipo=receita"
-                            class="btn btn-outline-success fw-bold d-flex align-items-center px-3 rounded-pill transition-hover shadow-sm">
-                            <i class="bi bi-arrow-up-short fs-5"></i> <span class="d-none d-sm-inline ms-1">Receita</span>
-                        </a>
-
-                        <a href="nova_transacao.php?carteira_id=<?php echo urlencode($carteira_selecionada) ?>&tipo=despesa"
-                            class="btn btn-outline-danger fw-bold d-flex align-items-center px-3 rounded-pill transition-hover shadow-sm">
-                            <i class="bi bi-arrow-down-short fs-5"></i> <span class="d-none d-sm-inline ms-1">Despesa</span>
-                        </a>
-                    </div>
+                    <a href="nova_transacao.php?carteira_id=<?php echo urlencode($carteira_selecionada) ?>&tipo=despesa"
+                        class="btn btn-outline-danger fw-bold d-flex align-items-center justify-content-center flex-grow-1 px-3 rounded-pill transition-hover shadow-sm">
+                        <i class="bi bi-arrow-down-short fs-5"></i> <span>Despesa</span>
+                    </a>
                 </div>
             </div>
         </div>
 
         <div class="row g-4 mb-5">
-            <div class="col-md-4">
-                <div class="card bg-body-tertiary border-secondary-subtle shadow-sm h-100 rounded-4">
-                    <div class="card-body p-4 position-relative">
-                        <style>
-                            .inferiorDireito{
-                                position: absolute;
-                                bottom: 10px;
-                                right: 10px;
-                            }
-                        </style>
-                        <button class="btn btn-sm btn-outline-secondary position-absolute inferiorDireito m-3 rounded-pill transition-hover border-0 shadow-none"
-                                data-bs-toggle="modal" data-bs-target="#modalAjusteSaldo" title="Ajustar Saldo Real">
-                            <i class="bi bi-pencil-square fs-5"></i>
-                        </button>
+           ```
 
-                        <div class="d-flex justify-content-between align-items-center mb-3">
-                            <h6 class="card-title text-secondary mb-0 fw-semibold pe-4">Saldo: <?php echo htmlspecialchars($nome_carteira_atual); ?></h6>
-                            <div class="p-2 bg-primary bg-opacity-10 rounded-3">
-                                <i class="bi bi-wallet2 text-primary fs-5"></i>
-                            </div>
-                        </div>
-                        <h3 class="fw-bold mb-1 <?php echo $saldoAtual < 0 ? 'text-danger' : 'text-light' ?>">
-                            R$ <?php echo number_format($saldoAtual, 2, ',', '.') ?>
-                        </h3>
-                        <p class="text-secondary small mb-0">Total disponível hoje</p>
-                    </div>
-                </div>
-            </div>
+E para a **Tabela de Transações**, adicione a classe `d-none d-md-table-cell` nas colunas e nas `td`'s de Categoria, Data e Status. Isso diz ao sistema: *"No celular, esconda essas colunas"*.
 
-            <div class="col-md-4">
-                <div class="card bg-body-tertiary border-secondary-subtle shadow-sm h-100 rounded-4">
-                    <div class="card-body p-4">
-                        <div class="d-flex justify-content-between align-items-center mb-3">
-                            <h6 class="card-title text-secondary mb-0 fw-semibold">Receitas (<?php echo $nome_mes ?>)</h6>
-                            <div class="p-2 bg-success bg-opacity-10 rounded-3">
-                                <i class="bi bi-graph-up-arrow text-success fs-5"></i>
-                            </div>
-                        </div>
-                        <h3 class="fw-bold text-success mb-1">
-                            R$ <?php echo number_format($receitasMes, 2, ',', '.') ?>
-                        </h3>
-                    </div>
-                </div>
-            </div>
-
-            <div class="col-md-4">
-                <div class="card bg-body-tertiary border-secondary-subtle shadow-sm h-100 rounded-4">
-                    <div class="card-body p-4">
-                        <div class="d-flex justify-content-between align-items-center mb-3">
-                            <h6 class="card-title text-secondary mb-0 fw-semibold">Despesas (<?php echo $nome_mes ?>)</h6>
-                            <div class="p-2 bg-danger bg-opacity-10 rounded-3">
-                                <i class="bi bi-graph-down-arrow text-danger fs-5"></i>
-                            </div>
-                        </div>
-                        <h3 class="fw-bold text-danger mb-1">
-                            R$ <?php echo number_format($despesasMes, 2, ',', '.') ?>
-                        </h3>
-                    </div>
-                </div>
-            </div>
-        </div>
-
-        <h4 class="fw-bold text-light mb-4">Transações de <?php echo $nome_mes ?></h4>
-        <div class="card bg-dark border-secondary-subtle shadow-sm rounded-4 overflow-hidden">
-
-            <?php if (empty($transacoes)): ?>
-                <div class="card-body p-5 text-center">
-                    <i class="bi bi-receipt text-secondary opacity-50 display-1 mb-3"></i>
-                    <h5 class="text-light fw-bold">Nenhum registro em <?php echo $nome_mes ?></h5>
-                    <p class="text-secondary mb-0">Esta carteira não tem movimentações neste mês.</p>
-                </div>
-            <?php else: ?>
-                <div class="table-responsive" style="overflow-x: visible;">
-                    <table class="table table-dark table-hover align-middle mb-0 auralis-table">
-                        <thead class="table-active border-secondary-subtle text-secondary small text-uppercase">
-                            <tr>
-                                <th class="ps-4 py-3 border-0">Descrição</th>
-                                <th class="py-3 border-0">Categoria</th>
-                                <th class="py-3 border-0">Data</th>
-                                <th class="py-3 border-0">Status</th>
-                                <th class="text-end pe-4 py-3 border-0">Valor</th>
-                            </tr>
-                        </thead>
+A sua tag `<table...>` e o `<thead...>` vão ficar assim:
+```html
+<table class="table table-dark table-hover align-middle mb-0 auralis-table">
+    <thead class="table-active border-secondary-subtle text-secondary small text-uppercase">
+        <tr>
+            <th class="ps-3 ps-md-4 py-3 border-0">Descrição</th>
+            <th class="py-3 border-0 d-none d-md-table-cell">Categoria</th>
+            <th class="py-3 border-0 d-none d-md-table-cell">Data</th>
+            <th class="py-3 border-0 d-none d-md-table-cell">Status</th>
+            <th class="text-end pe-3 pe-md-4 py-3 border-0">Valor</th>
+        </tr>
+    </thead>
                         <tbody class="border-top-0">
                             <?php foreach ($transacoes as $index => $t):
                                     $isDespesa     = ($t['TipoRegistro'] === 'despesa');

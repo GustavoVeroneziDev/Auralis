@@ -186,8 +186,11 @@ html {
 /* ==========================================
    AJUSTES RESPONSIVOS (MOBILE)
    ========================================== */
+/* ==========================================
+   AJUSTES RESPONSIVOS (MOBILE)
+   ========================================== */
 @media (max-width: 991.98px) {
-    /* Ajusta o espaçamento do menu quando aberto no celular */
+    /* ... (mantenha as regras do menu que já estavam aqui) ... */
     .navbar-collapse {
         background-color: rgba(18, 20, 24, 0.95);
         border-radius: 12px;
@@ -195,13 +198,7 @@ html {
         margin-top: 1rem;
         border: 1px solid rgba(255, 255, 255, 0.05);
     }
-    
-    /* Remove a animação do sublinhado no celular para evitar bugs de toque */
-    .navbar-nav .custom-link::after {
-        display: none;
-    }
-    
-    /* Dropdown do usuário não precisa flutuar no celular, ele empurra o conteúdo */
+    .navbar-nav .custom-link::after { display: none; }
     .dropdown-menu {
         position: static !important;
         transform: none !important;
@@ -209,5 +206,23 @@ html {
         border: none !important;
         box-shadow: none !important;
         padding-left: 1rem;
+    }
+
+    /* NOVAS REGRAS PARA O DASHBOARD NO CELULAR */
+    /* Reduz textos que ficam exagerados */
+    h2.fw-bold { font-size: 1.5rem !important; }
+    h3.fw-bold { font-size: 1.5rem !important; }
+    
+    /* Reduz o "gordura" (padding) dos cards para sobrar mais tela */
+    .card-body { padding: 1rem !important; }
+    
+    /* Força os botões do painel a ocuparem 100% da largura de forma harmônica */
+    .dropdown-toggle.w-100 { display: flex; justify-content: space-between; }
+    
+    /* Limpa a tabela para não espremer */
+    .auralis-table th, .auralis-table td { 
+        padding-left: 0.5rem !important; 
+        padding-right: 0.5rem !important; 
+        font-size: 0.9rem; 
     }
 }
