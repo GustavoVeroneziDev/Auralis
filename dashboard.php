@@ -433,12 +433,6 @@ error_reporting(E_ALL);
         </div>
 
         <div class="row g-4 mb-5">
-           ```
-
-E para a **Tabela de Transações**, adicione a classe `d-none d-md-table-cell` nas colunas e nas `td`'s de Categoria, Data e Status. Isso diz ao sistema: *"No celular, esconda essas colunas"*.
-
-A sua tag `<table...>` e o `<thead...>` vão ficar assim:
-```html
 <table class="table table-dark table-hover align-middle mb-0 auralis-table">
     <thead class="table-active border-secondary-subtle text-secondary small text-uppercase">
         <tr>
@@ -449,108 +443,111 @@ A sua tag `<table...>` e o `<thead...>` vão ficar assim:
             <th class="text-end pe-3 pe-md-4 py-3 border-0">Valor</th>
         </tr>
     </thead>
-                        <tbody class="border-top-0">
-                            <?php foreach ($transacoes as $index => $t):
-                                    $isDespesa     = ($t['TipoRegistro'] === 'despesa');
-                                    $sinalValor    = $isDespesa ? '-' : '+';
-                                    $corValor      = $isDespesa ? 'text-danger' : 'text-success';
-                                    $dataFormatada = date('d/m/Y', strtotime($t['MomentoRegistro']));
-                                    $iconeTipo     = $isDespesa ? '<i class="bi bi-arrow-down-short fs-5 text-danger bg-danger bg-opacity-10 rounded-circle p-1 me-3"></i>'
-                                        : '<i class="bi bi-arrow-up-short fs-5 text-success bg-success bg-opacity-10 rounded-circle p-1 me-3"></i>';
+    <tbody class="border-top-0">
+        <?php foreach ($transacoes as $index => $t):
+                $isDespesa     = ($t['TipoRegistro'] === 'despesa');
+                $sinalValor    = $isDespesa ? '-' : '+';
+                $corValor      = $isDespesa ? 'text-danger' : 'text-success';
+                $dataFormatada = date('d/m/Y', strtotime($t['MomentoRegistro']));
+                $iconeTipo     = $isDespesa ? '<i class="bi bi-arrow-down-short fs-5 text-danger bg-danger bg-opacity-10 rounded-circle p-1 me-3"></i>'
+                    : '<i class="bi bi-arrow-up-short fs-5 text-success bg-success bg-opacity-10 rounded-circle p-1 me-3"></i>';
 
-                                    $rowId           = "transacao-" . $index;
-                                    $isPendente      = ($t['StatusRegistro'] === 'pendente');
-                                    $textoAcaoStatus = $isDespesa ? 'Marcar como Pago' : 'Marcar como Recebido';
-                            ?>
-                            <tr data-bs-toggle="collapse" data-bs-target="#<?php echo $rowId ?>" class="cursor-pointer transition-hover" style="cursor: pointer;">
-                                <td class="ps-4 py-3 border-secondary-subtle">
-                                    <div class="d-flex align-items-center">
-                                        <?php echo $iconeTipo ?>
-                                        <span class="text-light fw-semibold"><?php echo htmlspecialchars($t['Descricao']) ?></span>
-                                    </div>
-                                </td>
-                                <td class="py-3 border-secondary-subtle text-secondary small">
-                                    <div class="d-flex align-items-center">
-                                        <i class="bi <?php echo htmlspecialchars($t['IconeCategoria'] ?? 'bi-tag') ?> me-2 fs-6"></i>
-                                        <span><?php echo htmlspecialchars($t['NomeCategoria'] ?? 'Sem categoria') ?></span>
-                                    </div>
-                                </td>
-                                <td class="py-3 border-secondary-subtle text-secondary small">
-                                    <?php echo $dataFormatada ?>
-                                </td>
-                                <td class="py-3 border-secondary-subtle">
-                                    <?php if ($isPendente): ?>
-                                        <span class="badge bg-warning text-dark px-2 py-1 rounded-pill fw-semibold shadow-sm"><i class="bi bi-clock-history me-1"></i> Pendente</span>
-                                    <?php else: ?>
-                                        <span class="badge bg-secondary bg-opacity-25 text-light px-2 py-1 rounded-pill"><i class="bi bi-check2-circle me-1"></i> Efetivado</span>
-                                    <?php endif; ?>
-                                </td>
-                                <td class="text-end pe-4 py-3 border-secondary-subtle fw-bold <?php echo $corValor ?>">
-                                    <?php echo $sinalValor ?> R$ <?php echo number_format($t['Valor'], 2, ',', '.') ?>
-                                </td>
-                            </tr>
-                            <tr>
-                                <td colspan="5" class="p-0 border-0">
-                                    <div class="collapse" id="<?php echo $rowId ?>">
-                                        <div class="p-4 bg-charcoal-analysis border-bottom border-secondary-subtle d-flex justify-content-between align-items-start">
-                                            <div class="d-flex gap-4">
-                                                <?php $labelData = $isDespesa ? 'Vencimento' : 'Recebimento'; ?>
-                                                    <div>
-                                                        <span class="d-block text-secondary small text-uppercase mb-1"><?php echo $labelData ?></span>
-                                                        <span class="text-light fs-6">
-                                                            <?php echo(! empty($t['DataVencimento']) && strtotime($t['DataVencimento'])) ? date('d/m/Y', strtotime($t['DataVencimento'])) : '<span class="text-muted">Não definido</span>' ?>
-                                                        </span>
-                                                    </div>
-                                                <div>
-                                                    <span class="d-block text-secondary small text-uppercase mb-1">Recorrência</span>
-                                                    <span class="text-light fs-6">
-                                                        <?php echo $t['Recorrente'] ? 'Sim (Dia ' . htmlspecialchars($t['DiaVencimento']) . ')' : 'Não' ?>
-                                                    </span>
-                                                </div>
-                                            </div>
-
-                                            <div class="d-flex gap-2">
-                                                <form method="POST" action="" class="m-0">
-                                                    <input type="hidden" name="action" value="toggle_status">
-                                                    <input type="hidden" name="registro_id" value="<?php echo $t['IDRegistro'] ?>">
-                                                    <?php if ($isPendente): ?>
-                                                        <input type="hidden" name="novo_status" value="efetivado">
-                                                        <button type="submit" class="btn btn-sm btn-outline-success rounded-pill fw-semibold px-3 d-inline-flex align-items-center gap-1">
-                                                            <i class="bi bi-check-circle"></i> <?php echo $textoAcaoStatus ?>
-                                                        </button>
-                                                    <?php else: ?>
-                                                        <input type="hidden" name="novo_status" value="pendente">
-                                                        <button type="submit" class="btn btn-sm btn-outline-secondary rounded-pill fw-semibold px-3 d-inline-flex align-items-center gap-1">
-                                                            <i class="bi bi-arrow-counterclockwise"></i> Desfazer
-                                                        </button>
-                                                    <?php endif; ?>
-                                                </form>
-
-                                                <a href="nova_transacao.php?editar=<?php echo $t['IDRegistro'] ?>" class="btn btn-sm btn-outline-warning rounded-pill fw-semibold px-3 d-inline-flex align-items-center gap-1 transition-hover">
-                                                    <i class="bi bi-pencil-square"></i> Editar
-                                                </a>
-
-                                                <form method="POST" action="" class="m-0" onsubmit="return confirm('Tem certeza que deseja excluir esta transação? A ação não pode ser desfeita.');">
-                                                    <input type="hidden" name="action" value="excluir_registro">
-                                                    <input type="hidden" name="registro_id" value="<?php echo $t['IDRegistro'] ?>">
-                                                    <button type="submit" class="btn btn-sm btn-outline-danger rounded-pill fw-semibold px-3 d-inline-flex align-items-center gap-1 transition-hover">
-                                                        <i class="bi bi-trash3"></i> Excluir
-                                                    </button>
-                                                </form>
-                                            </div>
-                                        </div>
-                                    </div>
-                                </td>
-                            </tr>
-                            <?php endforeach; ?>
-                        </tbody>
-                    </table>
+                $rowId           = "transacao-" . $index;
+                $isPendente      = ($t['StatusRegistro'] === 'pendente');
+                $textoAcaoStatus = $isDespesa ? 'Marcar como Pago' : 'Marcar como Recebido';
+        ?>
+        <tr data-bs-toggle="collapse" data-bs-target="#<?php echo $rowId ?>" class="cursor-pointer transition-hover" style="cursor: pointer;">
+            
+            <td class="ps-3 ps-md-4 py-3 border-secondary-subtle">
+                <div class="d-flex align-items-center">
+                    <?php echo $iconeTipo ?>
+                    <span class="text-light fw-semibold"><?php echo htmlspecialchars($t['Descricao']) ?></span>
                 </div>
-            <?php endif; ?>
-        </div>
+            </td>
+            
+            <td class="py-3 border-secondary-subtle text-secondary small d-none d-md-table-cell">
+                <div class="d-flex align-items-center">
+                    <i class="bi <?php echo htmlspecialchars($t['IconeCategoria'] ?? 'bi-tag') ?> me-2 fs-6"></i>
+                    <span><?php echo htmlspecialchars($t['NomeCategoria'] ?? 'Sem categoria') ?></span>
+                </div>
+            </td>
+            
+            <td class="py-3 border-secondary-subtle text-secondary small d-none d-md-table-cell">
+                <?php echo $dataFormatada ?>
+            </td>
+            
+            <td class="py-3 border-secondary-subtle d-none d-md-table-cell">
+                <?php if ($isPendente): ?>
+                    <span class="badge bg-warning text-dark px-2 py-1 rounded-pill fw-semibold shadow-sm"><i class="bi bi-clock-history me-1"></i> Pendente</span>
+                <?php else: ?>
+                    <span class="badge bg-secondary bg-opacity-25 text-light px-2 py-1 rounded-pill"><i class="bi bi-check2-circle me-1"></i> Efetivado</span>
+                <?php endif; ?>
+            </td>
+            
+            <td class="text-end pe-3 pe-md-4 py-3 border-secondary-subtle fw-bold <?php echo $corValor ?>">
+                <?php echo $sinalValor ?> R$ <?php echo number_format($t['Valor'], 2, ',', '.') ?>
+            </td>
+        </tr>
+        
+        <tr>
+            <td colspan="5" class="p-0 border-0">
+                <div class="collapse" id="<?php echo $rowId ?>">
+                    <div class="p-3 p-md-4 bg-charcoal-analysis border-bottom border-secondary-subtle d-flex flex-column flex-md-row justify-content-between align-items-start gap-3">
+                        
+                        <div class="d-flex gap-4 w-100 w-md-auto">
+                            <?php $labelData = $isDespesa ? 'Vencimento' : 'Recebimento'; ?>
+                            <div>
+                                <span class="d-block text-secondary small text-uppercase mb-1"><?php echo $labelData ?></span>
+                                <span class="text-light fs-6">
+                                    <?php echo(! empty($t['DataVencimento']) && strtotime($t['DataVencimento'])) ? date('d/m/Y', strtotime($t['DataVencimento'])) : '<span class="text-muted">Não definido</span>' ?>
+                                </span>
+                            </div>
+                            <div>
+                                <span class="d-block text-secondary small text-uppercase mb-1">Recorrência</span>
+                                <span class="text-light fs-6">
+                                    <?php echo $t['Recorrente'] ? 'Sim (Dia ' . htmlspecialchars($t['DiaVencimento']) . ')' : 'Não' ?>
+                                </span>
+                            </div>
+                        </div>
 
+                        <div class="d-flex gap-2 w-100 w-md-auto justify-content-end">
+                            <form method="POST" action="" class="m-0">
+                                <input type="hidden" name="action" value="toggle_status">
+                                <input type="hidden" name="registro_id" value="<?php echo $t['IDRegistro'] ?>">
+                                <?php if ($isPendente): ?>
+                                    <input type="hidden" name="novo_status" value="efetivado">
+                                    <button type="submit" class="btn btn-sm btn-outline-success rounded-pill fw-semibold px-3 d-inline-flex align-items-center gap-1 w-100 justify-content-center">
+                                        <i class="bi bi-check-circle"></i> <span class="d-none d-sm-inline"><?php echo $textoAcaoStatus ?></span>
+                                    </button>
+                                <?php else: ?>
+                                    <input type="hidden" name="novo_status" value="pendente">
+                                    <button type="submit" class="btn btn-sm btn-outline-secondary rounded-pill fw-semibold px-3 d-inline-flex align-items-center gap-1 w-100 justify-content-center" title="Desfazer">
+                                        <i class="bi bi-arrow-counterclockwise"></i> <span class="d-none d-sm-inline">Desfazer</span>
+                                    </button>
+                                <?php endif; ?>
+                            </form>
+
+                            <a href="nova_transacao.php?editar=<?php echo $t['IDRegistro'] ?>" class="btn btn-sm btn-outline-warning rounded-pill fw-semibold px-3 d-inline-flex align-items-center gap-1 transition-hover">
+                                <i class="bi bi-pencil-square"></i> <span class="d-none d-sm-inline">Editar</span>
+                            </a>
+
+                            <form method="POST" action="" class="m-0" onsubmit="return confirm('Tem certeza que deseja excluir esta transação? A ação não pode ser desfeita.');">
+                                <input type="hidden" name="action" value="excluir_registro">
+                                <input type="hidden" name="registro_id" value="<?php echo $t['IDRegistro'] ?>">
+                                <button type="submit" class="btn btn-sm btn-outline-danger rounded-pill fw-semibold px-3 d-inline-flex align-items-center gap-1 transition-hover">
+                                    <i class="bi bi-trash3"></i> <span class="d-none d-sm-inline">Excluir</span>
+                                </button>
+                            </form>
+                        </div>
+                    </div>
+                </div>
+            </td>
+        </tr>
+        <?php endforeach; ?>
+    </tbody>
+</table>
+                </div>
     <?php endif; ?>
-
 </main>
 
 <!-- ======================================================================= -->
