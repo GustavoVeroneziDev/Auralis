@@ -158,10 +158,12 @@ error_reporting(E_ALL);
 
             $diferenca = $saldo_informado - $saldo_sistema;
 
-            if (abs($diferenca) > 0.009) {
-                $tipoRegistro  = ($diferenca > 0) ? 'receita' : 'despesa';
+            // A MÁGICA AQUI: Se for o primeiro acesso, ele SALVA o registro mesmo que o valor seja zero.
+            if (abs($diferenca) > 0.009 || $is_primeiro_acesso) {
+                // Se for >= 0, é receita. Assim, o zero fica registrado como receita inicial.
+                $tipoRegistro  = ($diferenca >= 0) ? 'receita' : 'despesa';
                 $valorRegistro = abs($diferenca);
-                $descricao     = ($saldo_sistema == 0) ? 'Saldo Inicial' : 'Ajuste de Saldo';
+                $descricao     = $is_primeiro_acesso ? 'Saldo Inicial' : 'Ajuste de Saldo';
 
                 try {
                     $sqlCat  = "SELECT IDCategoria FROM Categoria WHERE FKUsuario = :uid AND NomeCategoria = 'Ajuste de Saldo' AND TipoCategoria = :tipo LIMIT 1";
@@ -170,7 +172,6 @@ error_reporting(E_ALL);
                     $catId = $stmtCat->fetchColumn();
 
                     if (!$catId) {
-                        // CORREÇÃO: Adicionado IDCategoria
                         $sqlNovaCat  = "INSERT INTO Categoria (IDCategoria, NomeCategoria, TipoCategoria, IconeCategoria, FKUsuario) VALUES (:id, 'Ajuste de Saldo', :tipo, 'bi-gear-fill', :uid)";
                         $stmtNovaCat = $pdo->prepare($sqlNovaCat);
                         $stmtNovaCat->execute([':id' => gerarUuid(), ':tipo' => $tipoRegistro, ':uid' => $usuario_id]);
@@ -179,7 +180,6 @@ error_reporting(E_ALL);
                         $catId = $stmtCat->fetchColumn();
                     }
 
-                    // CORREÇÃO: Adicionado IDRegistro
                     $sqlAjuste = "
                         INSERT INTO Registro (
                             IDRegistro, TipoRegistro, Valor, Descricao, MomentoRegistro,
@@ -199,7 +199,13 @@ error_reporting(E_ALL);
                         ':usuario'   => $usuario_id,
                         ':categoria' => $catId,
                     ]);
-                    header("Location: " . $redirectBase . "&sucesso=ajustado");
+                    
+                    // Se for o primeiro acesso, limpa a URL para não exibir avisos repetidos
+                    if ($is_primeiro_acesso) {
+                        header("Location: " . explode('&', $redirectBase)[0] . "&sucesso=ajustado");
+                    } else {
+                        header("Location: " . $redirectBase . "&sucesso=ajustado");
+                    }
                     exit;
                 } catch (PDOException $e) {}
             } else {
@@ -333,20 +339,21 @@ error_reporting(E_ALL);
                 if ($_GET['sucesso'] === 'registro') {
                     $msg = 'Transação salva com sucesso!';
                 }
-
                 if ($_GET['sucesso'] === 'editado') {
                     $msg = 'Transação atualizada com sucesso!';
                 }
-
                 if ($_GET['sucesso'] === 'excluido') {
                     $msg = 'Transação excluída!';
                 }
-
                 if ($_GET['sucesso'] === 'ajustado') {
                     $msg = 'Prontinho! Seu saldo foi ajustado e agora está real.';
                 }
-
+                // ADICIONE ESTA CONDIÇÃO AQUI:
+                if ($_GET['sucesso'] === 'criada') {
+                    $msg = 'Nova carteira criada! Agora informe seu saldo para começar.';
+                }
             ?>
+
             <?php if ($msg): ?>
             <div class="alert alert-success d-flex align-items-center gap-2 rounded-3 shadow-sm border-0 bg-success bg-opacity-10 text-success fw-semibold alert-dismissible fade show" role="alert">
                 <i class="bi bi-check-circle-fill"></i> <span><?php echo $msg ?></span>

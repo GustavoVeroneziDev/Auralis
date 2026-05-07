@@ -69,6 +69,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 ':usuarioId'    => $usuarioId
             ]);
             
+            // Se apenas editou o nome, volta para a lista de carteiras
+            header("Location: listar_carteiras.php?sucesso=editada");
+            
         } else {
             // MODO CRIAÇÃO (INSERT)
             $id_nova_carteira = gerarUuid(); // O PHP cria o ID único da carteira nova
@@ -80,9 +83,11 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 ':tipoCarteira' => $tipoCarteira,
                 ':usuarioId'    => $usuarioId
             ]);
+            
+            // Se CRIOU uma carteira (seja pelo modal ou pelo botão), vai direto pro Dashboard!
+            header("Location: ../dashboard.php?sucesso=criada");
         }
 
-        header("Location: listar_carteiras.php?sucesso=" . ($id_carteira ? 'editada' : 'criada'));
         exit;
 
     } catch (PDOException $e) {
