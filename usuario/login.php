@@ -5,7 +5,7 @@ require_once '../geral/header.php';
 
 <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css">
 
-<main class="container py-5 mt-5">
+<main class="container">
     <div class="row justify-content-center">
         <div class="col-lg-5 col-md-8 col-sm-10">
 

@@ -29,6 +29,7 @@ if (!empty($token)) {
     <title>Redefinir Senha - Auralis</title>
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.0/font/bootstrap-icons.css">
+            <link rel="shortcut icon" href="/geral/img/icone.ico" type="image/x-icon">
     <style>
         body { background-color: #0f0f16; color: #e0e0e0; font-family: 'Segoe UI', sans-serif; min-height: 100vh; display: flex; align-items: center; justify-content: center; }
         .card-reset { background-color: #161622; border: 1px solid #252538; border-radius: 16px; padding: 40px; width: 100%; max-width: 420px; box-shadow: 0 10px 30px rgba(0, 0, 0, 0.25); }
@@ -52,12 +53,12 @@ if (!empty($token)) {
 
             <div class="mb-3">
                 <label for="senha" class="form-label small text-secondary">Nova Senha</label>
-                <input type="password" name="senha" id="senha" class="form-control" required minlength="6">
+                <input type="password" name="senha" id="senha" class="form-control" required minlength="8">
             </div>
 
             <div class="mb-4">
                 <label for="confirma_senha" class="form-label small text-secondary">Confirmar Nova Senha</label>
-                <input type="password" name="confirma_senha" id="confirma_senha" class="form-control" required minlength="6">
+                <input type="password" name="confirma_senha" id="confirma_senha" class="form-control" required minlength="8">
             </div>
 
             <button type="submit" class="btn btn-primary w-100">Atualizar Senha</button>
