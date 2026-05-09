@@ -398,7 +398,6 @@ input[type=number] { -moz-appearance: textfield; }
 .table > tbody > tr[style*="border: 0"] > td {
     padding: 0 !important;
     border: 0 !important;
-    line-height: 0;
 }
 
 /* Mobile: header do dashboard em coluna limpa */

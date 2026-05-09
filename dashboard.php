@@ -561,7 +561,7 @@ require_once 'geral/header.php';
                         </tr>
 
                         <tr class="border-0" style="border: 0 !important;">
-                            <td colspan="5" class="p-0 border-0" style="border: 0 !important; line-height: 0;">
+                            <td colspan="5" class="p-0 border-0" style="border: 0 !important;">
                                 <div class="collapse" id="<?php echo $rowId ?>">
                                     <div class="p-3 p-md-4 bg-charcoal-analysis border-bottom border-secondary-subtle d-flex flex-column flex-md-row justify-content-between align-items-start gap-3">
 
