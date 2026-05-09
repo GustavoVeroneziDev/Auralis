@@ -1,0 +1,26 @@
+name: Deploy Produção (meuauralis.com) 🚀
+
+on:
+  push:
+    branches:
+      - main # Roda apenas quando o código for para a main
+
+jobs:
+  web-deploy:
+    name: 🎉 Deploy
+    runs-on: ubuntu-latest
+    steps:
+    - name: 🚚 Pegando o código
+      uses: actions/checkout@v4
+    
+    - name: 📂 Sincronizando com HostGator (PRODUÇÃO)
+      uses: SamKirkland/FTP-Deploy-Action@v4.3.4
+      with:
+        server: ${{ secrets.FTP_SERVER }}
+        username: ${{ secrets.FTP_USERNAME }} # Puxando o seu secret atual
+        password: ${{ secrets.FTP_PASSWORD }} # Puxando a sua senha atual
+        exclude: |
+          **/.git*
+          **/.git*/**
+          .github/**
+          .php-cs-fixer.php
