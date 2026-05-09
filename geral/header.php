@@ -79,7 +79,7 @@ $paginaAtual = basename($_SERVER['PHP_SELF']);
                         <div class="dropdown w-100 text-start text-lg-end">
                             <a href="#" class="d-flex align-items-center justify-content-start justify-content-lg-end text-light text-decoration-none dropdown-toggle custom-link py-2"
                                 id="menuUsuario" data-bs-toggle="dropdown" aria-expanded="false">
-                                <span class="me-2 text-muted">Olá, <strong class="text-light"><?php echo htmlspecialchars($primeiroNome); ?></strong></span>
+                                <span class="me-2 text-muted navbar-greeting">Olá, <strong class="text-light"><?php echo htmlspecialchars($primeiroNome); ?></strong></span>
                                 <i style="color: gold !important;" class="bi bi-person-circle fs-4 cardCentral"></i>
                             </a>
 

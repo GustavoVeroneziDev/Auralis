@@ -1,26 +1,29 @@
-/* Importação de fonte moderna */
-/* Importando a Fonte Inter Localmente (Arquivos 18pt) */
+/* ==========================================================================
+   AURALIS — DESIGN SYSTEM
+   Versão responsiva completa: mobile-first com ótima experiência no desktop
+   ========================================================================== */
+
+/* --------------------------------------------------------------------------
+   1. FONTES (Inter local)
+   -------------------------------------------------------------------------- */
 @font-face {
     font-family: 'Inter';
     src: url('fonts/Inter_18pt-Regular.ttf') format('truetype');
     font-weight: 400;
     font-style: normal;
 }
-
 @font-face {
     font-family: 'Inter';
     src: url('fonts/Inter_18pt-Medium.ttf') format('truetype');
     font-weight: 500;
     font-style: normal;
 }
-
 @font-face {
     font-family: 'Inter';
     src: url('fonts/Inter_18pt-SemiBold.ttf') format('truetype');
     font-weight: 600;
     font-style: normal;
 }
-
 @font-face {
     font-family: 'Inter';
     src: url('fonts/Inter_18pt-Bold.ttf') format('truetype');
@@ -28,143 +31,74 @@
     font-style: normal;
 }
 
-/* Sobrescrevendo o tema escuro do Bootstrap e criando nossas variáveis */
+/* --------------------------------------------------------------------------
+   2. VARIÁVEIS DO SISTEMA
+   -------------------------------------------------------------------------- */
 :root,
 [data-bs-theme="dark"] {
-    --bg-dark: #121418;
-    /* Um fundo escuro mais sofisticado e quente */
-    --bg-card: #1e2126;
-    /* Fundo dos cards levemente destacado */
+    --bg-dark:  #121418;
+    --bg-card:  #1e2126;
+    --bg-hover: #252a31;
 
-    /* A Paleta Dourada */
-    --accent: #d4af37;
-    /* Ouro Metálico Clássico */
+    --accent:       #d4af37;
     --accent-light: #f9e596;
-    /* Dourado claro para o gradiente e brilho */
+    --gold-primary: #FFB800;
 
-    --text-main: #f8fafc;
+    --text-main:  #f8fafc;
     --text-muted: #a1a1aa;
 
-    /* Forçando o Bootstrap a usar o nosso Dourado como cor "Primary" */
-    --bs-primary: var(--accent);
-    --bs-primary-rgb: 212, 175, 55;
-    --bs-link-color: var(--accent);
+    --bs-primary:          var(--accent);
+    --bs-primary-rgb:      212, 175, 55;
+    --bs-link-color:       var(--accent);
     --bs-link-hover-color: var(--accent-light);
-    
-    --gold-primary: #FFB800; /* Ajuste para o Hex exato do protótipo se necessário */
+
+    /* Espaçamentos que escalam com viewport */
+    --space-page-x: clamp(0.875rem, 4vw, 3rem);
+    --space-card:   clamp(0.875rem, 2vw, 1.5rem);
+
+    /* Tipografia fluída */
+    --fs-hero:     clamp(1.2rem, 3vw, 1.65rem);
+    --fs-card-val: clamp(1.3rem, 3.5vw, 1.875rem);
+    --fs-label:    clamp(0.625rem, 1.3vw, 0.725rem);
+    --fs-body:     clamp(0.8rem, 1.4vw, 0.9375rem);
+    --fs-small:    clamp(0.7rem, 1.1vw, 0.8125rem);
 }
+
+/* --------------------------------------------------------------------------
+   3. BASE
+   -------------------------------------------------------------------------- */
+*, *::before, *::after { box-sizing: border-box; }
+
+html { scroll-behavior: smooth; }
 
 body {
     font-family: 'Inter', sans-serif;
+    font-size: var(--fs-body);
     background-color: var(--bg-dark);
     color: var(--text-main);
     overflow-x: hidden;
+    -webkit-font-smoothing: antialiased;
 }
 
-/* Efeito de Vidro na Navbar */
+/* --------------------------------------------------------------------------
+   4. NAVBAR
+   -------------------------------------------------------------------------- */
 .navbar {
-    background-color: rgba(18, 20, 24, 0.8) !important;
+    background-color: rgba(18, 20, 24, 0.85) !important;
     backdrop-filter: blur(12px);
     -webkit-backdrop-filter: blur(12px);
 }
 
-/* Gradiente no Título (Hero Section) com tons de ouro */
-h1 span {
-    background: linear-gradient(90deg, var(--accent), var(--accent-light));
-    background-clip: text;
-    -webkit-background-clip: text;
-    -webkit-text-fill-color: transparent;
+.navbar-brand img {
+    height: clamp(26px, 4vw, 34px);
+    width: auto;
 }
 
-/* Cards Estilizados */
-.feature-card {
-    background-color: var(--bg-card);
-    border: 1px solid rgba(212, 175, 55, 0.1);
-    /* Borda bem sutil dourada */
-    border-radius: 1.25rem;
-    padding: 2rem;
-    transition: transform 0.3s ease, box-shadow 0.3s ease, border-color 0.3s ease;
-}
-
-.feature-card:hover {
-    transform: translateY(-10px);
-    box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.5), 0 10px 10px -5px rgba(212, 175, 55, 0.1);
-    border-color: var(--accent);
-}
-
-/* Botões Personalizados */
-.btn-primary {
-    background-color: var(--accent);
-    border: none;
-    color: #121418 !important;
-    /* Texto escuro para dar contraste no botão dourado */
-    font-weight: 700;
-}
-
-.btn-primary:hover {
-    background-color: var(--accent-light);
-    color: #000000 !important;
-}
-
-html {
-    scroll-behavior: smooth;
-    scroll-padding-top: 900px;
-}
-
-/* ==========================================
-   ANIMAÇÕES DE ROLAGEM (INTERSECTION OBSERVER)
-   ========================================== */
-.card-animado {
-    opacity: 0;
-    transition: all 0.8s cubic-bezier(0.175, 0.885, 0.32, 1.275);
-    /* Deixei a animação mais "elástica" e premium */
-}
-
-.surgir-baixo {
-    transform: translateY(60px);
-}
-
-.mostrar {
-    opacity: 1 !important;
-    transform: translate(0, 0) !important;
-}
-
-.text-gold {
-    color: var(--gold-primary) !important; 
-    /* Aqui o !important é aceitável por ser uma classe utilitária atômica */
-}
-
-/* Garante que o dourado funcione em qualquer ícone ou texto com as classes abaixo */
-.text-primary, .text-gold {
-    color: var(--accent) !important; /* var(--accent) é o seu dourado #d4af37 */
-}
-
-/* Brilho suave nos ícones da navbar para dar um ar premium */
 .navbar-brand i {
     filter: drop-shadow(0 0 5px rgba(212, 175, 55, 0.4));
 }
 
-/* Animação suave para o menu Dropdown do usuário */
-.dropdown-menu {
-    animation: slideDropdown 0.3s cubic-bezier(0.25, 0.8, 0.25, 1) forwards;
-    transform-origin: top center;
-}
-
-@keyframes slideDropdown {
-    0% {
-        opacity: 0;
-        transform: translateY(-10px) scale(0.95);
-    }
-    100% {
-        opacity: 1;
-        transform: translateY(0) scale(1);
-    }
-}
-
-/* Efeito de sublinhado animado nos links da Navbar */
-.navbar-nav .custom-link {
-    position: relative;
-}
+.navbar-nav .custom-link { position: relative; }
 
 .navbar-nav .custom-link::after {
     content: '';
@@ -173,32 +107,159 @@ html {
     height: 2px;
     bottom: 0;
     left: 50%;
-    background-color: gold; /* ou var(--primary-gold-analysis) */
+    background-color: var(--accent);
     transition: all 0.3s ease-in-out;
     transform: translateX(-50%);
 }
 
 .navbar-nav .custom-link:hover::after,
-.navbar-nav .custom-link.active::after {
-    width: 80%; /* O traço vai crescer até 80% do tamanho da palavra */
+.navbar-nav .custom-link.active::after { width: 80%; }
+
+.dropdown-menu {
+    animation: slideDropdown 0.25s cubic-bezier(0.25, 0.8, 0.25, 1) forwards;
+    transform-origin: top center;
 }
 
-/* ==========================================
-   AJUSTES RESPONSIVOS (MOBILE)
-   ========================================== */
-/* ==========================================
-   AJUSTES RESPONSIVOS (MOBILE)
-   ========================================== */
+@keyframes slideDropdown {
+    from { opacity: 0; transform: translateY(-8px) scale(0.96); }
+    to   { opacity: 1; transform: translateY(0) scale(1); }
+}
+
+/* --------------------------------------------------------------------------
+   5. TIPOGRAFIA
+   -------------------------------------------------------------------------- */
+h1 { font-size: clamp(1.4rem, 4vw, 2.25rem); }
+h2 { font-size: clamp(1.1rem, 2.8vw, 1.5rem); }
+h3 { font-size: clamp(0.95rem, 2.2vw, 1.25rem); }
+h4 { font-size: clamp(0.875rem, 1.8vw, 1.125rem); }
+h5 { font-size: clamp(0.8125rem, 1.5vw, 1rem); }
+
+h1 span {
+    background: linear-gradient(90deg, var(--accent), var(--accent-light));
+    background-clip: text;
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+}
+
+.text-gold,
+.text-primary { color: var(--accent) !important; }
+
+.fs-7 { font-size: 0.8125rem !important; }
+.tracking-wide { letter-spacing: 0.06em; }
+
+/* --------------------------------------------------------------------------
+   6. CARDS
+   -------------------------------------------------------------------------- */
+.card {
+    background-color: var(--bg-card);
+    border-color: rgba(212, 175, 55, 0.08) !important;
+}
+
+.card-body  { padding: var(--space-card) !important; }
+
+.card-header {
+    padding-inline: var(--space-card) !important;
+    padding-block:  calc(var(--space-card) * 0.75) !important;
+}
+
+.feature-card {
+    background-color: var(--bg-card);
+    border: 1px solid rgba(212, 175, 55, 0.1);
+    border-radius: 1.25rem;
+    padding: clamp(1.25rem, 3vw, 2rem);
+    transition: transform 0.3s ease, box-shadow 0.3s ease, border-color 0.3s ease;
+}
+
+.feature-card:hover {
+    transform: translateY(-8px);
+    box-shadow: 0 20px 25px -5px rgba(0,0,0,.5), 0 10px 10px -5px rgba(212,175,55,.1);
+    border-color: var(--accent);
+}
+
+/* --------------------------------------------------------------------------
+   7. BOTÕES
+   -------------------------------------------------------------------------- */
+.btn-primary {
+    background-color: var(--accent);
+    border: none;
+    color: #121418 !important;
+    font-weight: 700;
+}
+
+.btn-primary:hover {
+    background-color: var(--accent-light);
+    color: #000 !important;
+}
+
+/* --------------------------------------------------------------------------
+   8. TABELA
+   -------------------------------------------------------------------------- */
+.auralis-table { font-size: var(--fs-body); }
+
+.auralis-table th { font-size: var(--fs-label); }
+
+.auralis-table td,
+.auralis-table th {
+    padding-inline: clamp(0.5rem, 2vw, 1rem) !important;
+    padding-block:  0.75rem !important;
+}
+
+/* --------------------------------------------------------------------------
+   9. ANIMAÇÕES DE SCROLL
+   -------------------------------------------------------------------------- */
+.card-animado {
+    opacity: 0;
+    transition: all 0.7s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+}
+
+.surgir-baixo { transform: translateY(50px); }
+
+.mostrar {
+    opacity: 1 !important;
+    transform: translate(0, 0) !important;
+}
+
+/* --------------------------------------------------------------------------
+   10. UTILITÁRIOS
+   -------------------------------------------------------------------------- */
+.transition-hover {
+    transition: opacity 0.2s ease, background-color 0.2s ease, color 0.2s ease;
+}
+
+::-webkit-scrollbar { width: 6px; height: 6px; }
+::-webkit-scrollbar-track { background: var(--bg-dark); }
+::-webkit-scrollbar-thumb { background: rgba(212,175,55,.3); border-radius: 3px; }
+::-webkit-scrollbar-thumb:hover { background: var(--accent); }
+
+input[type=number]::-webkit-inner-spin-button,
+input[type=number]::-webkit-outer-spin-button { -webkit-appearance: none; margin: 0; }
+input[type=number] { -moz-appearance: textfield; }
+
+.table-responsive { -webkit-overflow-scrolling: touch; }
+
+
+/* ==========================================================================
+   RESPONSIVIDADE
+   ========================================================================== */
+
+/* --------------------------------------------------------------------------
+   TABLET (≤ 991px)
+   -------------------------------------------------------------------------- */
 @media (max-width: 991.98px) {
-    /* ... (mantenha as regras do menu que já estavam aqui) ... */
+
+    /* Navbar colapsada */
     .navbar-collapse {
-        background-color: rgba(18, 20, 24, 0.95);
-        border-radius: 12px;
-        padding: 1rem;
-        margin-top: 1rem;
-        border: 1px solid rgba(255, 255, 255, 0.05);
+        background-color: rgba(18, 20, 24, 0.97);
+        border-radius: 0.75rem;
+        padding: 0.875rem;
+        margin-top: 0.75rem;
+        border: 1px solid rgba(255,255,255,.06);
     }
+
     .navbar-nav .custom-link::after { display: none; }
+
+    .navbar-nav .nav-link { padding-block: 0.625rem; }
+
     .dropdown-menu {
         position: static !important;
         transform: none !important;
@@ -206,23 +267,121 @@ html {
         border: none !important;
         box-shadow: none !important;
         padding-left: 1rem;
+        animation: none;
     }
 
-    /* NOVAS REGRAS PARA O DASHBOARD NO CELULAR */
-    /* Reduz textos que ficam exagerados */
-    h2.fw-bold { font-size: 1.5rem !important; }
-    h3.fw-bold { font-size: 1.5rem !important; }
-    
-    /* Reduz o "gordura" (padding) dos cards para sobrar mais tela */
-    .card-body { padding: 1rem !important; }
-    
-    /* Força os botões do painel a ocuparem 100% da largura de forma harmônica */
-    .dropdown-toggle.w-100 { display: flex; justify-content: space-between; }
-    
-    /* Limpa a tabela para não espremer */
-    .auralis-table th, .auralis-table td { 
-        padding-left: 0.5rem !important; 
-        padding-right: 0.5rem !important; 
-        font-size: 0.9rem; 
+    /* Dashboard: linha de ações fica abaixo do título */
+    .dash-actions-row {
+        width: 100%;
+        flex-wrap: wrap;
     }
+
+    /* Botões de nova transação: cada um cresce igualmente */
+    .btn-nova-receita,
+    .btn-nova-despesa { flex: 1; justify-content: center; }
+}
+
+/* --------------------------------------------------------------------------
+   MOBILE (≤ 767px)
+   -------------------------------------------------------------------------- */
+@media (max-width: 767.98px) {
+
+    :root {
+        --space-page-x: 0.875rem;
+        --space-card:   0.875rem;
+    }
+
+    /* Cards de resumo: 1 por linha no mobile */
+    .summary-col { width: 100% !important; max-width: 100%; flex: 0 0 100%; }
+
+    /* Cabeçalho dashboard: empilha em coluna */
+    .dash-top-bar {
+        flex-direction: column !important;
+        align-items: flex-start !important;
+        gap: 0.625rem;
+    }
+
+    .dash-top-bar .dash-left,
+    .dash-top-bar .dash-right { width: 100%; }
+
+    /* Seletor de mês: ocupa linha toda */
+    .month-nav { width: 100%; justify-content: space-between; }
+
+    /* Dropdown de carteira: full-width */
+    .dropdown.w-100,
+    .carteira-select-wrap { width: 100% !important; }
+
+    /* Botões Receita/Despesa: lado a lado 50%/50% */
+    .btn-nova-receita,
+    .btn-nova-despesa { flex: 1; }
+
+    /* Tabela: colunas escondidas via Bootstrap d-none já aplicadas,
+       aqui só afinamos o restante */
+    .auralis-table th,
+    .auralis-table td {
+        padding-inline: 0.5rem !important;
+        font-size: 0.8125rem;
+    }
+
+    /* Análises: gráfico de rosca menor para não ocupar tela toda */
+    .donut-wrapper { max-width: 220px !important; }
+
+    .analises-list { max-height: 260px !important; }
+
+    /* Valor no formulário nova_transacao menor */
+    .valor-input { font-size: clamp(1.75rem, 10vw, 3rem) !important; }
+
+    /* Modais mais compactos */
+    .modal-body   { padding: 1rem !important; }
+    .modal-header,
+    .modal-footer { padding: 0.875rem 1rem !important; }
+
+    /* Separador vertical desnecessário */
+    .dash-vr { display: none !important; }
+
+    /* Painel de detalhe de transação */
+    .transacao-detail-panel {
+        flex-direction: column !important;
+        gap: 0.875rem !important;
+    }
+
+    .transacao-actions {
+        width: 100%;
+        flex-wrap: wrap;
+    }
+
+    .transacao-actions .btn {
+        flex: 1;
+        justify-content: center;
+        min-width: 80px;
+    }
+}
+
+/* --------------------------------------------------------------------------
+   MOBILE PEQUENO (≤ 479px)
+   -------------------------------------------------------------------------- */
+@media (max-width: 479px) {
+
+    :root {
+        --space-page-x: 0.75rem;
+        --space-card:   0.75rem;
+    }
+
+    .navbar-brand img { height: 24px; }
+
+    /* Oculta "Olá, Nome" para ganhar espaço */
+    .navbar-greeting { display: none !important; }
+
+    /* Gerenciar categorias e Configurações: cols ficam full-width */
+    .col-md-5,
+    .col-md-7,
+    .col-lg-6 { width: 100% !important; max-width: 100%; flex: 0 0 100%; }
+
+    /* Ícone de análise menor */
+    .analise-icon { padding: 0.5rem !important; }
+    .analise-icon i { font-size: 1.25rem !important; }
+
+    /* Botões dentro do painel de transação: coluna */
+    .transacao-actions { flex-direction: column; }
+    .transacao-actions .btn { width: 100%; }
 }
