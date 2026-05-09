@@ -1,0 +1,26 @@
+name: Deploy Homologação (beta.meuauralis.com) 🧪
+
+on:
+  push:
+    branches:
+      - beta # Roda apenas quando o código for para a branch beta
+
+jobs:
+  web-deploy:
+    name: 🎉 Deploy Beta
+    runs-on: ubuntu-latest
+    steps:
+    - name: 🚚 Pegando o código
+      uses: actions/checkout@v4
+    
+    - name: 📂 Sincronizando com HostGator (BETA)
+      uses: SamKirkland/FTP-Deploy-Action@v4.3.4
+      with:
+        server: ${{ secrets.FTP_SERVER }}
+        username: ${{ secrets.FTP_USERNAME_BETA }} # Puxando o novo secret
+        password: ${{ secrets.FTP_PASSWORD_BETA }} # Puxando a nova senha
+        exclude: |
+          **/.git*
+          **/.git*/**
+          .github/**
+          .php-cs-fixer.php
