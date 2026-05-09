@@ -29,7 +29,7 @@ $paginaAtual = basename($_SERVER['PHP_SELF']);
 
             <a class="navbar-brand fw-bold fs-3 d-flex align-items-center" href="/geral/index.php" style="letter-spacing: -0.05em;">
                 <img src="/geral/img/logoAuralis-SemFundo.png" alt="Logo Auralis" class="me-2" style="height: 38px; width: auto; object-fit: contain;">
-                <span style="color: gold !important;">Aura</span><span class="text-light">lisinho</span>
+                <span style="color: gold !important;">Aura</span><span class="text-light">TESTE</span>
             </a>
 
             <button class="navbar-toggler border-0 shadow-none p-2" type="button" data-bs-toggle="collapse"
