@@ -166,7 +166,7 @@ try {
 require_once 'geral/header.php';
 ?>
 
-<main class="container py-4 mt-2 flex-grow-1" style="min-height: 100vh; padding-inline: var(--space-page-x);">
+<main class="container py-4 mt-3 flex-grow-1" style="min-height: 100vh;">
     
     <div class="d-flex justify-content-between align-items-center mb-4 border-bottom border-secondary-subtle pb-3">
         <h2 class="fw-bold text-light mb-0"><i class="bi bi-gear text-secondary me-2"></i> Configurações da Conta</h2>

@@ -134,7 +134,7 @@
 
 <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 
-<main class="container-fluid py-4 mt-2 flex-grow-1" style="max-width: 1500px; padding-inline: var(--space-page-x); min-height: 100vh;">
+<main class="container-fluid px-3 px-xl-5 py-4 mt-3 flex-grow-1" style="max-width: 1500px; min-height: 100vh;">
 
     <div class="d-flex justify-content-between align-items-center mb-4 border-bottom border-secondary-subtle pb-3 flex-wrap gap-3">
         <h2 class="fw-bold text-light mb-0"><i class="bi bi-pie-chart text-primary me-2" style="color: var(--primary-gold-analysis) !important;"></i> Análises</h2>
@@ -199,7 +199,7 @@
         <div class="col-md-6">
             <div class="card bg-body-tertiary border-secondary-subtle shadow-sm h-100 rounded-4">
                 <div class="card-body p-4 d-flex align-items-center">
-                    <div class="bg-danger bg-opacity-10 p-3 rounded-circle me-3 analise-icon flex-shrink-0">
+                    <div class="bg-danger bg-opacity-10 p-3 rounded-circle me-4">
                         <i class="bi bi-fire text-danger fs-1"></i>
                     </div>
                     <div>
@@ -218,7 +218,7 @@
         <div class="col-md-6">
             <div class="card bg-body-tertiary border-secondary-subtle shadow-sm h-100 rounded-4">
                 <div class="card-body p-4 d-flex align-items-center">
-                    <div class="bg-success bg-opacity-10 p-3 rounded-circle me-3 analise-icon flex-shrink-0">
+                    <div class="bg-success bg-opacity-10 p-3 rounded-circle me-4">
                         <i class="bi bi-trophy text-success fs-1"></i>
                     </div>
                     <div>
@@ -243,7 +243,7 @@
                     <h5 class="text-light fw-bold mb-0">Distribuição de Despesas</h5>
                 </div>
                 <div class="card-body p-4 d-flex justify-content-center align-items-center position-relative">
-                    <div class="position-relative d-flex justify-content-center align-items-center w-100 donut-wrapper" style="max-width: 320px; aspect-ratio: 1;">
+                    <div class="position-relative d-flex justify-content-center align-items-center w-100" style="max-width: 320px; aspect-ratio: 1;">
                         <canvas id="graficoDespesas"></canvas>
                         <div class="position-absolute text-center" style="pointer-events: none;">
                             <span class="d-block text-secondary small">Total</span>
@@ -260,7 +260,7 @@
                     <h5 class="text-light fw-bold mb-0">Detalhamento</h5>
                     <span class="badge bg-secondary text-dark" id="badge-categoria-despesa">Geral</span>
                 </div>
-                <div class="card-body p-0 overflow-auto analises-list" style="max-height: 400px;" id="lista-detalhes-despesa">
+                <div class="card-body p-0 overflow-auto" style="max-height: 400px;" id="lista-detalhes-despesa">
                     <div class="p-5 text-center text-secondary">
                         <i class="bi bi-hand-index-thumb fs-1 mb-2 d-block opacity-50"></i>
                         Selecione uma fatia do gráfico para ver as transações.
@@ -279,7 +279,7 @@
                     <h5 class="text-light fw-bold mb-0">Distribuição de Receitas</h5>
                 </div>
                 <div class="card-body p-4 d-flex justify-content-center align-items-center position-relative">
-                    <div class="position-relative d-flex justify-content-center align-items-center w-100 donut-wrapper" style="max-width: 320px; aspect-ratio: 1;">
+                    <div class="position-relative d-flex justify-content-center align-items-center w-100" style="max-width: 320px; aspect-ratio: 1;">
                         <canvas id="graficoReceitas"></canvas>
                         <div class="position-absolute text-center" style="pointer-events: none;">
                             <span class="d-block text-secondary small">Total</span>
@@ -296,7 +296,7 @@
                     <h5 class="text-light fw-bold mb-0">Detalhamento</h5>
                     <span class="badge bg-secondary text-dark" id="badge-categoria-receita">Geral</span>
                 </div>
-                <div class="card-body p-0 overflow-auto analises-list" style="max-height: 400px;" id="lista-detalhes-receita">
+                <div class="card-body p-0 overflow-auto" style="max-height: 400px;" id="lista-detalhes-receita">
                     <div class="p-5 text-center text-secondary">
                         <i class="bi bi-hand-index-thumb fs-1 mb-2 d-block opacity-50"></i>
                         Selecione uma fatia do gráfico para ver as transações.
