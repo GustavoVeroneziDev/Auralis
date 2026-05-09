@@ -113,7 +113,7 @@ $listaIcones = [
 ];
 ?>
 
-<main class="container py-4 mt-3 flex-grow-1" style="min-height: 100vh;">
+<main class="container py-4 mt-2 flex-grow-1" style="min-height: 100vh; padding-inline: var(--space-page-x);">
     
     <div class="d-flex justify-content-between align-items-center mb-4 border-bottom border-secondary-subtle pb-3 gap-3">
         <h2 class="fw-bold text-light mb-0">Minhas Categorias</h2>
