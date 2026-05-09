@@ -1,8 +1,8 @@
 <?php
-    if (session_status() === PHP_SESSION_NONE) {
-        session_start();
-    }
-    $paginaAtual = basename($_SERVER['PHP_SELF']);
+if (session_status() === PHP_SESSION_NONE) {
+    session_start();
+}
+$paginaAtual = basename($_SERVER['PHP_SELF']);
 ?>
 <!DOCTYPE html>
 <html lang="pt-BR" data-bs-theme="dark">
@@ -24,7 +24,7 @@
 
     <nav class="navbar navbar-expand-lg border-bottom border-secondary-subtle sticky-top shadow-sm py-2"
         style="background-color: rgba(18, 20, 24, 0.85); backdrop-filter: blur(12px);">
-        
+
         <div class="container-fluid px-3 px-xl-5" style="max-width: 1500px;">
 
             <a class="navbar-brand fw-bold fs-3 d-flex align-items-center" href="/geral/index.php" style="letter-spacing: -0.05em;">
@@ -72,10 +72,10 @@
                     <?php endif; ?>
                 </ul>
 
-                <div class="d-flex flex-column flex-lg-row gap-3 align-items-lg-center px-3 px-lg-0 pb-3 pb-lg-0 border-top border-secondary-subtle border-lg-0 pt-3 pt-lg-0">
+                <div class="d-flex flex-column flex-lg-row gap-3 align-items-lg-center px-3 px-lg-0 pb-3 pb-lg-0">
                     <?php if (isset($_SESSION['usuario_id'])): ?>
                         <?php $primeiroNome = explode(' ', $_SESSION['usuario_nome'])[0]; ?>
-                        
+
                         <div class="dropdown w-100 text-start text-lg-end">
                             <a href="#" class="d-flex align-items-center justify-content-start justify-content-lg-end text-light text-decoration-none dropdown-toggle custom-link py-2"
                                 id="menuUsuario" data-bs-toggle="dropdown" aria-expanded="false">
@@ -89,7 +89,9 @@
                                         <i class="bi bi-gear me-3 me-lg-2" style="color: gold;"></i> Configurações
                                     </a>
                                 </li>
-                                <li><hr class="dropdown-divider border-secondary-subtle d-none d-lg-block"></li>
+                                <li>
+                                    <hr class="dropdown-divider border-secondary-subtle d-none d-lg-block">
+                                </li>
                                 <li>
                                     <a class="dropdown-item d-flex align-items-center py-3 py-lg-2 text-danger transition-hover" href="/usuario/logout.php">
                                         <i class="bi bi-box-arrow-right me-3 me-lg-2"></i> Sair

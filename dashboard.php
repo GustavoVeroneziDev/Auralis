@@ -446,6 +446,58 @@ require_once 'geral/header.php';
         </div>
 
         <div class="row g-4 mb-5">
+            <div class="col-md-4">
+                <div class="card bg-body-tertiary border-secondary-subtle shadow-sm h-100 rounded-4">
+                    <div class="card-body p-4">
+                        <div class="d-flex justify-content-between align-items-start mb-3">
+                            <p class="text-secondary fw-semibold mb-0">Saldo: <?php echo htmlspecialchars($nome_carteira_atual); ?></p>
+                            <div class="bg-primary bg-opacity-10 p-2 rounded-3">
+                                <i class="bi bi-wallet2 text-primary" style="color: var(--primary-gold-analysis) !important;"></i>
+                            </div>
+                        </div>
+                        <h2 class="fw-bold text-light mb-1">R$ <?php echo number_format($saldoAtual ?? 0, 2, ',', '.') ?></h2>
+                        <div class="d-flex justify-content-between align-items-center mt-3">
+                            <small class="text-secondary">Total disponível hoje</small>
+                            <button class="btn btn-sm btn-link text-secondary p-0 transition-hover" data-bs-toggle="modal" data-bs-target="#modalAjusteSaldo" title="Ajustar Saldo Real">
+                                <i class="bi bi-pencil-square fs-5"></i>
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="col-md-4">
+                <div class="card bg-body-tertiary border-secondary-subtle shadow-sm h-100 rounded-4">
+                    <div class="card-body p-4">
+                        <div class="d-flex justify-content-between align-items-start mb-3">
+                            <p class="text-secondary fw-semibold mb-0">Receitas (<?php echo $nome_mes ?>)</p>
+                            <div class="bg-success bg-opacity-10 p-2 rounded-3">
+                                <i class="bi bi-graph-up-arrow text-success fs-5"></i>
+                            </div>
+                        </div>
+                        <h2 class="fw-bold text-success mb-1">R$ <?php echo number_format($receitasMes ?? 0, 2, ',', '.') ?></h2>
+                    </div>
+                </div>
+            </div>
+
+            <div class="col-md-4">
+                <div class="card bg-body-tertiary border-secondary-subtle shadow-sm h-100 rounded-4">
+                    <div class="card-body p-4">
+                        <div class="d-flex justify-content-between align-items-start mb-3">
+                            <p class="text-secondary fw-semibold mb-0">Despesas (<?php echo $nome_mes ?>)</p>
+                            <div class="bg-danger bg-opacity-10 p-2 rounded-3">
+                                <i class="bi bi-graph-down-arrow text-danger fs-5"></i>
+                            </div>
+                        </div>
+                        <h2 class="fw-bold text-danger mb-1">R$ <?php echo number_format($despesasMes ?? 0, 2, ',', '.') ?></h2>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <h4 class="fw-bold text-light mb-3 mt-4">Transações de <?php echo $nome_mes ?></h4>
+
+        <div class="table-responsive rounded-4 border border-secondary-subtle shadow-sm mb-5">
             <table class="table table-dark table-hover align-middle mb-0 auralis-table">
                 <thead class="table-active border-secondary-subtle text-secondary small text-uppercase">
                     <tr>
