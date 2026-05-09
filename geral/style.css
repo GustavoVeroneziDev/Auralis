@@ -385,3 +385,25 @@ input[type=number] { -moz-appearance: textfield; }
     .transacao-actions { flex-direction: column; }
     .transacao-actions .btn { width: 100%; }
 }
+
+/* --------------------------------------------------------------------------
+   CORREÇÃO: linha de collapse da tabela — sem borda/espaço residual
+   -------------------------------------------------------------------------- */
+.table > tbody > tr.border-0,
+.table > tbody > tr[style*="border: 0"] {
+    border: 0 !important;
+}
+
+.table > tbody > tr.border-0 > td,
+.table > tbody > tr[style*="border: 0"] > td {
+    padding: 0 !important;
+    border: 0 !important;
+    line-height: 0;
+}
+
+/* Mobile: header do dashboard em coluna limpa */
+@media (max-width: 575.98px) {
+    .dash-month-pill { width: 100%; justify-content: space-between; }
+    .dash-actions-wrap { width: 100%; }
+    .dash-actions-wrap .btn { flex: 1; justify-content: center; }
+}

@@ -373,36 +373,39 @@ require_once 'geral/header.php';
             <?php endif; ?>
         <?php endif; ?>
 
-        <div class="d-flex flex-column flex-xl-row justify-content-between align-items-start align-items-xl-center mb-4 border-bottom border-secondary-subtle pb-3 gap-3">
+        <div class="d-flex flex-wrap justify-content-between align-items-center mb-3 border-bottom border-secondary-subtle pb-3 gap-2">
 
-            <div class="d-flex flex-column flex-md-row align-items-start align-items-md-center gap-3 w-100 w-xl-auto">
-                <h2 class="fw-bold text-light mb-0">Visão Geral</h2>
+            <!-- Título + Seletor de mês (agrupados, compactos) -->
+            <div class="d-flex align-items-center gap-2 flex-wrap">
+                <h2 class="fw-bold text-light mb-0" style="white-space: nowrap; font-size: clamp(1rem, 2vw, 1.35rem);">Visão Geral</h2>
 
-                <div class="d-flex align-items-center bg-dark border border-secondary-subtle rounded-pill px-2 py-1 shadow-sm w-100 w-md-auto justify-content-between">
-                    <a href="<?php echo $link_ant ?>" class="btn btn-sm btn-link text-light opacity-75 transition-hover text-decoration-none fs-5 d-flex align-items-center justify-content-center" style="width: 35px; height: 35px;">
-                        <i class="bi bi-caret-left-fill"></i>
+                <div class="d-flex align-items-center bg-dark border border-secondary-subtle rounded-pill shadow-sm" style="padding: 2px 4px;">
+                    <a href="<?php echo $link_ant ?>" class="btn btn-sm btn-link text-light opacity-75 transition-hover text-decoration-none d-flex align-items-center justify-content-center" style="width: 30px; height: 30px;">
+                        <i class="bi bi-caret-left-fill" style="font-size: 0.65rem;"></i>
                     </a>
 
-                    <button type="button" class="btn btn-link text-light text-decoration-none fw-bold px-2 transition-hover d-flex align-items-center justify-content-center flex-grow-1"
+                    <button type="button" class="btn btn-link text-light text-decoration-none fw-semibold px-1 transition-hover d-flex align-items-center justify-content-center"
+                        style="font-size: 0.875rem; white-space: nowrap;"
                         data-bs-toggle="modal" data-bs-target="#modalSeletorMes">
                         <?php echo $nome_mes ?> <?php echo $ano_atual ?>
-                        <i class="bi bi-chevron-down ms-2 fs-7 opacity-75"></i>
+                        <i class="bi bi-chevron-down ms-1 opacity-75" style="font-size: 0.65rem;"></i>
                     </button>
 
-                    <a href="<?php echo $link_prox ?>" class="btn btn-sm btn-link text-light opacity-75 transition-hover text-decoration-none fs-5 d-flex align-items-center justify-content-center" style="width: 35px; height: 35px;">
-                        <i class="bi bi-caret-right-fill"></i>
+                    <a href="<?php echo $link_prox ?>" class="btn btn-sm btn-link text-light opacity-75 transition-hover text-decoration-none d-flex align-items-center justify-content-center" style="width: 30px; height: 30px;">
+                        <i class="bi bi-caret-right-fill" style="font-size: 0.65rem;"></i>
                     </a>
                 </div>
             </div>
 
-            <div class="d-flex flex-column flex-md-row gap-2 w-100 w-xl-auto">
+            <!-- Carteira + Botões de ação -->
+            <div class="d-flex align-items-center gap-2 flex-wrap">
 
-                <div class="dropdown w-100 w-md-auto">
-                    <button class="btn border-secondary-subtle text-light shadow-sm fw-semibold dropdown-toggle d-flex justify-content-between align-items-center rounded-3 transition-hover w-100"
+                <div class="dropdown">
+                    <button class="btn border-secondary-subtle text-light shadow-sm fw-semibold dropdown-toggle d-flex align-items-center rounded-3 transition-hover"
                         type="button" data-bs-toggle="dropdown" aria-expanded="false"
-                        style="min-width: 220px; background-color: var(--bg-charcoal-analysis);">
-                        <span class="text-truncate d-flex align-items-center">
-                            <i class="bi bi-wallet2 me-2" style="color: var(--primary-gold-analysis);"></i>
+                        style="font-size: 0.875rem; background-color: var(--bg-charcoal-analysis); max-width: 200px;">
+                        <span class="text-truncate d-flex align-items-center" style="max-width: 140px;">
+                            <i class="bi bi-wallet2 me-2" style="color: var(--primary-gold-analysis); flex-shrink: 0;"></i>
                             <?php echo htmlspecialchars($nome_carteira_atual); ?>
                         </span>
                     </button>
@@ -429,17 +432,19 @@ require_once 'geral/header.php';
                     </ul>
                 </div>
 
-                <div class="vr bg-secondary opacity-25 mx-1 d-none d-md-block"></div>
+                <div class="vr bg-secondary opacity-25 mx-1 d-none d-sm-block"></div>
 
-                <div class="d-flex gap-2 w-100 w-md-auto mt-2 mt-md-0">
+                <div class="d-flex gap-2">
                     <a href="nova_transacao.php?carteira_id=<?php echo urlencode($carteira_selecionada) ?>&tipo=receita"
-                        class="btn btn-outline-success fw-bold d-flex align-items-center justify-content-center flex-grow-1 px-3 rounded-pill transition-hover shadow-sm">
-                        <i class="bi bi-arrow-up-short fs-5"></i> <span>Receita</span>
+                        class="btn btn-outline-success fw-semibold d-flex align-items-center gap-1 rounded-pill transition-hover shadow-sm"
+                        style="font-size: 0.875rem; padding: 0.375rem 0.875rem;">
+                        <i class="bi bi-arrow-up-short fs-6"></i> Receita
                     </a>
 
                     <a href="nova_transacao.php?carteira_id=<?php echo urlencode($carteira_selecionada) ?>&tipo=despesa"
-                        class="btn btn-outline-danger fw-bold d-flex align-items-center justify-content-center flex-grow-1 px-3 rounded-pill transition-hover shadow-sm">
-                        <i class="bi bi-arrow-down-short fs-5"></i> <span>Despesa</span>
+                        class="btn btn-outline-danger fw-semibold d-flex align-items-center gap-1 rounded-pill transition-hover shadow-sm"
+                        style="font-size: 0.875rem; padding: 0.375rem 0.875rem;">
+                        <i class="bi bi-arrow-down-short fs-6"></i> Despesa
                     </a>
                 </div>
             </div>
@@ -555,8 +560,8 @@ require_once 'geral/header.php';
                             </td>
                         </tr>
 
-                        <tr>
-                            <td colspan="5" class="p-0 border-0">
+                        <tr class="border-0" style="border: 0 !important;">
+                            <td colspan="5" class="p-0 border-0" style="border: 0 !important; line-height: 0;">
                                 <div class="collapse" id="<?php echo $rowId ?>">
                                     <div class="p-3 p-md-4 bg-charcoal-analysis border-bottom border-secondary-subtle d-flex flex-column flex-md-row justify-content-between align-items-start gap-3">
 
