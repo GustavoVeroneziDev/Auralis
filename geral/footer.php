@@ -33,7 +33,6 @@
                 }
             });
         }, { threshold: 0.1 });
-
         const elementosOcultos = document.querySelectorAll('.card-animado');
         elementosOcultos.forEach((el) => observer.observe(el));
     });
