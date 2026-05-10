@@ -120,6 +120,59 @@
     $maiorReceitaCat   = key($receitasPorCategoria);
     $maiorReceitaValor = current($receitasPorCategoria);
 
+    // ── Dados do mês ANTERIOR por categoria (para comparação) ─────────────
+    $gastosPorCategoriaAnt   = [];
+    $receitasPorCategoriaAnt = [];
+
+    if ($carteira_selecionada) {
+        try {
+            $sqlAnt = "
+                SELECT
+                    r.Valor, r.TipoRegistro,
+                    COALESCE(c.NomeCategoria, 'Sem Categoria') as Categoria
+                FROM Registro r
+                LEFT JOIN Categoria c ON r.FKCategoria = c.IDCategoria
+                WHERE r.FKUsuario   = :uid
+                  AND r.FKCarteira  = :carteira_id
+                  AND r.StatusRegistro = 'efetivado'
+                  AND MONTH(r.MomentoRegistro) = :mes
+                  AND YEAR(r.MomentoRegistro)  = :ano
+            ";
+            $stmtAnt = $pdo->prepare($sqlAnt);
+            $stmtAnt->execute([
+                ':uid'         => $usuario_id,
+                ':carteira_id' => $carteira_selecionada,
+                ':mes'         => $mes_ant,
+                ':ano'         => $ano_ant,
+            ]);
+            foreach ($stmtAnt->fetchAll(PDO::FETCH_ASSOC) as $t) {
+                $cat = $t['Categoria'];
+                if ($t['TipoRegistro'] === 'despesa') {
+                    $gastosPorCategoriaAnt[$cat] = ($gastosPorCategoriaAnt[$cat] ?? 0) + (float)$t['Valor'];
+                } else {
+                    $receitasPorCategoriaAnt[$cat] = ($receitasPorCategoriaAnt[$cat] ?? 0) + (float)$t['Valor'];
+                }
+            }
+        } catch (PDOException $e) {}
+    }
+
+    // ── Helper: badge de variação ─────────────────────────────────────────
+    function analisesBadgeVar(float $atual, float $anterior, bool $invertido = false): string {
+        if ($anterior <= 0) {
+            return $atual > 0 ? '<span class="badge bg-secondary bg-opacity-25 text-light" style="font-size:0.65rem;">Novo</span>' : '';
+        }
+        $delta = (($atual - $anterior) / $anterior) * 100;
+        $abs   = abs(round($delta, 1));
+        if ($abs < 0.5) {
+            return '<span class="badge bg-secondary bg-opacity-25 text-light" style="font-size:0.65rem;">= ant.</span>';
+        }
+        $subiu    = $delta > 0;
+        $positivo = $invertido ? !$subiu : $subiu;
+        $cor      = $positivo ? 'success' : 'danger';
+        $icon     = $subiu ? 'bi-arrow-up-short' : 'bi-arrow-down-short';
+        return "<span class="badge bg-{$cor} bg-opacity-20 text-{$cor}" style="font-size:0.65rem;"><i class="bi {$icon}"></i>{$abs}%</span>";
+    }
+
     // JSON Despesas
     $dadosJsonTransacoes      = json_encode($transacoes);
     $dadosJsonLabelsDespesas  = json_encode(array_keys($gastosPorCategoria));
@@ -205,8 +258,14 @@
                     <div>
                         <p class="text-secondary small mb-1 text-uppercase fw-bold tracking-wide">Maior Fuga de Capital (Gastos)</p>
                         <?php if ($maiorGastoCat): ?>
-                            <h4 class="fw-bold text-light mb-0"><?php echo htmlspecialchars($maiorGastoCat) ?></h4>
-                            <span class="text-danger fw-semibold fs-5">R$ <?php echo number_format($maiorGastoValor, 2, ',', '.') ?></span>
+                            <h4 class="fw-bold text-light mb-1"><?php echo htmlspecialchars($maiorGastoCat) ?></h4>
+                            <div class="d-flex align-items-center gap-2 flex-wrap">
+                                <span class="text-danger fw-semibold fs-5">R$ <?php echo number_format($maiorGastoValor, 2, ',', '.') ?></span>
+                                <?php echo analisesBadgeVar($maiorGastoValor, $gastosPorCategoriaAnt[$maiorGastoCat] ?? 0, true); ?>
+                            </div>
+                            <?php if (isset($gastosPorCategoriaAnt[$maiorGastoCat])): ?>
+                                <small class="text-secondary" style="font-size:0.7rem;">Mês anterior: R$ <?php echo number_format($gastosPorCategoriaAnt[$maiorGastoCat], 2, ',', '.') ?></small>
+                            <?php endif; ?>
                         <?php else: ?>
                             <h5 class="text-secondary mb-0">Nenhum gasto registrado</h5>
                         <?php endif; ?>
@@ -224,8 +283,14 @@
                     <div>
                         <p class="text-secondary small mb-1 text-uppercase fw-bold tracking-wide">Principal Motor de Renda</p>
                         <?php if ($maiorReceitaCat): ?>
-                            <h4 class="fw-bold text-light mb-0"><?php echo htmlspecialchars($maiorReceitaCat) ?></h4>
-                            <span class="text-success fw-semibold fs-5">R$ <?php echo number_format($maiorReceitaValor, 2, ',', '.') ?></span>
+                            <h4 class="fw-bold text-light mb-1"><?php echo htmlspecialchars($maiorReceitaCat) ?></h4>
+                            <div class="d-flex align-items-center gap-2 flex-wrap">
+                                <span class="text-success fw-semibold fs-5">R$ <?php echo number_format($maiorReceitaValor, 2, ',', '.') ?></span>
+                                <?php echo analisesBadgeVar($maiorReceitaValor, $receitasPorCategoriaAnt[$maiorReceitaCat] ?? 0, false); ?>
+                            </div>
+                            <?php if (isset($receitasPorCategoriaAnt[$maiorReceitaCat])): ?>
+                                <small class="text-secondary" style="font-size:0.7rem;">Mês anterior: R$ <?php echo number_format($receitasPorCategoriaAnt[$maiorReceitaCat], 2, ',', '.') ?></small>
+                            <?php endif; ?>
                         <?php else: ?>
                             <h5 class="text-secondary mb-0">Nenhuma renda registrada</h5>
                         <?php endif; ?>
@@ -397,7 +462,25 @@
     }
 </script>
 <script>
-    const transacoesBrutas = <?php echo $dadosJsonTransacoes ?>;
+    const transacoesBrutas      = <?php echo $dadosJsonTransacoes ?>;
+    const gastosCatAnt          = <?php echo json_encode($gastosPorCategoriaAnt) ?>;
+    const receitasCatAnt        = <?php echo json_encode($receitasPorCategoriaAnt) ?>;
+    const gastosCatAtual        = <?php echo json_encode($gastosPorCategoria) ?>;
+    const receitasCatAtual      = <?php echo json_encode($receitasPorCategoria) ?>;
+    const nomeMesAnterior       = "<?php echo $meses_pt[$mes_ant] ?>";
+
+    // Badge de variação JS-side
+    function badgeVarJS(atual, anterior, invertido = false) {
+        if (!anterior || anterior <= 0) return atual > 0 ? '<span class="badge bg-secondary bg-opacity-25 text-light" style="font-size:0.65rem;">Novo</span>' : '';
+        const delta = ((atual - anterior) / anterior) * 100;
+        const abs   = Math.abs(delta).toFixed(1);
+        if (abs < 0.5) return '<span class="badge bg-secondary bg-opacity-25 text-light" style="font-size:0.65rem;">= mês ant.</span>';
+        const subiu    = delta > 0;
+        const positivo = invertido ? !subiu : subiu;
+        const cor      = positivo ? 'success' : 'danger';
+        const icon     = subiu ? 'bi-arrow-up-short' : 'bi-arrow-down-short';
+        return `<span class="badge bg-${cor} bg-opacity-20 text-${cor}" style="font-size:0.65rem;"><i class="bi ${icon}"></i> ${abs}%</span>`;
+    }
 
     const coresDespesas = ['#AA8C2C', '#D4AF37', '#E7C665', '#E63946', '#F4A261', '#E9C46A', '#9C6644'];
     const coresReceitas = ['#06D6A0', '#118AB2', '#2A9D8F', '#264653', '#457B9D', '#1D3557', '#0077B6'];
@@ -471,15 +554,34 @@
             t.TipoRegistro === tipo && t.Categoria === categoriaFiltro
         );
 
-        let htmlLista = '<div class="list-group list-group-flush">';
+        const totalAtual   = tipo === 'despesa'
+            ? (gastosCatAtual[categoriaFiltro]   || 0)
+            : (receitasCatAtual[categoriaFiltro] || 0);
+        const totalAnt     = tipo === 'despesa'
+            ? (gastosCatAnt[categoriaFiltro]   || 0)
+            : (receitasCatAnt[categoriaFiltro] || 0);
+
+        const fmt = v => new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(v);
+        const corTotal = tipo === 'despesa' ? 'text-danger' : 'text-success';
+
+        // Cabeçalho de comparação da categoria
+        let htmlLista = `
+            <div class="px-4 py-3 border-bottom border-secondary-subtle d-flex justify-content-between align-items-center flex-wrap gap-2">
+                <div>
+                    <span class="text-secondary small">Total em ${categoriaFiltro}</span><br>
+                    <span class="${corTotal} fw-bold fs-5">${fmt(totalAtual)}</span>
+                    ${badgeVarJS(totalAtual, totalAnt, tipo === 'despesa')}
+                </div>
+                ${totalAnt > 0 ? `<span class="text-secondary small">${nomeMesAnterior}: ${fmt(totalAnt)}</span>` : ''}
+            </div>
+            <div class="list-group list-group-flush">`;
+
         transacoesFiltradas.forEach(t => {
-            // Ajuste no fuso horário para evitar bugs de exibição de data (-1 dia)
             const [ano, mes, dia] = t.MomentoRegistro.split(' ')[0].split('-');
-            const dataStr = `${dia}/${mes}/${ano}`;
-            
-            const valorFormatado = new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(t.Valor);
-            const corValor = tipo === 'despesa' ? 'text-danger' : 'text-success';
-            const sinalValor = tipo === 'despesa' ? '-' : '+';
+            const dataStr        = `${dia}/${mes}/${ano}`;
+            const valorFormatado = fmt(t.Valor);
+            const corValor       = tipo === 'despesa' ? 'text-danger' : 'text-success';
+            const sinalValor     = tipo === 'despesa' ? '-' : '+';
 
             htmlLista += `
                 <div class="list-group-item bg-transparent border-secondary-subtle px-4 py-3 d-flex justify-content-between align-items-center">
