@@ -53,15 +53,23 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         ]);
 
         // Injeção do Kit Inicial de Categorias
+        // Injeção do Kit Inicial de Categorias (Starter Pack Premium)
         $kitInicial = [
+            // DESPESAS
             ['nome' => 'Alimentação', 'tipo' => 'despesa', 'icone' => 'bi-cart3'],
             ['nome' => 'Moradia',     'tipo' => 'despesa', 'icone' => 'bi-house-door'],
             ['nome' => 'Transporte',  'tipo' => 'despesa', 'icone' => 'bi-car-front'],
             ['nome' => 'Saúde',       'tipo' => 'despesa', 'icone' => 'bi-heart-pulse'],
+            ['nome' => 'Educação',    'tipo' => 'despesa', 'icone' => 'bi-book'],
             ['nome' => 'Lazer',       'tipo' => 'despesa', 'icone' => 'bi-controller'],
-            ['nome' => 'Salário',     'tipo' => 'receita', 'icone' => 'bi-cash-stack'],
-            ['nome' => 'Investimentos','tipo' => 'receita', 'icone' => 'bi-graph-up-arrow'],
-            ['nome' => 'Outros',      'tipo' => 'receita', 'icone' => 'bi-plus-circle-dotted']
+            ['nome' => 'Assinaturas', 'tipo' => 'despesa', 'icone' => 'bi-play-btn'],
+            ['nome' => 'Vestuário',   'tipo' => 'despesa', 'icone' => 'bi-bag'],
+            
+            // RECEITAS
+            ['nome' => 'Salário',       'tipo' => 'receita', 'icone' => 'bi-cash-stack'],
+            ['nome' => 'Rendimentos',   'tipo' => 'receita', 'icone' => 'bi-graph-up-arrow'],
+            ['nome' => 'Serviços/Free', 'tipo' => 'receita', 'icone' => 'bi-laptop'],
+            ['nome' => 'Outros',        'tipo' => 'receita', 'icone' => 'bi-plus-circle-dotted']
         ];
 
         $sqlCat = "INSERT INTO Categoria (IDCategoria, NomeCategoria, TipoCategoria, IconeCategoria, FKUsuario) 
