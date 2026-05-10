@@ -40,10 +40,7 @@
                     entry.target.classList.add('mostrar');
                 }
             });
-        }, {
-            threshold: 0.1
-        });
-
+        }, { threshold: 0.1 });
         const elementosOcultos = document.querySelectorAll('.card-animado');
         elementosOcultos.forEach((el) => observer.observe(el));
     });
