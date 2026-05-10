@@ -120,6 +120,55 @@
     $maiorReceitaCat   = key($receitasPorCategoria);
     $maiorReceitaValor = current($receitasPorCategoria);
 
+    // ── Dados do mês ANTERIOR por categoria (para comparação) ─────────────
+    $gastosPorCategoriaAnt   = [];
+    $receitasPorCategoriaAnt = [];
+
+    if ($carteira_selecionada) {
+        try {
+            $sqlAnt = "
+                SELECT
+                    r.Valor, r.TipoRegistro,
+                    COALESCE(c.NomeCategoria, 'Sem Categoria') as Categoria
+                FROM Registro r
+                LEFT JOIN Categoria c ON r.FKCategoria = c.IDCategoria
+                WHERE r.FKUsuario   = :uid
+                  AND r.FKCarteira  = :carteira_id
+                  AND r.StatusRegistro = 'efetivado'
+                  AND MONTH(r.MomentoRegistro) = :mes
+                  AND YEAR(r.MomentoRegistro)  = :ano
+            ";
+            $stmtAnt = $pdo->prepare($sqlAnt);
+            $stmtAnt->execute([
+                ':uid'         => $usuario_id,
+                ':carteira_id' => $carteira_selecionada,
+                ':mes'         => $mes_ant,
+                ':ano'         => $ano_ant,
+            ]);
+            foreach ($stmtAnt->fetchAll(PDO::FETCH_ASSOC) as $t) {
+                $cat = $t['Categoria'];
+                if ($t['TipoRegistro'] === 'despesa') {
+                    $gastosPorCategoriaAnt[$cat] = ($gastosPorCategoriaAnt[$cat] ?? 0) + (float)$t['Valor'];
+                } else {
+                    $receitasPorCategoriaAnt[$cat] = ($receitasPorCategoriaAnt[$cat] ?? 0) + (float)$t['Valor'];
+                }
+            }
+        } catch (PDOException $e) {}
+    }
+
+    // ── Helper: badge de variação ─────────────────────────────────────────
+    function analisesBadgeVar(float $atual, float $anterior, bool $invertido = false): string {
+        if ($anterior <= 0) return '';
+        $delta = (($atual - $anterior) / $anterior) * 100;
+        $abs   = abs(round($delta, 1));
+        if ($abs < 0.5) return '';
+        $subiu    = $delta > 0;
+        $positivo = $invertido ? !$subiu : $subiu;
+        $cor  = $positivo ? '28a745' : 'dc3545';
+        $icon = $subiu ? 'bi-arrow-up-short' : 'bi-arrow-down-short';
+        return "<span style='display:inline-flex;align-items:center;background:#{$cor}22;color:#{$cor};border:1px solid #{$cor}44;border-radius:999px;padding:1px 7px;font-size:0.68rem;font-weight:600;'><i class='bi {$icon}'></i>{$abs}%</span>";
+    }
+
     // JSON Despesas
     $dadosJsonTransacoes      = json_encode($transacoes);
     $dadosJsonLabelsDespesas  = json_encode(array_keys($gastosPorCategoria));
@@ -205,8 +254,14 @@
                     <div>
                         <p class="text-secondary small mb-1 text-uppercase fw-bold tracking-wide">Maior Fuga de Capital (Gastos)</p>
                         <?php if ($maiorGastoCat): ?>
-                            <h4 class="fw-bold text-light mb-0"><?php echo htmlspecialchars($maiorGastoCat) ?></h4>
-                            <span class="text-danger fw-semibold fs-5">R$ <?php echo number_format($maiorGastoValor, 2, ',', '.') ?></span>
+                            <h4 class="fw-bold text-light mb-1"><?php echo htmlspecialchars($maiorGastoCat) ?></h4>
+                            <div class="d-flex align-items-center gap-2 flex-wrap">
+                                <span class="text-danger fw-semibold fs-5">R$ <?php echo number_format($maiorGastoValor, 2, ',', '.') ?></span>
+                                <?php echo analisesBadgeVar($maiorGastoValor, $gastosPorCategoriaAnt[$maiorGastoCat] ?? 0, true); ?>
+                            </div>
+                            <?php if (isset($gastosPorCategoriaAnt[$maiorGastoCat])): ?>
+                                <small class="text-secondary" style="font-size:0.7rem;">Mês anterior: R$ <?php echo number_format($gastosPorCategoriaAnt[$maiorGastoCat], 2, ',', '.') ?></small>
+                            <?php endif; ?>
                         <?php else: ?>
                             <h5 class="text-secondary mb-0">Nenhum gasto registrado</h5>
                         <?php endif; ?>
@@ -224,8 +279,14 @@
                     <div>
                         <p class="text-secondary small mb-1 text-uppercase fw-bold tracking-wide">Principal Motor de Renda</p>
                         <?php if ($maiorReceitaCat): ?>
-                            <h4 class="fw-bold text-light mb-0"><?php echo htmlspecialchars($maiorReceitaCat) ?></h4>
-                            <span class="text-success fw-semibold fs-5">R$ <?php echo number_format($maiorReceitaValor, 2, ',', '.') ?></span>
+                            <h4 class="fw-bold text-light mb-1"><?php echo htmlspecialchars($maiorReceitaCat) ?></h4>
+                            <div class="d-flex align-items-center gap-2 flex-wrap">
+                                <span class="text-success fw-semibold fs-5">R$ <?php echo number_format($maiorReceitaValor, 2, ',', '.') ?></span>
+                                <?php echo analisesBadgeVar($maiorReceitaValor, $receitasPorCategoriaAnt[$maiorReceitaCat] ?? 0, false); ?>
+                            </div>
+                            <?php if (isset($receitasPorCategoriaAnt[$maiorReceitaCat])): ?>
+                                <small class="text-secondary" style="font-size:0.7rem;">Mês anterior: R$ <?php echo number_format($receitasPorCategoriaAnt[$maiorReceitaCat], 2, ',', '.') ?></small>
+                            <?php endif; ?>
                         <?php else: ?>
                             <h5 class="text-secondary mb-0">Nenhuma renda registrada</h5>
                         <?php endif; ?>
@@ -397,68 +458,145 @@
     }
 </script>
 <script>
-    const transacoesBrutas = <?php echo $dadosJsonTransacoes ?>;
+    const transacoesBrutas      = <?php echo $dadosJsonTransacoes ?>;
+    const gastosCatAnt          = <?php echo json_encode($gastosPorCategoriaAnt) ?>;
+    const receitasCatAnt        = <?php echo json_encode($receitasPorCategoriaAnt) ?>;
+    const gastosCatAtual        = <?php echo json_encode($gastosPorCategoria) ?>;
+    const receitasCatAtual      = <?php echo json_encode($receitasPorCategoria) ?>;
+    const nomeMesAnterior       = "<?php echo $meses_pt[$mes_ant] ?>";
+
+    // Badge de variação JS-side
+    function badgeVarJS(atual, anterior, invertido = false) {
+        if (!anterior || anterior <= 0) return '';
+        const delta = ((atual - anterior) / anterior) * 100;
+        const abs   = Math.abs(delta).toFixed(1);
+        if (abs < 0.5) return '';
+        const subiu    = delta > 0;
+        const positivo = invertido ? !subiu : subiu;
+        const cor      = positivo ? '28a745' : 'dc3545';
+        const icon     = subiu ? 'bi-arrow-up-short' : 'bi-arrow-down-short';
+        return `<span style="display:inline-flex;align-items:center;background:#${cor}22;color:#${cor};border:1px solid #${cor}44;border-radius:999px;padding:1px 7px;font-size:0.68rem;font-weight:600;"><i class="bi ${icon}"></i> ${abs}%</span>`;
+    }
 
     const coresDespesas = ['#AA8C2C', '#D4AF37', '#E7C665', '#E63946', '#F4A261', '#E9C46A', '#9C6644'];
     const coresReceitas = ['#06D6A0', '#118AB2', '#2A9D8F', '#264653', '#457B9D', '#1D3557', '#0077B6'];
 
-    if (document.getElementById('graficoDespesas')) {
-        const ctxDespesas = document.getElementById('graficoDespesas').getContext('2d');
-        const chartDespesas = new Chart(ctxDespesas, {
+    // ── Plugin: labels nas fatias do gráfico ──────────────────────────────────
+    const pluginLabelsFatias = {
+        id: 'labelsFatias',
+        afterDatasetsDraw(chart) {
+            const { ctx, data } = chart;
+            const total = data.datasets[0].data.reduce((a, b) => a + b, 0);
+            if (total === 0) return;
+
+            ctx.save();
+            data.datasets[0].data.forEach((valor, i) => {
+                const pct = (valor / total) * 100;
+                // Fatias muito pequenas (< 6%) não recebem label para não sujar
+                if (pct < 6) return;
+
+                const meta     = chart.getDatasetMeta(0);
+                const arc      = meta.data[i];
+                const midAngle = arc.startAngle + (arc.endAngle - arc.startAngle) / 2;
+
+                // Posição: 82% do raio externo (dentro da fatia, mas perto da borda)
+                const outerRadius = arc.outerRadius;
+                const innerRadius = arc.innerRadius;
+                const midRadius   = innerRadius + (outerRadius - innerRadius) * 0.6;
+
+                const x = arc.x + Math.cos(midAngle) * midRadius;
+                const y = arc.y + Math.sin(midAngle) * midRadius;
+
+                // Nome da categoria (truncado em 10 chars)
+                const label = data.labels[i].length > 10
+                    ? data.labels[i].substring(0, 9) + '…'
+                    : data.labels[i];
+
+                ctx.textAlign    = 'center';
+                ctx.textBaseline = 'middle';
+
+                // Percentagem em cima — maior e em negrito
+                ctx.font         = 'bold 11px Inter, sans-serif';
+                ctx.fillStyle    = 'rgba(255,255,255,0.95)';
+                ctx.fillText(Math.round(pct) + '%', x, y - 7);
+
+                // Nome embaixo — menor
+                ctx.font      = '9px Inter, sans-serif';
+                ctx.fillStyle = 'rgba(255,255,255,0.75)';
+                ctx.fillText(label, x, y + 6);
+            });
+            ctx.restore();
+        }
+    };
+
+    function criarGrafico(canvasId, labels, valores, cores, tipo) {
+        const canvas = document.getElementById(canvasId);
+        if (!canvas) return null;
+
+        const chart = new Chart(canvas.getContext('2d'), {
             type: 'doughnut',
             data: {
-                labels: <?php echo $dadosJsonLabelsDespesas ?>,
+                labels,
                 datasets: [{
-                    data: <?php echo $dadosJsonValoresDespesas ?>,
-                    backgroundColor: coresDespesas,
-                    borderWidth: 2,
-                    borderColor: '#1a1d21'
+                    data: valores,
+                    backgroundColor: cores,
+                    borderWidth: 3,
+                    borderColor: '#1a1d21',
+                    hoverBorderWidth: 0,
+                    hoverOffset: 6,
                 }]
             },
             options: {
                 responsive: true,
                 maintainAspectRatio: false,
-                cutout: '75%',
-                plugins: { legend: { display: false } },
+                cutout: '65%',
+                animation: { animateRotate: true, duration: 600 },
+                plugins: {
+                    legend: { display: false },
+                    tooltip: {
+                        callbacks: {
+                            label(ctx) {
+                                const total = ctx.dataset.data.reduce((a, b) => a + b, 0);
+                                const pct   = ((ctx.parsed / total) * 100).toFixed(1);
+                                const val   = new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(ctx.parsed);
+                                return ` ${val} (${pct}%)`;
+                            }
+                        },
+                        backgroundColor: '#1e2126',
+                        borderColor: 'rgba(212,175,55,0.3)',
+                        borderWidth: 1,
+                        titleColor: '#f8fafc',
+                        bodyColor: '#a1a1aa',
+                        padding: 10,
+                    }
+                },
                 onClick: (event, elements) => {
                     if (elements.length > 0) {
-                        const index = elements[0].index;
-                        const categoriaClicada = chartDespesas.data.labels[index];
-                        atualizarListaDetalhes(categoriaClicada, 'despesa');
+                        const categoriaClicada = chart.data.labels[elements[0].index];
+                        atualizarListaDetalhes(categoriaClicada, tipo);
                     }
                 }
-            }
+            },
+            plugins: [pluginLabelsFatias]
         });
+        return chart;
     }
 
-    if (document.getElementById('graficoReceitas')) {
-        const ctxReceitas = document.getElementById('graficoReceitas').getContext('2d');
-        const chartReceitas = new Chart(ctxReceitas, {
-            type: 'doughnut',
-            data: {
-                labels: <?php echo $dadosJsonLabelsReceitas ?>,
-                datasets: [{
-                    data: <?php echo $dadosJsonValoresReceitas ?>,
-                    backgroundColor: coresReceitas,
-                    borderWidth: 2,
-                    borderColor: '#1a1d21'
-                }]
-            },
-            options: {
-                responsive: true,
-                maintainAspectRatio: false,
-                cutout: '75%',
-                plugins: { legend: { display: false } },
-                onClick: (event, elements) => {
-                    if (elements.length > 0) {
-                        const index = elements[0].index;
-                        const categoriaClicada = chartReceitas.data.labels[index];
-                        atualizarListaDetalhes(categoriaClicada, 'receita');
-                    }
-                }
-            }
-        });
-    }
+    const chartDespesas = criarGrafico(
+        'graficoDespesas',
+        <?php echo $dadosJsonLabelsDespesas ?>,
+        <?php echo $dadosJsonValoresDespesas ?>,
+        coresDespesas,
+        'despesa'
+    );
+
+    const chartReceitas = criarGrafico(
+        'graficoReceitas',
+        <?php echo $dadosJsonLabelsReceitas ?>,
+        <?php echo $dadosJsonValoresReceitas ?>,
+        coresReceitas,
+        'receita'
+    );
 
     function atualizarListaDetalhes(categoriaFiltro, tipo) {
         const containerLista = document.getElementById(`lista-detalhes-${tipo}`);
@@ -471,15 +609,34 @@
             t.TipoRegistro === tipo && t.Categoria === categoriaFiltro
         );
 
-        let htmlLista = '<div class="list-group list-group-flush">';
+        const totalAtual   = tipo === 'despesa'
+            ? (gastosCatAtual[categoriaFiltro]   || 0)
+            : (receitasCatAtual[categoriaFiltro] || 0);
+        const totalAnt     = tipo === 'despesa'
+            ? (gastosCatAnt[categoriaFiltro]   || 0)
+            : (receitasCatAnt[categoriaFiltro] || 0);
+
+        const fmt = v => new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(v);
+        const corTotal = tipo === 'despesa' ? 'text-danger' : 'text-success';
+
+        // Cabeçalho de comparação da categoria
+        let htmlLista = `
+            <div class="px-4 py-3 border-bottom border-secondary-subtle d-flex justify-content-between align-items-center flex-wrap gap-2">
+                <div>
+                    <span class="text-secondary small">Total em ${categoriaFiltro}</span><br>
+                    <span class="${corTotal} fw-bold fs-5">${fmt(totalAtual)}</span>
+                    ${badgeVarJS(totalAtual, totalAnt, tipo === 'despesa')}
+                </div>
+                ${totalAnt > 0 ? `<span class="text-secondary small">${nomeMesAnterior}: ${fmt(totalAnt)}</span>` : ''}
+            </div>
+            <div class="list-group list-group-flush">`;
+
         transacoesFiltradas.forEach(t => {
-            // Ajuste no fuso horário para evitar bugs de exibição de data (-1 dia)
             const [ano, mes, dia] = t.MomentoRegistro.split(' ')[0].split('-');
-            const dataStr = `${dia}/${mes}/${ano}`;
-            
-            const valorFormatado = new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(t.Valor);
-            const corValor = tipo === 'despesa' ? 'text-danger' : 'text-success';
-            const sinalValor = tipo === 'despesa' ? '-' : '+';
+            const dataStr        = `${dia}/${mes}/${ano}`;
+            const valorFormatado = fmt(t.Valor);
+            const corValor       = tipo === 'despesa' ? 'text-danger' : 'text-success';
+            const sinalValor     = tipo === 'despesa' ? '-' : '+';
 
             htmlLista += `
                 <div class="list-group-item bg-transparent border-secondary-subtle px-4 py-3 d-flex justify-content-between align-items-center">

@@ -84,6 +84,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $subCategoriaId = trim($_POST['subcategoria_id'] ?? '') ?: null;
     $recorrente     = isset($_POST['recorrente']) ? 1 : 0; 
     $diaVencimento  = $recorrente ? intval($_POST['dia_vencimento'] ?? 0) : null;
+    $parcelado      = isset($_POST['parcelado']) ? 1 : 0;
+    $numParcelas    = $parcelado ? max(2, min(48, intval($_POST['num_parcelas'] ?? 2))) : 1;
 
     // Validações
     if (!in_array($tipoRegistro, ['receita', 'despesa'])) $erro = "Tipo de registro inválido.";
@@ -94,6 +96,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     elseif (!in_array($statusRegistro, ['pendente', 'efetivado'])) $erro = "Status inválido.";
     elseif (empty($carteiraId)) $erro = "Selecione uma carteira.";
     elseif ($recorrente && ($diaVencimento < 1 || $diaVencimento > 31)) $erro = "Dia de vencimento inválido (1 a 31).";
+    elseif ($parcelado && ($numParcelas < 2 || $numParcelas > 48)) $erro = "Número de parcelas deve ser entre 2 e 48.";
+    elseif ($parcelado && $recorrente) $erro = "Uma transação não pode ser parcelada E recorrente ao mesmo tempo.";
 
     if (!$erro) {
         $valor = str_replace(',', '.', $valorRaw);
@@ -101,47 +105,100 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         
         try {
             if (isset($_POST['id_editar']) && !empty($_POST['id_editar'])) {
-                // É UMA ATUALIZAÇÃO (UPDATE)
+                // ── ATUALIZAÇÃO (UPDATE) ─────────────────────────────────────
+                // Na edição, não mudamos parcelamento — apenas os campos editáveis.
                 $sql = "
-                    UPDATE Registro SET 
+                    UPDATE Registro SET
                         TipoRegistro = :tipo, Valor = :valor, Descricao = :descricao,
                         MomentoRegistro = :momento, DataVencimento = :vencimento,
                         StatusRegistro = :status, Recorrente = :recorrente, DiaVencimento = :dia,
-                        FKCarteira = :carteira, FKCategoria = :categoria, FKSubCategoria = :subcategoria
+                        FKCarteira = :carteira, FKCategoria = :categoria
                     WHERE IDRegistro = :id_editar AND FKUsuario = :usuario
                 ";
                 $stmt = $pdo->prepare($sql);
                 $stmt->execute([
-                    ':tipo' => $tipoRegistro, ':valor' => $valor, ':descricao' => $descricao,
-                    ':momento' => $dataRegistro, ':vencimento' => $dataVencimento, ':status' => $statusRegistro,
-                    ':recorrente' => $recorrente, ':dia' => $diaVencimento, ':carteira' => $carteiraId,
-                    ':categoria' => $categoriaId, ':subcategoria' => $subCategoriaId,
-                    ':id_editar' => $_POST['id_editar'], ':usuario' => $usuario_id
+                    ':tipo'      => $tipoRegistro, ':valor'    => $valor,   ':descricao' => $descricao,
+                    ':momento'   => $dataRegistro, ':vencimento' => $dataVencimento,
+                    ':status'    => $statusRegistro, ':recorrente' => $recorrente,
+                    ':dia'       => $diaVencimento, ':carteira'  => $carteiraId,
+                    ':categoria' => $categoriaId,  ':id_editar' => $_POST['id_editar'],
+                    ':usuario'   => $usuario_id,
                 ]);
                 header("Location: dashboard.php?sucesso=editado");
+
+            } elseif ($parcelado && $numParcelas >= 2) {
+                // ── CRIAÇÃO PARCELADA — gera N registros encadeados ──────────
+                $valorParcela  = round(floatval($valor) / $numParcelas, 2);
+                $grupoParcela  = gerarUuid(); // UUID compartilhado entre todas as parcelas
+                $dataBase      = new DateTime($dataRegistro);
+
+                $sqlInsert = "
+                    INSERT INTO Registro (
+                        IDRegistro, TipoRegistro, Valor, Descricao, MomentoRegistro, DataVencimento,
+                        StatusRegistro, Recorrente, DiaVencimento, FKCarteira, FKUsuario, FKCategoria,
+                        GrupoParcela, ParcelaAtual, TotalParcelas
+                    ) VALUES (
+                        :id, :tipo, :valor, :descricao, :momento, :vencimento,
+                        :status, 0, NULL, :carteira, :usuario, :categoria,
+                        :grupo, :parcela_atual, :total_parcelas
+                    )
+                ";
+                $stmtP = $pdo->prepare($sqlInsert);
+
+                for ($i = 0; $i < $numParcelas; $i++) {
+                    $dataParcela = clone $dataBase;
+                    $dataParcela->modify("+{$i} month");
+                    $dataStr     = $dataParcela->format('Y-m-d');
+
+                    // A 1ª parcela herda o status escolhido; as demais ficam pendentes
+                    $statusParcela = ($i === 0) ? $statusRegistro : 'pendente';
+
+                    // Label: "Tênis (1/3)", "Tênis (2/3)", etc.
+                    $descParcela = $descricao . " (" . ($i + 1) . "/" . $numParcelas . ")";
+
+                    $stmtP->execute([
+                        ':id'            => gerarUuid(),
+                        ':tipo'          => $tipoRegistro,
+                        ':valor'         => $valorParcela,
+                        ':descricao'     => $descParcela,
+                        ':momento'       => $dataStr,
+                        ':vencimento'    => $dataStr,
+                        ':status'        => $statusParcela,
+                        ':carteira'      => $carteiraId,
+                        ':usuario'       => $usuario_id,
+                        ':categoria'     => $categoriaId,
+                        ':grupo'         => $grupoParcela,
+                        ':parcela_atual' => $i + 1,
+                        ':total_parcelas' => $numParcelas,
+                    ]);
+                }
+                header("Location: dashboard.php?sucesso=parcelado&parcelas={$numParcelas}");
+
             } else {
-                // É UMA CRIAÇÃO (INSERT)
+                // ── CRIAÇÃO SIMPLES ──────────────────────────────────────────
                 $sql = "
                     INSERT INTO Registro (
                         IDRegistro, TipoRegistro, Valor, Descricao, MomentoRegistro, DataVencimento,
-                        StatusRegistro, Recorrente, DiaVencimento, FKCarteira, FKUsuario, FKCategoria, FKSubCategoria
+                        StatusRegistro, Recorrente, DiaVencimento, FKCarteira, FKUsuario, FKCategoria
                     ) VALUES (
                         :id, :tipo, :valor, :descricao, :momento, :vencimento,
-                        :status, :recorrente, :dia, :carteira, :usuario, :categoria, :subcategoria
+                        :status, :recorrente, :dia, :carteira, :usuario, :categoria
                     )
                 ";
                 $stmt = $pdo->prepare($sql);
                 $stmt->execute([
-                    ':id' => gerarUuid(), ':tipo' => $tipoRegistro, ':valor' => $valor, ':descricao' => $descricao,
-                    ':momento' => $dataRegistro, ':vencimento' => $dataVencimento, ':status' => $statusRegistro,
-                    ':recorrente' => $recorrente, ':dia' => $diaVencimento, ':carteira' => $carteiraId,
-                    ':usuario' => $usuario_id, ':categoria' => $categoriaId, ':subcategoria' => $subCategoriaId,
+                    ':id'        => gerarUuid(), ':tipo'       => $tipoRegistro,
+                    ':valor'     => $valor,      ':descricao'  => $descricao,
+                    ':momento'   => $dataRegistro, ':vencimento' => $dataVencimento,
+                    ':status'    => $statusRegistro, ':recorrente' => $recorrente,
+                    ':dia'       => $diaVencimento,  ':carteira'   => $carteiraId,
+                    ':usuario'   => $usuario_id,  ':categoria'  => $categoriaId,
                 ]);
                 header("Location: dashboard.php?sucesso=registro");
             }
             exit;
         } catch (PDOException $e) {
-            $erro = "Erro ao salvar o registro. Verifique os dados.";
+            $erro = "Erro ao salvar o registro: " . $e->getMessage();
         }
     }
 }
@@ -155,7 +212,11 @@ $val_cart   = $_POST['carteira_id'] ?? ($transacao_edit ? $transacao_edit['FKCar
 $val_cat    = $_POST['categoria_id'] ?? ($transacao_edit ? $transacao_edit['FKCategoria'] : '');
 $val_venc   = $_POST['data_vencimento'] ?? ($transacao_edit ? $transacao_edit['DataVencimento'] : '');
 $val_rec    = isset($_POST['recorrente']) ? true : ($transacao_edit ? $transacao_edit['Recorrente'] : false);
-$val_dia    = $_POST['dia_vencimento'] ?? ($transacao_edit ? $transacao_edit['DiaVencimento'] : '');
+$val_dia        = $_POST['dia_vencimento'] ?? ($transacao_edit ? $transacao_edit['DiaVencimento'] : '');
+$val_parcelado  = isset($_POST['parcelado']) ? true : false;
+$val_num_parc   = $_POST['num_parcelas'] ?? 2;
+// Na edição, parcelamento não está disponível para evitar inconsistências
+$is_edicao      = !empty($id_editar);
 
 require_once 'geral/header.php';
 ?>
@@ -291,6 +352,37 @@ require_once 'geral/header.php';
                             </div>
                         </div>
 
+                        <?php if (!$is_edicao): ?>
+                        <!-- ── Parcelamento ──────────────────────────────────── -->
+                        <div class="mb-4 auralis-line-input pb-3">
+                            <div class="d-flex align-items-center justify-content-between mb-2">
+                                <div class="d-flex align-items-center">
+                                    <i class="bi bi-credit-card-2-front text-secondary-analysis me-3 w-icon text-center"></i>
+                                    <span class="text-light fs-6">Parcelado</span>
+                                </div>
+                                <div class="form-check form-switch fs-4 mb-0 toggle-analysis">
+                                    <input class="form-check-input bg-dark border-border-color shadow-none" type="checkbox" name="parcelado" id="toggle_parcelado" role="switch" <?= $val_parcelado ? 'checked' : '' ?>>
+                                </div>
+                            </div>
+
+                            <div id="bloco_parcelamento" style="display: <?= $val_parcelado ? 'block' : 'none' ?>;" class="ps-4 border-start border-border-color mt-2">
+                                <label class="form-label text-secondary-analysis fs-7 mb-1">Número de parcelas</label>
+                                <div class="d-flex align-items-center gap-3">
+                                    <input type="number" name="num_parcelas" id="num_parcelas"
+                                        class="form-control bg-dark border-border-color text-light-analysis form-control-sm no-spinners fs-7"
+                                        min="2" max="48" placeholder="Ex: 3"
+                                        value="<?= htmlspecialchars($val_num_parc) ?>"
+                                        style="width: 80px;">
+                                    <div id="preview_parcela" class="text-muted fs-7"></div>
+                                </div>
+                                <p class="text-secondary fs-7 mt-2 mb-0">
+                                    <i class="bi bi-info-circle me-1"></i>
+                                    O sistema criará uma entrada por mês, começando na data informada.
+                                </p>
+                            </div>
+                        </div>
+                        <?php endif; ?>
+
                         <div class="d-grid mt-2">
                             <button id="btnSalvar" type="submit" class="btn btn-gold fw-bold text-dark py-3 rounded-pill fs-6 shadow-lg d-flex align-items-center justify-content-center transition-hover">
                                 <?= $id_editar ? 'Salvar Alterações' : 'Salvar Transação' ?>
@@ -420,16 +512,60 @@ require_once 'geral/header.php';
     // ==========================================
     // 2. LÓGICA DA RECORRÊNCIA
     // ==========================================
-    const checkRecorrente = document.getElementById('recorrente');
+    const checkRecorrente  = document.getElementById('recorrente');
     const blocoRecorrencia = document.getElementById('bloco_recorrencia');
-    const inputDia = document.getElementById('dia_vencimento');
+    const inputDia         = document.getElementById('dia_vencimento');
 
+    // ── Recorrente toggle ────────────────────────────────────────────────────
     if (checkRecorrente) {
         checkRecorrente.addEventListener('change', function () {
             blocoRecorrencia.style.display = this.checked ? 'block' : 'none';
             inputDia.required = this.checked;
+            // Desativa parcelamento se recorrente for ligado
+            if (this.checked && toggleParcelado && toggleParcelado.checked) {
+                toggleParcelado.checked = false;
+                if (blocoParcelamento) blocoParcelamento.style.display = 'none';
+            }
         });
     }
+
+    // ── Parcelamento toggle ──────────────────────────────────────────────────
+    const toggleParcelado   = document.getElementById('toggle_parcelado');
+    const blocoParcelamento = document.getElementById('bloco_parcelamento');
+    const inputParcelas     = document.getElementById('num_parcelas');
+    const previewParcela    = document.getElementById('preview_parcela');
+    const inputValor        = document.getElementById('valor');
+
+    function atualizarPreviewParcela() {
+        if (!toggleParcelado || !toggleParcelado.checked || !previewParcela) return;
+        const valor = parseFloat((inputValor ? inputValor.value : '0').replace(',', '.')) || 0;
+        const n     = parseInt(inputParcelas ? inputParcelas.value : 0) || 0;
+        if (valor > 0 && n >= 2) {
+            const parcela = (valor / n).toLocaleString('pt-BR', {minimumFractionDigits: 2, maximumFractionDigits: 2});
+            previewParcela.innerHTML = '<span style="color:var(--accent);font-weight:600;">' + n + 'x de R$ ' + parcela + '</span>';
+        } else {
+            previewParcela.textContent = '';
+        }
+    }
+
+    if (toggleParcelado) {
+        toggleParcelado.addEventListener('change', function () {
+            const ativo = this.checked;
+            if (blocoParcelamento) blocoParcelamento.style.display = ativo ? 'block' : 'none';
+            // Parcelado e Recorrente são mutuamente exclusivos
+            if (ativo && checkRecorrente && checkRecorrente.checked) {
+                checkRecorrente.checked = false;
+                if (blocoRecorrencia) blocoRecorrencia.style.display = 'none';
+                if (inputDia) inputDia.required = false;
+            }
+            atualizarPreviewParcela();
+        });
+    }
+
+    if (inputParcelas) inputParcelas.addEventListener('input', atualizarPreviewParcela);
+    if (inputValor)    inputValor.addEventListener('input', atualizarPreviewParcela);
+
+    atualizarPreviewParcela();
 
 // ==========================================
     // TRAVA ANTI-SPAM (BLINDAGEM ABSOLUTA)

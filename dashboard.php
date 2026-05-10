@@ -300,6 +300,7 @@ if ($carteira_selecionada) {
                 SELECT
                     r.IDRegistro, r.MomentoRegistro, r.Valor, r.Descricao, r.TipoRegistro, r.StatusRegistro,
                     r.DataVencimento, r.Recorrente, r.DiaVencimento,
+                    r.GrupoParcela, r.ParcelaAtual, r.TotalParcelas,
                     c.NomeCategoria, c.IconeCategoria
                 FROM Registro r
                 LEFT JOIN Categoria c ON r.FKCategoria = c.IDCategoria
@@ -307,7 +308,7 @@ if ($carteira_selecionada) {
                   AND r.FKUsuario = :usuario_id
                   AND MONTH(r.MomentoRegistro) = :mes
                   AND YEAR(r.MomentoRegistro) = :ano
-                ORDER BY r.MomentoRegistro DESC, r.created_at DESC
+                ORDER BY r.MomentoRegistro DESC, r.IDRegistro DESC
                 LIMIT 50
             ";
         $stmtTrans = $pdo->prepare($sqlTransacoes);
@@ -321,6 +322,88 @@ if ($carteira_selecionada) {
     } catch (PDOException $e) {
     }
 }
+
+
+    // ── COMPARAÇÃO: totais do mês ANTERIOR (para badges de variação) ──────────
+    $receitasMesAnt = 0.00;
+    $despesasMesAnt = 0.00;
+
+    if ($carteira_selecionada) {
+        try {
+            $sqlMesAnt = "
+                SELECT
+                    COALESCE(SUM(CASE WHEN TipoRegistro = 'receita' THEN Valor ELSE 0 END), 0) as total_receitas,
+                    COALESCE(SUM(CASE WHEN TipoRegistro = 'despesa' THEN Valor ELSE 0 END), 0) as total_despesas
+                FROM Registro
+                WHERE FKCarteira = :carteira_id
+                  AND FKUsuario  = :usuario_id
+                  AND StatusRegistro = 'efetivado'
+                  AND MONTH(MomentoRegistro) = :mes
+                  AND YEAR(MomentoRegistro)  = :ano
+            ";
+            $stmtAnt = $pdo->prepare($sqlMesAnt);
+            $stmtAnt->execute([
+                ':carteira_id' => $carteira_selecionada,
+                ':usuario_id'  => $usuario_id,
+                ':mes'         => $mes_ant,
+                ':ano'         => $ano_ant,
+            ]);
+            $resAnt = $stmtAnt->fetch();
+            if ($resAnt) {
+                $receitasMesAnt = (float) $resAnt['total_receitas'];
+                $despesasMesAnt = (float) $resAnt['total_despesas'];
+            }
+        } catch (PDOException $e) {}
+    }
+
+    // ── GASTOS ESPERADOS: pendentes do mês atual ──────────────────────────────
+    $despesasPendentes = 0.00;
+    $receitasPendentes = 0.00;
+
+    if ($carteira_selecionada) {
+        try {
+            $sqlPend = "
+                SELECT
+                    COALESCE(SUM(CASE WHEN TipoRegistro = 'despesa' THEN Valor ELSE 0 END), 0) as pend_desp,
+                    COALESCE(SUM(CASE WHEN TipoRegistro = 'receita' THEN Valor ELSE 0 END), 0) as pend_rec
+                FROM Registro
+                WHERE FKCarteira = :carteira_id
+                  AND FKUsuario  = :usuario_id
+                  AND StatusRegistro = 'pendente'
+                  AND MONTH(MomentoRegistro) = :mes
+                  AND YEAR(MomentoRegistro)  = :ano
+            ";
+            $stmtPend = $pdo->prepare($sqlPend);
+            $stmtPend->execute([
+                ':carteira_id' => $carteira_selecionada,
+                ':usuario_id'  => $usuario_id,
+                ':mes'         => $mes_atual,
+                ':ano'         => $ano_atual,
+            ]);
+            $resPend = $stmtPend->fetch();
+            if ($resPend) {
+                $despesasPendentes = (float) $resPend['pend_desp'];
+                $receitasPendentes = (float) $resPend['pend_rec'];
+            }
+        } catch (PDOException $e) {}
+    }
+
+    // ── Função helper: calcula variação percentual e retorna badge HTML ────────
+
+    function badgeVar(float $atual, float $anterior, bool $invertido = false): string {
+        // Sem dado anterior → sem badge. Menos poluição visual.
+        if ($anterior <= 0) return '';
+        $delta = (($atual - $anterior) / $anterior) * 100;
+        $abs   = abs(round($delta, 1));
+        if ($abs < 0.5) return '';
+        $subiu    = $delta > 0;
+        $positivo = $invertido ? !$subiu : $subiu;
+        // bg-opacity-20 deixa o badge invisível porque text-{cor} combina com bg-{cor}.
+        // Usamos text-white sobre fundo colorido sólido.
+        $cor  = $positivo ? '28a745' : 'dc3545';
+        $icon = $subiu ? 'bi-arrow-up-short' : 'bi-arrow-down-short';
+        return "<span class='ms-1' style='display:inline-flex;align-items:center;background:#{$cor}22;color:#{$cor};border:1px solid #{$cor}44;border-radius:999px;padding:1px 7px;font-size:0.68rem;font-weight:600;'><i class='bi {$icon}'></i>{$abs}%</span>";
+    }
 
 require_once 'geral/header.php';
 ?>
@@ -362,6 +445,10 @@ require_once 'geral/header.php';
             // ADICIONE ESTA CONDIÇÃO AQUI:
             if ($_GET['sucesso'] === 'criada') {
                 $msg = 'Nova carteira criada! Agora informe seu saldo para começar.';
+            }
+            if ($_GET['sucesso'] === 'parcelado') {
+                $n = isset($_GET['parcelas']) ? (int)$_GET['parcelas'] : '';
+                $msg = "Compra parcelada em {$n}x registrada com sucesso!";
             }
             ?>
 
@@ -450,7 +537,8 @@ require_once 'geral/header.php';
             </div>
         </div>
 
-        <div class="row g-3 mb-4">
+        <!-- ── Cards de Resumo ─────────────────────────────────────── -->
+        <div class="row g-3 mb-3">
             <!-- Saldo -->
             <div class="col-12 col-md-4">
                 <div class="card bg-body-tertiary border-secondary-subtle shadow-sm h-100 rounded-4">
@@ -482,6 +570,14 @@ require_once 'geral/header.php';
                             </div>
                         </div>
                         <div class="fw-bold text-success mb-1" style="font-size: var(--fs-card-val);">R$ <?php echo number_format($receitasMes ?? 0, 2, ',', '.') ?></div>
+                        <div class="mt-2 d-flex align-items-center flex-wrap gap-1">
+                            <?php echo badgeVar($receitasMes, $receitasMesAnt, false); ?>
+                            <?php if ($receitasPendentes > 0): ?>
+                                <span style="display:inline-flex;align-items:center;background:#FFB80022;color:#FFB800;border:1px solid #FFB80055;border-radius:999px;padding:1px 7px;font-size:0.68rem;font-weight:600;" title="A receber este mês">
+                                    <i class="bi bi-clock me-1"></i>+ R$ <?php echo number_format($receitasPendentes, 2, ',', '.') ?>
+                                </span>
+                            <?php endif; ?>
+                        </div>
                     </div>
                 </div>
             </div>
@@ -496,10 +592,55 @@ require_once 'geral/header.php';
                             </div>
                         </div>
                         <div class="fw-bold text-danger mb-1" style="font-size: var(--fs-card-val);">R$ <?php echo number_format($despesasMes ?? 0, 2, ',', '.') ?></div>
+                        <div class="mt-2 d-flex align-items-center flex-wrap gap-1">
+                            <?php echo badgeVar($despesasMes, $despesasMesAnt, true); ?>
+                            <?php if ($despesasPendentes > 0): ?>
+                                <span style="display:inline-flex;align-items:center;background:#FFB80022;color:#FFB800;border:1px solid #FFB80055;border-radius:999px;padding:1px 7px;font-size:0.68rem;font-weight:600;" title="A pagar este mês">
+                                    <i class="bi bi-clock me-1"></i>+ R$ <?php echo number_format($despesasPendentes, 2, ',', '.') ?>
+                                </span>
+                            <?php endif; ?>
+                        </div>
                     </div>
                 </div>
             </div>
         </div>
+
+        <!-- ── Barra de Gastos Esperados ──────────────────────────────────── -->
+        <?php if ($despesasPendentes > 0 || $receitasPendentes > 0): ?>
+        <div class="card bg-body-tertiary border-secondary-subtle rounded-4 shadow-sm mb-4">
+            <div class="card-body py-3 px-3">
+                <div class="d-flex flex-wrap align-items-center justify-content-between gap-3">
+                    <div class="d-flex align-items-center gap-2">
+                        <i class="bi bi-hourglass-split text-warning"></i>
+                        <span class="fw-semibold text-light" style="font-size:0.875rem;">Aguardando confirmação em <?php echo $nome_mes ?></span>
+                    </div>
+                    <div class="d-flex flex-wrap gap-3">
+                        <?php if ($receitasPendentes > 0): ?>
+                        <div class="d-flex align-items-center gap-2">
+                            <span class="text-secondary small">A receber:</span>
+                            <span class="fw-bold text-success" style="font-size:0.9rem;">R$ <?php echo number_format($receitasPendentes, 2, ',', '.') ?></span>
+                        </div>
+                        <?php endif; ?>
+                        <?php if ($despesasPendentes > 0): ?>
+                        <div class="d-flex align-items-center gap-2">
+                            <span class="text-secondary small">A pagar:</span>
+                            <span class="fw-bold text-danger" style="font-size:0.9rem;">R$ <?php echo number_format($despesasPendentes, 2, ',', '.') ?></span>
+                        </div>
+                        <?php endif; ?>
+                        <?php
+                        $projecaoSaldo = $saldoAtual + $receitasPendentes - $despesasPendentes;
+                        ?>
+                        <div class="d-flex align-items-center gap-2 border-start border-secondary-subtle ps-3">
+                            <span class="text-secondary small">Saldo projetado:</span>
+                            <span class="fw-bold <?php echo $projecaoSaldo >= 0 ? 'text-light' : 'text-danger' ?>" style="font-size:0.9rem;">
+                                R$ <?php echo number_format($projecaoSaldo, 2, ',', '.') ?>
+                            </span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        <?php endif; ?>
 
         <h4 class="fw-bold text-light mb-3 mt-4">Transações de <?php echo $nome_mes ?></h4>
 
@@ -530,9 +671,18 @@ require_once 'geral/header.php';
                         <tr data-bs-toggle="collapse" data-bs-target="#<?php echo $rowId ?>" class="cursor-pointer transition-hover" style="cursor: pointer;">
 
                             <td class="ps-3 ps-md-4 py-3 border-secondary-subtle">
-                                <div class="d-flex align-items-center">
+                                <div class="d-flex align-items-center gap-2">
                                     <?php echo $iconeTipo ?>
-                                    <span class="text-light fw-semibold"><?php echo htmlspecialchars($t['Descricao']) ?></span>
+                                    <div>
+                                        <span class="text-light fw-semibold"><?php echo htmlspecialchars($t['Descricao']) ?></span>
+                                        <?php if (!empty($t['TotalParcelas']) && $t['TotalParcelas'] > 1): ?>
+                                            <div>
+                                                <span class="badge bg-secondary bg-opacity-25 text-secondary" style="font-size:0.65rem;">
+                                                    <i class="bi bi-credit-card-2-front me-1"></i><?php echo $t['ParcelaAtual'] ?>/<?php echo $t['TotalParcelas'] ?>
+                                                </span>
+                                            </div>
+                                        <?php endif; ?>
+                                    </div>
                                 </div>
                             </td>
 
