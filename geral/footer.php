@@ -1,7 +1,7 @@
 <hr class="border-secondary-subtle my-4">
 
 <div class="row align-items-center pb-3">
-    <div class="col-md-6 text-center text-md-start mb-3 mb-md-0">
+    <div class="col-md-6 text-center text-md-start m-3">
         <p class="text-light opacity-50 mb-0 small">
             &copy;
             <?php echo date('Y'); ?> Auralis. Todos os direitos reservados.
