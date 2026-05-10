@@ -405,7 +405,7 @@ if ($carteira_selecionada) {
         $positivo = $invertido ? !$subiu : $subiu;
         $cor      = $positivo ? 'success' : 'danger';
         $icon     = $subiu ? 'bi-arrow-up-short' : 'bi-arrow-down-short';
-        return "<span class="badge bg-{$cor} bg-opacity-20 text-{$cor} ms-1" style="font-size:0.7rem;"><i class="bi {$icon}"></i> {$abs}%</span>";
+        return "<span class='badge bg-{$cor} bg-opacity-20 text-{$cor} ms-1' style='font-size:0.7rem;'><i class='bi {$icon}'></i> {$abs}%</span>";
     }
 
 require_once 'geral/header.php';

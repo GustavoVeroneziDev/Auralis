@@ -170,7 +170,7 @@
         $positivo = $invertido ? !$subiu : $subiu;
         $cor      = $positivo ? 'success' : 'danger';
         $icon     = $subiu ? 'bi-arrow-up-short' : 'bi-arrow-down-short';
-        return "<span class="badge bg-{$cor} bg-opacity-20 text-{$cor}" style="font-size:0.65rem;"><i class="bi {$icon}"></i>{$abs}%</span>";
+        return "<span class='badge bg-{$cor} bg-opacity-20 text-{$cor}' style='font-size:0.65rem;'><i class='bi {$icon}'></i>{$abs}%</span>";
     }
 
     // JSON Despesas
