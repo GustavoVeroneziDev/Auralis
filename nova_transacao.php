@@ -154,7 +154,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                     $statusParcela = ($i === 0) ? $statusRegistro : 'pendente';
 
                     // Label: "Tênis (1/3)", "Tênis (2/3)", etc.
-                    $descParcela = $descricao . " ({$numParcelas}x — " . ($i + 1) . "/" . $numParcelas . ")";
+                    $descParcela = $descricao . " (" . ($i + 1) . "/" . $numParcelas . ")";
 
                     $stmtP->execute([
                         ':id'            => gerarUuid(),

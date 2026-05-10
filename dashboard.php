@@ -391,21 +391,18 @@ if ($carteira_selecionada) {
     // ── Função helper: calcula variação percentual e retorna badge HTML ────────
 
     function badgeVar(float $atual, float $anterior, bool $invertido = false): string {
-        if ($anterior <= 0) {
-            return $atual > 0
-                ? '<span class="badge bg-secondary bg-opacity-25 text-light ms-1" style="font-size:0.7rem;">Novo</span>'
-                : '';
-        }
+        // Sem dado anterior → sem badge. Menos poluição visual.
+        if ($anterior <= 0) return '';
         $delta = (($atual - $anterior) / $anterior) * 100;
         $abs   = abs(round($delta, 1));
-        if ($abs < 0.5) {
-            return '<span class="badge bg-secondary bg-opacity-25 text-light ms-1" style="font-size:0.7rem;">= mês ant.</span>';
-        }
+        if ($abs < 0.5) return '';
         $subiu    = $delta > 0;
         $positivo = $invertido ? !$subiu : $subiu;
-        $cor      = $positivo ? 'success' : 'danger';
-        $icon     = $subiu ? 'bi-arrow-up-short' : 'bi-arrow-down-short';
-        return "<span class='badge bg-{$cor} bg-opacity-20 text-{$cor} ms-1' style='font-size:0.7rem;'><i class='bi {$icon}'></i> {$abs}%</span>";
+        // bg-opacity-20 deixa o badge invisível porque text-{cor} combina com bg-{cor}.
+        // Usamos text-white sobre fundo colorido sólido.
+        $cor  = $positivo ? '28a745' : 'dc3545';
+        $icon = $subiu ? 'bi-arrow-up-short' : 'bi-arrow-down-short';
+        return "<span class= 'ms-1' style='display:inline-flex;align-items:center;background:#{$cor}22;color:#{$cor};border:1px solid #{$cor}44;border-radius:999px;padding:1px 7px;font-size:0.68rem;font-weight:600;'><i class='bi {$icon}'></i>{$abs}%</span>";
     }
 
 require_once 'geral/header.php';

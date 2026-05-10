@@ -158,19 +158,15 @@
 
     // ── Helper: badge de variação ─────────────────────────────────────────
     function analisesBadgeVar(float $atual, float $anterior, bool $invertido = false): string {
-        if ($anterior <= 0) {
-            return $atual > 0 ? '<span class="badge bg-secondary bg-opacity-25 text-light" style="font-size:0.65rem;">Novo</span>' : '';
-        }
+        if ($anterior <= 0) return '';
         $delta = (($atual - $anterior) / $anterior) * 100;
         $abs   = abs(round($delta, 1));
-        if ($abs < 0.5) {
-            return '<span class="badge bg-secondary bg-opacity-25 text-light" style="font-size:0.65rem;">= ant.</span>';
-        }
+        if ($abs < 0.5) return '';
         $subiu    = $delta > 0;
         $positivo = $invertido ? !$subiu : $subiu;
-        $cor      = $positivo ? 'success' : 'danger';
-        $icon     = $subiu ? 'bi-arrow-up-short' : 'bi-arrow-down-short';
-        return "<span class='badge bg-{$cor} bg-opacity-20 text-{$cor}' style='font-size:0.65rem;'><i class='bi {$icon}'></i>{$abs}%</span>";
+        $cor  = $positivo ? '28a745' : 'dc3545';
+        $icon = $subiu ? 'bi-arrow-up-short' : 'bi-arrow-down-short';
+        return "<span style=\"display:inline-flex;align-items:center;background:#{$cor}22;color:#{$cor};border:1px solid #{$cor}44;border-radius:999px;padding:1px 7px;font-size:0.68rem;font-weight:600;\"><i class=\"bi {$icon}\"></i>{$abs}%</span>";
     }
 
     // JSON Despesas
@@ -471,15 +467,15 @@
 
     // Badge de variação JS-side
     function badgeVarJS(atual, anterior, invertido = false) {
-        if (!anterior || anterior <= 0) return atual > 0 ? '<span class="badge bg-secondary bg-opacity-25 text-light" style="font-size:0.65rem;">Novo</span>' : '';
+        if (!anterior || anterior <= 0) return '';
         const delta = ((atual - anterior) / anterior) * 100;
         const abs   = Math.abs(delta).toFixed(1);
-        if (abs < 0.5) return '<span class="badge bg-secondary bg-opacity-25 text-light" style="font-size:0.65rem;">= mês ant.</span>';
+        if (abs < 0.5) return '';
         const subiu    = delta > 0;
         const positivo = invertido ? !subiu : subiu;
-        const cor      = positivo ? 'success' : 'danger';
+        const cor      = positivo ? '28a745' : 'dc3545';
         const icon     = subiu ? 'bi-arrow-up-short' : 'bi-arrow-down-short';
-        return `<span class="badge bg-${cor} bg-opacity-20 text-${cor}" style="font-size:0.65rem;"><i class="bi ${icon}"></i> ${abs}%</span>`;
+        return `<span style="display:inline-flex;align-items:center;background:#${cor}22;color:#${cor};border:1px solid #${cor}44;border-radius:999px;padding:1px 7px;font-size:0.68rem;font-weight:600;"><i class="bi ${icon}"></i> ${abs}%</span>`;
     }
 
     const coresDespesas = ['#AA8C2C', '#D4AF37', '#E7C665', '#E63946', '#F4A261', '#E9C46A', '#9C6644'];
