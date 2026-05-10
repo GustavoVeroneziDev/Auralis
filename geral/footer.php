@@ -28,7 +28,6 @@
         <a href="#" class="text-light opacity-50 text-decoration-none small custom-link" style="margin-right: 10px;">Política de Privacidade</a>
     </div>
 </div>
-</div>
 </footer>
 
 <script src="/geral/js/bootstrap.bundle.min.js"></script>
