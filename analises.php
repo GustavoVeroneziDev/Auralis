@@ -166,7 +166,7 @@
         $positivo = $invertido ? !$subiu : $subiu;
         $cor  = $positivo ? '28a745' : 'dc3545';
         $icon = $subiu ? 'bi-arrow-up-short' : 'bi-arrow-down-short';
-        return "<span style=\"display:inline-flex;align-items:center;background:#{$cor}22;color:#{$cor};border:1px solid #{$cor}44;border-radius:999px;padding:1px 7px;font-size:0.68rem;font-weight:600;\"><i class=\"bi {$icon}\"></i>{$abs}%</span>";
+        return "<span style='display:inline-flex;align-items:center;background:#{$cor}22;color:#{$cor};border:1px solid #{$cor}44;border-radius:999px;padding:1px 7px;font-size:0.68rem;font-weight:600;'><i class='bi {$icon}'></i>{$abs}%</span>";
     }
 
     // JSON Despesas
@@ -481,63 +481,122 @@
     const coresDespesas = ['#AA8C2C', '#D4AF37', '#E7C665', '#E63946', '#F4A261', '#E9C46A', '#9C6644'];
     const coresReceitas = ['#06D6A0', '#118AB2', '#2A9D8F', '#264653', '#457B9D', '#1D3557', '#0077B6'];
 
-    if (document.getElementById('graficoDespesas')) {
-        const ctxDespesas = document.getElementById('graficoDespesas').getContext('2d');
-        const chartDespesas = new Chart(ctxDespesas, {
+    // ── Plugin: labels nas fatias do gráfico ──────────────────────────────────
+    const pluginLabelsFatias = {
+        id: 'labelsFatias',
+        afterDatasetsDraw(chart) {
+            const { ctx, data } = chart;
+            const total = data.datasets[0].data.reduce((a, b) => a + b, 0);
+            if (total === 0) return;
+
+            ctx.save();
+            data.datasets[0].data.forEach((valor, i) => {
+                const pct = (valor / total) * 100;
+                // Fatias muito pequenas (< 6%) não recebem label para não sujar
+                if (pct < 6) return;
+
+                const meta     = chart.getDatasetMeta(0);
+                const arc      = meta.data[i];
+                const midAngle = arc.startAngle + (arc.endAngle - arc.startAngle) / 2;
+
+                // Posição: 82% do raio externo (dentro da fatia, mas perto da borda)
+                const outerRadius = arc.outerRadius;
+                const innerRadius = arc.innerRadius;
+                const midRadius   = innerRadius + (outerRadius - innerRadius) * 0.6;
+
+                const x = arc.x + Math.cos(midAngle) * midRadius;
+                const y = arc.y + Math.sin(midAngle) * midRadius;
+
+                // Nome da categoria (truncado em 10 chars)
+                const label = data.labels[i].length > 10
+                    ? data.labels[i].substring(0, 9) + '…'
+                    : data.labels[i];
+
+                ctx.textAlign    = 'center';
+                ctx.textBaseline = 'middle';
+
+                // Percentagem em cima — maior e em negrito
+                ctx.font         = 'bold 11px Inter, sans-serif';
+                ctx.fillStyle    = 'rgba(255,255,255,0.95)';
+                ctx.fillText(Math.round(pct) + '%', x, y - 7);
+
+                // Nome embaixo — menor
+                ctx.font      = '9px Inter, sans-serif';
+                ctx.fillStyle = 'rgba(255,255,255,0.75)';
+                ctx.fillText(label, x, y + 6);
+            });
+            ctx.restore();
+        }
+    };
+
+    function criarGrafico(canvasId, labels, valores, cores, tipo) {
+        const canvas = document.getElementById(canvasId);
+        if (!canvas) return null;
+
+        const chart = new Chart(canvas.getContext('2d'), {
             type: 'doughnut',
             data: {
-                labels: <?php echo $dadosJsonLabelsDespesas ?>,
+                labels,
                 datasets: [{
-                    data: <?php echo $dadosJsonValoresDespesas ?>,
-                    backgroundColor: coresDespesas,
-                    borderWidth: 2,
-                    borderColor: '#1a1d21'
+                    data: valores,
+                    backgroundColor: cores,
+                    borderWidth: 3,
+                    borderColor: '#1a1d21',
+                    hoverBorderWidth: 0,
+                    hoverOffset: 6,
                 }]
             },
             options: {
                 responsive: true,
                 maintainAspectRatio: false,
-                cutout: '75%',
-                plugins: { legend: { display: false } },
+                cutout: '65%',
+                animation: { animateRotate: true, duration: 600 },
+                plugins: {
+                    legend: { display: false },
+                    tooltip: {
+                        callbacks: {
+                            label(ctx) {
+                                const total = ctx.dataset.data.reduce((a, b) => a + b, 0);
+                                const pct   = ((ctx.parsed / total) * 100).toFixed(1);
+                                const val   = new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(ctx.parsed);
+                                return ` ${val} (${pct}%)`;
+                            }
+                        },
+                        backgroundColor: '#1e2126',
+                        borderColor: 'rgba(212,175,55,0.3)',
+                        borderWidth: 1,
+                        titleColor: '#f8fafc',
+                        bodyColor: '#a1a1aa',
+                        padding: 10,
+                    }
+                },
                 onClick: (event, elements) => {
                     if (elements.length > 0) {
-                        const index = elements[0].index;
-                        const categoriaClicada = chartDespesas.data.labels[index];
-                        atualizarListaDetalhes(categoriaClicada, 'despesa');
+                        const categoriaClicada = chart.data.labels[elements[0].index];
+                        atualizarListaDetalhes(categoriaClicada, tipo);
                     }
                 }
-            }
+            },
+            plugins: [pluginLabelsFatias]
         });
+        return chart;
     }
 
-    if (document.getElementById('graficoReceitas')) {
-        const ctxReceitas = document.getElementById('graficoReceitas').getContext('2d');
-        const chartReceitas = new Chart(ctxReceitas, {
-            type: 'doughnut',
-            data: {
-                labels: <?php echo $dadosJsonLabelsReceitas ?>,
-                datasets: [{
-                    data: <?php echo $dadosJsonValoresReceitas ?>,
-                    backgroundColor: coresReceitas,
-                    borderWidth: 2,
-                    borderColor: '#1a1d21'
-                }]
-            },
-            options: {
-                responsive: true,
-                maintainAspectRatio: false,
-                cutout: '75%',
-                plugins: { legend: { display: false } },
-                onClick: (event, elements) => {
-                    if (elements.length > 0) {
-                        const index = elements[0].index;
-                        const categoriaClicada = chartReceitas.data.labels[index];
-                        atualizarListaDetalhes(categoriaClicada, 'receita');
-                    }
-                }
-            }
-        });
-    }
+    const chartDespesas = criarGrafico(
+        'graficoDespesas',
+        <?php echo $dadosJsonLabelsDespesas ?>,
+        <?php echo $dadosJsonValoresDespesas ?>,
+        coresDespesas,
+        'despesa'
+    );
+
+    const chartReceitas = criarGrafico(
+        'graficoReceitas',
+        <?php echo $dadosJsonLabelsReceitas ?>,
+        <?php echo $dadosJsonValoresReceitas ?>,
+        coresReceitas,
+        'receita'
+    );
 
     function atualizarListaDetalhes(categoriaFiltro, tipo) {
         const containerLista = document.getElementById(`lista-detalhes-${tipo}`);

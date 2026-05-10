@@ -402,7 +402,7 @@ if ($carteira_selecionada) {
         // Usamos text-white sobre fundo colorido sólido.
         $cor  = $positivo ? '28a745' : 'dc3545';
         $icon = $subiu ? 'bi-arrow-up-short' : 'bi-arrow-down-short';
-        return "<span class= 'ms-1' style='display:inline-flex;align-items:center;background:#{$cor}22;color:#{$cor};border:1px solid #{$cor}44;border-radius:999px;padding:1px 7px;font-size:0.68rem;font-weight:600;'><i class='bi {$icon}'></i>{$abs}%</span>";
+        return "<span class='ms-1' style='display:inline-flex;align-items:center;background:#{$cor}22;color:#{$cor};border:1px solid #{$cor}44;border-radius:999px;padding:1px 7px;font-size:0.68rem;font-weight:600;'><i class='bi {$icon}'></i>{$abs}%</span>";
     }
 
 require_once 'geral/header.php';
@@ -573,7 +573,7 @@ require_once 'geral/header.php';
                         <div class="mt-2 d-flex align-items-center flex-wrap gap-1">
                             <?php echo badgeVar($receitasMes, $receitasMesAnt, false); ?>
                             <?php if ($receitasPendentes > 0): ?>
-                                <span class="badge bg-warning bg-opacity-15 text-warning" style="font-size:0.7rem;" title="A receber este mês">
+                                <span style="display:inline-flex;align-items:center;background:#FFB80022;color:#FFB800;border:1px solid #FFB80055;border-radius:999px;padding:1px 7px;font-size:0.68rem;font-weight:600;" title="A receber este mês">
                                     <i class="bi bi-clock me-1"></i>+ R$ <?php echo number_format($receitasPendentes, 2, ',', '.') ?>
                                 </span>
                             <?php endif; ?>
@@ -595,7 +595,7 @@ require_once 'geral/header.php';
                         <div class="mt-2 d-flex align-items-center flex-wrap gap-1">
                             <?php echo badgeVar($despesasMes, $despesasMesAnt, true); ?>
                             <?php if ($despesasPendentes > 0): ?>
-                                <span class="badge bg-warning bg-opacity-15 text-warning" style="font-size:0.7rem;" title="A pagar este mês">
+                                <span style="display:inline-flex;align-items:center;background:#FFB80022;color:#FFB800;border:1px solid #FFB80055;border-radius:999px;padding:1px 7px;font-size:0.68rem;font-weight:600;" title="A pagar este mês">
                                     <i class="bi bi-clock me-1"></i>+ R$ <?php echo number_format($despesasPendentes, 2, ',', '.') ?>
                                 </span>
                             <?php endif; ?>
