@@ -13,6 +13,7 @@ if (!isset($_SESSION['usuario_id'])) {
 
 // 2. Conecta ao banco de dados
 require_once 'config/conexao.php';
+require_once 'config/funcoes.php';
 
 // Função auxiliar para gerar UUID no padrão MySQL
 if (!function_exists('gerarUuid')) {
