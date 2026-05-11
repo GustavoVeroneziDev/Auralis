@@ -178,7 +178,12 @@ require_once 'geral/header.php';
 
                     <ul class="list-unstyled flex-grow-1 mb-4" style="font-size:0.875rem;">
                         <?php foreach ([
-                            ['ok', 'Tudo do plano PRO'],
+                            ['ok', 'Carteiras ilimitadas'],
+                            ['ok', 'Transações ilimitadas'],
+                            ['ok', 'Categorias ilimitadas'],
+                            ['ok', 'Parcelamento em até 48x'],
+                            ['ok', 'Histórico comparativo (12 meses)'],
+                            ['ok', 'Exportação de extrato PDF/Excel'],
                             ['ok', 'Compartilhamento familiar (4 membros)'],
                             ['ok', 'Módulo de cartão de crédito'],
                             ['ok', 'Histórico ilimitado'],
