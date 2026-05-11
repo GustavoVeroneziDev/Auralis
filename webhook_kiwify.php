@@ -1,24 +1,15 @@
 <?php
-/**
- * AURALIS — Webhook Kiwify
- * -------------------------------------------------------
- * URL para cadastrar no painel Kiwify:
- *   https://meuauralis.com/webhook_kiwify.php
- *
- * No painel Kiwify: Produto → Configurações → Webhooks
- * Cole a URL acima e copie o "token" gerado para KIWIFY_TOKEN abaixo.
- */
 
 // ── Configuração ──────────────────────────────────────────────────────────
-define('KIWIFY_TOKEN', 'COLE_SEU_TOKEN_KIWIFY_AQUI');
+define('KIWIFY_TOKEN', '5sm15z80ljq');
 
 // Mapeamento: ID do produto Kiwify → plano no Auralis
 // Substitua pelos IDs reais dos seus produtos depois de criá-los na Kiwify
 define('PRODUTOS', [
-    'ID_PRODUTO_PRO_MENSAL'  => ['plano' => 'pro',  'ciclo' => 'mensal',  'dias' => 32],
-    'ID_PRODUTO_PRO_ANUAL'   => ['plano' => 'pro',  'ciclo' => 'anual',   'dias' => 370],
-    'ID_PRODUTO_VIP_MENSAL'  => ['plano' => 'vip',  'ciclo' => 'mensal',  'dias' => 32],
-    'ID_PRODUTO_VIP_ANUAL'   => ['plano' => 'vip',  'ciclo' => 'anual',   'dias' => 370],
+    '85614e30-4d82-11f1-8f1e-03c7d68b7a1a'  => ['plano' => 'pro',  'ciclo' => 'mensal',  'dias' => 32],
+    'ded60050-4d82-11f1-9355-f981dc8f326a'   => ['plano' => 'pro',  'ciclo' => 'anual',   'dias' => 370],
+    '40ab03c0-4d83-11f1-990a-29bfa0d38fbb'  => ['plano' => 'vip',  'ciclo' => 'mensal',  'dias' => 32],
+    '7e5a07c0-4d83-11f1-8430-c7a3defb5c42'   => ['plano' => 'vip',  'ciclo' => 'anual',   'dias' => 370],
 ]);
 
 // ── Bootstrap ─────────────────────────────────────────────────────────────
