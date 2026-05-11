@@ -138,13 +138,13 @@ require_once 'geral/header.php';
                         </button>
                     <?php else: ?>
                         <div class="d-flex flex-column gap-2">
-                            <a href="https://pay.kiwify.com.br/SEU-LINK-PRO-MENSAL"
+                            <a href="https://pay.kiwify.com.br/0SJpQgL"
                                target="_blank"
                                class="btn w-100 rounded-pill fw-bold preco-mensal"
                                style="background:#7c3aed;color:#fff;border:none;">
                                 Assinar PRO — R$ 14,90/mês
                             </a>
-                            <a href="https://pay.kiwify.com.br/SEU-LINK-PRO-ANUAL"
+                            <a href="https://pay.kiwify.com.br/nah2Uov"
                                target="_blank"
                                class="btn w-100 rounded-pill fw-bold preco-anual d-none"
                                style="background:#7c3aed;color:#fff;border:none;">
@@ -205,13 +205,13 @@ require_once 'geral/header.php';
                         </button>
                     <?php else: ?>
                         <div class="d-flex flex-column gap-2">
-                            <a href="https://pay.kiwify.com.br/SEU-LINK-VIP-MENSAL"
+                            <a href="https://pay.kiwify.com.br/tVgjQF1"
                                target="_blank"
                                class="btn w-100 rounded-pill fw-bold preco-mensal"
                                style="background:linear-gradient(90deg,#AA8C2C,#d4af37);color:#121418;border:none;font-weight:800;">
                                 Assinar VIP — R$ 29,90/mês
                             </a>
-                            <a href="https://pay.kiwify.com.br/SEU-LINK-VIP-ANUAL"
+                            <a href="https://pay.kiwify.com.br/XF8b7bX"
                                target="_blank"
                                class="btn w-100 rounded-pill fw-bold preco-anual d-none"
                                style="background:linear-gradient(90deg,#AA8C2C,#d4af37);color:#121418;border:none;font-weight:800;">
