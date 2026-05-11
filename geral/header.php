@@ -79,11 +79,36 @@ $paginaAtual = basename($_SERVER['PHP_SELF']);
                         <div class="dropdown w-100 text-start text-lg-end">
                             <a href="#" class="d-flex align-items-center justify-content-start justify-content-lg-end text-light text-decoration-none dropdown-toggle custom-link py-2"
                                 id="menuUsuario" data-bs-toggle="dropdown" aria-expanded="false">
-                                <span class="me-2 text-muted navbar-greeting">Olá, <strong class="text-light"><?php echo htmlspecialchars($primeiroNome); ?></strong></span>
+                                <span class="me-2 text-muted navbar-greeting d-flex align-items-center gap-2">
+                                    Olá, <strong class="text-light"><?php echo htmlspecialchars($primeiroNome); ?></strong>
+                                    <?php echo badgePlano(); ?>
+                                </span>
                                 <i style="color: gold !important;" class="bi bi-person-circle fs-4 cardCentral"></i>
                             </a>
 
                             <ul class="dropdown-menu dropdown-menu-lg-end shadow-lg border border-secondary-subtle mt-2 bg-dark w-100 w-lg-auto" aria-labelledby="menuUsuario">
+                                <!-- Info do plano no topo do dropdown -->
+                                <li class="px-3 py-2 border-bottom border-secondary-subtle">
+                                    <div class="d-flex align-items-center justify-content-between gap-3">
+                                        <small class="text-secondary"><?php echo htmlspecialchars($_SESSION['usuario_nome'] ?? ''); ?></small>
+                                        <?php
+                                        $plano = obterPlanoAtual();
+                                        $labelPlano = match($plano) {
+                                            'pro' => 'Auralis PRO',
+                                            'vip' => 'Auralis VIP',
+                                            default => 'Plano Free',
+                                        };
+                                        ?>
+                                        <a href="/planos.php" class="text-decoration-none" style="font-size:0.7rem;">
+                                            <?php echo badgePlano($plano) ?: '<span style="font-size:0.7rem;color:#6b7280;">Free</span>'; ?>
+                                        </a>
+                                    </div>
+                                    <?php if ($plano === 'free'): ?>
+                                        <a href="/planos.php" class="btn btn-sm w-100 mt-2 fw-semibold rounded-pill" style="background:#d4af3718;color:#d4af37;border:1px solid #d4af3744;font-size:0.75rem;">
+                                            <i class="bi bi-stars me-1"></i> Fazer upgrade
+                                        </a>
+                                    <?php endif; ?>
+                                </li>
                                 <li>
                                     <a class="dropdown-item text-light d-flex align-items-center py-3 py-lg-2 transition-hover" href="/configuracoes.php">
                                         <i class="bi bi-gear me-3 me-lg-2" style="color: gold;"></i> Configurações

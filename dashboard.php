@@ -324,6 +324,9 @@ if ($carteira_selecionada) {
 }
 
 
+    // ── Verifica se assinatura ainda está válida (1x por sessão) ────────────
+    verificarExpiracao($pdo);
+
     // ── COMPARAÇÃO: totais do mês ANTERIOR (para badges de variação) ──────────
     $receitasMesAnt = 0.00;
     $despesasMesAnt = 0.00;
