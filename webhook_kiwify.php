@@ -1,15 +1,14 @@
 <?php
-
 // ── Configuração ──────────────────────────────────────────────────────────
 define('KIWIFY_TOKEN', '5sm15z80ljq');
 
-// Mapeamento: ID do produto Kiwify → plano no Auralis
-// Substitua pelos IDs reais dos seus produtos depois de criá-los na Kiwify
+// ATENÇÃO: O ID do PRO Mensal e VIP Mensal estavam iguais. 
+// Coloque o ID correto do VIP Mensal na terceira linha!
 define('PRODUTOS', [
     '85614e30-4d82-11f1-8f1e-03c7d68b7a1a'  => ['plano' => 'pro',  'ciclo' => 'mensal',  'dias' => 32],
-    'ded60050-4d82-11f1-9355-f981dc8f326a'   => ['plano' => 'pro',  'ciclo' => 'anual',   'dias' => 370],
-    '85614e30-4d82-11f1-8f1e-03c7d68b7a1a'  => ['plano' => 'vip',  'ciclo' => 'mensal',  'dias' => 32],
-    '7e5a07c0-4d83-11f1-8430-c7a3defb5c42'   => ['plano' => 'vip',  'ciclo' => 'anual',   'dias' => 370],
+    'ded60050-4d82-11f1-9355-f981dc8f326a'  => ['plano' => 'pro',  'ciclo' => 'anual',   'dias' => 370],
+    '40ab03c0-4d83-11f1-990a-29bfa0d38fbb'  => ['plano' => 'vip',  'ciclo' => 'mensal',  'dias' => 32], 
+    '7e5a07c0-4d83-11f1-8430-c7a3defb5c42'  => ['plano' => 'vip',  'ciclo' => 'anual',   'dias' => 370],
 ]);
 
 // ── Bootstrap ─────────────────────────────────────────────────────────────
@@ -28,24 +27,25 @@ if (!$data) {
     exit('Payload inválido');
 }
 
-// Validação do token Kiwify (vem no header Authorization: Bearer TOKEN)
-$authHeader = $_SERVER['HTTP_AUTHORIZATION'] ?? ($_SERVER['HTTP_X_KIWIFY_TOKEN'] ?? '');
-$token      = str_replace('Bearer ', '', $authHeader);
+// ── 1. Validação de Segurança ─────────────────────────────────────────────
+// Verifica se o Token veio pela URL (?token=...) ou se a assinatura da Kiwify está presente no JSON
+$tokenRecebido = $_GET['token'] ?? '';
+$assinatura    = $data['signature'] ?? '';
 
-if ($token !== KIWIFY_TOKEN) {
-    // Tenta também via query string (alguns gateways preferem assim)
-    if (($_GET['token'] ?? '') !== KIWIFY_TOKEN) {
-        http_response_code(401);
-        exit('Não autorizado');
-    }
+if ($tokenRecebido !== KIWIFY_TOKEN && empty($assinatura)) {
+    http_response_code(401);
+    exit('Não autorizado');
 }
 
-// ── Leitura dos campos da Kiwify ──────────────────────────────────────────
-$evento        = $data['type']                   ?? '';          // order.approved, order.refunded, subscription.cancelled
-$emailComprador = strtolower(trim($data['Customer']['email'] ?? $data['customer']['email'] ?? ''));
-$idProduto     = $data['Product']['id']          ?? $data['product']['id'] ?? '';
-$idAssinaturaGW = $data['subscription_id']       ?? $data['id'] ?? '';
-$valorPago     = (float)($data['amount']         ?? 0) / 100;   // Kiwify envia centavos
+// ── 2. Leitura dos campos da Kiwify (Estrutura Correta) ───────────────────
+// A Kiwify manda as informações vitais dentro do objeto "order"
+$order = $data['order'] ?? [];
+
+$evento         = $order['webhook_event_type'] ?? '';
+$emailComprador = strtolower(trim($order['Customer']['email'] ?? ''));
+$idProduto      = $order['Product']['product_id'] ?? '';
+$idAssinaturaGW = $order['subscription_id'] ?? '';
+$valorPago      = (float)($order['Commissions']['charge_amount'] ?? 0) / 100;
 
 if (empty($emailComprador) || empty($idProduto)) {
     http_response_code(422);
@@ -71,9 +71,8 @@ try {
 }
 
 if (!$usuario) {
-    // Usuário não encontrado — pode não ter se cadastrado ainda
-    // Logamos e saímos (não é erro nosso)
-    _log("USUARIO_NAO_ENCONTRADO: {$emailComprador} comprou {$idProduto}");
+    // Usuário não encontrado no Auralis
+    _log("USUARIO_NAO_ENCONTRADO: {$emailComprador} comprou o produto {$idProduto}");
     http_response_code(200);
     exit('Usuário não encontrado no sistema');
 }
@@ -86,8 +85,8 @@ $pdo->beginTransaction();
 try {
     switch (true) {
 
-        // ── Pagamento aprovado / assinatura nova ─────────────────────────
-        case in_array($evento, ['order.approved', 'subscription.renewed', 'subscription.activated']):
+        // ── Pagamento aprovado / assinatura nova (Nomes corrigidos) ───────
+        case in_array($evento, ['order_approved', 'subscription_renewed', 'subscription_activated']):
             $dataInicio    = new DateTime();
             $dataExpiracao = (new DateTime())->modify("+{$config['dias']} days");
 
@@ -118,16 +117,16 @@ try {
                 ':email'     => $emailComprador,
             ]);
 
-            // Atualiza o plano do usuário (campo desnormalizado para queries rápidas)
+            // Atualiza o plano do usuário
             $pdo->prepare("UPDATE Usuario SET Plano = :plano WHERE IDUsuario = :uid")
                 ->execute([':plano' => $config['plano'], ':uid' => $uid]);
 
-            _log("PLANO_ATIVADO: {$emailComprador} → {$config['plano']} ({$config['ciclo']})");
+            _log("PLANO_ATIVADO: {$emailComprador} -> {$config['plano']} ({$config['ciclo']})");
             break;
 
         // ── Reembolso / cancelamento ──────────────────────────────────────
-        case in_array($evento, ['order.refunded', 'subscription.cancelled', 'subscription.overdue']):
-            $novoStatus = ($evento === 'subscription.overdue') ? 'inadimplente' : 'cancelada';
+        case in_array($evento, ['order_refunded', 'subscription_canceled', 'subscription_overdue']):
+            $novoStatus = ($evento === 'subscription_overdue') ? 'inadimplente' : 'cancelada';
 
             $pdo->prepare("
                 UPDATE Assinatura SET Status = :status
@@ -138,11 +137,11 @@ try {
             $pdo->prepare("UPDATE Usuario SET Plano = 'free' WHERE IDUsuario = :uid")
                 ->execute([':uid' => $uid]);
 
-            _log("PLANO_CANCELADO: {$emailComprador} → free (evento: {$evento})");
+            _log("PLANO_CANCELADO: {$emailComprador} -> free (evento: {$evento})");
             break;
 
         default:
-            // Evento que não nos interessa (ex: order.pending) — ignora
+            _log("EVENTO_IGNORADO: Recebeu evento {$evento} da Kiwify");
             break;
     }
 
