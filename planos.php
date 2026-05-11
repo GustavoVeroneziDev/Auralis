@@ -138,11 +138,11 @@ require_once 'geral/header.php';
                         </button>
                     <?php else: ?>
                         <div class="d-flex flex-column gap-2">
-                            <a href="https://pay.kiwify.com.br/0SJpQgL"
+                            <a href="https://pay.kiwify.com.br/znkZIHv"
                                target="_blank"
                                class="btn w-100 rounded-pill fw-bold preco-mensal"
                                style="background:#7c3aed;color:#fff;border:none;">
-                                Assinar PRO — R$ 14,90/mês
+                                Assinar PRO — R$ 5,90/mês
                             </a>
                             <a href="https://pay.kiwify.com.br/nah2Uov"
                                target="_blank"
