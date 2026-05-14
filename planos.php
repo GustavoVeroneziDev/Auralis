@@ -17,7 +17,6 @@ require_once 'geral/header.php';
 
 <main class="container py-5 mt-2 flex-grow-1" style="padding-inline: var(--space-page-x); max-width: 1100px;">
 
-    <!-- Topo -->
     <div class="text-center mb-5">
         <h1 class="fw-bold text-light mb-2">Escolha seu plano</h1>
         <p class="text-secondary" style="max-width: 520px; margin: 0 auto;">
@@ -30,7 +29,6 @@ require_once 'geral/header.php';
         </div>
         <?php endif; ?>
 
-        <!-- Toggle mensal / anual -->
         <div class="d-flex align-items-center justify-content-center gap-3 mt-4">
             <span class="text-secondary" id="labelMensal" style="font-size:0.9rem;">Mensal</span>
             <div class="form-check form-switch fs-4 mb-0">
@@ -43,10 +41,8 @@ require_once 'geral/header.php';
         </div>
     </div>
 
-    <!-- Cards de planos -->
     <div class="row g-4 justify-content-center">
 
-        <!-- FREE -->
         <div class="col-12 col-md-4">
             <div class="card rounded-4 shadow-sm h-100 border-secondary-subtle" style="background: var(--bg-card);">
                 <div class="card-body p-4 d-flex flex-column">
@@ -91,11 +87,9 @@ require_once 'geral/header.php';
             </div>
         </div>
 
-        <!-- PRO -->
         <div class="col-12 col-md-4">
             <div class="card rounded-4 shadow h-100 position-relative overflow-hidden"
                 style="background: var(--bg-card); border: 1.5px solid #7c3aed88;">
-                <!-- Destaque -->
                 <div class="text-center py-1" style="background:#7c3aed;font-size:0.7rem;font-weight:700;letter-spacing:0.08em;color:#fff;">
                     MAIS POPULAR
                 </div>
@@ -104,11 +98,11 @@ require_once 'geral/header.php';
                         <p class="fw-semibold mb-1 small text-uppercase tracking-wide" style="color:#a78bfa;">PRO</p>
                         <h3 class="fw-bold text-light mb-0">Auralis PRO</h3>
                         <div class="mt-3">
-                            <span class="fw-bold text-light preco-mensal" style="font-size:2rem;">R$ 14,90</span>
-                            <span class="fw-bold text-light preco-anual d-none" style="font-size:2rem;">R$ 9,92</span>
+                            <span class="fw-bold text-light preco-mensal" style="font-size:2rem;">R$ 19,90</span>
+                            <span class="fw-bold text-light preco-anual d-none" style="font-size:2rem;">R$ 14,99</span>
                             <span class="text-secondary">/mês</span>
                         </div>
-                        <p class="text-secondary mt-1 mb-0 preco-anual-info d-none" style="font-size:0.8rem;">R$ 119,00 cobrado anualmente</p>
+                        <p class="text-secondary mt-1 mb-0 preco-anual-info d-none" style="font-size:0.8rem;">R$ 179,90 cobrado anualmente</p>
                         <p class="text-secondary mt-2 mb-0" style="font-size:0.85rem;">Para quem leva as finanças a sério.</p>
                     </div>
 
@@ -138,17 +132,17 @@ require_once 'geral/header.php';
                         </button>
                     <?php else: ?>
                         <div class="d-flex flex-column gap-2">
-                            <a href="https://pay.kiwify.com.br/znkZIHv"
+                            <a href="https://www.mercadopago.com.br/subscriptions/checkout?preapproval_plan_id=9c7869b02a884962a185a44dee6c16f8"
                                target="_blank"
                                class="btn w-100 rounded-pill fw-bold preco-mensal"
                                style="background:#7c3aed;color:#fff;border:none;">
-                                Assinar PRO — R$ 5,90/mês
+                                Assinar PRO — R$ 19,90/mês
                             </a>
-                            <a href="https://pay.kiwify.com.br/nah2Uov"
+                            <a href="https://www.mercadopago.com.br/subscriptions/checkout?preapproval_plan_id=98c6343b478e4efcad77ab56fe6f5948"
                                target="_blank"
                                class="btn w-100 rounded-pill fw-bold preco-anual d-none"
                                style="background:#7c3aed;color:#fff;border:none;">
-                                Assinar PRO — R$ 119,00/ano
+                                Assinar PRO — R$ 179,90/ano
                             </a>
                         </div>
                     <?php endif; ?>
@@ -156,7 +150,6 @@ require_once 'geral/header.php';
             </div>
         </div>
 
-        <!-- VIP -->
         <div class="col-12 col-md-4">
             <div class="card rounded-4 shadow h-100 position-relative overflow-hidden"
                 style="background: var(--bg-card); border: 1.5px solid #d4af3766;">
@@ -169,10 +162,10 @@ require_once 'geral/header.php';
                         <h3 class="fw-bold text-light mb-0">Auralis VIP</h3>
                         <div class="mt-3">
                             <span class="fw-bold text-light preco-mensal" style="font-size:2rem;">R$ 29,90</span>
-                            <span class="fw-bold text-light preco-anual d-none" style="font-size:2rem;">R$ 19,92</span>
+                            <span class="fw-bold text-light preco-anual d-none" style="font-size:2rem;">R$ 19,99</span>
                             <span class="text-secondary">/mês</span>
                         </div>
-                        <p class="text-secondary mt-1 mb-0 preco-anual-info d-none" style="font-size:0.8rem;">R$ 239,00 cobrado anualmente</p>
+                        <p class="text-secondary mt-1 mb-0 preco-anual-info d-none" style="font-size:0.8rem;">R$ 239,90 cobrado anualmente</p>
                         <p class="text-secondary mt-2 mb-0" style="font-size:0.85rem;">Tudo do PRO + gestão familiar completa.</p>
                     </div>
 
@@ -205,17 +198,17 @@ require_once 'geral/header.php';
                         </button>
                     <?php else: ?>
                         <div class="d-flex flex-column gap-2">
-                            <a href="https://pay.kiwify.com.br/tVgjQF1"
+                            <a href="https://www.mercadopago.com.br/subscriptions/checkout?preapproval_plan_id=55856961da8d49d09b4ccded59a56810"
                                target="_blank"
                                class="btn w-100 rounded-pill fw-bold preco-mensal"
                                style="background:linear-gradient(90deg,#AA8C2C,#d4af37);color:#121418;border:none;font-weight:800;">
                                 Assinar VIP — R$ 29,90/mês
                             </a>
-                            <a href="https://pay.kiwify.com.br/XF8b7bX"
+                            <a href="https://www.mercadopago.com.br/subscriptions/checkout?preapproval_plan_id=3ed445df740c439884e8ebc71ddbdb69"
                                target="_blank"
                                class="btn w-100 rounded-pill fw-bold preco-anual d-none"
                                style="background:linear-gradient(90deg,#AA8C2C,#d4af37);color:#121418;border:none;font-weight:800;">
-                                Assinar VIP — R$ 239,00/ano
+                                Assinar VIP — R$ 239,90/ano
                             </a>
                         </div>
                     <?php endif; ?>
@@ -225,7 +218,6 @@ require_once 'geral/header.php';
 
     </div>
 
-    <!-- Garantia -->
     <div class="text-center mt-5 text-secondary" style="font-size:0.85rem;">
         <i class="bi bi-shield-check me-1"></i>
         Pagamento seguro. Cancele quando quiser. Sem fidelidade.
