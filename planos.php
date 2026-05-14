@@ -198,11 +198,11 @@ require_once 'geral/header.php';
                         </button>
                     <?php else: ?>
                         <div class="d-flex flex-column gap-2">
-                            <a href="https://www.mercadopago.com.br/subscriptions/checkout?preapproval_plan_id=55856961da8d49d09b4ccded59a56810"
+                            <a href="https://www.mercadopago.com.br/subscriptions/checkout?preapproval_plan_id=c138ef8757e948f2aafaa4f9ae5d7ea5" 
                                target="_blank"
                                class="btn w-100 rounded-pill fw-bold preco-mensal"
                                style="background:linear-gradient(90deg,#AA8C2C,#d4af37);color:#121418;border:none;font-weight:800;">
-                                Assinar VIP — R$ 29,90/mês
+                                Assinar teste
                             </a>
                             <a href="https://www.mercadopago.com.br/subscriptions/checkout?preapproval_plan_id=3ed445df740c439884e8ebc71ddbdb69"
                                target="_blank"
