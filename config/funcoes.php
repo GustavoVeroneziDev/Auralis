@@ -150,3 +150,27 @@ if (!function_exists('_rebaixarParaFree')) {
         } catch (PDOException $e) {}
     }
 }
+function obterPlanoEfetivo() {
+    global $pdo;
+    $uid = $_SESSION['IDUsuario'] ?? '';
+    if(!$uid) return 'free';
+
+    $stmt = $pdo->prepare("SELECT Plano, DataCriacao FROM Usuario WHERE IDUsuario = ?");
+    $stmt->execute([$uid]);
+    $user = $stmt->fetch();
+
+    if (!$user) return 'free';
+
+    // Cálculo das 50 horas
+    $dataCriacao = new DateTime($user['DataCriacao']);
+    $agora = new DateTime();
+    $diff = $agora->diff($dataCriacao);
+    $horasPassadas = ($diff->days * 24) + $diff->h;
+
+    // Se tiver menos de 50h e for free, dá o "Passe Livre" (VIP)
+    if ($horasPassadas < 50 && $user['Plano'] === 'free') {
+        return 'vip_trial'; // Um status especial para você saber que é teste
+    }
+
+    return $user['Plano'];
+}
