@@ -155,17 +155,17 @@ if (!function_exists('_rebaixarParaFree')) {
     $uid = $_SESSION['usuario_id'] ?? '';
     if(!$uid || !$pdo) return 'free';
 
-    $stmt = $pdo->prepare("SELECT Plano, DataCriacao FROM Usuario WHERE IDUsuario = ?");
+    $stmt = $pdo->prepare("SELECT Plano, MomentoCriacao FROM Usuario WHERE IDUsuario = ?");
     $stmt->execute([$uid]);
     $user = $stmt->fetch();
 
     if (!$user) return 'free';
 
     // Cálculo das 50 horas
-    if (!empty($user['DataCriacao'])) {
-        $dataCriacao = new DateTime($user['DataCriacao']);
+    if (!empty($user['MomentoCriacao'])) {
+        $MomentoCriacao = new DateTime($user['MomentoCriacao']);
         $agora = new DateTime();
-        $diff = $agora->diff($dataCriacao);
+        $diff = $agora->diff($MomentoCriacao);
         $horasPassadas = ($diff->days * 24) + $diff->h;
 
         // Se tiver menos de 50h e for free, dá o "Passe Livre"
@@ -183,14 +183,14 @@ function obterHorasRestantesTeste() {
     $uid = $_SESSION['usuario_id'] ?? '';
     if (!$uid || !$pdo) return 0;
 
-    $stmt = $pdo->prepare("SELECT Plano, DataCriacao FROM Usuario WHERE IDUsuario = ?");
+    $stmt = $pdo->prepare("SELECT Plano, MomentoCriacao FROM Usuario WHERE IDUsuario = ?");
     $stmt->execute([$uid]);
     $user = $stmt->fetch();
 
-    if ($user && $user['Plano'] === 'free' && !empty($user['DataCriacao'])) {
-        $dataCriacao = new DateTime($user['DataCriacao']);
+    if ($user && $user['Plano'] === 'free' && !empty($user['MomentoCriacao'])) {
+        $MomentoCriacao = new DateTime($user['MomentoCriacao']);
         $agora = new DateTime();
-        $diff = $agora->diff($dataCriacao);
+        $diff = $agora->diff($MomentoCriacao);
         
         $horasPassadas = ($diff->days * 24) + $diff->h;
         
