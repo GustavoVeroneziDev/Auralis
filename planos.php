@@ -3,7 +3,7 @@ session_start();
 require_once 'config/conexao.php';
 exigirAcessoMinimo(1);
 
-$planoAtual  = obterPlanoAtual(); // Aqui você pode usar a lógica do Trial se quiser mostrar o badge
+$planoAtual  = obterPlanoAtual();
 $upgrade     = $_GET['upgrade'] ?? '';
 $pageTitle   = "Planos — Auralis";
 $msg_upgrade = match ($upgrade) {
@@ -14,7 +14,6 @@ $msg_upgrade = match ($upgrade) {
 
 require_once 'geral/header.php';
 ?>
-
 <main class="container py-5 mt-2 flex-grow-1" style="padding-inline: var(--space-page-x); max-width: 1100px;">
 
     <div class="text-center mb-5">

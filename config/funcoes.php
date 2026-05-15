@@ -174,3 +174,25 @@ function obterPlanoEfetivo() {
 
     return $user['Plano'];
 }
+function obterHorasRestantesTeste() {
+    global $pdo;
+    $uid = $_SESSION['IDUsuario'] ?? '';
+    if (!$uid) return 0;
+
+    $stmt = $pdo->prepare("SELECT Plano, DataCriacao FROM Usuario WHERE IDUsuario = ?");
+    $stmt->execute([$uid]);
+    $user = $stmt->fetch();
+
+    if ($user && $user['Plano'] === 'free' && !empty($user['DataCriacao'])) {
+        $dataCriacao = new DateTime($user['DataCriacao']);
+        $agora = new DateTime();
+        $diff = $agora->diff($dataCriacao);
+        
+        $horasPassadas = ($diff->days * 24) + $diff->h;
+        
+        if ($horasPassadas < 50) {
+            return 50 - $horasPassadas;
+        }
+    }
+    return 0;
+}
