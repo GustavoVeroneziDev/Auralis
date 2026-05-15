@@ -17,7 +17,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
     try {
         // CORREÇÃO: Adicionado o StatusConta na busca
-        $sql = "SELECT IDUsuario, Nome, Senha, NivelAcesso, StatusConta FROM Usuario WHERE Email = :email LIMIT 1";
+        $sql = "SELECT IDUsuario, Nome, Email, Senha, NivelAcesso, StatusConta, Plano FROM Usuario WHERE Email = :email LIMIT 1";
         $stmt = $pdo->prepare($sql);
         $stmt->execute([':email' => $email]);
         
@@ -41,6 +41,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             $_SESSION['usuario_id']   = $usuario['IDUsuario'];
             $_SESSION['usuario_nome'] = $usuario['Nome'];
             $_SESSION['nivel_acesso'] = $usuario['NivelAcesso'];
+            $_SESSION['plano']        = $usuario['Plano'] ?? 'free';
 
             if ($lembrar_me) {
                 $chave_secreta = "Auralis2026_UltraSecretKey";

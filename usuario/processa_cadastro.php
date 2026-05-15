@@ -52,7 +52,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             ':token'        => $token_ativacao
         ]);
 
-        // Injeção do Kit Inicial de Categorias
         // Injeção do Kit Inicial de Categorias (Starter Pack Premium)
         $kitInicial = [
             // DESPESAS
@@ -92,7 +91,14 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $para = $email;
         $assunto = "Confirme sua conta no Auralis";
         
-        $link_ativacao = "https://meuauralis.com/usuario/ativar_conta.php?token=" . $token_ativacao;
+        // ── INTELIGÊNCIA DE DOMÍNIO (BETA OU MAIN) ──
+        $protocolo = (isset($_SERVER['HTTPS']) && $_SERVER['HTTPS'] === 'on') ? "https://" : "http://";
+        $dominioAtual = $_SERVER['HTTP_HOST'];
+        
+        // Monta os links com base em onde o usuário está acessando no momento
+        $link_ativacao = $protocolo . $dominioAtual . "/usuario/ativar_conta.php?token=" . $token_ativacao;
+        $link_logo     = $protocolo . $dominioAtual . "/geral/img/logoAuralis-SemFundo.png";
+        
         $primeiro_nome = explode(' ', $nome)[0];
         
         // Template HTML do E-mail com a Logo
@@ -116,7 +122,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         <body>
             <div class='container'>
                 <div class='header'>
-                    <img src='https://meuauralis.com/geral/img/logoAuralis-SemFundo.png' alt='Auralis'>
+                    <img src='" . $link_logo . "' alt='Auralis'>
                 </div>
                 <div class='content'>
                     <h2>Olá, " . htmlspecialchars($primeiro_nome) . "!</h2>

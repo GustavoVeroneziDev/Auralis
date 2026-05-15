@@ -13,6 +13,7 @@ if (!isset($_SESSION['usuario_id'])) {
 
 // 2. Conecta ao banco de dados
 require_once 'config/conexao.php';
+require_once 'config/funcoes.php';
 
 // Função auxiliar para gerar UUID no padrão MySQL
 if (!function_exists('gerarUuid')) {
@@ -323,6 +324,9 @@ if ($carteira_selecionada) {
     }
 }
 
+
+    // ── Verifica se assinatura ainda está válida (1x por sessão) ────────────
+    verificarExpiracao($pdo);
 
     // ── COMPARAÇÃO: totais do mês ANTERIOR (para badges de variação) ──────────
     $receitasMesAnt = 0.00;
