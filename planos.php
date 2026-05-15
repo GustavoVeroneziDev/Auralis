@@ -153,7 +153,7 @@ require_once 'geral/header.php';
                                 ['ok', 'Compartilhamento familiar'],
                                 ['ok', 'Metas financeiras'],
                                 ['ok', 'Suporte VIP dedicado'],
-                            ] as [$item]
+                            ] as [$tipo, $item]
                         ): ?>
                             <li class="d-flex align-items-center gap-2 mb-2">
                                 <i class="bi bi-check-circle-fill" style="color:#eab308;"></i>
