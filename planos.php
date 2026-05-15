@@ -44,7 +44,11 @@ require_once 'geral/header.php';
     <div class="row g-4 justify-content-center">
 
         <div class="col-12 col-md-4">
-            <div class="card rounded-4 shadow-sm h-100 border-secondary-subtle" style="background: var(--bg-card);">
+            <div class="card rounded-4 shadow-sm h-100 position-relative overflow-hidden" 
+                 style="background: var(--bg-card); border: 1.5px solid #4b556366;">
+                <div class="text-center py-1" style="background:#4b5563;font-size:0.7rem;font-weight:700;letter-spacing:0.08em;color:#fff;">
+                    PARA CONHECER O SISTEMA
+                </div>
                 <div class="card-body p-4 d-flex flex-column">
                     <div class="mb-4">
                         <p class="text-secondary fw-semibold mb-1 small text-uppercase tracking-wide">Gratuito</p>
@@ -53,30 +57,34 @@ require_once 'geral/header.php';
                             <span class="fw-bold text-light" style="font-size:2rem;">R$ 0</span>
                             <span class="text-secondary">/mês</span>
                         </div>
-                        <p class="text-secondary mt-2 mb-0" style="font-size:0.85rem;">Para quem quer começar a organizar.</p>
+                        <p class="text-secondary mt-2 mb-0" style="font-size:0.85rem;">O essencial para começar a organizar.</p>
                     </div>
 
                     <ul class="list-unstyled flex-grow-1 mb-4" style="font-size:0.875rem;">
                         <?php foreach ([
                             ['ok', '1 carteira'],
                             ['ok', 'Até 35 transações/mês'],
-                            ['ok', 'Categorias (até 10)'],
+                            ['ok', 'Até 10 categorias'],
                             ['ok', 'Parcelamento em até 3x'],
-                            ['ok', 'Dashboard com análises básicas'],
+                            ['ok', 'Dashboard básico'],
                             ['no', 'Histórico comparativo'],
-                            ['no', 'Exportação de extrato'],
-                            ['no', 'Carteiras ilimitadas'],
+                            ['no', 'Exportação PDF/Excel'],
+                            ['no', 'Módulo de Cartão de Crédito'],
+                            ['no', 'Compartilhamento familiar'],
+                            ['no', 'Metas financeiras'],
+                            ['no', 'Relatórios para IR'],
+                            ['no', 'Suporte Prioritário/VIP'],
                         ] as [$tipo, $item]): ?>
                         <li class="d-flex align-items-center gap-2 mb-2">
                             <i class="bi <?php echo $tipo === 'ok' ? 'bi-check-circle-fill text-success' : 'bi-x-circle text-secondary opacity-50' ?>"></i>
-                            <span class="<?php echo $tipo === 'no' ? 'text-secondary opacity-50' : 'text-light' ?>"><?php echo $item ?></span>
+                            <span class="<?php echo $tipo === 'no' ? 'text-secondary opacity-50 text-decoration-line-through' : 'text-light' ?>"><?php echo $item ?></span>
                         </li>
                         <?php endforeach; ?>
                     </ul>
 
                     <?php if ($planoAtual === 'free'): ?>
                         <button class="btn w-100 rounded-pill fw-semibold" style="background:rgba(255,255,255,.06);color:#6b7280;cursor:default;" disabled>
-                            Plano atual
+                            ✓ Plano atual
                         </button>
                     <?php else: ?>
                         <div class="btn w-100 rounded-pill fw-semibold text-secondary" style="background:transparent;border:1px solid rgba(255,255,255,.1);">
@@ -112,16 +120,19 @@ require_once 'geral/header.php';
                             ['ok', 'Transações ilimitadas'],
                             ['ok', 'Categorias ilimitadas'],
                             ['ok', 'Parcelamento em até 48x'],
-                            ['ok', 'Histórico comparativo (12 meses)'],
-                            ['ok', 'Exportação de extrato PDF/Excel'],
-                            ['ok', 'Suporte prioritário'],
+                            ['ok', 'Dashboard completo'],
+                            ['ok', 'Histórico comparativo (12m)'],
+                            ['ok', 'Exportação PDF/Excel'],
+                            ['no', 'Módulo de Cartão de Crédito'],
                             ['no', 'Compartilhamento familiar'],
-                            ['no', 'Módulo de cartão de crédito'],
+                            ['no', 'Metas financeiras'],
+                            ['no', 'Relatórios para IR'],
+                            ['ok', 'Suporte prioritário'],
                         ] as [$tipo, $item]): ?>
                         <li class="d-flex align-items-center gap-2 mb-2">
                             <i class="bi <?php echo $tipo === 'ok' ? 'bi-check-circle-fill' : 'bi-x-circle text-secondary opacity-50' ?>"
                                <?php echo $tipo === 'ok' ? 'style="color:#a78bfa;"' : '' ?>></i>
-                            <span class="<?php echo $tipo === 'no' ? 'text-secondary opacity-50' : 'text-light' ?>"><?php echo $item ?></span>
+                            <span class="<?php echo $tipo === 'no' ? 'text-secondary opacity-50 text-decoration-line-through' : 'text-light' ?>"><?php echo $item ?></span>
                         </li>
                         <?php endforeach; ?>
                     </ul>
@@ -175,14 +186,13 @@ require_once 'geral/header.php';
                             ['ok', 'Transações ilimitadas'],
                             ['ok', 'Categorias ilimitadas'],
                             ['ok', 'Parcelamento em até 48x'],
-                            ['ok', 'Histórico comparativo (12 meses)'],
-                            ['ok', 'Exportação de extrato PDF/Excel'],
-                            ['ok', 'Compartilhamento familiar (4 membros)'],
-                            ['ok', 'Módulo de cartão de crédito'],
+                            ['ok', 'Dashboard completo'],
                             ['ok', 'Histórico ilimitado'],
-                            ['ok', 'Dashboard familiar com balanço'],
+                            ['ok', 'Exportação PDF/Excel'],
+                            ['ok', 'Módulo de Cartão de Crédito'],
+                            ['ok', 'Compartilhamento familiar (4 membros)'],
                             ['ok', 'Metas financeiras'],
-                            ['ok', 'Relatórios para IR (em breve)'],
+                            ['ok', 'Relatórios para IR'],
                             ['ok', 'Suporte VIP dedicado'],
                         ] as [$tipo, $item]): ?>
                         <li class="d-flex align-items-center gap-2 mb-2">
