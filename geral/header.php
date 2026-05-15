@@ -134,7 +134,12 @@ $paginaAtual = basename($_SERVER['PHP_SELF']);
         </div>
     </nav>
     <?php
-    $horasRestantes = obterHorasRestantesTeste();
+    // PROTEÇÃO: Só tenta calcular se a pessoa estiver logada E se a função já tiver carregado
+    $horasRestantes = 0;
+    if (isset($_SESSION['usuario_id']) && function_exists('obterHorasRestantesTeste')) {
+        $horasRestantes = obterHorasRestantesTeste();
+    }
+
     if ($horasRestantes > 0):
     ?>
         <div class="container-fluid px-0">

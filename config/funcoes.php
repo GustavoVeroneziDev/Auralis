@@ -149,11 +149,11 @@ if (!function_exists('_rebaixarParaFree')) {
             unset($_SESSION['expiracao_verificada']);
         } catch (PDOException $e) {}
     }
-}
-function obterPlanoEfetivo() {
+}function obterPlanoEfetivo() {
     global $pdo;
-    $uid = $_SESSION['IDUsuario'] ?? '';
-    if(!$uid) return 'free';
+    // CORREÇÃO: Usando a chave certa da sessão do Auralis
+    $uid = $_SESSION['usuario_id'] ?? '';
+    if(!$uid || !$pdo) return 'free';
 
     $stmt = $pdo->prepare("SELECT Plano, DataCriacao FROM Usuario WHERE IDUsuario = ?");
     $stmt->execute([$uid]);
@@ -162,22 +162,26 @@ function obterPlanoEfetivo() {
     if (!$user) return 'free';
 
     // Cálculo das 50 horas
-    $dataCriacao = new DateTime($user['DataCriacao']);
-    $agora = new DateTime();
-    $diff = $agora->diff($dataCriacao);
-    $horasPassadas = ($diff->days * 24) + $diff->h;
+    if (!empty($user['DataCriacao'])) {
+        $dataCriacao = new DateTime($user['DataCriacao']);
+        $agora = new DateTime();
+        $diff = $agora->diff($dataCriacao);
+        $horasPassadas = ($diff->days * 24) + $diff->h;
 
-    // Se tiver menos de 50h e for free, dá o "Passe Livre" (VIP)
-    if ($horasPassadas < 50 && $user['Plano'] === 'free') {
-        return 'vip_trial'; // Um status especial para você saber que é teste
+        // Se tiver menos de 50h e for free, dá o "Passe Livre"
+        if ($horasPassadas < 50 && $user['Plano'] === 'free') {
+            return 'vip_trial'; 
+        }
     }
 
     return $user['Plano'];
 }
+
 function obterHorasRestantesTeste() {
     global $pdo;
-    $uid = $_SESSION['IDUsuario'] ?? '';
-    if (!$uid) return 0;
+    // CORREÇÃO: Usando a chave certa da sessão do Auralis
+    $uid = $_SESSION['usuario_id'] ?? '';
+    if (!$uid || !$pdo) return 0;
 
     $stmt = $pdo->prepare("SELECT Plano, DataCriacao FROM Usuario WHERE IDUsuario = ?");
     $stmt->execute([$uid]);
