@@ -6,7 +6,7 @@ error_reporting(E_ALL);
 try {
     // ── 1. CREDENCIAIS ────────────────────────────────────────────────────────
     // COLE SEU ACCESS TOKEN DE PRODUÇÃO AQUI EMBAIXO
-    define('MP_ACCESS_TOKEN', 'APP_USR-5281602985004701-051414-88cd6d41efffeb27c856f9cd8b144663-542853802');
+    define('MP_ACCESS_TOKEN', 'APP_USR-3265675594930667-051414-05a766f55f35ec3d0b8749d7f65c0206-3401629357');
 
     define('PRODUTOS', [
         'Auralis PRO - Mensal' => ['plano' => 'pro',  'ciclo' => 'mensal',  'dias' => 32],
@@ -21,27 +21,28 @@ try {
     $raw  = file_get_contents('php://input');
     $data = json_decode($raw, true);
     
-    // O IPN manda por $_GET, o Webhook manda por JSON. Pegamos quem estiver preenchido!
     $type = $_GET['topic'] ?? $_GET['type'] ?? $data['type'] ?? $data['topic'] ?? '';
     $id   = $_GET['id'] ?? $data['data']['id'] ?? $data['id'] ?? '';
 
-    // Ignora o ping de teste do painel do Mercado Pago
-    if ($id === '123456' || $id === '123456789') {
-        _log("TESTE DO PAINEL MP RECEBIDO. Retornando 200 OK.");
-        http_response_code(200); exit('OK');
-    }
-    // ------------------------------------
-
     _log("--- NOVO EVENTO RECEBIDO ---");
-    _log("GET Params (IPN): " . json_encode($_GET));
-    _log("Payload JSON (Webhook): " . $raw);
+    _log("Tipo: {$type} | ID: {$id}");
+
+    // ── PROTEÇÃO CONTRA O TESTE DO PAINEL ─────────────────────────────────────
+    // O MP usa "123456" ou "123456789" no botão "Experimentar". 
+    // Se tentarmos consultar isso na API, vai dar erro 400. Então aprovamos direto o teste.
+    if ($id === '123456' || $id === '123456789') {
+        _log("Sucesso: Ping de teste do painel do Mercado Pago reconhecido e validado.");
+        http_response_code(200); 
+        echo "OK";
+        exit;
+    }
 
     if (empty($id)) {
-        _log("IGNORADO: Nenhum ID recebido. Evento: {$type}");
+        _log("IGNORADO: Nenhum ID recebido.");
         http_response_code(200); exit('OK');
     }
 
-    _log("Passo 1: Consultando MP para o ID: {$id} (Tipo: {$type})");
+    _log("Passo 1: Consultando MP para o ID real: {$id}");
 
     // ── 2. CONSULTA AO MERCADO PAGO ───────────────────────────────────────────
     $url = "";
