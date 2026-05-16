@@ -81,18 +81,19 @@ $paginaAtual = basename($_SERVER['PHP_SELF']);
                                 id="menuUsuario" data-bs-toggle="dropdown" aria-expanded="false">
                                 <span class="me-2 text-muted navbar-greeting d-flex align-items-center gap-2">
                                     Olá, <strong class="text-light"><?php echo htmlspecialchars($primeiroNome); ?></strong>
-                                    <?php echo badgePlano(); ?>
+                                    <?php echo function_exists('badgePlano') ? badgePlano() : ''; ?>
                                 </span>
                                 <i style="color: gold !important;" class="bi bi-person-circle fs-4 cardCentral"></i>
                             </a>
 
                             <ul class="dropdown-menu dropdown-menu-lg-end shadow-lg border border-secondary-subtle mt-2 bg-dark w-100 w-lg-auto" aria-labelledby="menuUsuario">
-                                <!-- Info do plano no topo do dropdown -->
                                 <li class="px-3 py-2 border-bottom border-secondary-subtle">
                                     <div class="d-flex align-items-center justify-content-between gap-3">
                                         <small class="text-secondary"><?php echo htmlspecialchars($_SESSION['usuario_nome'] ?? ''); ?></small>
                                         <?php
-                                        $plano = obterPlanoAtual();
+                                        // PROTEÇÃO 2: Só chama obterPlanoAtual se existir, senão pega direto da sessão
+                                        $plano = function_exists('obterPlanoAtual') ? obterPlanoAtual() : ($_SESSION['plano'] ?? 'free');
+                                        
                                         $labelPlano = match ($plano) {
                                             'pro' => 'Auralis PRO',
                                             'vip' => 'Auralis VIP',
@@ -100,7 +101,7 @@ $paginaAtual = basename($_SERVER['PHP_SELF']);
                                         };
                                         ?>
                                         <a href="/planos.php" class="text-decoration-none" style="font-size:0.7rem;">
-                                            <?php echo badgePlano($plano) ?: '<span style="font-size:0.7rem;color:#6b7280;">Free</span>'; ?>
+                                            <?php echo function_exists('badgePlano') && badgePlano($plano) ? badgePlano($plano) : '<span style="font-size:0.7rem;color:#6b7280;font-weight:bold;text-transform:uppercase;">' . htmlspecialchars($plano) . '</span>'; ?>
                                         </a>
                                     </div>
                                     <?php if ($plano === 'free'): ?>
@@ -129,7 +130,6 @@ $paginaAtual = basename($_SERVER['PHP_SELF']);
                         <a href="/usuario/cadastro.php" class="btn px-4 py-2 rounded-pill fw-bold shadow-sm w-100 w-lg-auto" style="background-color: gold; color: #121418;">Criar Conta</a>
                     <?php endif; ?>
                 </div>
-
             </div>
         </div>
     </nav>
