@@ -25,6 +25,13 @@ try {
     $type = $_GET['topic'] ?? $_GET['type'] ?? $data['type'] ?? $data['topic'] ?? '';
     $id   = $_GET['id'] ?? $data['data']['id'] ?? $data['id'] ?? '';
 
+    // Ignora o ping de teste do painel do Mercado Pago
+    if ($id === '123456' || $id === '123456789') {
+        _log("TESTE DO PAINEL MP RECEBIDO. Retornando 200 OK.");
+        http_response_code(200); exit('OK');
+    }
+    // ------------------------------------
+
     _log("--- NOVO EVENTO RECEBIDO ---");
     _log("GET Params (IPN): " . json_encode($_GET));
     _log("Payload JSON (Webhook): " . $raw);
