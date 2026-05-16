@@ -1,134 +1,125 @@
 <?php
-// ── MODO RAIO-X: LIGADO ──────────────────────────────────────────────────
-ini_set('display_errors', '1');
-error_reporting(E_ALL);
+/**
+ * AURALIS — Webhook Mercado Pago
+ * ─────────────────────────────────────────────────────────────────────────
+ * URL para configurar no painel MP:
+ *   Configurações de notificações → Webhooks
+ *   URL: https://meuauralis.com/webhook_mercadopago.php
+ *   Eventos: Pagamentos, Assinaturas (preapproval)
+ *
+ * IMPORTANTE: Este webhook é uma camada de segurança para renovações.
+ * A ativação inicial já ocorre em sucesso_pagamento.php via consulta ativa.
+ */
+
+ini_set('display_errors', '0');
+error_reporting(0);
 
 try {
-    // ── 1. CREDENCIAIS ────────────────────────────────────────────────────────
-    // COLE SEU ACCESS TOKEN DE PRODUÇÃO AQUI EMBAIXO
-    define('MP_ACCESS_TOKEN', 'APP_USR-3265675594930667-051414-05a766f55f35ec3d0b8749d7f65c0206-3401629357');
+    require_once __DIR__ . '/config/conexao.php';
 
-    define('PRODUTOS', [
-        'Auralis PRO - Mensal' => ['plano' => 'pro',  'ciclo' => 'mensal',  'dias' => 32],
-        'Auralis PRO - Anual'  => ['plano' => 'pro',  'ciclo' => 'anual',   'dias' => 370],
-        'Auralis VIP - Mensal' => ['plano' => 'vip',  'ciclo' => 'mensal',  'dias' => 32],
-        'Auralis VIP - Anual'  => ['plano' => 'vip',  'ciclo' => 'anual',   'dias' => 370],
-    ]);
-
-    require_once 'config/conexao.php';
-
-    // ── LEITURA HÍBRIDA (Aceita tanto IPN quanto Webhook) ─────────────────────
     $raw  = file_get_contents('php://input');
-    $data = json_decode($raw, true);
-    
+    $data = json_decode($raw, true) ?? [];
+
+    // MP envia via query string (IPN) ou JSON body (Webhook)
     $type = $_GET['topic'] ?? $_GET['type'] ?? $data['type'] ?? $data['topic'] ?? '';
-    $id   = $_GET['id'] ?? $data['data']['id'] ?? $data['id'] ?? '';
+    $id   = $_GET['id']    ?? $data['data']['id'] ?? $data['id'] ?? '';
 
-    _log("--- NOVO EVENTO RECEBIDO ---");
-    _log("Tipo: {$type} | ID: {$id}");
+    _mpLog("EVENTO: type=[{$type}] id=[{$id}]");
 
-    // ── PROTEÇÃO CONTRA O TESTE DO PAINEL ─────────────────────────────────────
-    // O MP usa "123456" ou "123456789" no botão "Experimentar". 
-    // Se tentarmos consultar isso na API, vai dar erro 400. Então aprovamos direto o teste.
-    if ($id === '123456' || $id === '123456789') {
-        _log("Sucesso: Ping de teste do painel do Mercado Pago reconhecido e validado.");
-        http_response_code(200); 
-        echo "OK";
-        exit;
+    // Teste do painel MP — retorna 200 sem processar
+    if (in_array($id, ['123456', '123456789']) || empty($id)) {
+        _mpLog("Ping de teste reconhecido.");
+        http_response_code(200); echo 'OK'; exit;
     }
 
-    if (empty($id)) {
-        _log("IGNORADO: Nenhum ID recebido.");
-        http_response_code(200); exit('OK');
-    }
+    // ── Normaliza o tipo ──────────────────────────────────────────────────
+    // MP usa diferentes nomes dependendo da versão da notificação
+    $tiposAssinatura = ['subscription_preapproval', 'preapproval', 'subscription', 'planos e assinaturas'];
+    $tiposPagamento  = ['payment'];
 
-    _log("Passo 1: Consultando MP para o ID real: {$id}");
+    if (in_array($type, $tiposAssinatura)) {
+        // ── EVENTO DE ASSINATURA ──────────────────────────────────────────
+        list($httpCode, $info) = mpConsultarApi("https://api.mercadopago.com/preapproval/{$id}");
 
-    // ── 2. CONSULTA AO MERCADO PAGO ───────────────────────────────────────────
-    $url = "";
-    if ($type === 'payment') {
-        $url = "https://api.mercadopago.com/v1/payments/{$id}";
-    } elseif (in_array($type, ['subscription_preapproval', 'preapproval', 'subscription', 'planos e assinaturas'])) {
-        $url = "https://api.mercadopago.com/preapproval/{$id}";
+        if ($httpCode !== 200 || empty($info)) {
+            _mpLog("ERRO: API retornou {$httpCode} para preapproval/{$id}");
+            http_response_code(200); echo 'OK'; exit;
+        }
+
+        $mpStatus = $info['status']             ?? '';
+        $planId   = $info['preapproval_plan_id'] ?? '';
+        $email    = $info['payer_email']          ?? '';
+
+        _mpLog("Assinatura: status=[{$mpStatus}] plan=[{$planId}] email=[{$email}]");
+
+        if (in_array($mpStatus, ['authorized', 'active'])) {
+            $resultado = mpAtivarPlano($pdo, $email, $planId, $id);
+            _mpLog($resultado ? "ATIVADO: {$email} → {$resultado}" : "FALHOU ativação para {$email}");
+
+        } elseif (in_array($mpStatus, ['cancelled', 'paused', 'pending'])) {
+            // Cancelamento ou inadimplência — rebaixa para free
+            $stmtU = $pdo->prepare("SELECT IDUsuario FROM Usuario WHERE Email = :e LIMIT 1");
+            $stmtU->execute([':e' => strtolower(trim($email))]);
+            $usuario = $stmtU->fetch();
+            if ($usuario) {
+                $novoStatus = $mpStatus === 'paused' ? 'inadimplente' : 'cancelada';
+                $pdo->prepare("UPDATE Assinatura SET Status = :s WHERE FKUsuario = :uid AND Status IN ('ativa','trial')")
+                    ->execute([':s' => $novoStatus, ':uid' => $usuario['IDUsuario']]);
+                _rebaixarParaFree($pdo, $usuario['IDUsuario']);
+                _mpLog("REBAIXADO: {$email} → free (status MP: {$mpStatus})");
+            }
+        }
+
+    } elseif (in_array($type, $tiposPagamento)) {
+        // ── EVENTO DE PAGAMENTO ───────────────────────────────────────────
+        // Para assinaturas, o pagamento está vinculado a uma preapproval
+        list($httpCode, $pagamento) = mpConsultarApi("https://api.mercadopago.com/v1/payments/{$id}");
+
+        if ($httpCode !== 200 || empty($pagamento)) {
+            _mpLog("ERRO: API retornou {$httpCode} para payment/{$id}");
+            http_response_code(200); echo 'OK'; exit;
+        }
+
+        $mpStatus  = $pagamento['status']                ?? '';
+        $email     = $pagamento['payer']['email']         ?? '';
+
+        _mpLog("Pagamento: status=[{$mpStatus}] email=[{$email}]");
+
+        // Só processa se for pagamento aprovado de assinatura
+        if ($mpStatus === 'approved') {
+            // Tenta pegar o preapproval_id do metadado do pagamento
+            $preapprovalId = $pagamento['metadata']['preapproval_id']
+                ?? $pagamento['point_of_interaction']['transaction_data']['subscription_id']
+                ?? '';
+
+            if ($preapprovalId) {
+                list($code2, $assinatura) = mpConsultarApi("https://api.mercadopago.com/preapproval/{$preapprovalId}");
+                if ($code2 === 200 && !empty($assinatura)) {
+                    $planId = $assinatura['preapproval_plan_id'] ?? '';
+                    $valor  = $pagamento['transaction_amount'] ?? 0;
+                    $resultado = mpAtivarPlano($pdo, $email, $planId, $preapprovalId, $valor);
+                    _mpLog($resultado ? "ATIVADO via payment: {$email} → {$resultado}" : "FALHOU via payment para {$email}");
+                }
+            } else {
+                _mpLog("Pagamento aprovado mas sem preapproval_id nos metadados. Email: {$email}");
+            }
+        }
+
     } else {
-        _log("IGNORADO: Evento irrelevante ({$type}).");
-        http_response_code(200); exit('OK');
+        _mpLog("Tipo [{$type}] ignorado (não é assinatura nem pagamento).");
     }
 
-    $ch = curl_init($url);
-    curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
-    curl_setopt($ch, CURLOPT_HTTPHEADER, ["Authorization: Bearer " . MP_ACCESS_TOKEN]);
-    $responseMP = curl_exec($ch);
-    $httpCode = curl_getinfo($ch, CURLINFO_HTTP_CODE);
-    curl_close($ch);
+    http_response_code(200);
+    echo 'OK';
 
-    if ($httpCode !== 200) {
-        _log("ERRO FATAL MP: Falha ao consultar API. Código HTTP: {$httpCode}. Resposta: {$responseMP}");
-        http_response_code(400); exit('ERRO MP');
-    }
-
-    $info = json_decode($responseMP, true);
-    $status = $info['status'] ?? ''; 
-    $emailComprador = strtolower(trim($info['payer']['email'] ?? ''));
-    $idProduto = trim($info['description'] ?? $info['reason'] ?? $info['preapproval_plan_id'] ?? '');
-
-    _log("Passo 2: Dados extraídos -> Status: [{$status}], Email: [{$emailComprador}], Produto: [{$idProduto}]");
-
-    // ── 3. VALIDAÇÕES ─────────────────────────────────────────────────────────
-    if (empty($emailComprador) || empty($idProduto)) {
-        _log("IGNORADO: Faltam dados cruciais (Email ou Produto vazios).");
-        http_response_code(200); exit('OK');
-    }
-
-    if (!array_key_exists($idProduto, PRODUTOS)) {
-        _log("PRODUTO IGNORADO: O produto '{$idProduto}' não é um plano válido no código PHP.");
-        http_response_code(200); exit('OK');
-    }
-
-    $config = PRODUTOS[$idProduto];
-
-    // ── 4. ATUALIZAÇÃO NO BANCO ───────────────────────────────────────────────
-    $stmtUsuario = $pdo->prepare("SELECT IDUsuario, Plano FROM Usuario WHERE Email = :email LIMIT 1");
-    $stmtUsuario->execute([':email' => $emailComprador]);
-    $usuario = $stmtUsuario->fetch();
-
-    if (!$usuario) {
-        _log("ERRO USUARIO: Email '{$emailComprador}' não existe na tabela Usuario.");
-        http_response_code(200); exit('OK');
-    }
-
-    $uid = $usuario['IDUsuario'];
-    $pdo->beginTransaction();
-
-    if (in_array($status, ['approved', 'authorized'])) {
-        $dataInicio = new DateTime();
-        $dataExpiracao = (new DateTime())->modify("+{$config['dias']} days");
-
-        $pdo->prepare("UPDATE Assinatura SET Status = 'cancelada' WHERE FKUsuario = :uid AND Plano = :plano AND Status = 'ativa'")->execute([':uid' => $uid, ':plano' => $config['plano']]);
-
-        $novoId = function_exists('gerarUuid') ? gerarUuid() : bin2hex(random_bytes(16));
-        $pdo->prepare("INSERT INTO Assinatura (IDAssinatura, FKUsuario, Plano, Status, Ciclo, ValorPago, DataInicio, DataExpiracao, IDAssinaturaGW, EmailGateway, FontePagamento) VALUES (:id, :uid, :plano, 'ativa', :ciclo, 0, :inicio, :expiracao, :gwid, :email, 'mercadopago')")->execute([
-            ':id' => $novoId, ':uid' => $uid, ':plano' => $config['plano'], ':ciclo' => $config['ciclo'], ':inicio' => $dataInicio->format('Y-m-d H:i:s'), ':expiracao' => $dataExpiracao->format('Y-m-d H:i:s'), ':gwid' => $id, ':email' => $emailComprador,
-        ]);
-
-        $pdo->prepare("UPDATE Usuario SET Plano = :plano WHERE IDUsuario = :uid")->execute([':plano' => $config['plano'], ':uid' => $uid]);
-
-        _log("SUCESSO FINAL: Plano {$config['plano']} ativado para {$emailComprador}!");
-    } else {
-        _log("STATUS PENDENTE/CANCELADO: Nenhuma ativação feita. Status: {$status}");
-    }
-
-    $pdo->commit();
-    http_response_code(200); echo "Sucesso";
-
-} catch (\Throwable $e) {
-    if (isset($pdo) && $pdo->inTransaction()) { $pdo->rollBack(); }
-    _log("ERRO FATAL PHP: " . $e->getMessage() . " na linha " . $e->getLine());
-    http_response_code(500); echo "Erro";
+} catch (Throwable $e) {
+    if (isset($pdo) && $pdo->inTransaction()) $pdo->rollBack();
+    _mpLog("ERRO FATAL: " . $e->getMessage() . " (linha " . $e->getLine() . ")");
+    http_response_code(500);
+    echo 'Erro';
 }
 
-function _log(string $msg): void {
+function _mpLog($msg) {
     $linha = date('[Y-m-d H:i:s] ') . $msg . PHP_EOL;
     @file_put_contents(__DIR__ . '/logs/webhook_mercadopago.log', $linha, FILE_APPEND | LOCK_EX);
 }
-?>
