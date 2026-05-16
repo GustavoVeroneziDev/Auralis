@@ -40,8 +40,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
             $_SESSION['usuario_id']   = $usuario['IDUsuario'];
             $_SESSION['usuario_nome'] = $usuario['Nome'];
-            $_SESSION['nivel_acesso'] = $usuario['NivelAcesso'];
-            $_SESSION['plano']        = $usuario['Plano'] ?? 'free';
+            $_SESSION['nivel_acesso'] = strtolower($usuario['NivelAcesso']);
+            $_SESSION['plano'] = strtolower($usuario['Plano'] ?? 'free');
 
             if ($lembrar_me) {
                 $chave_secreta = "Auralis2026_UltraSecretKey";

@@ -5,14 +5,15 @@ require_once 'chaves_google.php';
 
 // Função para gerar ID único caso seja um cadastro novo
 if (!function_exists('gerarUuid')) {
-    function gerarUuid() {
+    function gerarUuid()
+    {
         return sprintf('%04x%04x-%04x-%04x-%04x-%04x%04x%04x', mt_rand(0, 0xffff), mt_rand(0, 0xffff), mt_rand(0, 0xffff), mt_rand(0, 0x0fff) | 0x4000, mt_rand(0, 0x3fff) | 0x8000, mt_rand(0, 0xffff), mt_rand(0, 0xffff), mt_rand(0, 0xffff));
     }
 }
 
 // 1. O Google nos devolveu um código de autorização?
 if (isset($_GET['code'])) {
-    
+
     // 2. Trocamos esse código por um "Access Token"
     $tokenUrl = 'https://oauth2.googleapis.com/token';
     $postData = [
@@ -34,7 +35,7 @@ if (isset($_GET['code'])) {
     $tokenData = json_decode($tokenResponse, true);
 
     if (isset($tokenData['access_token'])) {
-        
+
         // 3. Usamos o Access Token para pegar os dados (Nome e E-mail) da pessoa
         $userInfoUrl = 'https://www.googleapis.com/oauth2/v2/userinfo';
         $ch = curl_init();
@@ -51,14 +52,14 @@ if (isset($_GET['code'])) {
             $nome = $googleUser['name'];
 
             // 4. Procura se esse e-mail já existe no Auralis
-            $sql = "SELECT IDUsuario, Nome, NivelAcesso, StatusConta FROM Usuario WHERE Email = :email LIMIT 1";
+            // CORREÇÃO 1: Adicionado o 'Plano' no SELECT
+            $sql = "SELECT IDUsuario, Nome, NivelAcesso, StatusConta, Plano FROM Usuario WHERE Email = :email LIMIT 1";
             $stmt = $pdo->prepare($sql);
             $stmt->execute([':email' => $email]);
             $usuario = $stmt->fetch();
 
             if ($usuario) {
                 // JÁ EXISTE! 
-                // Se a conta estava 'pendente', ativamos agora (pois o Google já validou o e-mail dela)
                 if ($usuario['StatusConta'] === 'pendente') {
                     $pdo->prepare("UPDATE Usuario SET StatusConta = 'ativo', TokenAtivacao = NULL WHERE IDUsuario = :uid")
                         ->execute([':uid' => $usuario['IDUsuario']]);
@@ -68,41 +69,47 @@ if (isset($_GET['code'])) {
                 session_regenerate_id(true);
                 $_SESSION['usuario_id']   = $usuario['IDUsuario'];
                 $_SESSION['usuario_nome'] = $usuario['Nome'];
-                $_SESSION['nivel_acesso'] = $usuario['NivelAcesso'];
-            $_SESSION['plano']        = $usuario['Plano'] ?? 'free';
-                
+                $_SESSION['nivel_acesso'] = strtolower($usuario['NivelAcesso']);
+
+                // CORREÇÃO 2: Forçar minúsculas (strtolower)
+                $_SESSION['plano']        = strtolower($usuario['Plano'] ?? 'free');
+
                 header("Location: ../dashboard.php");
                 exit;
-
             } else {
                 // NÃO EXISTE! VAMOS CADASTRAR NA HORA
                 $id_novo_usuario = gerarUuid();
-                
-                // ARQUITETURA INTELIGENTE: Marcador para Google SSO e Token de 24h
-                $senha_google = 'GOOGLE_SSO'; 
+
+                $senha_google = 'GOOGLE_SSO';
                 $token_recuperacao = bin2hex(random_bytes(32));
                 $expiracao = date('Y-m-d H:i:s', strtotime('+24 hours'));
 
-                // Insere o usuário já como 'ativo' (pois confiamos no Google) com o Token
                 $sqlInsert = "INSERT INTO Usuario (IDUsuario, Nome, Email, Senha, TipoPessoa, NivelAcesso, StatusConta, TokenRecuperacao, TokenRecuperacaoExpiracao) 
                               VALUES (:id, :nome, :email, :senha, 'PF', 'Titular', 'ativo', :token, :expiracao)";
                 $pdo->prepare($sqlInsert)->execute([
-                    ':id' => $id_novo_usuario, 
-                    ':nome' => $nome, 
-                    ':email' => $email, 
+                    ':id' => $id_novo_usuario,
+                    ':nome' => $nome,
+                    ':email' => $email,
                     ':senha' => $senha_google,
                     ':token' => $token_recuperacao,
                     ':expiracao' => $expiracao
                 ]);
 
-                // Injeta as categorias iniciais
+                // Injeta as categorias iniciais (Google SSO) - Adicionei as 13 categorias aqui também para ficar igual ao seu kit oficial!
                 $kitInicial = [
                     ['nome' => 'Alimentação', 'tipo' => 'despesa', 'icone' => 'bi-cart3'],
                     ['nome' => 'Moradia',     'tipo' => 'despesa', 'icone' => 'bi-house-door'],
                     ['nome' => 'Transporte',  'tipo' => 'despesa', 'icone' => 'bi-car-front'],
                     ['nome' => 'Saúde',       'tipo' => 'despesa', 'icone' => 'bi-heart-pulse'],
-                    ['nome' => 'Salário',     'tipo' => 'receita', 'icone' => 'bi-cash-stack'],
-                    ['nome' => 'Outros',      'tipo' => 'receita', 'icone' => 'bi-plus-circle-dotted']
+                    ['nome' => 'Educação',    'tipo' => 'despesa', 'icone' => 'bi-book'],
+                    ['nome' => 'Lazer',       'tipo' => 'despesa', 'icone' => 'bi-controller'],
+                    ['nome' => 'Assinaturas', 'tipo' => 'despesa', 'icone' => 'bi-play-btn'],
+                    ['nome' => 'Vestuário',   'tipo' => 'despesa', 'icone' => 'bi-bag'],
+                    ['nome' => 'Salário',         'tipo' => 'receita', 'icone' => 'bi-cash-stack'],
+                    ['nome' => 'Rendimentos',     'tipo' => 'receita', 'icone' => 'bi-graph-up-arrow'],
+                    ['nome' => 'Serviços/Free',   'tipo' => 'receita', 'icone' => 'bi-laptop'],
+                    ['nome' => 'Ajuste de Saldo', 'tipo' => 'receita', 'icone' => 'bi-gear'],
+                    ['nome' => 'Outros',          'tipo' => 'receita', 'icone' => 'bi-plus-circle-dotted']
                 ];
 
                 $sqlCat = "INSERT INTO Categoria (IDCategoria, NomeCategoria, TipoCategoria, IconeCategoria, FKUsuario) VALUES (:id_cat, :nome, :tipo, :icone, :uid)";
@@ -111,9 +118,7 @@ if (isset($_GET['code'])) {
                     $stmtCat->execute([':id_cat' => gerarUuid(), ':nome' => $cat['nome'], ':tipo' => $cat['tipo'], ':icone' => $cat['icone'], ':uid' => $id_novo_usuario]);
                 }
 
-                // ==============================================================================
-                // DISPARO DO E-MAIL DE BOAS-VINDAS (HTML) COM OPÇÃO DE SENHA
-                // ==============================================================================
+                // E-mail de Boas Vindas
                 $link_criar_senha = "https://meuauralis.com/usuario/redefinir_senha.php?token=" . $token_recuperacao;
                 $primeiro_nome = explode(' ', $nome)[0];
 
@@ -170,8 +175,11 @@ if (isset($_GET['code'])) {
                 session_regenerate_id(true);
                 $_SESSION['usuario_id']   = $id_novo_usuario;
                 $_SESSION['usuario_nome'] = $nome;
-                $_SESSION['nivel_acesso'] = 'Titular';
-                
+                $_SESSION['nivel_acesso'] = 'titular';
+
+                // CORREÇÃO 3: Define a sessão de plano para utilizadores novos pelo Google
+                $_SESSION['plano']        = 'free';
+
                 header("Location: ../dashboard.php");
                 exit;
             }
@@ -182,4 +190,3 @@ if (isset($_GET['code'])) {
 // Se algo der errado na comunicação com o Google
 header("Location: login.php?erro=google");
 exit;
-?>

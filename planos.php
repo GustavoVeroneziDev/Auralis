@@ -6,17 +6,20 @@ exigirAcessoMinimo(1);
 $planoAtual  = obterPlanoAtual();
 $upgrade     = $_GET['upgrade'] ?? '';
 $pageTitle   = "Planos — Auralis";
-$msg_upgrade = match($upgrade) {
-    'pro'  => 'Este recurso é exclusivo do <strong>Auralis PRO</strong>. Faça upgrade para desbloquear.',
-    'vip'  => 'Este recurso é exclusivo do <strong>Auralis VIP</strong>. Faça upgrade para desbloquear.',
-    default => '',
-};
+if ($upgrade === 'pro') {
+    $msg_upgrade = 'Este recurso é exclusivo do <strong>Auralis PRO</strong>. Faça upgrade para desbloquear.';
+} elseif ($upgrade === 'vip') {
+    $msg_upgrade = 'Este recurso é exclusivo do <strong>Auralis VIP</strong>. Faça upgrade para desbloquear.';
+} else {
+    $msg_upgrade = '';
+}
 
 require_once 'geral/header.php';
 ?>
 
 <main class="container py-5 mt-2 flex-grow-1" style="padding-inline: var(--space-page-x); max-width: 1100px;">
 
+    <!-- Topo -->
     <div class="text-center mb-5">
         <h1 class="fw-bold text-light mb-2">Escolha seu plano</h1>
         <p class="text-secondary" style="max-width: 520px; margin: 0 auto;">
@@ -29,6 +32,7 @@ require_once 'geral/header.php';
         </div>
         <?php endif; ?>
 
+        <!-- Toggle mensal / anual -->
         <div class="d-flex align-items-center justify-content-center gap-3 mt-4">
             <span class="text-secondary" id="labelMensal" style="font-size:0.9rem;">Mensal</span>
             <div class="form-check form-switch fs-4 mb-0">
@@ -41,8 +45,10 @@ require_once 'geral/header.php';
         </div>
     </div>
 
+    <!-- Cards de planos -->
     <div class="row g-4 justify-content-center">
 
+        <!-- FREE -->
         <div class="col-12 col-md-4">
             <div class="card rounded-4 shadow-sm h-100 border-secondary-subtle" style="background: var(--bg-card);">
                 <div class="card-body p-4 d-flex flex-column">
@@ -87,9 +93,11 @@ require_once 'geral/header.php';
             </div>
         </div>
 
+        <!-- PRO -->
         <div class="col-12 col-md-4">
             <div class="card rounded-4 shadow h-100 position-relative overflow-hidden"
                 style="background: var(--bg-card); border: 1.5px solid #7c3aed88;">
+                <!-- Destaque -->
                 <div class="text-center py-1" style="background:#7c3aed;font-size:0.7rem;font-weight:700;letter-spacing:0.08em;color:#fff;">
                     MAIS POPULAR
                 </div>
@@ -98,11 +106,11 @@ require_once 'geral/header.php';
                         <p class="fw-semibold mb-1 small text-uppercase tracking-wide" style="color:#a78bfa;">PRO</p>
                         <h3 class="fw-bold text-light mb-0">Auralis PRO</h3>
                         <div class="mt-3">
-                            <span class="fw-bold text-light preco-mensal" style="font-size:2rem;">R$ 19,90</span>
-                            <span class="fw-bold text-light preco-anual d-none" style="font-size:2rem;">R$ 14,99</span>
+                            <span class="fw-bold text-light preco-mensal" style="font-size:2rem;">R$ 14,90</span>
+                            <span class="fw-bold text-light preco-anual d-none" style="font-size:2rem;">R$ 9,92</span>
                             <span class="text-secondary">/mês</span>
                         </div>
-                        <p class="text-secondary mt-1 mb-0 preco-anual-info d-none" style="font-size:0.8rem;">R$ 179,90 cobrado anualmente</p>
+                        <p class="text-secondary mt-1 mb-0 preco-anual-info d-none" style="font-size:0.8rem;">R$ 119,00 cobrado anualmente</p>
                         <p class="text-secondary mt-2 mb-0" style="font-size:0.85rem;">Para quem leva as finanças a sério.</p>
                     </div>
 
@@ -150,6 +158,7 @@ require_once 'geral/header.php';
             </div>
         </div>
 
+        <!-- VIP -->
         <div class="col-12 col-md-4">
             <div class="card rounded-4 shadow h-100 position-relative overflow-hidden"
                 style="background: var(--bg-card); border: 1.5px solid #d4af3766;">
@@ -162,21 +171,16 @@ require_once 'geral/header.php';
                         <h3 class="fw-bold text-light mb-0">Auralis VIP</h3>
                         <div class="mt-3">
                             <span class="fw-bold text-light preco-mensal" style="font-size:2rem;">R$ 29,90</span>
-                            <span class="fw-bold text-light preco-anual d-none" style="font-size:2rem;">R$ 19,99</span>
+                            <span class="fw-bold text-light preco-anual d-none" style="font-size:2rem;">R$ 19,92</span>
                             <span class="text-secondary">/mês</span>
                         </div>
-                        <p class="text-secondary mt-1 mb-0 preco-anual-info d-none" style="font-size:0.8rem;">R$ 239,90 cobrado anualmente</p>
+                        <p class="text-secondary mt-1 mb-0 preco-anual-info d-none" style="font-size:0.8rem;">R$ 239,00 cobrado anualmente</p>
                         <p class="text-secondary mt-2 mb-0" style="font-size:0.85rem;">Tudo do PRO + gestão familiar completa.</p>
                     </div>
 
                     <ul class="list-unstyled flex-grow-1 mb-4" style="font-size:0.875rem;">
                         <?php foreach ([
-                            ['ok', 'Carteiras ilimitadas'],
-                            ['ok', 'Transações ilimitadas'],
-                            ['ok', 'Categorias ilimitadas'],
-                            ['ok', 'Parcelamento em até 48x'],
-                            ['ok', 'Histórico comparativo (12 meses)'],
-                            ['ok', 'Exportação de extrato PDF/Excel'],
+                            ['ok', 'Tudo do plano PRO'],
                             ['ok', 'Compartilhamento familiar (4 membros)'],
                             ['ok', 'Módulo de cartão de crédito'],
                             ['ok', 'Histórico ilimitado'],
@@ -218,6 +222,7 @@ require_once 'geral/header.php';
 
     </div>
 
+    <!-- Garantia -->
     <div class="text-center mt-5 text-secondary" style="font-size:0.85rem;">
         <i class="bi bi-shield-check me-1"></i>
         Pagamento seguro. Cancele quando quiser. Sem fidelidade.
