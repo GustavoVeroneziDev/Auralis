@@ -27,7 +27,7 @@ $paginaAtual = basename($_SERVER['PHP_SELF']);
 
         <div class="container-fluid px-3 px-xl-5" style="max-width: 1500px;">
 
-            <a class="navbar-brand fw-bold fs-3 d-flex align-items-center" href="/geral/index.php" style="letter-spacing: -0.05em;">
+            <a class="navbar-brand fw-bold fs-3 d-flex align-items-center" href="<?php echo isset($_SESSION['usuario_id']) ? '/dashboard.php' : '/geral/index.php'; ?>" style="letter-spacing: -0.05em;">
                 <img src="/geral/img/logoAuralis-SemFundo.png" alt="Logo Auralis" class="me-2" style="height: 38px; width: auto; object-fit: contain;">
                 <span style="color: gold !important;">Aura</span><span class="text-light">lis</span>
             </a>
@@ -62,6 +62,11 @@ $paginaAtual = basename($_SERVER['PHP_SELF']);
                                 <i class="bi bi-wallet me-2"></i> Carteiras
                             </a>
                         </li>
+                        <li class="nav-item">
+                            <a class="nav-link custom-link py-3 py-lg-2 <?php echo ($paginaAtual == 'planos.php') ? 'text-warning active' : ''; ?>" href="/planos.php">
+                                <i class="bi bi-star me-2"></i> Planos
+                            </a>
+                        </li>
                     <?php else: ?>
                         <li class="nav-item">
                             <a class="nav-link custom-link py-3 py-lg-2" href="/geral/index.php">Início</a>
@@ -91,14 +96,7 @@ $paginaAtual = basename($_SERVER['PHP_SELF']);
                                     <div class="d-flex align-items-center justify-content-between gap-3">
                                         <small class="text-secondary"><?php echo htmlspecialchars($_SESSION['usuario_nome'] ?? ''); ?></small>
                                         <?php
-                                        // PROTEÇÃO 2: Só chama obterPlanoAtual se existir, senão pega direto da sessão
                                         $plano = function_exists('obterPlanoAtual') ? obterPlanoAtual() : ($_SESSION['plano'] ?? 'free');
-                                        
-                                        $labelPlano = match ($plano) {
-                                            'pro' => 'Auralis PRO',
-                                            'vip' => 'Auralis VIP',
-                                            default => 'Plano Free',
-                                        };
                                         ?>
                                         <a href="/planos.php" class="text-decoration-none" style="font-size:0.7rem;">
                                             <?php echo function_exists('badgePlano') && badgePlano($plano) ? badgePlano($plano) : '<span style="font-size:0.7rem;color:#6b7280;font-weight:bold;text-transform:uppercase;">' . htmlspecialchars($plano) . '</span>'; ?>
