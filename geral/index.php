@@ -1,3 +1,12 @@
+
+<?php
+session_start();
+// Se estiver logado, redireciona direto para o Dashboard!
+if (isset($_SESSION['usuario_id'])) {
+    header("Location: ../dashboard.php");
+    exit;
+}
+?>
 <?php require_once 'header.php'; ?>
 
 <main class="container py-5 mt-4">
