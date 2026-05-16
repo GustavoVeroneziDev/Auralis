@@ -6,7 +6,7 @@ error_reporting(E_ALL);
 try {
     // ── 1. CREDENCIAIS ────────────────────────────────────────────────────────
     // COLE SEU ACCESS TOKEN DE PRODUÇÃO AQUI EMBAIXO
-    define('MP_ACCESS_TOKEN', 'APP_USR-3265675594930667-051414-05a766f55f35ec3d0b8749d7f65c0206-3401629357');
+    define('MP_ACCESS_TOKEN', 'APP_USR-5281602985004701-051414-88cd6d41efffeb27c856f9cd8b144663-542853802');
 
     define('PRODUTOS', [
         'Auralis PRO - Mensal' => ['plano' => 'pro',  'ciclo' => 'mensal',  'dias' => 32],
@@ -17,21 +17,20 @@ try {
 
     require_once 'config/conexao.php';
 
+    // ── LEITURA HÍBRIDA (Aceita tanto IPN quanto Webhook) ─────────────────────
     $raw  = file_get_contents('php://input');
-    _log("--- NOVO EVENTO RECEBIDO ---");
-    _log("Payload: " . $raw);
-
     $data = json_decode($raw, true);
-    if (!$data) {
-        _log("ERRO: Payload JSON inválido ou vazio.");
-        http_response_code(400); exit('ERRO');
-    }
+    
+    // O IPN manda por $_GET, o Webhook manda por JSON. Pegamos quem estiver preenchido!
+    $type = $_GET['topic'] ?? $_GET['type'] ?? $data['type'] ?? $data['topic'] ?? '';
+    $id   = $_GET['id'] ?? $data['data']['id'] ?? $data['id'] ?? '';
 
-    $type = $data['type'] ?? $data['topic'] ?? '';
-    $id = $data['data']['id'] ?? '';
+    _log("--- NOVO EVENTO RECEBIDO ---");
+    _log("GET Params (IPN): " . json_encode($_GET));
+    _log("Payload JSON (Webhook): " . $raw);
 
     if (empty($id)) {
-        _log("IGNORADO: Nenhum ID recebido. Evento: " . $type);
+        _log("IGNORADO: Nenhum ID recebido. Evento: {$type}");
         http_response_code(200); exit('OK');
     }
 
@@ -41,7 +40,7 @@ try {
     $url = "";
     if ($type === 'payment') {
         $url = "https://api.mercadopago.com/v1/payments/{$id}";
-    } elseif (in_array($type, ['subscription_preapproval', 'preapproval', 'subscription'])) {
+    } elseif (in_array($type, ['subscription_preapproval', 'preapproval', 'subscription', 'planos e assinaturas'])) {
         $url = "https://api.mercadopago.com/preapproval/{$id}";
     } else {
         _log("IGNORADO: Evento irrelevante ({$type}).");
