@@ -52,6 +52,7 @@ require_once 'geral/header.php';
                             <span class="fw-bold text-light" style="font-size:2rem;">R$ 0</span>
                             <span class="text-secondary">/mês</span>
                         </div>
+                        <p class="text-secondary mt-2 mb-0" style="font-size:0.85rem;">O essencial para começar a organizar.</p>
                     </div>
 
                     <ul class="list-unstyled flex-grow-1 mb-4" style="font-size:0.875rem;">
@@ -94,6 +95,7 @@ require_once 'geral/header.php';
                             <span class="fw-bold text-light preco-anual d-none" style="font-size:2rem;">R$ 14,99</span>
                             <span class="text-secondary">/mês</span>
                         </div>
+                        <p class="text-secondary mt-1 mb-0 preco-anual-info d-none" style="font-size:0.8rem;">R$ 179,90 cobrado anualmente</p>
                     </div>
 
                     <ul class="list-unstyled flex-grow-1 mb-4" style="font-size:0.875rem;">
@@ -119,7 +121,20 @@ require_once 'geral/header.php';
                             </li>
                         <?php endforeach; ?>
                     </ul>
-                    <a href="URL_MERCADO_PAGO" class="btn w-100 rounded-pill fw-bold" style="background:#7c3aed;color:#fff;border:none;">Assinar PRO</a>
+                    <div class="d-flex flex-column gap-2">
+                        <a href="https://www.mercadopago.com.br/subscriptions/checkout?preapproval_plan_id=9c7869b02a884962a185a44dee6c16f8"
+                            target="_blank"
+                            class="btn w-100 rounded-pill fw-bold preco-mensal"
+                            style="background:#7c3aed;color:#fff;border:none;">
+                            Assinar PRO
+                        </a>
+                        <a href="https://www.mercadopago.com.br/subscriptions/checkout?preapproval_plan_id=98c6343b478e4efcad77ab56fe6f5948"
+                            target="_blank"
+                            class="btn w-100 rounded-pill fw-bold preco-anual d-none"
+                            style="background:#7c3aed;color:#fff;border:none;">
+                            Assinar PRO
+                        </a>
+                    </div>
                 </div>
             </div>
         </div>
@@ -136,6 +151,7 @@ require_once 'geral/header.php';
                             <span class="fw-bold text-light preco-anual d-none" style="font-size:2rem;">R$ 19,99</span>
                             <span class="text-secondary">/mês</span>
                         </div>
+                        <p class="text-secondary mt-1 mb-0 preco-anual-info d-none" style="font-size:0.8rem;">R$ 239,90 cobrado anualmente</p>
                     </div>
 
                     <ul class="list-unstyled flex-grow-1 mb-4" style="font-size:0.875rem;">
@@ -161,7 +177,20 @@ require_once 'geral/header.php';
                             </li>
                         <?php endforeach; ?>
                     </ul>
-                    <a href="URL_MERCADO_PAGO" class="btn w-100 rounded-pill fw-bold" style="background:linear-gradient(90deg, #ca8a04, #eab308);color:#fff;border:none;">Assinar VIP</a>
+                    <div class="d-flex flex-column gap-2">
+                        <a href="https://www.mercadopago.com.br/subscriptions/checkout?preapproval_plan_id=55856961da8d49d09b4ccded59a56810"
+                            target="_blank"
+                            class="btn w-100 rounded-pill fw-bold preco-mensal"
+                            style="background:linear-gradient(90deg, #ca8a04, #eab308);color:#fff;border:none;">
+                            Assinar VIP
+                        </a>
+                        <a href="https://www.mercadopago.com.br/subscriptions/checkout?preapproval_plan_id=3ed445df740c439884e8ebc71ddbdb69"
+                            target="_blank"
+                            class="btn w-100 rounded-pill fw-bold preco-anual d-none"
+                            style="background:linear-gradient(90deg, #ca8a04, #eab308);color:#fff;border:none;">
+                            Assinar VIP
+                        </a>
+                    </div>
                 </div>
             </div>
         </div>
@@ -173,10 +202,12 @@ require_once 'geral/header.php';
     const toggle = document.getElementById('toggleAnual');
     const mensal = document.querySelectorAll('.preco-mensal');
     const anual = document.querySelectorAll('.preco-anual');
+    const anualInfo = document.querySelectorAll('.preco-anual-info');
 
     toggle.addEventListener('change', function() {
         mensal.forEach(el => el.classList.toggle('d-none', this.checked));
         anual.forEach(el => el.classList.toggle('d-none', !this.checked));
+        anualInfo.forEach(el => el.classList.toggle('d-none', !this.checked));
     });
 </script>
 
