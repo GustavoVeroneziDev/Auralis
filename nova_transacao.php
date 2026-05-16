@@ -77,8 +77,18 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
     // ── LIMPEZA DA MÁSCARA ──────────────────────────────────────────
     $valorPost  = trim($_POST['valor'] ?? '');
-    $valorLimpo = str_replace(['R$', ' ', '.'], '', $valorPost); // Remove R$, espaços e pontos de milhar
-    $valorRaw   = str_replace(',', '.', $valorLimpo);            // Troca a vírgula dos centavos por ponto (Ex: 1500.50)
+    
+    // 1. Remove letras, "R$", espaços normais e espaços invisíveis!
+    // Sobram apenas números, pontos e vírgulas (Ex: 1.500,50)
+    $valorLimpo = preg_replace('/[^\d.,]/', '', $valorPost);
+    
+    // 2. Converte para o padrão americano de Banco de Dados (1500.50)
+    if (strpos($valorLimpo, ',') !== false) {
+        $valorLimpo = str_replace('.', '', $valorLimpo); // Remove pontos de milhar
+        $valorRaw   = str_replace(',', '.', $valorLimpo); // Troca vírgula por ponto
+    } else {
+        $valorRaw   = $valorLimpo; // Já está no formato certo ou é número inteiro
+    }
     // ────────────────────────────────────────────────────────────────
 
     $descricao      = trim($_POST['descricao'] ?? '');
