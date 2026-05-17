@@ -132,12 +132,18 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 ";
                 $stmt = $pdo->prepare($sql);
                 $stmt->execute([
-                    ':tipo'      => $tipoRegistro,      ':valor'     => $valor,
-                    ':descricao' => $descricao,         ':momento'   => $dataRegistro,
-                    ':vencimento'=> $dataVencimento,    ':status'    => $statusRegistro,
-                    ':recorrente'=> $recorrente,        ':dia'       => $diaVencimento,
-                    ':carteira'  => $carteiraId,        ':categoria' => $categoriaId,
-                    ':id_editar' => $_POST['id_editar'],':usuario'   => $usuario_id,
+                    ':tipo'      => $tipoRegistro,
+                    ':valor'     => $valor,
+                    ':descricao' => $descricao,
+                    ':momento'   => $dataRegistro,
+                    ':vencimento' => $dataVencimento,
+                    ':status'    => $statusRegistro,
+                    ':recorrente' => $recorrente,
+                    ':dia'       => $diaVencimento,
+                    ':carteira'  => $carteiraId,
+                    ':categoria' => $categoriaId,
+                    ':id_editar' => $_POST['id_editar'],
+                    ':usuario'   => $usuario_id,
                 ]);
 
                 // ── PROPAGAÇÃO DE EDIÇÃO (FUTUROS) ───────────────────────────
@@ -158,19 +164,22 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                     ";
                     $stmtF = $pdo->prepare($sqlFuturos);
                     $stmtF->execute([
-                        ':valor'     => $valor,         ':descricao' => $descricao,
-                        ':carteira'  => $carteiraId,    ':categoria' => $categoriaId,
-                        ':grupo'     => $grupoAtual,    ':usuario'   => $usuario_id,
+                        ':valor'     => $valor,
+                        ':descricao' => $descricao,
+                        ':carteira'  => $carteiraId,
+                        ':categoria' => $categoriaId,
+                        ':grupo'     => $grupoAtual,
+                        ':usuario'   => $usuario_id,
+                        ':id_editar' => $_POST['id_editar'], // Correção: Variável adicionada
                         ':data_base' => $dataAtual
                     ]);
                 }
                 header("Location: dashboard.php?sucesso=editado");
-
             } elseif ($parcelado && $numParcelas >= 2) {
                 // ── CRIAÇÃO PARCELADA (Restaurada e Blindada) ────────────────
                 $grupoParcela = gerarUuid();
                 $dataBase     = new DateTime($dataRegistro);
-                
+
                 $valorParcela = floor(($valor / $numParcelas) * 100) / 100;
                 $resto        = $valor - ($valorParcela * $numParcelas);
 
@@ -200,17 +209,22 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                     $statusP  = ($i === 0) ? $statusRegistro : 'pendente';
 
                     $stmtP->execute([
-                        ':id'         => gerarUuid(),       ':tipo'      => $tipoRegistro,
-                        ':valor'      => $valAtual,         ':descricao' => $descricao,
-                        ':momento'    => $dataStr,          ':vencimento'=> $dataStr,
-                        ':status'     => $statusP,          ':carteira'  => $carteiraId,
-                        ':usuario'    => $usuario_id,       ':categoria' => $categoriaId,
-                        ':grupo'      => $grupoParcela,     ':parc_atual'=> ($i + 1),
+                        ':id'         => gerarUuid(),
+                        ':tipo'      => $tipoRegistro,
+                        ':valor'      => $valAtual,
+                        ':descricao' => $descricao,
+                        ':momento'    => $dataStr,
+                        ':vencimento' => $dataStr,
+                        ':status'     => $statusP,
+                        ':carteira'  => $carteiraId,
+                        ':usuario'    => $usuario_id,
+                        ':categoria' => $categoriaId,
+                        ':grupo'      => $grupoParcela,
+                        ':parc_atual' => ($i + 1),
                         ':tot_parc'   => $numParcelas
                     ]);
                 }
                 header("Location: dashboard.php?sucesso=parcelado&parcelas={$numParcelas}");
-
             } elseif ($recorrente) {
                 // ── CRIAÇÃO RECORRENTE (Fix NULL e Pulo de Mês) ──────────────
                 $grupoRecorrencia = gerarUuid();
@@ -235,23 +249,28 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                     $mesAlvo = (int)$dataBase->format('m') + $i;
                     $anoAlvo = (int)$dataBase->format('Y') + floor(($mesAlvo - 1) / 12);
                     $mesAlvo = (($mesAlvo - 1) % 12) + 1;
-                    
+
                     $diaCorreto = min($diaVencimento, date('t', strtotime(sprintf('%04d-%02d-01', $anoAlvo, $mesAlvo))));
                     $dataStr = sprintf('%04d-%02d-%02d', $anoAlvo, $mesAlvo, $diaCorreto);
 
                     $statusRec = ($i === 0) ? $statusRegistro : 'pendente';
 
                     $stmtR->execute([
-                        ':id'         => gerarUuid(),       ':tipo'      => $tipoRegistro,
-                        ':valor'      => $valor,            ':descricao' => $descricao,
-                        ':momento'    => $dataStr,          ':vencimento'=> $dataStr,
-                        ':status'     => $statusRec,        ':dia'       => $diaCorreto,
-                        ':carteira'   => $carteiraId,       ':usuario'   => $usuario_id,
-                        ':categoria'  => $categoriaId,      ':grupo'     => $grupoRecorrencia
+                        ':id'         => gerarUuid(),
+                        ':tipo'      => $tipoRegistro,
+                        ':valor'      => $valor,
+                        ':descricao' => $descricao,
+                        ':momento'    => $dataStr,
+                        ':vencimento' => $dataStr,
+                        ':status'     => $statusRec,
+                        ':dia'       => $diaCorreto,
+                        ':carteira'   => $carteiraId,
+                        ':usuario'   => $usuario_id,
+                        ':categoria'  => $categoriaId,
+                        ':grupo'     => $grupoRecorrencia
                     ]);
                 }
                 header("Location: dashboard.php?sucesso=recorrente");
-
             } else {
                 // ── CRIAÇÃO SIMPLES (Transação Única) ────────────────────────
                 $sql = "
@@ -265,12 +284,18 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 ";
                 $stmt = $pdo->prepare($sql);
                 $stmt->execute([
-                    ':id'         => gerarUuid(),       ':tipo'      => $tipoRegistro,
-                    ':valor'      => $valor,            ':descricao' => $descricao,
-                    ':momento'    => $dataRegistro,     ':vencimento'=> $dataVencimento,
-                    ':status'     => $statusRegistro,   ':recorrente'=> $recorrente ? 1 : 0,
-                    ':dia'        => $diaVencimento,    ':carteira'  => $carteiraId,
-                    ':usuario'    => $usuario_id,       ':categoria' => $categoriaId,
+                    ':id'         => gerarUuid(),
+                    ':tipo'      => $tipoRegistro,
+                    ':valor'      => $valor,
+                    ':descricao' => $descricao,
+                    ':momento'    => $dataRegistro,
+                    ':vencimento' => $dataVencimento,
+                    ':status'     => $statusRegistro,
+                    ':recorrente' => $recorrente ? 1 : 0,
+                    ':dia'        => $diaVencimento,
+                    ':carteira'  => $carteiraId,
+                    ':usuario'    => $usuario_id,
+                    ':categoria' => $categoriaId,
                 ]);
                 header("Location: dashboard.php?sucesso=registro");
             }
