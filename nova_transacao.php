@@ -11,7 +11,8 @@ require_once 'config/conexao.php';
 
 // Função auxiliar para gerar UUID no padrão MySQL
 if (!function_exists('gerarUuid')) {
-    function gerarUuid() {
+    function gerarUuid()
+    {
         return sprintf('%04x%04x-%04x-%04x-%04x-%04x%04x%04x', mt_rand(0, 0xffff), mt_rand(0, 0xffff), mt_rand(0, 0xffff), mt_rand(0, 0x0fff) | 0x4000, mt_rand(0, 0x3fff) | 0x8000, mt_rand(0, 0xffff), mt_rand(0, 0xffff), mt_rand(0, 0xffff));
     }
 }
@@ -31,7 +32,7 @@ if ($id_editar) {
     $stmtEdit = $pdo->prepare($sqlEdit);
     $stmtEdit->execute([':id' => $id_editar, ':uid' => $usuario_id]);
     $transacao_edit = $stmtEdit->fetch();
-    
+
     // Trava de segurança: se a transação não existir, volta pro painel
     if (!$transacao_edit) {
         header("Location: dashboard.php");
@@ -40,7 +41,7 @@ if ($id_editar) {
 }
 
 // UX INTELIGENTE: Pega o tipo para filtrar o banco. Se for edição, trava no tipo original.
-$tipo_sugerido = $_POST['tipo_registro'] ?? ($transacao_edit ? $transacao_edit['TipoRegistro'] : ($_GET['tipo'] ?? 'despesa')); 
+$tipo_sugerido = $_POST['tipo_registro'] ?? ($transacao_edit ? $transacao_edit['TipoRegistro'] : ($_GET['tipo'] ?? 'despesa'));
 
 try {
     // Busca carteiras (Lembrete: Mudei para a sintaxe do MySQL puro)
@@ -65,7 +66,6 @@ try {
     $stmtCat = $pdo->prepare($sqlCategorias);
     $stmtCat->execute([':uid' => $usuario_id, ':tipo' => $tipo_sugerido]);
     $categorias = $stmtCat->fetchAll();
-
 } catch (PDOException $e) {
     $carteiras = [];
     $categorias = [];
@@ -74,7 +74,23 @@ try {
 // Processa o Formulário quando o usuário clica em Salvar (Criar ou Atualizar)
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $tipoRegistro   = trim($_POST['tipo_registro'] ?? '');
-    $valorRaw       = trim($_POST['valor'] ?? '');
+
+    // ── LIMPEZA DA MÁSCARA ──────────────────────────────────────────
+    $valorPost  = trim($_POST['valor'] ?? '');
+    
+    // 1. Remove letras, "R$", espaços normais e espaços invisíveis!
+    // Sobram apenas números, pontos e vírgulas (Ex: 1.500,50)
+    $valorLimpo = preg_replace('/[^\d.,]/', '', $valorPost);
+    
+    // 2. Converte para o padrão americano de Banco de Dados (1500.50)
+    if (strpos($valorLimpo, ',') !== false) {
+        $valorLimpo = str_replace('.', '', $valorLimpo); // Remove pontos de milhar
+        $valorRaw   = str_replace(',', '.', $valorLimpo); // Troca vírgula por ponto
+    } else {
+        $valorRaw   = $valorLimpo; // Já está no formato certo ou é número inteiro
+    }
+    // ────────────────────────────────────────────────────────────────
+
     $descricao      = trim($_POST['descricao'] ?? '');
     $dataRegistro   = trim($_POST['data_registro'] ?? '');
     $dataVencimento = trim($_POST['data_vencimento'] ?? '');
@@ -82,15 +98,15 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $carteiraId     = trim($_POST['carteira_id'] ?? '');
     $categoriaId    = trim($_POST['categoria_id'] ?? '') ?: null;
     $subCategoriaId = trim($_POST['subcategoria_id'] ?? '') ?: null;
-    $recorrente     = isset($_POST['recorrente']) ? 1 : 0; 
+    $recorrente     = isset($_POST['recorrente']) ? 1 : 0;
     $diaVencimento  = $recorrente ? intval($_POST['dia_vencimento'] ?? 0) : null;
     $parcelado      = isset($_POST['parcelado']) ? 1 : 0;
     $numParcelas    = $parcelado ? max(2, min(48, intval($_POST['num_parcelas'] ?? 2))) : 1;
 
-    // Validações
+    // Validações (agora usando o valorRaw limpo)
     if (!in_array($tipoRegistro, ['receita', 'despesa'])) $erro = "Tipo de registro inválido.";
-    elseif (empty($valorRaw) || !is_numeric(str_replace(',', '.', $valorRaw))) $erro = "Informe um valor numérico válido.";
-    elseif (floatval(str_replace(',', '.', $valorRaw)) <= 0) $erro = "O valor deve ser maior que zero.";
+    elseif (empty($valorRaw) || !is_numeric($valorRaw)) $erro = "Informe um valor numérico válido.";
+    elseif (floatval($valorRaw) <= 0) $erro = "O valor deve ser maior que zero.";
     elseif (empty($descricao)) $erro = "A descrição não pode ficar em branco.";
     elseif (empty($dataRegistro)) $erro = "Selecione a data do registro.";
     elseif (!in_array($statusRegistro, ['pendente', 'efetivado'])) $erro = "Status inválido.";
@@ -100,9 +116,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     elseif ($parcelado && $recorrente) $erro = "Uma transação não pode ser parcelada E recorrente ao mesmo tempo.";
 
     if (!$erro) {
-        $valor = str_replace(',', '.', $valorRaw);
+        $valor = $valorRaw; // O valor já está pronto para o banco!
         $dataVencimento = !empty($dataVencimento) ? $dataVencimento : null;
-        
+
         try {
             if (isset($_POST['id_editar']) && !empty($_POST['id_editar'])) {
                 // ── ATUALIZAÇÃO (UPDATE) ─────────────────────────────────────
@@ -117,15 +133,20 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 ";
                 $stmt = $pdo->prepare($sql);
                 $stmt->execute([
-                    ':tipo'      => $tipoRegistro, ':valor'    => $valor,   ':descricao' => $descricao,
-                    ':momento'   => $dataRegistro, ':vencimento' => $dataVencimento,
-                    ':status'    => $statusRegistro, ':recorrente' => $recorrente,
-                    ':dia'       => $diaVencimento, ':carteira'  => $carteiraId,
-                    ':categoria' => $categoriaId,  ':id_editar' => $_POST['id_editar'],
+                    ':tipo'      => $tipoRegistro,
+                    ':valor'    => $valor,
+                    ':descricao' => $descricao,
+                    ':momento'   => $dataRegistro,
+                    ':vencimento' => $dataVencimento,
+                    ':status'    => $statusRegistro,
+                    ':recorrente' => $recorrente,
+                    ':dia'       => $diaVencimento,
+                    ':carteira'  => $carteiraId,
+                    ':categoria' => $categoriaId,
+                    ':id_editar' => $_POST['id_editar'],
                     ':usuario'   => $usuario_id,
                 ]);
                 header("Location: dashboard.php?sucesso=editado");
-
             } elseif ($parcelado && $numParcelas >= 2) {
                 // ── CRIAÇÃO PARCELADA — gera N registros encadeados ──────────
                 $valorParcela  = round(floatval($valor) / $numParcelas, 2);
@@ -173,7 +194,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                     ]);
                 }
                 header("Location: dashboard.php?sucesso=parcelado&parcelas={$numParcelas}");
-
             } else {
                 // ── CRIAÇÃO SIMPLES ──────────────────────────────────────────
                 $sql = "
@@ -187,12 +207,18 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 ";
                 $stmt = $pdo->prepare($sql);
                 $stmt->execute([
-                    ':id'        => gerarUuid(), ':tipo'       => $tipoRegistro,
-                    ':valor'     => $valor,      ':descricao'  => $descricao,
-                    ':momento'   => $dataRegistro, ':vencimento' => $dataVencimento,
-                    ':status'    => $statusRegistro, ':recorrente' => $recorrente,
-                    ':dia'       => $diaVencimento,  ':carteira'   => $carteiraId,
-                    ':usuario'   => $usuario_id,  ':categoria'  => $categoriaId,
+                    ':id'        => gerarUuid(),
+                    ':tipo'       => $tipoRegistro,
+                    ':valor'     => $valor,
+                    ':descricao'  => $descricao,
+                    ':momento'   => $dataRegistro,
+                    ':vencimento' => $dataVencimento,
+                    ':status'    => $statusRegistro,
+                    ':recorrente' => $recorrente,
+                    ':dia'       => $diaVencimento,
+                    ':carteira'   => $carteiraId,
+                    ':usuario'   => $usuario_id,
+                    ':categoria'  => $categoriaId,
                 ]);
                 header("Location: dashboard.php?sucesso=registro");
             }
@@ -263,10 +289,11 @@ require_once 'geral/header.php';
                         </div>
 
                         <div class="mb-5 d-flex align-items-center justify-content-center pb-3 auralis-line-input">
-                            <input type="number" step="0.01" min="0.01" name="valor" id="valor" onkeydown="return !['e', 'E', '+', '-'].includes(event.key);"
+                            <input type="text" inputmode="numeric" name="valor" id="valor"
                                 class="form-control form-control-lg bg-transparent border-0 text-gold-analysis fw-bold text-center fs-1-large valor-input p-0 p-lg-1 no-spinners"
-                                placeholder="Valor:" required autofocus
-                                value="<?= htmlspecialchars($val_valor) ?>">   
+                                placeholder="R$ 0,00" required autofocus autocomplete="off"
+                                value="<?= htmlspecialchars($val_valor) ?>"
+                                oninput="mascaraMoeda(this)">
                         </div>
 
                         <div class="d-flex align-items-center mb-4 pb-2 auralis-line-input">
@@ -329,7 +356,7 @@ require_once 'geral/header.php';
                                 </h2>
                                 <div id="collapseDetalhes" class="accordion-collapse collapse <?= (!empty($val_venc) || $val_rec) ? 'show' : '' ?>" data-bs-parent="#accordionMaisDetalhes">
                                     <div class="accordion-body border-top border-border-color pt-3 px-3 fs-7 bg-charcoal">
-                                        
+
                                         <div class="mb-3">
                                             <label class="form-label text-secondary-analysis fs-7 mb-1">Data de Vencimento</label>
                                             <input type="date" name="data_vencimento" class="form-control bg-dark border-border-color text-light-analysis fs-7" value="<?= htmlspecialchars($val_venc) ?>">
@@ -353,34 +380,34 @@ require_once 'geral/header.php';
                         </div>
 
                         <?php if (!$is_edicao): ?>
-                        <!-- ── Parcelamento ──────────────────────────────────── -->
-                        <div class="mb-4 auralis-line-input pb-3">
-                            <div class="d-flex align-items-center justify-content-between mb-2">
-                                <div class="d-flex align-items-center">
-                                    <i class="bi bi-credit-card-2-front text-secondary-analysis me-3 w-icon text-center"></i>
-                                    <span class="text-light fs-6">Parcelado</span>
+                            <!-- ── Parcelamento ──────────────────────────────────── -->
+                            <div class="mb-4 auralis-line-input pb-3">
+                                <div class="d-flex align-items-center justify-content-between mb-2">
+                                    <div class="d-flex align-items-center">
+                                        <i class="bi bi-credit-card-2-front text-secondary-analysis me-3 w-icon text-center"></i>
+                                        <span class="text-light fs-6">Parcelado</span>
+                                    </div>
+                                    <div class="form-check form-switch fs-4 mb-0 toggle-analysis">
+                                        <input class="form-check-input bg-dark border-border-color shadow-none" type="checkbox" name="parcelado" id="toggle_parcelado" role="switch" <?= $val_parcelado ? 'checked' : '' ?>>
+                                    </div>
                                 </div>
-                                <div class="form-check form-switch fs-4 mb-0 toggle-analysis">
-                                    <input class="form-check-input bg-dark border-border-color shadow-none" type="checkbox" name="parcelado" id="toggle_parcelado" role="switch" <?= $val_parcelado ? 'checked' : '' ?>>
-                                </div>
-                            </div>
 
-                            <div id="bloco_parcelamento" style="display: <?= $val_parcelado ? 'block' : 'none' ?>;" class="ps-4 border-start border-border-color mt-2">
-                                <label class="form-label text-secondary-analysis fs-7 mb-1">Número de parcelas</label>
-                                <div class="d-flex align-items-center gap-3">
-                                    <input type="number" name="num_parcelas" id="num_parcelas"
-                                        class="form-control bg-dark border-border-color text-light-analysis form-control-sm no-spinners fs-7"
-                                        min="2" max="48" placeholder="Ex: 3"
-                                        value="<?= htmlspecialchars($val_num_parc) ?>"
-                                        style="width: 80px;">
-                                    <div id="preview_parcela" class="text-muted fs-7"></div>
+                                <div id="bloco_parcelamento" style="display: <?= $val_parcelado ? 'block' : 'none' ?>;" class="ps-4 border-start border-border-color mt-2">
+                                    <label class="form-label text-secondary-analysis fs-7 mb-1">Número de parcelas</label>
+                                    <div class="d-flex align-items-center gap-3">
+                                        <input type="number" name="num_parcelas" id="num_parcelas"
+                                            class="form-control bg-dark border-border-color text-light-analysis form-control-sm no-spinners fs-7"
+                                            min="2" max="48" placeholder="Ex: 3"
+                                            value="<?= htmlspecialchars($val_num_parc) ?>"
+                                            style="width: 80px;">
+                                        <div id="preview_parcela" class="text-muted fs-7"></div>
+                                    </div>
+                                    <p class="text-secondary fs-7 mt-2 mb-0">
+                                        <i class="bi bi-info-circle me-1"></i>
+                                        O sistema criará uma entrada por mês, começando na data informada.
+                                    </p>
                                 </div>
-                                <p class="text-secondary fs-7 mt-2 mb-0">
-                                    <i class="bi bi-info-circle me-1"></i>
-                                    O sistema criará uma entrada por mês, começando na data informada.
-                                </p>
                             </div>
-                        </div>
                         <?php endif; ?>
 
                         <div class="d-grid mt-2">
@@ -410,11 +437,23 @@ require_once 'geral/header.php';
         --text-gold-analysis: #D4AF37;
     }
 
-    .auralis-premium-form .text-light { color: var(--text-light-analysis) !important; }
-    .auralis-premium-form .text-secondary { color: var(--text-muted-analysis) !important; }
-    .bg-dark { background-color: var(--bg-charcoal-analysis) !important; }
-    .card { background-color: var(--bg-card-analysis) !important; border-color: var(--border-color-analysis) !important; }
-    
+    .auralis-premium-form .text-light {
+        color: var(--text-light-analysis) !important;
+    }
+
+    .auralis-premium-form .text-secondary {
+        color: var(--text-muted-analysis) !important;
+    }
+
+    .bg-dark {
+        background-color: var(--bg-charcoal-analysis) !important;
+    }
+
+    .card {
+        background-color: var(--bg-card-analysis) !important;
+        border-color: var(--border-color-analysis) !important;
+    }
+
     .auralis-premium-form input[type="text"]:focus,
     .auralis-premium-form input[type="number"]:focus,
     .auralis-premium-form select:focus {
@@ -423,52 +462,96 @@ require_once 'geral/header.php';
         box-shadow: none;
     }
 
-    .w-icon { width: 30px; }
-    .w-icon i { font-size: 1.25rem; }
+    .w-icon {
+        width: 30px;
+    }
+
+    .w-icon i {
+        font-size: 1.25rem;
+    }
 
     .auralis-line-input {
         border-bottom: 1px solid var(--border-color-analysis);
         background-color: transparent !important;
     }
+
     .auralis-line-input .form-control,
-    .auralis-line-input .form-select { color: var(--text-light-analysis) !important; }
+    .auralis-line-input .form-select {
+        color: var(--text-light-analysis) !important;
+    }
 
     .no-spinners::-webkit-outer-spin-button,
-    .no-spinners::-webkit-inner-spin-button { -webkit-appearance: none; margin: 0; }
-    .no-spinners { -moz-appearance: textfield; appearance: none; padding-left: 2rem !important; }
+    .no-spinners::-webkit-inner-spin-button {
+        -webkit-appearance: none;
+        margin: 0;
+    }
 
-    .fs-1-large { font-size: 3rem !important; }
-    .fs-6 { font-size: 1rem !important; }
-    .fs-7 { font-size: 0.875rem !important; }
-    .fw-bold { font-weight: 700 !important; }
-    .fw-semibold { font-weight: 600 !important; }
+    .no-spinners {
+        -moz-appearance: textfield;
+        appearance: none;
+        padding-left: 2rem !important;
+    }
 
-    .toggle-analysis .form-check-input { border-color: var(--border-color-analysis); cursor: pointer; }
+    .fs-1-large {
+        font-size: 3rem !important;
+    }
+
+    .fs-6 {
+        font-size: 1rem !important;
+    }
+
+    .fs-7 {
+        font-size: 0.875rem !important;
+    }
+
+    .fw-bold {
+        font-weight: 700 !important;
+    }
+
+    .fw-semibold {
+        font-weight: 600 !important;
+    }
+
+    .toggle-analysis .form-check-input {
+        border-color: var(--border-color-analysis);
+        cursor: pointer;
+    }
+
     .toggle-analysis .form-check-input:checked {
         background-color: var(--primary-gold-analysis);
         border-color: var(--primary-gold-analysis);
     }
+
     .toggle-analysis .form-check-input:focus {
         border-color: var(--primary-gold-analysis);
         box-shadow: 0 0 0 0.25rem var(--gold-glow-analysis);
     }
-    .toggle-analysis-muted .form-check-input:checked { opacity: 0.6; }
 
-    .auralis-line-input select option { background-color: var(--bg-card-analysis); color: var(--text-light-analysis); }
+    .toggle-analysis-muted .form-check-input:checked {
+        opacity: 0.6;
+    }
+
+    .auralis-line-input select option {
+        background-color: var(--bg-card-analysis);
+        color: var(--text-light-analysis);
+    }
 
     .badge-tipo {
         background: linear-gradient(135deg, #2a2a2a, #1f1f1f);
         border: 1px solid var(--border-color-analysis);
         min-width: 180px;
     }
-    
-    .w-icon .bi { transition: all 0.3s ease; }
+
+    .w-icon .bi {
+        transition: all 0.3s ease;
+    }
+
     .auralis-premium-form input:focus~i.text-secondary-analysis,
     .auralis-premium-form select:focus~i.text-secondary-analysis {
         color: var(--primary-gold-analysis) !important;
         opacity: 0.8;
     }
-    
+
     .btn-gold {
         background: linear-gradient(135deg, #FFB800 0%, #D4AF37 100%);
         border: none;
@@ -488,16 +571,16 @@ require_once 'geral/header.php';
     const toggleStatus = document.getElementById('toggle_status');
     const inputReal = document.getElementById('status_real');
     const textoStatus = document.getElementById('texto_status');
-    const tipoAtual = "<?= htmlspecialchars($tipo_sugerido) ?>"; 
+    const tipoAtual = "<?= htmlspecialchars($tipo_sugerido) ?>";
 
     function atualizarTextoToggle() {
         if (toggleStatus.checked) {
-            inputReal.value = 'efetivado'; 
+            inputReal.value = 'efetivado';
             textoStatus.innerText = 'Foi ' + (tipoAtual === 'receita' ? 'recebido' : 'pago');
             textoStatus.classList.remove('text-secondary-analysis');
             textoStatus.classList.add('text-light');
         } else {
-            inputReal.value = 'pendente'; 
+            inputReal.value = 'pendente';
             textoStatus.innerText = 'Não ' + (tipoAtual === 'receita' ? 'recebido' : 'pago') + ' ainda';
             textoStatus.classList.remove('text-light');
             textoStatus.classList.add('text-secondary-analysis');
@@ -512,13 +595,13 @@ require_once 'geral/header.php';
     // ==========================================
     // 2. LÓGICA DA RECORRÊNCIA
     // ==========================================
-    const checkRecorrente  = document.getElementById('recorrente');
+    const checkRecorrente = document.getElementById('recorrente');
     const blocoRecorrencia = document.getElementById('bloco_recorrencia');
-    const inputDia         = document.getElementById('dia_vencimento');
+    const inputDia = document.getElementById('dia_vencimento');
 
     // ── Recorrente toggle ────────────────────────────────────────────────────
     if (checkRecorrente) {
-        checkRecorrente.addEventListener('change', function () {
+        checkRecorrente.addEventListener('change', function() {
             blocoRecorrencia.style.display = this.checked ? 'block' : 'none';
             inputDia.required = this.checked;
             // Desativa parcelamento se recorrente for ligado
@@ -530,18 +613,25 @@ require_once 'geral/header.php';
     }
 
     // ── Parcelamento toggle ──────────────────────────────────────────────────
-    const toggleParcelado   = document.getElementById('toggle_parcelado');
+    const toggleParcelado = document.getElementById('toggle_parcelado');
     const blocoParcelamento = document.getElementById('bloco_parcelamento');
-    const inputParcelas     = document.getElementById('num_parcelas');
-    const previewParcela    = document.getElementById('preview_parcela');
-    const inputValor        = document.getElementById('valor');
+    const inputParcelas = document.getElementById('num_parcelas');
+    const previewParcela = document.getElementById('preview_parcela');
+    const inputValor = document.getElementById('valor');
 
     function atualizarPreviewParcela() {
         if (!toggleParcelado || !toggleParcelado.checked || !previewParcela) return;
-        const valor = parseFloat((inputValor ? inputValor.value : '0').replace(',', '.')) || 0;
-        const n     = parseInt(inputParcelas ? inputParcelas.value : 0) || 0;
+
+        // Limpa a máscara do R$ pegando só os números puros e dividindo por 100
+        let rawStr = (inputValor ? inputValor.value : '0').replace(/\D/g, '');
+        const valor = (parseFloat(rawStr) / 100) || 0;
+
+        const n = parseInt(inputParcelas ? inputParcelas.value : 0) || 0;
         if (valor > 0 && n >= 2) {
-            const parcela = (valor / n).toLocaleString('pt-BR', {minimumFractionDigits: 2, maximumFractionDigits: 2});
+            const parcela = (valor / n).toLocaleString('pt-BR', {
+                minimumFractionDigits: 2,
+                maximumFractionDigits: 2
+            });
             previewParcela.innerHTML = '<span style="color:var(--accent);font-weight:600;">' + n + 'x de R$ ' + parcela + '</span>';
         } else {
             previewParcela.textContent = '';
@@ -549,7 +639,7 @@ require_once 'geral/header.php';
     }
 
     if (toggleParcelado) {
-        toggleParcelado.addEventListener('change', function () {
+        toggleParcelado.addEventListener('change', function() {
             const ativo = this.checked;
             if (blocoParcelamento) blocoParcelamento.style.display = ativo ? 'block' : 'none';
             // Parcelado e Recorrente são mutuamente exclusivos
@@ -563,22 +653,22 @@ require_once 'geral/header.php';
     }
 
     if (inputParcelas) inputParcelas.addEventListener('input', atualizarPreviewParcela);
-    if (inputValor)    inputValor.addEventListener('input', atualizarPreviewParcela);
+    if (inputValor) inputValor.addEventListener('input', atualizarPreviewParcela);
 
     atualizarPreviewParcela();
 
-// ==========================================
+    // ==========================================
     // TRAVA ANTI-SPAM (BLINDAGEM ABSOLUTA)
     // ==========================================
     const formTransacao = document.getElementById('formTransacao');
     const btnSalvar = document.getElementById('btnSalvar');
-    
+
     // O nosso "Trinco" lógico
-    let enviando = false; 
+    let enviando = false;
 
     if (formTransacao) {
         formTransacao.addEventListener('submit', function(event) {
-            
+
             // Se o trinco já estiver trancado, bloqueia a tentativa e para tudo!
             if (enviando) {
                 event.preventDefault(); // Cancela o 2º, 3º, 4º Enter...
@@ -592,9 +682,40 @@ require_once 'geral/header.php';
             if (btnSalvar) {
                 btnSalvar.innerHTML = '<span class="spinner-border spinner-border-sm me-2" role="status" aria-hidden="true"></span> Salvando...';
                 btnSalvar.style.pointerEvents = 'none'; // Impede novos cliques via CSS
-                btnSalvar.classList.add('opacity-75');  // Deixa o botão meio transparente
+                btnSalvar.classList.add('opacity-75'); // Deixa o botão meio transparente
             }
         });
     }
+
+    function mascaraMoeda(input) {
+        // 1. Remove tudo que não for número (tira letras, símbolos, etc)
+        let valor = input.value.replace(/\D/g, '');
+
+        // Se estiver vazio, não faz nada
+        if (valor === '') {
+            input.value = '';
+            return;
+        }
+
+        // 2. Transforma em número e divide por 100 para criar os centavos (Ex: 1500 vira 15.00)
+        valor = (parseInt(valor, 10) / 100);
+
+        // 3. Formata nativamente para o padrão Real Brasileiro (R$ 1.500,00)
+        input.value = valor.toLocaleString('pt-BR', {
+            style: 'currency',
+            currency: 'BRL'
+        });
+    }
+
+    // Isso garante que se você estiver EDITANDO uma transação, 
+    // o valor que vier do banco já apareça formatado.
+    document.addEventListener("DOMContentLoaded", function() {
+        let inputValor = document.getElementById('valor');
+        if (inputValor.value !== '' && !inputValor.value.includes('R$')) {
+            // Multiplica por 100 para simular a digitação sem a vírgula
+            inputValor.value = (parseFloat(inputValor.value) * 100).toFixed(0);
+            mascaraMoeda(inputValor);
+        }
+    });
 </script>
 <?php require_once 'geral/footer.php'; ?>
