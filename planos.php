@@ -28,9 +28,9 @@ require_once 'geral/header.php';
         </p>
 
         <?php if ($msg_upgrade): ?>
-        <div class="alert mt-4 mx-auto" style="max-width:520px;background:#d4af3715;border:1px solid #d4af3740;color:#d4af37;border-radius:0.75rem;">
-            <i class="bi bi-lock-fill me-2"></i> <?php echo $msg_upgrade ?>
-        </div>
+            <div class="alert mt-4 mx-auto" style="max-width:520px;background:#d4af3715;border:1px solid #d4af3740;color:#d4af37;border-radius:0.75rem;">
+                <i class="bi bi-lock-fill me-2"></i> <?php echo $msg_upgrade ?>
+            </div>
         <?php endif; ?>
 
         <!-- Toggle mensal / anual -->
@@ -52,10 +52,10 @@ require_once 'geral/header.php';
         <!-- ── FREE ─────────────────────────────────────────────────────── -->
         <div class="col-12 col-md-4">
             <div class="card rounded-4 shadow-sm h-100 position-relative overflow-hidden"
-                 style="background:var(--bg-card);border:1.5px solid #4b556366;">
+                style="background:var(--bg-card);border:1.5px solid #4b556366;">
 
                 <div class="text-center py-1"
-                     style="background:#4b5563;font-size:0.7rem;font-weight:700;letter-spacing:0.08em;color:#fff;">
+                    style="background:#4b5563;font-size:0.7rem;font-weight:700;letter-spacing:0.08em;color:#fff;">
                     PARA CONHECER O SISTEMA
                 </div>
 
@@ -71,41 +71,43 @@ require_once 'geral/header.php';
                     </div>
 
                     <ul class="list-unstyled flex-grow-1 mb-4" style="font-size:0.875rem;">
-                        <?php foreach ([
-                            ['ok', '1 carteira'],
-                            ['ok', 'Até 35 registros/mês'],
-                            ['ok', 'Categorias (até 10)'],
-                            ['ok', 'Parcelamento em até 3x'],
-                            ['ok', 'Dashboard básico'],
-                            ['no', 'Histórico comparativo'],
-                            ['no', 'Exportação PDF/Excel'],
-                            ['no', 'Carteiras ilimitadas'],
-                            ['no', 'Módulo de Cartão de Crédito'],
-                            ['no', 'Compartilhamento familiar'],
-                            ['no', 'Metas financeiras'],
-                            ['no', 'Suporte prioritário'],
-                        ] as [$tipo, $item]): ?>
-                        <li class="d-flex align-items-center gap-2 mb-2">
-                            <i class="bi <?php echo $tipo === 'ok'
-                                ? 'bi-check-circle-fill text-success'
-                                : 'bi-x-circle text-secondary opacity-40' ?>"></i>
-                            <span class="<?php echo $tipo === 'no'
-                                ? 'text-secondary opacity-40 text-decoration-line-through'
-                                : 'text-light' ?>">
-                                <?php echo $item ?>
-                            </span>
-                        </li>
+                        <?php foreach (
+                            [
+                                ['ok', '1 carteira'],
+                                ['ok', 'Até 35 registros/mês'],
+                                ['ok', 'Categorias (até 10)'],
+                                ['ok', 'Parcelamento em até 3x'],
+                                ['ok', 'Dashboard básico'],
+                                ['no', 'Histórico comparativo'],
+                                ['no', 'Exportação PDF/Excel'],
+                                ['no', 'Carteiras ilimitadas'],
+                                ['no', 'Módulo de Cartão de Crédito'],
+                                ['no', 'Compartilhamento familiar'],
+                                ['no', 'Metas financeiras'],
+                                ['no', 'Suporte prioritário'],
+                            ] as [$tipo, $item]
+                        ): ?>
+                            <li class="d-flex align-items-center gap-2 mb-2">
+                                <i class="bi <?php echo $tipo === 'ok'
+                                                    ? 'bi-check-circle-fill text-success'
+                                                    : 'bi-x-circle text-secondary opacity-40' ?>"></i>
+                                <span class="<?php echo $tipo === 'no'
+                                                    ? 'text-secondary opacity-40 text-decoration-line-through'
+                                                    : 'text-light' ?>">
+                                    <?php echo $item ?>
+                                </span>
+                            </li>
                         <?php endforeach; ?>
                     </ul>
 
                     <?php if ($planoAtual === 'free'): ?>
                         <button class="btn w-100 rounded-pill fw-semibold"
-                                style="background:rgba(255,255,255,.06);color:#6b7280;cursor:default;" disabled>
+                            style="background:rgba(255,255,255,.06);color:#6b7280;cursor:default;" disabled>
                             ✓ Plano atual
                         </button>
                     <?php else: ?>
                         <div class="btn w-100 rounded-pill fw-semibold text-secondary"
-                             style="background:transparent;border:1px solid rgba(255,255,255,.1);cursor:default;">
+                            style="background:transparent;border:1px solid rgba(255,255,255,.1);cursor:default;">
                             Plano básico
                         </div>
                     <?php endif; ?>
@@ -116,10 +118,10 @@ require_once 'geral/header.php';
         <!-- ── PRO ──────────────────────────────────────────────────────── -->
         <div class="col-12 col-md-4">
             <div class="card rounded-4 shadow h-100 position-relative overflow-hidden"
-                 style="background:var(--bg-card);border:1.5px solid #7c3aed88;">
+                style="background:var(--bg-card);border:1.5px solid #7c3aed88;">
 
                 <div class="text-center py-1"
-                     style="background:#7c3aed;font-size:0.7rem;font-weight:700;letter-spacing:0.08em;color:#fff;">
+                    style="background:#7c3aed;font-size:0.7rem;font-weight:700;letter-spacing:0.08em;color:#fff;">
                     MAIS POPULAR
                 </div>
 
@@ -137,51 +139,53 @@ require_once 'geral/header.php';
                     </div>
 
                     <ul class="list-unstyled flex-grow-1 mb-4" style="font-size:0.875rem;">
-                        <?php foreach ([
-                            ['ok', 'Até 3 carteiras'],
-                            ['ok', 'Registros ilimitados'],
-                            ['ok', 'Categorias ilimitadas'],
-                            ['ok', 'Parcelamento em até 48x'],
-                            ['ok', 'Dashboard completo'],
-                            ['ok', 'Histórico comparativo (12 meses)'],
-                            ['ok', 'Exportação PDF/Excel'],
-                            ['ok', 'Carteiras ilimitadas'],
-                            ['no', 'Módulo de Cartão de Crédito'],
-                            ['no', 'Compartilhamento familiar'],
-                            ['no', 'Metas financeiras'],
-                            ['ok', 'Suporte prioritário'],
-                        ] as [$tipo, $item]): ?>
-                        <li class="d-flex align-items-center gap-2 mb-2">
-                            <i class="bi <?php echo $tipo === 'ok'
-                                ? 'bi-check-circle-fill'
-                                : 'bi-x-circle text-secondary opacity-40' ?>"
-                               <?php echo $tipo === 'ok' ? 'style="color:#a78bfa;"' : '' ?>></i>
-                            <span class="<?php echo $tipo === 'no'
-                                ? 'text-secondary opacity-40 text-decoration-line-through'
-                                : 'text-light' ?>">
-                                <?php echo $item ?>
-                            </span>
-                        </li>
+                        <?php foreach (
+                            [
+                                ['ok', 'Até 3 carteiras'],
+                                ['ok', 'Registros ilimitados'],
+                                ['ok', 'Categorias ilimitadas'],
+                                ['ok', 'Parcelamento em até 48x'],
+                                ['ok', 'Dashboard completo'],
+                                ['ok', 'Histórico comparativo (12 meses)'],
+                                ['ok', 'Exportação PDF/Excel'],
+                                ['ok', 'Carteiras ilimitadas'],
+                                ['no', 'Módulo de Cartão de Crédito'],
+                                ['no', 'Compartilhamento familiar'],
+                                ['no', 'Metas financeiras'],
+                                ['ok', 'Suporte prioritário'],
+                            ] as [$tipo, $item]
+                        ): ?>
+                            <li class="d-flex align-items-center gap-2 mb-2">
+                                <i class="bi <?php echo $tipo === 'ok'
+                                                    ? 'bi-check-circle-fill'
+                                                    : 'bi-x-circle text-secondary opacity-40' ?>"
+                                    <?php echo $tipo === 'ok' ? 'style="color:#a78bfa;"' : '' ?>></i>
+                                <span class="<?php echo $tipo === 'no'
+                                                    ? 'text-secondary opacity-40 text-decoration-line-through'
+                                                    : 'text-light' ?>">
+                                    <?php echo $item ?>
+                                </span>
+                            </li>
                         <?php endforeach; ?>
                     </ul>
 
                     <?php if ($planoAtual === 'pro'): ?>
                         <button class="btn w-100 rounded-pill fw-semibold"
-                                style="background:rgba(124,58,237,.2);color:#a78bfa;border:1px solid #7c3aed66;cursor:default;" disabled>
+                            style="background:rgba(124,58,237,.2);color:#a78bfa;border:1px solid #7c3aed66;cursor:default;" disabled>
                             ✓ Plano atual
                         </button>
                     <?php else: ?>
                         <div class="d-flex flex-column gap-2">
                             <a href="https://www.mercadopago.com.br/subscriptions/checkout?preapproval_plan_id=9c7869b02a884962a185a44dee6c16f8"
-                               target="_blank"
-                               class="btn w-100 rounded-pill fw-bold preco-mensal"
-                               style="background:#7c3aed;color:#fff;border:none;">
+                                target="_blank"
+                                class="btn w-100 rounded-pill fw-bold preco-mensal"
+                                style="background:#7c3aed;color:#fff;border:none;">
                                 Assinar PRO — R$ 19,90/mês
                             </a>
                             <a href="https://www.mercadopago.com.br/subscriptions/checkout?preapproval_plan_id=98c6343b478e4efcad77ab56fe6f5948"
-                               target="_blank"
-                               class="btn w-100 rounded-pill fw-bold preco-anual d-none"
-                               style="background:#7c3aed;color:#fff;border:none;">
+                                target="_blank"
+                                class="btn w-100 rounded-pill fw-bold preco-anual d-none"
+                                style="background:#7c3aed;color:#fff;border:none;">
                                 Assinar PRO — R$ 179,90/ano
                             </a>
                         </div>
@@ -193,10 +197,10 @@ require_once 'geral/header.php';
         <!-- ── VIP ──────────────────────────────────────────────────────── -->
         <div class="col-12 col-md-4">
             <div class="card rounded-4 shadow h-100 position-relative overflow-hidden"
-                 style="background:var(--bg-card);border:1.5px solid #d4af3766;">
+                style="background:var(--bg-card);border:1.5px solid #d4af3766;">
 
                 <div class="text-center py-1"
-                     style="background:linear-gradient(90deg,#AA8C2C,#d4af37);font-size:0.7rem;font-weight:700;letter-spacing:0.08em;color:#121418;">
+                    style="background:linear-gradient(90deg,#AA8C2C,#d4af37);font-size:0.7rem;font-weight:700;letter-spacing:0.08em;color:#121418;">
                     ⭐ PARA FAMÍLIAS &amp; EMPREENDEDORES
                 </div>
 
@@ -214,44 +218,46 @@ require_once 'geral/header.php';
                     </div>
 
                     <ul class="list-unstyled flex-grow-1 mb-4" style="font-size:0.875rem;">
-                        <?php foreach ([
-                            ['ok', 'Carteiras ilimitadas'],
-                            ['ok', 'Registros ilimitados'],
-                            ['ok', 'Categorias ilimitadas'],
-                            ['ok', 'Parcelamento em até 48x'],
-                            ['ok', 'Dashboard completo'],
-                            ['ok', 'Histórico ilimitado'],
-                            ['ok', 'Exportação PDF/Excel'],
-                            ['ok', 'Carteiras ilimitadas'],
-                            ['ok', 'Módulo de Cartão de Crédito'],
-                            ['ok', 'Compartilhamento familiar (4 membros)'],
-                            ['ok', 'Metas financeiras'],
-                            ['ok', 'Suporte VIP dedicado'],
-                        ] as [$tipo, $item]): ?>
-                        <li class="d-flex align-items-center gap-2 mb-2">
-                            <i class="bi bi-check-circle-fill" style="color:#d4af37;"></i>
-                            <span class="text-light"><?php echo $item ?></span>
-                        </li>
+                        <?php foreach (
+                            [
+                                ['ok', 'Carteiras ilimitadas'],
+                                ['ok', 'Registros ilimitados'],
+                                ['ok', 'Categorias ilimitadas'],
+                                ['ok', 'Parcelamento em até 48x'],
+                                ['ok', 'Dashboard completo'],
+                                ['ok', 'Histórico ilimitado'],
+                                ['ok', 'Exportação PDF/Excel'],
+                                ['ok', 'Carteiras ilimitadas'],
+                                ['ok', 'Módulo de Cartão de Crédito'],
+                                ['ok', 'Compartilhamento familiar (4 membros)'],
+                                ['ok', 'Metas financeiras'],
+                                ['ok', 'Suporte VIP dedicado'],
+                            ] as [$tipo, $item]
+                        ): ?>
+                            <li class="d-flex align-items-center gap-2 mb-2">
+                                <i class="bi bi-check-circle-fill" style="color:#d4af37;"></i>
+                                <span class="text-light"><?php echo $item ?></span>
+                            </li>
                         <?php endforeach; ?>
                     </ul>
 
                     <?php if ($planoAtual === 'vip'): ?>
                         <button class="btn w-100 rounded-pill fw-semibold"
-                                style="background:#d4af3720;color:#d4af37;border:1px solid #d4af3766;cursor:default;" disabled>
+                            style="background:#d4af3720;color:#d4af37;border:1px solid #d4af3766;cursor:default;" disabled>
                             ⭐ Plano atual
                         </button>
                     <?php else: ?>
                         <div class="d-flex flex-column gap-2">
                             <a href="https://www.mercadopago.com.br/subscriptions/checkout?preapproval_plan_id=55856961da8d49d09b4ccded59a56810"
-                               target="_blank"
-                               class="btn w-100 rounded-pill fw-bold preco-mensal"
-                               style="background:linear-gradient(90deg,#AA8C2C,#d4af37);color:#121418;border:none;font-weight:800;">
+                                target="_blank"
+                                class="btn w-100 rounded-pill fw-bold preco-mensal"
+                                style="background:linear-gradient(90deg,#AA8C2C,#d4af37);color:#121418;border:none;font-weight:800;">
                                 Assinar VIP — R$ 29,90/mês
                             </a>
                             <a href="https://www.mercadopago.com.br/subscriptions/checkout?preapproval_plan_id=3ed445df740c439884e8ebc71ddbdb69"
-                               target="_blank"
-                               class="btn w-100 rounded-pill fw-bold preco-anual d-none"
-                               style="background:linear-gradient(90deg,#AA8C2C,#d4af37);color:#121418;border:none;font-weight:800;">
+                                target="_blank"
+                                class="btn w-100 rounded-pill fw-bold preco-anual d-none"
+                                style="background:linear-gradient(90deg,#AA8C2C,#d4af37);color:#121418;border:none;font-weight:800;">
                                 Assinar VIP — R$ 239,90/ano
                             </a>
                         </div>
@@ -271,17 +277,17 @@ require_once 'geral/header.php';
 </main>
 
 <script>
-const toggle  = document.getElementById('toggleAnual');
-const mensal  = document.querySelectorAll('.preco-mensal');
-const anual   = document.querySelectorAll('.preco-anual');
-const anualInfo = document.querySelectorAll('.preco-anual-info');
+    const toggle = document.getElementById('toggleAnual');
+    const mensal = document.querySelectorAll('.preco-mensal');
+    const anual = document.querySelectorAll('.preco-anual');
+    const anualInfo = document.querySelectorAll('.preco-anual-info');
 
-toggle.addEventListener('change', function () {
-    const isAnual = this.checked;
-    mensal.forEach(el   => el.classList.toggle('d-none', isAnual));
-    anual.forEach(el    => el.classList.toggle('d-none', !isAnual));
-    anualInfo.forEach(el => el.classList.toggle('d-none', !isAnual));
-});
+    toggle.addEventListener('change', function() {
+        const isAnual = this.checked;
+        mensal.forEach(el => el.classList.toggle('d-none', isAnual));
+        anual.forEach(el => el.classList.toggle('d-none', !isAnual));
+        anualInfo.forEach(el => el.classList.toggle('d-none', !isAnual));
+    });
 </script>
 
 <?php require_once 'geral/footer.php'; ?>
