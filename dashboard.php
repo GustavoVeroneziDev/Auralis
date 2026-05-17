@@ -54,7 +54,7 @@ try {
         $mesAnterior = date('Y-m', strtotime('-1 month'));
 
         // CORREÇÃO: TO_CHAR trocado por DATE_FORMAT e booleano para 1
-        $sqlRec  = "SELECT * FROM Registro WHERE FKUsuario = :uid AND Recorrente = 1 AND DATE_FORMAT(MomentoRegistro, '%Y-%m') = :mes_ant";
+        $sqlRec  = "SELECT * FROM Registro WHERE FKUsuario = :uid AND Recorrente = 1 AND (GrupoParcela IS NULL OR TotalParcelas IS NOT NULL) AND DATE_FORMAT(MomentoRegistro, '%Y-%m') = :mes_ant";
         $stmtRec = $pdo->prepare($sqlRec);
         $stmtRec->execute([':uid' => $usuario_id, ':mes_ant' => $mesAnterior]);
         $contas = $stmtRec->fetchAll();

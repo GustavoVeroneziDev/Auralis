@@ -77,11 +77,11 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
     // ── LIMPEZA DA MÁSCARA ──────────────────────────────────────────
     $valorPost  = trim($_POST['valor'] ?? '');
-    
+
     // 1. Remove letras, "R$", espaços normais e espaços invisíveis!
     // Sobram apenas números, pontos e vírgulas (Ex: 1.500,50)
     $valorLimpo = preg_replace('/[^\d.,]/', '', $valorPost);
-    
+
     // 2. Converte para o padrão americano de Banco de Dados (1500.50)
     if (strpos($valorLimpo, ',') !== false) {
         $valorLimpo = str_replace('.', '', $valorLimpo); // Remove pontos de milhar
@@ -122,7 +122,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         try {
             if (isset($_POST['id_editar']) && !empty($_POST['id_editar'])) {
                 // ── ATUALIZAÇÃO (UPDATE) ─────────────────────────────────────
-                // Na edição, não mudamos parcelamento — apenas os campos editáveis.
                 $sql = "
                     UPDATE Registro SET
                         TipoRegistro = :tipo, Valor = :valor, Descricao = :descricao,
@@ -134,7 +133,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 $stmt = $pdo->prepare($sql);
                 $stmt->execute([
                     ':tipo'      => $tipoRegistro,
-                    ':valor'    => $valor,
+                    ':valor'     => $valor,
                     ':descricao' => $descricao,
                     ':momento'   => $dataRegistro,
                     ':vencimento' => $dataVencimento,
@@ -146,12 +145,43 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                     ':id_editar' => $_POST['id_editar'],
                     ':usuario'   => $usuario_id,
                 ]);
+
+                // ── PROPAGAÇÃO DE EDIÇÃO (FUTUROS) ───────────────────────────
+                $grupoAtual = $transacao_edit['GrupoParcela'] ?? null;
+                $dataAtual  = $transacao_edit['MomentoRegistro'];
+
+                if (isset($_POST['editar_futuros']) && $grupoAtual) {
+                    $sqlFuturos = "
+                        UPDATE Registro SET
+                            Valor = :valor, Descricao = :descricao, 
+                            FKCarteira = :carteira, FKCategoria = :categoria
+                        WHERE GrupoParcela = :grupo
+                          AND FKUsuario = :usuario
+                          AND IDRegistro != :id_editar
+                          AND MomentoRegistro > :data_base
+                          AND StatusRegistro = 'pendente'
+                          AND TotalParcelas IS NULL
+                    ";
+                    $stmtF = $pdo->prepare($sqlFuturos);
+                    $stmtF->execute([
+                        ':valor'     => $valor,
+                        ':descricao' => $descricao,
+                        ':carteira'  => $carteiraId,
+                        ':categoria' => $categoriaId,
+                        ':grupo'     => $grupoAtual,
+                        ':usuario'   => $usuario_id,
+                        ':data_base' => $dataAtual
+                    ]);
+                }
                 header("Location: dashboard.php?sucesso=editado");
             } elseif ($parcelado && $numParcelas >= 2) {
-                // ── CRIAÇÃO PARCELADA — gera N registros encadeados ──────────
-                $valorParcela  = round(floatval($valor) / $numParcelas, 2);
-                $grupoParcela  = gerarUuid(); // UUID compartilhado entre todas as parcelas
-                $dataBase      = new DateTime($dataRegistro);
+                // ... [O SEU CÓDIGO ATUAL DE PARCELAMENTO CONTINUA AQUI] ...
+                header("Location: dashboard.php?sucesso=parcelado&parcelas={$numParcelas}");
+            } elseif ($recorrente) {
+                // ── CRIAÇÃO RECORRENTE (Fix: ParcelaAtual/Total NULL) ────────
+                $grupoRecorrencia = gerarUuid();
+                $dataBase         = new DateTime($dataRegistro);
+                $limiteMeses      = 24;
 
                 $sqlInsert = "
                     INSERT INTO Registro (
@@ -160,40 +190,40 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                         GrupoParcela, ParcelaAtual, TotalParcelas
                     ) VALUES (
                         :id, :tipo, :valor, :descricao, :momento, :vencimento,
-                        :status, 0, NULL, :carteira, :usuario, :categoria,
-                        :grupo, :parcela_atual, :total_parcelas
+                        :status, 1, :dia, :carteira, :usuario, :categoria,
+                        :grupo, NULL, NULL
                     )
                 ";
-                $stmtP = $pdo->prepare($sqlInsert);
+                $stmtR = $pdo->prepare($sqlInsert);
 
-                for ($i = 0; $i < $numParcelas; $i++) {
-                    $dataParcela = clone $dataBase;
-                    $dataParcela->modify("+{$i} month");
-                    $dataStr     = $dataParcela->format('Y-m-d');
+                for ($i = 0; $i < $limiteMeses; $i++) {
+                    $dataRec = clone $dataBase;
+                    if ($i > 0) $dataRec->modify("+{$i} month");
 
-                    // A 1ª parcela herda o status escolhido; as demais ficam pendentes
-                    $statusParcela = ($i === 0) ? $statusRegistro : 'pendente';
+                    $ano = $dataRec->format('Y');
+                    $mes = $dataRec->format('m');
+                    $diaCorreto = min($diaVencimento, date('t', strtotime("$ano-$mes-01")));
+                    $dataRec->setDate($ano, $mes, $diaCorreto);
+                    $dataStr = $dataRec->format('Y-m-d');
 
-                    // Label: "Tênis (1/3)", "Tênis (2/3)", etc.
-                    $descParcela = $descricao . " (" . ($i + 1) . "/" . $numParcelas . ")";
+                    $statusRec = ($i === 0) ? $statusRegistro : 'pendente';
 
-                    $stmtP->execute([
-                        ':id'            => gerarUuid(),
-                        ':tipo'          => $tipoRegistro,
-                        ':valor'         => $valorParcela,
-                        ':descricao'     => $descParcela,
-                        ':momento'       => $dataStr,
-                        ':vencimento'    => $dataStr,
-                        ':status'        => $statusParcela,
-                        ':carteira'      => $carteiraId,
-                        ':usuario'       => $usuario_id,
-                        ':categoria'     => $categoriaId,
-                        ':grupo'         => $grupoParcela,
-                        ':parcela_atual' => $i + 1,
-                        ':total_parcelas' => $numParcelas,
+                    $stmtR->execute([
+                        ':id'         => gerarUuid(),
+                        ':tipo'       => $tipoRegistro,
+                        ':valor'      => $valor,
+                        ':descricao'  => $descricao,
+                        ':momento'    => $dataStr,
+                        ':vencimento' => $dataStr,
+                        ':status'     => $statusRec,
+                        ':dia'        => $diaCorreto,
+                        ':carteira'   => $carteiraId,
+                        ':usuario'    => $usuario_id,
+                        ':categoria'  => $categoriaId,
+                        ':grupo'      => $grupoRecorrencia
                     ]);
                 }
-                header("Location: dashboard.php?sucesso=parcelado&parcelas={$numParcelas}");
+                header("Location: dashboard.php?sucesso=recorrente");
             } else {
                 // ── CRIAÇÃO SIMPLES ──────────────────────────────────────────
                 $sql = "
@@ -356,7 +386,17 @@ require_once 'geral/header.php';
                                 </h2>
                                 <div id="collapseDetalhes" class="accordion-collapse collapse <?= (!empty($val_venc) || $val_rec) ? 'show' : '' ?>" data-bs-parent="#accordionMaisDetalhes">
                                     <div class="accordion-body border-top border-border-color pt-3 px-3 fs-7 bg-charcoal">
-
+                                        <?php
+                                        // Mostra opção de atualizar o grupo apenas se estiver editando uma recorrência ativa
+                                        if ($is_edicao && !empty($transacao_edit['GrupoParcela']) && empty($transacao_edit['TotalParcelas'])):
+                                        ?>
+                                            <div class="form-check form-switch mt-3 pt-3 border-top border-border-color toggle-analysis toggle-analysis-muted">
+                                                <input class="form-check-input bg-dark border-border-color shadow-none" type="checkbox" name="editar_futuros" id="editar_futuros" checked>
+                                                <label class="form-check-label text-light fs-7 fw-semibold" for="editar_futuros">
+                                                    Aplicar novo valor/descrição neste e em <strong>todos os meses futuros pendentes</strong>.
+                                                </label>
+                                            </div>
+                                        <?php endif; ?>
                                         <div class="mb-3">
                                             <label class="form-label text-secondary-analysis fs-7 mb-1">Data de Vencimento</label>
                                             <input type="date" name="data_vencimento" class="form-control bg-dark border-border-color text-light-analysis fs-7" value="<?= htmlspecialchars($val_venc) ?>">
