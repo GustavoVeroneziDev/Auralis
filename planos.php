@@ -148,11 +148,11 @@ require_once 'geral/header.php';
                                 ['ok', 'Dashboard completo'],
                                 ['ok', 'Histórico comparativo (12 meses)'],
                                 ['ok', 'Exportação PDF/Excel'],
-                                ['ok', 'Carteiras ilimitadas'],
+                                ['ok', 'Suporte prioritário'],
+                                ['no', 'Carteiras ilimitadas'],
                                 ['no', 'Módulo de Cartão de Crédito'],
                                 ['no', 'Compartilhamento familiar'],
                                 ['no', 'Metas financeiras'],
-                                ['ok', 'Suporte prioritário'],
                             ] as [$tipo, $item]
                         ): ?>
                             <li class="d-flex align-items-center gap-2 mb-2">
@@ -200,7 +200,7 @@ require_once 'geral/header.php';
                 style="background:var(--bg-card);border:1.5px solid #d4af3766;">
 
                 <div class="text-center py-1"
-                    style="background:linear-gradient(90deg,#AA8C2C,#d4af37);font-size:0.7rem;font-weight:700;letter-spacing:0.08em;color:#121418;">
+                    style="background:linear-gradient(90deg,#AA8C2C,#d4af37);font-size:0.7rem;font-weight:700;letter-spacing:0.08em;color:#fff;">
                     ⭐ PARA FAMÍLIAS &amp; EMPREENDEDORES
                 </div>
 
@@ -227,7 +227,6 @@ require_once 'geral/header.php';
                                 ['ok', 'Dashboard completo'],
                                 ['ok', 'Histórico ilimitado'],
                                 ['ok', 'Exportação PDF/Excel'],
-                                ['ok', 'Carteiras ilimitadas'],
                                 ['ok', 'Módulo de Cartão de Crédito'],
                                 ['ok', 'Compartilhamento familiar (4 membros)'],
                                 ['ok', 'Metas financeiras'],
@@ -251,13 +250,13 @@ require_once 'geral/header.php';
                             <a href="https://www.mercadopago.com.br/subscriptions/checkout?preapproval_plan_id=55856961da8d49d09b4ccded59a56810"
                                 target="_blank"
                                 class="btn w-100 rounded-pill fw-bold preco-mensal"
-                                style="background:linear-gradient(90deg,#AA8C2C,#d4af37);color:#121418;border:none;font-weight:800;">
+                                style="background:linear-gradient(90deg,#AA8C2C,#d4af37);color:#fff;border:none;font-weight:800;">
                                 Assinar VIP — R$ 29,90/mês
                             </a>
                             <a href="https://www.mercadopago.com.br/subscriptions/checkout?preapproval_plan_id=3ed445df740c439884e8ebc71ddbdb69"
                                 target="_blank"
                                 class="btn w-100 rounded-pill fw-bold preco-anual d-none"
-                                style="background:linear-gradient(90deg,#AA8C2C,#d4af37);color:#121418;border:none;font-weight:800;">
+                                style="background:linear-gradient(90deg,#AA8C2C,#d4af37);color:#fff;border:none;font-weight:800;">
                                 Assinar VIP — R$ 239,90/ano
                             </a>
                         </div>
