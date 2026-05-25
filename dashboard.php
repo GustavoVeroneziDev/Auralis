@@ -804,13 +804,13 @@ require_once 'geral/header.php';
                                                     <i class="bi bi-trash3"></i> <span class="d-none d-sm-inline">Excluir</span>
                                                 </button>
                                             <?php else: ?>
-                                                <form method="POST" action="" class="m-0" onsubmit="return confirm('Tem certeza que deseja excluir esta transação? A ação não pode ser desfeita.');">
-                                                    <input type="hidden" name="action" value="excluir_registro">
-                                                    <input type="hidden" name="registro_id" value="<?php echo $t['IDRegistro'] ?>">
-                                                    <button type="submit" class="btn btn-sm btn-outline-danger rounded-pill fw-semibold px-3 d-inline-flex align-items-center gap-1 transition-hover">
-                                                        <i class="bi bi-trash3"></i> <span class="d-none d-sm-inline">Excluir</span>
-                                                    </button>
-                                                </form>
+                                                <button type="button" 
+                                                        class="btn btn-sm btn-outline-danger rounded-pill fw-semibold px-3 d-inline-flex align-items-center gap-1 transition-hover"
+                                                        data-bs-toggle="modal" 
+                                                        data-bs-target="#modalExcluirNormal"
+                                                        data-id="<?php echo $t['IDRegistro'] ?>">
+                                                    <i class="bi bi-trash3"></i> <span class="d-none d-sm-inline">Excluir</span>
+                                                </button>
                                             <?php endif; ?>
                                         </div>
                                     </div>
@@ -941,6 +941,34 @@ require_once 'geral/header.php';
                         </label>
                         <div class="text-secondary opacity-75" style="font-size: 0.75rem;">Remove esta transação e todas as projeções não pagas/recebidas adiante.</div>
                     </div>
+                </div>
+                <div class="modal-footer border-top border-secondary-subtle d-flex justify-content-between p-2">
+                    <button type="button" class="btn btn-sm btn-link text-secondary text-decoration-none" data-bs-dismiss="modal">Cancelar</button>
+                    <button type="submit" class="btn btn-sm btn-danger fw-bold px-3 rounded-pill">
+                        Confirmar Exclusão
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+<!-- MODAL: EXCLUIR NORMAL -->
+
+<div class="modal fade" id="modalExcluirNormal" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered modal-sm" style="max-width: 400px;">
+        <div class="modal-content bg-dark border-secondary-subtle shadow-lg rounded-4">
+            <div class="modal-header border-bottom border-secondary-subtle p-3">
+                <h6 class="modal-title text-light fw-bold">
+                    <i class="bi bi-trash3 me-2 text-danger"></i> Excluir Transação
+                </h6>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <form method="POST" action="">
+                <div class="modal-body p-4 text-center">
+                    <p class="text-secondary mb-0">Tem certeza que deseja excluir esta transação? Essa ação não pode ser desfeita.</p>
+                    <input type="hidden" name="action" value="excluir_registro">
+                    <input type="hidden" name="registro_id" id="excluir_normal_id">
                 </div>
                 <div class="modal-footer border-top border-secondary-subtle d-flex justify-content-between p-2">
                     <button type="button" class="btn btn-sm btn-link text-secondary text-decoration-none" data-bs-dismiss="modal">Cancelar</button>
@@ -1146,6 +1174,14 @@ require_once 'geral/header.php';
             document.getElementById('excluir_recorrente_id').value = id;
             document.getElementById('excluir_grupo_id').value = grupo;
             document.getElementById('excluir_data_base').value = data;
+        });
+    }
+    
+    const modalExcluirNormal = document.getElementById('modalExcluirNormal');
+    if (modalExcluirNormal) {
+        modalExcluirNormal.addEventListener('show.bs.modal', function (event) {
+            const button = event.relatedTarget;
+            document.getElementById('excluir_normal_id').value = button.getAttribute('data-id');
         });
     }
 </script>
