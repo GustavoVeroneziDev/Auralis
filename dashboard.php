@@ -54,7 +54,7 @@ try {
         $mesAnterior = date('Y-m', strtotime('-1 month'));
 
         // CORREÇÃO: TO_CHAR trocado por DATE_FORMAT e booleano para 1
-        $sqlRec  = "SELECT * FROM Registro WHERE FKUsuario = :uid AND Recorrente = 1 AND DATE_FORMAT(MomentoRegistro, '%Y-%m') = :mes_ant";
+        $sqlRec  = "SELECT * FROM Registro WHERE FKUsuario = :uid AND Recorrente = 1 AND (GrupoParcela IS NULL OR TotalParcelas IS NOT NULL) AND DATE_FORMAT(MomentoRegistro, '%Y-%m') = :mes_ant";
         $stmtRec = $pdo->prepare($sqlRec);
         $stmtRec->execute([':uid' => $usuario_id, ':mes_ant' => $mesAnterior]);
         $contas = $stmtRec->fetchAll();
@@ -150,12 +150,46 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'])) {
         }
     }
 
-    if ($_POST['action'] === 'excluir_registro') {
+if ($_POST['action'] === 'excluir_registro') {
         $id_registro = $_POST['registro_id'];
         try {
             $sqlDel  = "DELETE FROM Registro WHERE IDRegistro = :id AND FKUsuario = :uid";
             $stmtDel = $pdo->prepare($sqlDel);
             $stmtDel->execute([':id' => $id_registro, ':uid' => $usuario_id]);
+            header("Location: " . $redirectBase . "&sucesso=excluido");
+            exit;
+        } catch (PDOException $e) {
+        }
+    }
+
+    if ($_POST['action'] === 'excluir_recorrente_grupo') {
+        $id_registro   = $_POST['registro_id'];
+        $grupo_id      = $_POST['grupo_parcela'];
+        $data_base     = $_POST['momento_registro'];
+        $tipo_exclusao = $_POST['tipo_exclusao'] ?? 'apenas_este';
+
+        try {
+            if ($tipo_exclusao === 'futuros' && !empty($grupo_id)) {
+                // Exclui o registro selecionado E todas as projeções futuras pendentes do grupo
+                $sqlDel = "
+                    DELETE FROM Registro 
+                    WHERE FKUsuario = :uid 
+                      AND GrupoParcela = :grupo
+                      AND (IDRegistro = :id OR (MomentoRegistro > :data_base AND StatusRegistro = 'pendente' AND TotalParcelas IS NULL))
+                ";
+                $stmtDel = $pdo->prepare($sqlDel);
+                $stmtDel->execute([
+                    ':uid'       => $usuario_id,
+                    ':grupo'     => $grupo_id,
+                    ':id'        => $id_registro,
+                    ':data_base' => $data_base
+                ]);
+            } else {
+                // Comportamento padrão: exclui apenas o mês selecionado
+                $sqlDel  = "DELETE FROM Registro WHERE IDRegistro = :id AND FKUsuario = :uid";
+                $stmtDel = $pdo->prepare($sqlDel);
+                $stmtDel->execute([':id' => $id_registro, ':uid' => $usuario_id]);
+            }
             header("Location: " . $redirectBase . "&sucesso=excluido");
             exit;
         } catch (PDOException $e) {
@@ -756,13 +790,28 @@ require_once 'geral/header.php';
                                                 <i class="bi bi-pencil-square"></i> <span class="d-none d-sm-inline">Editar</span>
                                             </a>
 
-                                            <form method="POST" action="" class="m-0" onsubmit="return confirm('Tem certeza que deseja excluir esta transação? A ação não pode ser desfeita.');">
-                                                <input type="hidden" name="action" value="excluir_registro">
-                                                <input type="hidden" name="registro_id" value="<?php echo $t['IDRegistro'] ?>">
-                                                <button type="submit" class="btn btn-sm btn-outline-danger rounded-pill fw-semibold px-3 d-inline-flex align-items-center gap-1 transition-hover">
+                                            <?php 
+                                            // Verifica se é uma conta recorrente com projeções futuras
+                                            if ($t['Recorrente'] == 1 && !empty($t['GrupoParcela']) && empty($t['TotalParcelas'])): 
+                                            ?>
+                                                <button type="button" 
+                                                        class="btn btn-sm btn-outline-danger rounded-pill fw-semibold px-3 d-inline-flex align-items-center gap-1 transition-hover"
+                                                        data-bs-toggle="modal" 
+                                                        data-bs-target="#modalExcluirRecorrente"
+                                                        data-id="<?php echo $t['IDRegistro'] ?>"
+                                                        data-grupo="<?php echo $t['GrupoParcela'] ?>"
+                                                        data-data="<?php echo $t['MomentoRegistro'] ?>">
                                                     <i class="bi bi-trash3"></i> <span class="d-none d-sm-inline">Excluir</span>
                                                 </button>
-                                            </form>
+                                            <?php else: ?>
+                                                <button type="button" 
+                                                        class="btn btn-sm btn-outline-danger rounded-pill fw-semibold px-3 d-inline-flex align-items-center gap-1 transition-hover"
+                                                        data-bs-toggle="modal" 
+                                                        data-bs-target="#modalExcluirNormal"
+                                                        data-id="<?php echo $t['IDRegistro'] ?>">
+                                                    <i class="bi bi-trash3"></i> <span class="d-none d-sm-inline">Excluir</span>
+                                                </button>
+                                            <?php endif; ?>
                                         </div>
                                     </div>
                                 </div>
@@ -856,6 +905,81 @@ require_once 'geral/header.php';
     </div>
 </div>
 
+
+<!-- MODAL: EXCLUIR RECORRENTE -->
+
+<div class="modal fade" id="modalExcluirRecorrente" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered modal-sm" style="max-width: 400px;">
+        <div class="modal-content bg-dark border-secondary-subtle shadow-lg rounded-4">
+            <div class="modal-header border-bottom border-secondary-subtle p-3">
+                <h6 class="modal-title text-light fw-bold">
+                    <i class="bi bi-trash3 me-2 text-danger"></i> Excluir Recorrência
+                </h6>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <form method="POST" action="">
+                <div class="modal-body p-4">
+                    <p class="text-secondary small mb-3">
+                        Esta é uma transação recorrente. Escolha a opção de exclusão ideal:
+                    </p>
+                    <input type="hidden" name="action" value="excluir_recorrente_grupo">
+                    <input type="hidden" name="registro_id" id="excluir_recorrente_id">
+                    <input type="hidden" name="grupo_parcela" id="excluir_grupo_id">
+                    <input type="hidden" name="momento_registro" id="excluir_data_base">
+
+                    <div class="form-check mb-3">
+                        <input class="form-check-input" type="radio" name="tipo_exclusao" id="excluir_apenas_este" value="apenas_este" checked>
+                        <label class="form-check-label text-light fw-semibold fs-7" for="excluir_apenas_este">
+                            Excluir apenas este mês
+                        </label>
+                        <div class="text-secondary opacity-75" style="font-size: 0.75rem;">Os demais meses futuros continuam ativos.</div>
+                    </div>
+                    <div class="form-check">
+                        <input class="form-check-input" type="radio" name="tipo_exclusao" id="excluir_todos_futuros" value="futuros">
+                        <label class="form-check-label text-light fw-semibold fs-7" for="excluir_todos_futuros">
+                            Excluir este e os meses futuros pendentes
+                        </label>
+                        <div class="text-secondary opacity-75" style="font-size: 0.75rem;">Remove esta transação e todas as projeções não pagas/recebidas adiante.</div>
+                    </div>
+                </div>
+                <div class="modal-footer border-top border-secondary-subtle d-flex justify-content-between p-2">
+                    <button type="button" class="btn btn-sm btn-link text-secondary text-decoration-none" data-bs-dismiss="modal">Cancelar</button>
+                    <button type="submit" class="btn btn-sm btn-danger fw-bold px-3 rounded-pill">
+                        Confirmar Exclusão
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+<!-- MODAL: EXCLUIR NORMAL -->
+
+<div class="modal fade" id="modalExcluirNormal" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered modal-sm" style="max-width: 400px;">
+        <div class="modal-content bg-dark border-secondary-subtle shadow-lg rounded-4">
+            <div class="modal-header border-bottom border-secondary-subtle p-3">
+                <h6 class="modal-title text-light fw-bold">
+                    <i class="bi bi-trash3 me-2 text-danger"></i> Excluir Transação
+                </h6>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <form method="POST" action="">
+                <div class="modal-body p-4 text-center">
+                    <p class="text-secondary mb-0">Tem certeza que deseja excluir esta transação? Essa ação não pode ser desfeita.</p>
+                    <input type="hidden" name="action" value="excluir_registro">
+                    <input type="hidden" name="registro_id" id="excluir_normal_id">
+                </div>
+                <div class="modal-footer border-top border-secondary-subtle d-flex justify-content-between p-2">
+                    <button type="button" class="btn btn-sm btn-link text-secondary text-decoration-none" data-bs-dismiss="modal">Cancelar</button>
+                    <button type="submit" class="btn btn-sm btn-danger fw-bold px-3 rounded-pill">
+                        Confirmar Exclusão
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
 <!-- ======================================================================= -->
 <!-- MODAIS DE ONBOARDING (PRIMEIRO ACESSO) -->
 <!-- ======================================================================= -->
@@ -1037,6 +1161,29 @@ require_once 'geral/header.php';
             modal2.show();
         <?php endif; ?>
     });
+    // Script para alimentar o Modal de Exclusão de Recorrência
+    const modalExcluirRecorrente = document.getElementById('modalExcluirRecorrente');
+    if (modalExcluirRecorrente) {
+        modalExcluirRecorrente.addEventListener('show.bs.modal', function (event) {
+            const button = event.relatedTarget;
+            
+            const id = button.getAttribute('data-id');
+            const grupo = button.getAttribute('data-grupo');
+            const data = button.getAttribute('data-data');
+
+            document.getElementById('excluir_recorrente_id').value = id;
+            document.getElementById('excluir_grupo_id').value = grupo;
+            document.getElementById('excluir_data_base').value = data;
+        });
+    }
+    
+    const modalExcluirNormal = document.getElementById('modalExcluirNormal');
+    if (modalExcluirNormal) {
+        modalExcluirNormal.addEventListener('show.bs.modal', function (event) {
+            const button = event.relatedTarget;
+            document.getElementById('excluir_normal_id').value = button.getAttribute('data-id');
+        });
+    }
 </script>
 
 <?php require_once 'geral/footer.php'; ?>
