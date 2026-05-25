@@ -207,37 +207,33 @@ $listaIcones = [
                         <div class="mb-4">
                             <label class="form-label text-secondary-analysis fs-7 mb-2">Escolha um ícone</label>
 
-                            <div class="mb-4">
-    <label class="form-label text-secondary-analysis fs-7 mb-2">Escolha um ícone</label>
-    
-    <div class="w-100">
-        <?php foreach ($gruposIcones as $nomeGrupo => $icones): ?>
-            
-            <div class="d-flex align-items-center mt-3 mb-2">
-                <hr class="flex-grow-1" style="border-color: #D4AF37; opacity: 0.35;">
-                <span class="mx-3" style="font-size: 0.65rem; font-weight: 800; text-transform: uppercase; letter-spacing: 1.5px; color: #D4AF37;">
-                    <?= $nomeGrupo ?>
-                </span>
-                <hr class="flex-grow-1" style="border-color: #D4AF37; opacity: 0.35;">
-            </div>
+                            <div class="w-100">
+                                <?php foreach ($gruposIcones as $nomeGrupo => $icones): ?>
 
-            <div class="d-flex flex-wrap gap-2 justify-content-center">
-                <?php foreach ($icones as $icone): ?>
-                    <div>
-                        <input type="radio" class="btn-check" name="icone" id="icone_<?= $icone ?>" value="<?= $icone ?>" autocomplete="off" required>
-                        <label class="btn btn-outline-secondary rounded-3 p-2 d-flex align-items-center justify-content-center transition-hover" 
-                               for="icone_<?= $icone ?>" style="width: 42px; height: 42px;">
-                            <i class="bi <?= $icone ?> fs-5"></i>
-                        </label>
-                    </div>
-                <?php endforeach; ?>
-            </div>
+                                    <div class="d-flex align-items-center mt-3 mb-2">
+                                        <hr class="flex-grow-1" style="border-color: #D4AF37; opacity: 0.35;">
+                                        <span class="mx-3" style="font-size: 0.65rem; font-weight: 800; text-transform: uppercase; letter-spacing: 1.5px; color: #D4AF37;">
+                                            <?= $nomeGrupo ?>
+                                        </span>
+                                        <hr class="flex-grow-1" style="border-color: #D4AF37; opacity: 0.35;">
+                                    </div>
 
-        <?php endforeach; ?>
-    </div>
-</div>
+                                    <div class="d-flex flex-wrap gap-2 justify-content-center">
+                                        <?php foreach ($icones as $icone): ?>
+                                            <div>
+                                                <input type="radio" class="btn-check" name="icone" id="icone_<?= $icone ?>" value="<?= $icone ?>" autocomplete="off" required>
+                                                <label class="btn-icon-select" for="icone_<?= $icone ?>" style="width: 45px; padding: 0;">
+                                                    <i class="bi <?= $icone ?> fs-5"></i>
+                                                </label>
+                                            </div>
+                                        <?php endforeach; ?>
+                                    </div>
 
-                        <button type="submit" class="btn btn-gold fw-bold text-dark py-3 w-100 rounded-pill shadow-lg mt-2 transition-hover">
+                                <?php endforeach; ?>
+                            </div>
+                        </div>
+
+                        <button type="submit" class="btn btn-gold fw-bold text-dark py-3 w-100 rounded-pill shadow-lg mt-4 transition-hover">
                             Salvar Categoria
                         </button>
                     </form>
