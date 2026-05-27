@@ -481,7 +481,7 @@ require_once 'geral/header.php';
 
                                 <div id="bloco_parcelamento" style="display: <?= $val_parcelado ? 'block' : 'none' ?>;" class="ps-4 border-start border-border-color mt-2">
                                     <label class="form-label text-secondary-analysis fs-7 mb-1">Número de parcelas</label>
-                                    <div class="d-flex align-items-center gap-3">
+                                    <div class="d-flex align-items-center gap-3 mb-3">
                                         <input type="number" name="num_parcelas" id="num_parcelas"
                                             class="form-control bg-dark border-border-color text-light-analysis form-control-sm no-spinners fs-7"
                                             min="2" max="48" placeholder="Ex: 3"
@@ -489,7 +489,29 @@ require_once 'geral/header.php';
                                             style="width: 80px;">
                                         <div id="preview_parcela" class="text-muted fs-7"></div>
                                     </div>
-                                    <p class="text-secondary fs-7 mt-2 mb-0">
+
+                                    <div class="d-flex gap-3 mb-2 mt-1">
+                                        <div class="form-check">
+                                            <input class="form-check-input bg-dark border-border-color shadow-none" type="radio" name="tipo_juros" id="juros_sem" value="sem" checked>
+                                            <label class="form-check-label text-light fs-7" for="juros_sem">Sem juros</label>
+                                        </div>
+                                        <div class="form-check">
+                                            <input class="form-check-input bg-dark border-border-color shadow-none" type="radio" name="tipo_juros" id="juros_com" value="com">
+                                            <label class="form-check-label text-light fs-7" for="juros_com">Com juros</label>
+                                        </div>
+                                    </div>
+
+                                    <div id="bloco_com_juros" style="display: none;" class="mt-2 bg-charcoal p-3 border border-border-color rounded-3">
+                                        <label class="form-label text-secondary-analysis fs-7 mb-1">Valor exato de <strong>cada parcela</strong> com juros:</label>
+                                        <div class="input-group input-group-sm mb-1" style="max-width: 200px;">
+                                            <span class="input-group-text bg-dark border-border-color text-secondary-analysis fs-7">R$</span>
+                                            <input type="text" inputmode="numeric" id="valor_parcela_juros" class="form-control bg-dark border-border-color text-gold-analysis fw-bold fs-7 no-spinners" placeholder="0,00" oninput="mascaraMoeda(this); recalcularTotalComJuros();">
+                                        </div>
+                                        <div class="text-secondary opacity-75 mt-1" style="font-size: 0.7rem;">
+                                            <i class="bi bi-arrow-up-circle me-1"></i> O valor total da compra será atualizado automaticamente.
+                                        </div>
+                                    </div>
+                                    <p class="text-secondary fs-7 mt-3 mb-0">
                                         <i class="bi bi-info-circle me-1"></i>
                                         O sistema criará uma entrada por mês, começando na data informada.
                                     </p>
@@ -699,27 +721,80 @@ require_once 'geral/header.php';
         });
     }
 
-    // ── Parcelamento toggle ──────────────────────────────────────────────────
+    // ==========================================
+    // LÓGICA DE PARCELAMENTO E JUROS
+    // ==========================================
     const toggleParcelado = document.getElementById('toggle_parcelado');
     const blocoParcelamento = document.getElementById('bloco_parcelamento');
     const inputParcelas = document.getElementById('num_parcelas');
     const previewParcela = document.getElementById('preview_parcela');
     const inputValor = document.getElementById('valor');
 
+    const radioJurosSem = document.getElementById('juros_sem');
+    const radioJurosCom = document.getElementById('juros_com');
+    const blocoComJuros = document.getElementById('bloco_com_juros');
+    const inputValorParcelaJuros = document.getElementById('valor_parcela_juros');
+
+    // Alterna a visibilidade da opção com juros
+    if (radioJurosSem && radioJurosCom) {
+        radioJurosSem.addEventListener('change', function() {
+            blocoComJuros.style.display = 'none';
+            atualizarPreviewParcela();
+        });
+        radioJurosCom.addEventListener('change', function() {
+            blocoComJuros.style.display = 'block';
+            recalcularTotalComJuros();
+        });
+    }
+
+    // Calcula de baixo para cima (Parcela -> Total)
+    function recalcularTotalComJuros() {
+        if (!radioJurosCom || !radioJurosCom.checked) return;
+
+        const n = parseInt(inputParcelas.value) || 0;
+        let rawStr = inputValorParcelaJuros.value.replace(/\D/g, '');
+        const valorParcela = (parseFloat(rawStr) / 100) || 0;
+
+        if (n >= 2 && valorParcela > 0) {
+            const valorTotal = valorParcela * n;
+
+            // Atualiza o input gigante lá no topo da tela
+            inputValor.value = valorTotal.toLocaleString('pt-BR', {
+                style: 'currency',
+                currency: 'BRL'
+            });
+
+            // Atualiza o textinho de preview
+            const parcelaStr = valorParcela.toLocaleString('pt-BR', {
+                minimumFractionDigits: 2,
+                maximumFractionDigits: 2
+            });
+            previewParcela.innerHTML = '<span style="color:#d4af37;font-weight:600;">' + n + 'x de R$ ' + parcelaStr + '</span>';
+        } else {
+            previewParcela.textContent = '';
+        }
+    }
+
+    // Calcula de cima para baixo (Total -> Parcela)
     function atualizarPreviewParcela() {
         if (!toggleParcelado || !toggleParcelado.checked || !previewParcela) return;
 
-        // Limpa a máscara do R$ pegando só os números puros e dividindo por 100
+        // Se estiver no modo Juros, o comando é do input debaixo
+        if (radioJurosCom && radioJurosCom.checked) {
+            recalcularTotalComJuros();
+            return;
+        }
+
         let rawStr = (inputValor ? inputValor.value : '0').replace(/\D/g, '');
         const valor = (parseFloat(rawStr) / 100) || 0;
-
         const n = parseInt(inputParcelas ? inputParcelas.value : 0) || 0;
+
         if (valor > 0 && n >= 2) {
             const parcela = (valor / n).toLocaleString('pt-BR', {
                 minimumFractionDigits: 2,
                 maximumFractionDigits: 2
             });
-            previewParcela.innerHTML = '<span style="color:var(--accent);font-weight:600;">' + n + 'x de R$ ' + parcela + '</span>';
+            previewParcela.innerHTML = '<span style="color:var(--text-gold-analysis);font-weight:600;">' + n + 'x de R$ ' + parcela + '</span>';
         } else {
             previewParcela.textContent = '';
         }
@@ -729,7 +804,6 @@ require_once 'geral/header.php';
         toggleParcelado.addEventListener('change', function() {
             const ativo = this.checked;
             if (blocoParcelamento) blocoParcelamento.style.display = ativo ? 'block' : 'none';
-            // Parcelado e Recorrente são mutuamente exclusivos
             if (ativo && checkRecorrente && checkRecorrente.checked) {
                 checkRecorrente.checked = false;
                 if (blocoRecorrencia) blocoRecorrencia.style.display = 'none';
