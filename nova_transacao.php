@@ -176,20 +176,50 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 }
                 header("Location: dashboard.php?sucesso=editado");
             } elseif ($parcelado && $numParcelas >= 2) {
-                // ── CRIAÇÃO PARCELADA (Restaurada e Blindada) ────────────────
+                // ── CRIAÇÃO PARCELADA ────────────────
                 $grupoParcela = gerarUuid();
                 $dataBase     = new DateTime($dataRegistro);
+
+                $valorJurosTotal = 0;
+                $jurosPorParcela = null;
+
+                // LÓGICA VIP: CALCULAR JUROS SE EXISTIR
+                if (isset($_POST['tipo_juros']) && $_POST['tipo_juros'] === 'com') {
+                    $valJurosLimpo = preg_replace('/[^\d.,]/', '', $_POST['valor_parcela_juros'] ?? '0');
+                    if (strpos($valJurosLimpo, ',') !== false) {
+                        $valJurosLimpo = str_replace('.', '', $valJurosLimpo);
+                        $valJurosRaw   = str_replace(',', '.', $valJurosLimpo);
+                    } else {
+                        $valJurosRaw = $valJurosLimpo;
+                    }
+
+                    $parcelaComJuros = (float)$valJurosRaw;
+
+                    // Se a pessoa digitou a parcela com juros, o valor total do registro muda
+                    if ($parcelaComJuros > 0) {
+                        $valorTotalComJuros = $parcelaComJuros * $numParcelas;
+                        $valorJurosTotal    = $valorTotalComJuros - $valor; // Juros puro
+
+                        // Atualiza a variável $valor para o total (Ex: 3600 vira 3990)
+                        $valor = $valorTotalComJuros;
+                    }
+                }
 
                 $valorParcela = floor(($valor / $numParcelas) * 100) / 100;
                 $resto        = $valor - ($valorParcela * $numParcelas);
 
+                // Divide o juros total pelo número de parcelas para salvar em cada linha
+                if ($valorJurosTotal > 0) {
+                    $jurosPorParcela = round($valorJurosTotal / $numParcelas, 2);
+                }
+
                 $sqlParcela = "
                     INSERT INTO Registro (
-                        IDRegistro, TipoRegistro, Valor, Descricao, MomentoRegistro, DataVencimento,
+                        IDRegistro, TipoRegistro, Valor, ValorJuros, Descricao, MomentoRegistro, DataVencimento,
                         StatusRegistro, Recorrente, DiaVencimento, FKCarteira, FKUsuario, FKCategoria,
                         GrupoParcela, ParcelaAtual, TotalParcelas
                     ) VALUES (
-                        :id, :tipo, :valor, :descricao, :momento, :vencimento,
+                        :id, :tipo, :valor, :juros, :descricao, :momento, :vencimento,
                         :status, 0, NULL, :carteira, :usuario, :categoria,
                         :grupo, :parc_atual, :tot_parc
                     )
@@ -197,7 +227,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 $stmtP = $pdo->prepare($sqlParcela);
 
                 for ($i = 0; $i < $numParcelas; $i++) {
-                    // Cálculo matemático exato para não pular meses com 31 dias
                     $mesAlvo = (int)$dataBase->format('m') + $i;
                     $anoAlvo = (int)$dataBase->format('Y') + floor(($mesAlvo - 1) / 12);
                     $mesAlvo = (($mesAlvo - 1) % 12) + 1;
@@ -212,16 +241,17 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                         ':id'         => gerarUuid(),
                         ':tipo'      => $tipoRegistro,
                         ':valor'      => $valAtual,
-                        ':descricao' => $descricao,
-                        ':momento'    => $dataStr,
+                        ':juros'     => $jurosPorParcela,
+                        ':descricao'  => $descricao,
+                        ':momento'   => $dataStr,
                         ':vencimento' => $dataStr,
-                        ':status'     => $statusP,
-                        ':carteira'  => $carteiraId,
-                        ':usuario'    => $usuario_id,
-                        ':categoria' => $categoriaId,
-                        ':grupo'      => $grupoParcela,
+                        ':status'    => $statusP,
+                        ':carteira'   => $carteiraId,
+                        ':usuario'   => $usuario_id,
+                        ':categoria'  => $categoriaId,
+                        ':grupo'     => $grupoParcela,
                         ':parc_atual' => ($i + 1),
-                        ':tot_parc'   => $numParcelas
+                        ':tot_parc'  => $numParcelas
                     ]);
                 }
                 header("Location: dashboard.php?sucesso=parcelado&parcelas={$numParcelas}");
@@ -479,6 +509,8 @@ require_once 'geral/header.php';
                                     </div>
                                 </div>
 
+                                <?php $isVip = ($_SESSION['plano'] ?? 'free') === 'vip'; ?>
+
                                 <div id="bloco_parcelamento" style="display: <?= $val_parcelado ? 'block' : 'none' ?>;" class="ps-4 border-start border-border-color mt-2">
                                     <label class="form-label text-secondary-analysis fs-7 mb-1">Número de parcelas</label>
                                     <div class="d-flex align-items-center gap-3 mb-3">
@@ -495,9 +527,11 @@ require_once 'geral/header.php';
                                             <input class="form-check-input bg-dark border-border-color shadow-none" type="radio" name="tipo_juros" id="juros_sem" value="sem" checked>
                                             <label class="form-check-label text-light fs-7" for="juros_sem">Sem juros</label>
                                         </div>
-                                        <div class="form-check">
-                                            <input class="form-check-input bg-dark border-border-color shadow-none" type="radio" name="tipo_juros" id="juros_com" value="com">
-                                            <label class="form-check-label text-light fs-7" for="juros_com">Com juros</label>
+                                        <div class="form-check" <?= !$isVip ? 'title="Exclusivo Auralis VIP" data-bs-toggle="tooltip"' : '' ?>>
+                                            <input class="form-check-input bg-dark border-border-color shadow-none" type="radio" name="tipo_juros" id="juros_com" value="com" <?= !$isVip ? 'disabled' : '' ?>>
+                                            <label class="form-check-label text-light fs-7 d-flex align-items-center gap-1" for="juros_com">
+                                                Com juros <?= !$isVip ? '<span class="badge bg-warning text-dark ms-1" style="font-size:0.55rem; padding: 2px 4px;"><i class="bi bi-star-fill"></i> VIP</span>' : '' ?>
+                                            </label>
                                         </div>
                                     </div>
 
@@ -505,10 +539,10 @@ require_once 'geral/header.php';
                                         <label class="form-label text-secondary-analysis fs-7 mb-1">Valor exato de <strong>cada parcela</strong> com juros:</label>
                                         <div class="input-group input-group-sm mb-1" style="max-width: 200px;">
                                             <span class="input-group-text bg-dark border-border-color text-secondary-analysis fs-7">R$</span>
-                                            <input type="text" inputmode="numeric" id="valor_parcela_juros" class="form-control bg-dark border-border-color text-gold-analysis fw-bold fs-7 no-spinners" placeholder="0,00" oninput="mascaraMoeda(this); recalcularTotalComJuros();">
+                                            <input type="text" inputmode="numeric" name="valor_parcela_juros" id="valor_parcela_juros" class="form-control bg-dark border-border-color text-gold-analysis fw-bold fs-7 no-spinners" placeholder="0,00" oninput="mascaraMoeda(this); atualizarPreviewParcela();">
                                         </div>
-                                        <div class="text-secondary opacity-75 mt-1" style="font-size: 0.7rem;">
-                                            <i class="bi bi-arrow-up-circle me-1"></i> O valor total da compra será atualizado automaticamente.
+                                        <div class="text-secondary opacity-75 mt-1" style="font-size: 0.7rem;" id="preview_total_juros">
+                                            <i class="bi bi-calculator me-1"></i> Digite o valor da parcela para calcular.
                                         </div>
                                     </div>
                                     <p class="text-secondary fs-7 mt-3 mb-0">
@@ -734,6 +768,7 @@ require_once 'geral/header.php';
     const radioJurosCom = document.getElementById('juros_com');
     const blocoComJuros = document.getElementById('bloco_com_juros');
     const inputValorParcelaJuros = document.getElementById('valor_parcela_juros');
+    const previewTotalJuros = document.getElementById('preview_total_juros');
 
     // Alterna a visibilidade da opção com juros
     if (radioJurosSem && radioJurosCom) {
@@ -743,7 +778,7 @@ require_once 'geral/header.php';
         });
         radioJurosCom.addEventListener('change', function() {
             blocoComJuros.style.display = 'block';
-            recalcularTotalComJuros();
+            atualizarPreviewParcela();
         });
     }
 
@@ -779,18 +814,40 @@ require_once 'geral/header.php';
     function atualizarPreviewParcela() {
         if (!toggleParcelado || !toggleParcelado.checked || !previewParcela) return;
 
-        // Se estiver no modo Juros, o comando é do input debaixo
+        const n = parseInt(inputParcelas ? inputParcelas.value : 0) || 0;
+        let valorBaseRaw = (inputValor ? inputValor.value : '0').replace(/\D/g, '');
+        const valorBase = (parseFloat(valorBaseRaw) / 100) || 0;
+
+        // SE ESTIVER COM JUROS (VIP)
         if (radioJurosCom && radioJurosCom.checked) {
-            recalcularTotalComJuros();
+            let jurosRaw = inputValorParcelaJuros.value.replace(/\D/g, '');
+            const valorParcelaComJuros = (parseFloat(jurosRaw) / 100) || 0;
+
+            if (n >= 2 && valorParcelaComJuros > 0) {
+                const totalComJuros = valorParcelaComJuros * n;
+                const diferenca = totalComJuros - valorBase;
+
+                const parcelaStr = valorParcelaComJuros.toLocaleString('pt-BR', {
+                    minimumFractionDigits: 2,
+                    maximumFractionDigits: 2
+                });
+                const totalStr = totalComJuros.toLocaleString('pt-BR', {
+                    style: 'currency',
+                    currency: 'BRL'
+                });
+
+                previewParcela.innerHTML = '<span style="color:#d4af37;font-weight:600;">' + n + 'x de R$ ' + parcelaStr + '</span>';
+                previewTotalJuros.innerHTML = `<span class="text-warning"><i class="bi bi-exclamation-triangle me-1"></i> Total real: ${totalStr} (R$ ${diferenca.toLocaleString('pt-BR', { minimumFractionDigits: 2 })} de juros).</span>`;
+            } else {
+                previewParcela.textContent = '';
+                previewTotalJuros.innerHTML = '<i class="bi bi-calculator me-1"></i> Digite o valor da parcela para calcular.';
+            }
             return;
         }
 
-        let rawStr = (inputValor ? inputValor.value : '0').replace(/\D/g, '');
-        const valor = (parseFloat(rawStr) / 100) || 0;
-        const n = parseInt(inputParcelas ? inputParcelas.value : 0) || 0;
-
-        if (valor > 0 && n >= 2) {
-            const parcela = (valor / n).toLocaleString('pt-BR', {
+        // SE FOR SEM JUROS (PADRÃO)
+        if (valorBase > 0 && n >= 2) {
+            const parcela = (valorBase / n).toLocaleString('pt-BR', {
                 minimumFractionDigits: 2,
                 maximumFractionDigits: 2
             });
