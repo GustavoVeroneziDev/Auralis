@@ -183,8 +183,13 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 $valorJurosTotal = 0;
                 $jurosPorParcela = null;
 
-                // LÓGICA VIP: CALCULAR JUROS SE EXISTIR
-                if (isset($_POST['tipo_juros']) && $_POST['tipo_juros'] === 'com') {
+                // 1. VERIFICAÇÃO DE ACESSO (PRO, VIP OU TESTE)
+                $planoUsuarioLogado = strtolower($_SESSION['plano'] ?? 'free');
+                $horasTesteRestantes = function_exists('obterHorasRestantesTeste') ? obterHorasRestantesTeste() : 0;
+                $acessoLiberadoJuros = ($planoUsuarioLogado === 'pro' || $planoUsuarioLogado === 'vip' || $horasTesteRestantes > 0);
+
+                // 2. LÓGICA DE JUROS (COM TRAVA DE SEGURANÇA)
+                if ($acessoLiberadoJuros && isset($_POST['tipo_juros']) && $_POST['tipo_juros'] === 'com') {
                     $valJurosLimpo = preg_replace('/[^\d.,]/', '', $_POST['valor_parcela_juros'] ?? '0');
                     if (strpos($valJurosLimpo, ',') !== false) {
                         $valJurosLimpo = str_replace('.', '', $valJurosLimpo);
@@ -195,13 +200,10 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
                     $parcelaComJuros = (float)$valJurosRaw;
 
-                    // Se a pessoa digitou a parcela com juros, o valor total do registro muda
                     if ($parcelaComJuros > 0) {
                         $valorTotalComJuros = $parcelaComJuros * $numParcelas;
-                        $valorJurosTotal    = $valorTotalComJuros - $valor; // Juros puro
-
-                        // Atualiza a variável $valor para o total (Ex: 3600 vira 3990)
-                        $valor = $valorTotalComJuros;
+                        $valorJurosTotal    = $valorTotalComJuros - $valor;
+                        $valor              = $valorTotalComJuros;
                     }
                 }
 
@@ -509,7 +511,15 @@ require_once 'geral/header.php';
                                     </div>
                                 </div>
 
-                                <?php $isVip = ($_SESSION['plano'] ?? 'free') === 'vip'; ?>
+                                <?php
+                                $planoFront = strtolower($_SESSION['plano'] ?? 'free');
+                                $testeFront = function_exists('obterHorasRestantesTeste') ? (obterHorasRestantesTeste() > 0) : false;
+
+                                // Tem acesso porque assinou ou porque está no teste
+                                $liberaJuros = ($planoFront === 'pro' || $planoFront === 'vip' || $testeFront);
+                                // É assinante real (não é teste)
+                                $assinanteNativo = ($planoFront === 'pro' || $planoFront === 'vip');
+                                ?>
 
                                 <div id="bloco_parcelamento" style="display: <?= $val_parcelado ? 'block' : 'none' ?>;" class="ps-4 border-start border-border-color mt-2">
                                     <label class="form-label text-secondary-analysis fs-7 mb-1">Número de parcelas</label>
@@ -527,10 +537,16 @@ require_once 'geral/header.php';
                                             <input class="form-check-input bg-dark border-border-color shadow-none" type="radio" name="tipo_juros" id="juros_sem" value="sem" checked>
                                             <label class="form-check-label text-light fs-7" for="juros_sem">Sem juros</label>
                                         </div>
-                                        <div class="form-check" <?= !$isVip ? 'title="Exclusivo Auralis VIP" data-bs-toggle="tooltip"' : '' ?>>
-                                            <input class="form-check-input bg-dark border-border-color shadow-none" type="radio" name="tipo_juros" id="juros_com" value="com" <?= !$isVip ? 'disabled' : '' ?>>
+                                        <div class="form-check" <?= !$liberaJuros ? 'title="Exclusivo Auralis PRO" data-bs-toggle="tooltip"' : '' ?>>
+                                            <input class="form-check-input bg-dark border-border-color shadow-none" type="radio" name="tipo_juros" id="juros_com" value="com" <?= !$liberaJuros ? 'disabled' : '' ?>>
                                             <label class="form-check-label text-light fs-7 d-flex align-items-center gap-1" for="juros_com">
-                                                Com juros <?= !$isVip ? '<span class="badge bg-warning text-dark ms-1" style="font-size:0.55rem; padding: 2px 4px;"><i class="bi bi-star-fill"></i> VIP</span>' : '' ?>
+                                                Com juros
+                                                <?php
+                                                // Se não for assinante real (Free ou Trial), mostra o selo correspondente
+                                                if (!$assinanteNativo) {
+                                                    echo function_exists('badgePremium') ? badgePremium('pro', $testeFront) : '';
+                                                }
+                                                ?>
                                             </label>
                                         </div>
                                     </div>
