@@ -515,7 +515,7 @@ require_once 'geral/header.php';
                                                 </div>
                                                 <div>
                                                     <strong class="text-light d-block mb-1">Compra Parcelada</strong>
-                                                    <span class="text-secondary fs-7">Você está editando a parcela <strong><?= $transacao_edit['ParcelaAtual'] ?> de <?= $transacao_edit['TotalParcelas'] ?></strong>.<br>Opções de recorrência foram ocultadas.</span>
+                                                    <span class="text-secondary fs-7">Você está editando a parcela <strong><?= $transacao_edit['ParcelaAtual'] ?> de <?= $transacao_edit['TotalParcelas'] ?></strong>.
                                                 </div>
                                             </div>
                                         <?php endif; ?>
