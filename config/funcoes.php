@@ -2,7 +2,8 @@
 // config/funcoes.php — Compatível com PHP 7.4+
 
 if (!function_exists('obterNivelAcesso')) {
-    function obterNivelAcesso() {
+    function obterNivelAcesso()
+    {
         if (!isset($_SESSION['usuario_id'])) return 0;
         $nivel = strtolower($_SESSION['nivel_acesso'] ?? 'titular');
         if ($nivel === 'supremo') return 3;
@@ -12,7 +13,8 @@ if (!function_exists('obterNivelAcesso')) {
 }
 
 if (!function_exists('exigirAcessoMinimo')) {
-    function exigirAcessoMinimo($nivelNecessario) {
+    function exigirAcessoMinimo($nivelNecessario)
+    {
         $nivelAtual = obterNivelAcesso();
         if ($nivelAtual < $nivelNecessario) {
             $nivelAtual === 0
@@ -24,13 +26,15 @@ if (!function_exists('exigirAcessoMinimo')) {
 }
 
 if (!function_exists('obterPlanoAtual')) {
-    function obterPlanoAtual() {
+    function obterPlanoAtual()
+    {
         return $_SESSION['plano'] ?? 'free';
     }
 }
 
 if (!function_exists('exigirPlano')) {
-    function exigirPlano($planoMinimo) {
+    function exigirPlano($planoMinimo)
+    {
         $hierarquia = ['free' => 0, 'pro' => 1, 'vip' => 2];
         $atual      = $hierarquia[obterPlanoAtual()] ?? 0;
         $necessario = $hierarquia[$planoMinimo]       ?? 0;
@@ -42,7 +46,8 @@ if (!function_exists('exigirPlano')) {
 }
 
 if (!function_exists('temPlano')) {
-    function temPlano($planoMinimo) {
+    function temPlano($planoMinimo)
+    {
         $hierarquia = ['free' => 0, 'pro' => 1, 'vip' => 2];
         $atual      = $hierarquia[obterPlanoAtual()] ?? 0;
         $necessario = $hierarquia[$planoMinimo]       ?? 0;
@@ -51,7 +56,8 @@ if (!function_exists('temPlano')) {
 }
 
 if (!function_exists('badgePlano')) {
-    function badgePlano($plano = '') {
+    function badgePlano($plano = '')
+    {
         if (!$plano) $plano = obterPlanoAtual();
         if ($plano === 'pro') {
             return '<span style="display:inline-flex;align-items:center;background:#7c3aed22;color:#a78bfa;border:1px solid #7c3aed55;border-radius:999px;padding:1px 8px;font-size:0.65rem;font-weight:700;letter-spacing:0.05em;">PRO</span>';
@@ -64,7 +70,8 @@ if (!function_exists('badgePlano')) {
 }
 
 if (!function_exists('limitesDoPlano')) {
-    function limitesDoPlano() {
+    function limitesDoPlano()
+    {
         $plano = obterPlanoAtual();
         if ($plano === 'pro') {
             return [
@@ -100,7 +107,8 @@ if (!function_exists('limitesDoPlano')) {
 }
 
 if (!function_exists('verificarExpiracao')) {
-    function verificarExpiracao($pdo) {
+    function verificarExpiracao($pdo)
+    {
         if (!isset($_SESSION['usuario_id'])) return;
         if (($_SESSION['plano'] ?? 'free') === 'free') return;
         if (isset($_SESSION['expiracao_verificada'])) return;
@@ -129,25 +137,29 @@ if (!function_exists('verificarExpiracao')) {
                     ->execute([':uid' => $_SESSION['usuario_id']]);
                 _rebaixarParaFree($pdo, $_SESSION['usuario_id']);
             }
-        } catch (PDOException $e) {}
+        } catch (PDOException $e) {
+        }
     }
 }
 
 if (!function_exists('_rebaixarParaFree')) {
-    function _rebaixarParaFree($pdo, $uid) {
+    function _rebaixarParaFree($pdo, $uid)
+    {
         try {
             $pdo->prepare("UPDATE Usuario SET Plano = 'free' WHERE IDUsuario = :uid")
                 ->execute([':uid' => $uid]);
             $_SESSION['plano'] = 'free';
             unset($_SESSION['expiracao_verificada']);
-        } catch (PDOException $e) {}
+        } catch (PDOException $e) {
+        }
     }
 }
 
 // ── Trial de 50 horas para novos usuários ─────────────────────────────────
 
 if (!function_exists('obterPlanoEfetivo')) {
-    function obterPlanoEfetivo() {
+    function obterPlanoEfetivo()
+    {
         global $pdo;
         $uid = $_SESSION['usuario_id'] ?? '';
         if (!$uid || !$pdo) return obterPlanoAtual();
@@ -167,14 +179,16 @@ if (!function_exists('obterPlanoEfetivo')) {
 
                 if ($horas < 50) return 'vip_trial';
             }
-        } catch (PDOException $e) {}
+        } catch (PDOException $e) {
+        }
 
         return 'free';
     }
 }
 
 if (!function_exists('obterHorasRestantesTeste')) {
-    function obterHorasRestantesTeste() {
+    function obterHorasRestantesTeste()
+    {
         global $pdo;
         $uid = $_SESSION['usuario_id'] ?? '';
         if (!$uid || !$pdo || obterPlanoAtual() !== 'free') return 0;
@@ -190,7 +204,8 @@ if (!function_exists('obterHorasRestantesTeste')) {
                 $horas   = ($diff->days * 24) + $diff->h;
                 if ($horas < 50) return 50 - $horas;
             }
-        } catch (PDOException $e) {}
+        } catch (PDOException $e) {
+        }
 
         return 0;
     }
@@ -214,7 +229,8 @@ if (!defined('MP_PLANOS')) {
 
 // ── Helper MP: consulta API com cURL (saída do servidor → sem bloqueio) ──
 if (!function_exists('mpConsultarApi')) {
-    function mpConsultarApi($url) {
+    function mpConsultarApi($url)
+    {
         $ch = curl_init($url);
         curl_setopt_array($ch, [
             CURLOPT_RETURNTRANSFER => true,
@@ -230,7 +246,8 @@ if (!function_exists('mpConsultarApi')) {
 
 // ── Helper MP: ativa plano no banco a partir de dados da assinatura ───────
 if (!function_exists('mpAtivarPlano')) {
-    function mpAtivarPlano($pdo, $emailComprador, $planId, $gwId, $valorPago = 0) {
+    function mpAtivarPlano($pdo, $emailComprador, $planId, $gwId, $valorPago = 0)
+    {
         $planos = MP_PLANOS;
         if (!isset($planos[$planId])) return false;
 
@@ -257,10 +274,14 @@ if (!function_exists('mpAtivarPlano')) {
                      DataInicio, DataExpiracao, IDAssinaturaGW, EmailGateway, FontePagamento)
                 VALUES (:id, :uid, :plano, 'ativa', :ciclo, :valor, :inicio, :exp, :gwid, :email, 'mercadopago')
             ")->execute([
-                ':id'    => $novoId,       ':uid'   => $uid,
-                ':plano' => $config['plano'], ':ciclo' => $config['ciclo'],
-                ':valor' => $valorPago,    ':inicio' => $dataInicio,
-                ':exp'   => $dataExpiracao, ':gwid'  => $gwId,
+                ':id'    => $novoId,
+                ':uid'   => $uid,
+                ':plano' => $config['plano'],
+                ':ciclo' => $config['ciclo'],
+                ':valor' => $valorPago,
+                ':inicio' => $dataInicio,
+                ':exp'   => $dataExpiracao,
+                ':gwid'  => $gwId,
                 ':email' => strtolower(trim($emailComprador)),
             ]);
 
@@ -274,4 +295,18 @@ if (!function_exists('mpAtivarPlano')) {
             return false;
         }
     }
+}
+
+// Função universal para selos de recursos bloqueados/em teste
+function badgePremium($nivelExigido = 'pro', $emTeste = false)
+{
+    // PRO = Roxo (#7c3aed) | VIP = Dourado (#D4AF37)
+    $cor = (strtolower($nivelExigido) === 'vip') ? '#D4AF37' : '#7c3aed';
+    $texto = strtoupper($nivelExigido);
+
+    if ($emTeste) {
+        $texto .= ' (Teste)';
+    }
+
+    return "<span class=\"badge ms-1\" style=\"background: {$cor}22; color: {$cor}; border: 1px solid {$cor}66; font-size: 0.55rem; padding: 2px 5px; vertical-align: middle;\"><i class=\"bi bi-star-fill\"></i> {$texto}</span>";
 }

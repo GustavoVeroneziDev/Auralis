@@ -150,7 +150,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'])) {
         }
     }
 
-if ($_POST['action'] === 'excluir_registro') {
+    if ($_POST['action'] === 'excluir_registro') {
         $id_registro = $_POST['registro_id'];
         try {
             $sqlDel  = "DELETE FROM Registro WHERE IDRegistro = :id AND FKUsuario = :uid";
@@ -186,6 +186,39 @@ if ($_POST['action'] === 'excluir_registro') {
                 ]);
             } else {
                 // Comportamento padrão: exclui apenas o mês selecionado
+                $sqlDel  = "DELETE FROM Registro WHERE IDRegistro = :id AND FKUsuario = :uid";
+                $stmtDel = $pdo->prepare($sqlDel);
+                $stmtDel->execute([':id' => $id_registro, ':uid' => $usuario_id]);
+            }
+            header("Location: " . $redirectBase . "&sucesso=excluido");
+            exit;
+        } catch (PDOException $e) {
+        }
+    }
+
+    if ($_POST['action'] === 'excluir_parcelado_grupo') {
+        $id_registro   = $_POST['registro_id'];
+        $grupo_id      = $_POST['grupo_parcela'];
+        $parcela_atual = (int)$_POST['parcela_atual'];
+        $tipo_exclusao = $_POST['tipo_exclusao'] ?? 'apenas_este';
+
+        try {
+            if ($tipo_exclusao === 'futuros' && !empty($grupo_id)) {
+                // Exclui a parcela selecionada e todas as que vêm DEPOIS dela
+                $sqlDel = "
+                    DELETE FROM Registro 
+                    WHERE FKUsuario = :uid 
+                      AND GrupoParcela = :grupo
+                      AND ParcelaAtual >= :parc_atual
+                ";
+                $stmtDel = $pdo->prepare($sqlDel);
+                $stmtDel->execute([
+                    ':uid'       => $usuario_id,
+                    ':grupo'     => $grupo_id,
+                    ':parc_atual' => $parcela_atual
+                ]);
+            } else {
+                // Exclui apenas a parcela selecionada
                 $sqlDel  = "DELETE FROM Registro WHERE IDRegistro = :id AND FKUsuario = :uid";
                 $stmtDel = $pdo->prepare($sqlDel);
                 $stmtDel->execute([':id' => $id_registro, ':uid' => $usuario_id]);
@@ -359,16 +392,16 @@ if ($carteira_selecionada) {
 }
 
 
-    // ── Verifica se assinatura ainda está válida (1x por sessão) ────────────
-    verificarExpiracao($pdo);
+// ── Verifica se assinatura ainda está válida (1x por sessão) ────────────
+verificarExpiracao($pdo);
 
-    // ── COMPARAÇÃO: totais do mês ANTERIOR (para badges de variação) ──────────
-    $receitasMesAnt = 0.00;
-    $despesasMesAnt = 0.00;
+// ── COMPARAÇÃO: totais do mês ANTERIOR (para badges de variação) ──────────
+$receitasMesAnt = 0.00;
+$despesasMesAnt = 0.00;
 
-    if ($carteira_selecionada) {
-        try {
-            $sqlMesAnt = "
+if ($carteira_selecionada) {
+    try {
+        $sqlMesAnt = "
                 SELECT
                     COALESCE(SUM(CASE WHEN TipoRegistro = 'receita' THEN Valor ELSE 0 END), 0) as total_receitas,
                     COALESCE(SUM(CASE WHEN TipoRegistro = 'despesa' THEN Valor ELSE 0 END), 0) as total_despesas
@@ -379,28 +412,29 @@ if ($carteira_selecionada) {
                   AND MONTH(MomentoRegistro) = :mes
                   AND YEAR(MomentoRegistro)  = :ano
             ";
-            $stmtAnt = $pdo->prepare($sqlMesAnt);
-            $stmtAnt->execute([
-                ':carteira_id' => $carteira_selecionada,
-                ':usuario_id'  => $usuario_id,
-                ':mes'         => $mes_ant,
-                ':ano'         => $ano_ant,
-            ]);
-            $resAnt = $stmtAnt->fetch();
-            if ($resAnt) {
-                $receitasMesAnt = (float) $resAnt['total_receitas'];
-                $despesasMesAnt = (float) $resAnt['total_despesas'];
-            }
-        } catch (PDOException $e) {}
+        $stmtAnt = $pdo->prepare($sqlMesAnt);
+        $stmtAnt->execute([
+            ':carteira_id' => $carteira_selecionada,
+            ':usuario_id'  => $usuario_id,
+            ':mes'         => $mes_ant,
+            ':ano'         => $ano_ant,
+        ]);
+        $resAnt = $stmtAnt->fetch();
+        if ($resAnt) {
+            $receitasMesAnt = (float) $resAnt['total_receitas'];
+            $despesasMesAnt = (float) $resAnt['total_despesas'];
+        }
+    } catch (PDOException $e) {
     }
+}
 
-    // ── GASTOS ESPERADOS: pendentes do mês atual ──────────────────────────────
-    $despesasPendentes = 0.00;
-    $receitasPendentes = 0.00;
+// ── GASTOS ESPERADOS: pendentes do mês atual ──────────────────────────────
+$despesasPendentes = 0.00;
+$receitasPendentes = 0.00;
 
-    if ($carteira_selecionada) {
-        try {
-            $sqlPend = "
+if ($carteira_selecionada) {
+    try {
+        $sqlPend = "
                 SELECT
                     COALESCE(SUM(CASE WHEN TipoRegistro = 'despesa' THEN Valor ELSE 0 END), 0) as pend_desp,
                     COALESCE(SUM(CASE WHEN TipoRegistro = 'receita' THEN Valor ELSE 0 END), 0) as pend_rec
@@ -411,37 +445,39 @@ if ($carteira_selecionada) {
                   AND MONTH(MomentoRegistro) = :mes
                   AND YEAR(MomentoRegistro)  = :ano
             ";
-            $stmtPend = $pdo->prepare($sqlPend);
-            $stmtPend->execute([
-                ':carteira_id' => $carteira_selecionada,
-                ':usuario_id'  => $usuario_id,
-                ':mes'         => $mes_atual,
-                ':ano'         => $ano_atual,
-            ]);
-            $resPend = $stmtPend->fetch();
-            if ($resPend) {
-                $despesasPendentes = (float) $resPend['pend_desp'];
-                $receitasPendentes = (float) $resPend['pend_rec'];
-            }
-        } catch (PDOException $e) {}
+        $stmtPend = $pdo->prepare($sqlPend);
+        $stmtPend->execute([
+            ':carteira_id' => $carteira_selecionada,
+            ':usuario_id'  => $usuario_id,
+            ':mes'         => $mes_atual,
+            ':ano'         => $ano_atual,
+        ]);
+        $resPend = $stmtPend->fetch();
+        if ($resPend) {
+            $despesasPendentes = (float) $resPend['pend_desp'];
+            $receitasPendentes = (float) $resPend['pend_rec'];
+        }
+    } catch (PDOException $e) {
     }
+}
 
-    // ── Função helper: calcula variação percentual e retorna badge HTML ────────
+// ── Função helper: calcula variação percentual e retorna badge HTML ────────
 
-    function badgeVar(float $atual, float $anterior, bool $invertido = false): string {
-        // Sem dado anterior → sem badge. Menos poluição visual.
-        if ($anterior <= 0) return '';
-        $delta = (($atual - $anterior) / $anterior) * 100;
-        $abs   = abs(round($delta, 1));
-        if ($abs < 0.5) return '';
-        $subiu    = $delta > 0;
-        $positivo = $invertido ? !$subiu : $subiu;
-        // bg-opacity-20 deixa o badge invisível porque text-{cor} combina com bg-{cor}.
-        // Usamos text-white sobre fundo colorido sólido.
-        $cor  = $positivo ? '28a745' : 'dc3545';
-        $icon = $subiu ? 'bi-arrow-up-short' : 'bi-arrow-down-short';
-        return "<span class='ms-1' style='display:inline-flex;align-items:center;background:#{$cor}22;color:#{$cor};border:1px solid #{$cor}44;border-radius:999px;padding:1px 7px;font-size:0.68rem;font-weight:600;'><i class='bi {$icon}'></i>{$abs}%</span>";
-    }
+function badgeVar(float $atual, float $anterior, bool $invertido = false): string
+{
+    // Sem dado anterior → sem badge. Menos poluição visual.
+    if ($anterior <= 0) return '';
+    $delta = (($atual - $anterior) / $anterior) * 100;
+    $abs   = abs(round($delta, 1));
+    if ($abs < 0.5) return '';
+    $subiu    = $delta > 0;
+    $positivo = $invertido ? !$subiu : $subiu;
+    // bg-opacity-20 deixa o badge invisível porque text-{cor} combina com bg-{cor}.
+    // Usamos text-white sobre fundo colorido sólido.
+    $cor  = $positivo ? '28a745' : 'dc3545';
+    $icon = $subiu ? 'bi-arrow-up-short' : 'bi-arrow-down-short';
+    return "<span class='ms-1' style='display:inline-flex;align-items:center;background:#{$cor}22;color:#{$cor};border:1px solid #{$cor}44;border-radius:999px;padding:1px 7px;font-size:0.68rem;font-weight:600;'><i class='bi {$icon}'></i>{$abs}%</span>";
+}
 
 require_once 'geral/header.php';
 ?>
@@ -645,39 +681,39 @@ require_once 'geral/header.php';
 
         <!-- ── Barra de Gastos Esperados ──────────────────────────────────── -->
         <?php if ($despesasPendentes > 0 || $receitasPendentes > 0): ?>
-        <div class="card bg-body-tertiary border-secondary-subtle rounded-4 shadow-sm mb-4">
-            <div class="card-body py-3 px-3">
-                <div class="d-flex flex-wrap align-items-center justify-content-between gap-3">
-                    <div class="d-flex align-items-center gap-2">
-                        <i class="bi bi-hourglass-split text-warning"></i>
-                        <span class="fw-semibold text-light" style="font-size:0.875rem;">Aguardando confirmação em <?php echo $nome_mes ?></span>
-                    </div>
-                    <div class="d-flex flex-wrap gap-3">
-                        <?php if ($receitasPendentes > 0): ?>
+            <div class="card bg-body-tertiary border-secondary-subtle rounded-4 shadow-sm mb-4">
+                <div class="card-body py-3 px-3">
+                    <div class="d-flex flex-wrap align-items-center justify-content-between gap-3">
                         <div class="d-flex align-items-center gap-2">
-                            <span class="text-secondary small">A receber:</span>
-                            <span class="fw-bold text-success" style="font-size:0.9rem;">R$ <?php echo number_format($receitasPendentes, 2, ',', '.') ?></span>
+                            <i class="bi bi-hourglass-split text-warning"></i>
+                            <span class="fw-semibold text-light" style="font-size:0.875rem;">Aguardando confirmação em <?php echo $nome_mes ?></span>
                         </div>
-                        <?php endif; ?>
-                        <?php if ($despesasPendentes > 0): ?>
-                        <div class="d-flex align-items-center gap-2">
-                            <span class="text-secondary small">A pagar:</span>
-                            <span class="fw-bold text-danger" style="font-size:0.9rem;">R$ <?php echo number_format($despesasPendentes, 2, ',', '.') ?></span>
-                        </div>
-                        <?php endif; ?>
-                        <?php
-                        $projecaoSaldo = $saldoAtual + $receitasPendentes - $despesasPendentes;
-                        ?>
-                        <div class="d-flex align-items-center gap-2 border-start border-secondary-subtle ps-3">
-                            <span class="text-secondary small">Saldo projetado:</span>
-                            <span class="fw-bold <?php echo $projecaoSaldo >= 0 ? 'text-light' : 'text-danger' ?>" style="font-size:0.9rem;">
-                                R$ <?php echo number_format($projecaoSaldo, 2, ',', '.') ?>
-                            </span>
+                        <div class="d-flex flex-wrap gap-3">
+                            <?php if ($receitasPendentes > 0): ?>
+                                <div class="d-flex align-items-center gap-2">
+                                    <span class="text-secondary small">A receber:</span>
+                                    <span class="fw-bold text-success" style="font-size:0.9rem;">R$ <?php echo number_format($receitasPendentes, 2, ',', '.') ?></span>
+                                </div>
+                            <?php endif; ?>
+                            <?php if ($despesasPendentes > 0): ?>
+                                <div class="d-flex align-items-center gap-2">
+                                    <span class="text-secondary small">A pagar:</span>
+                                    <span class="fw-bold text-danger" style="font-size:0.9rem;">R$ <?php echo number_format($despesasPendentes, 2, ',', '.') ?></span>
+                                </div>
+                            <?php endif; ?>
+                            <?php
+                            $projecaoSaldo = $saldoAtual + $receitasPendentes - $despesasPendentes;
+                            ?>
+                            <div class="d-flex align-items-center gap-2 border-start border-secondary-subtle ps-3">
+                                <span class="text-secondary small">Saldo projetado:</span>
+                                <span class="fw-bold <?php echo $projecaoSaldo >= 0 ? 'text-light' : 'text-danger' ?>" style="font-size:0.9rem;">
+                                    R$ <?php echo number_format($projecaoSaldo, 2, ',', '.') ?>
+                                </span>
+                            </div>
                         </div>
                     </div>
                 </div>
             </div>
-        </div>
         <?php endif; ?>
 
         <h4 class="fw-bold text-light mb-3 mt-4">Transações de <?php echo $nome_mes ?></h4>
@@ -712,7 +748,12 @@ require_once 'geral/header.php';
                                 <div class="d-flex align-items-center gap-2">
                                     <?php echo $iconeTipo ?>
                                     <div>
-                                        <span class="text-light fw-semibold"><?php echo htmlspecialchars($t['Descricao']) ?></span>
+                                        <span class="text-light fw-semibold">
+                                            <?php if ($t['Recorrente'] == 1): ?>
+                                                <i class="bi bi-arrow-repeat me-1" style="color: var(--primary-gold-analysis);" title="Conta Recorrente"></i>
+                                            <?php endif; ?>
+                                            <?php echo htmlspecialchars($t['Descricao']) ?>
+                                        </span>
                                         <?php if (!empty($t['TotalParcelas']) && $t['TotalParcelas'] > 1): ?>
                                             <div>
                                                 <span class="badge bg-secondary bg-opacity-25 text-secondary" style="font-size:0.65rem;">
@@ -761,12 +802,18 @@ require_once 'geral/header.php';
                                                     <?php echo (! empty($t['DataVencimento']) && strtotime($t['DataVencimento'])) ? date('d/m/Y', strtotime($t['DataVencimento'])) : '<span class="text-muted">Não definido</span>' ?>
                                                 </span>
                                             </div>
-                                            <div>
-                                                <span class="d-block text-secondary small text-uppercase mb-1">Recorrência</span>
-                                                <span class="text-light fs-6">
-                                                    <?php echo $t['Recorrente'] ? 'Sim (Dia ' . htmlspecialchars($t['DiaVencimento']) . ')' : 'Não' ?>
-                                                </span>
-                                            </div>
+                                            
+                                            <?php if ($t['Recorrente'] == 1): ?>
+                                                <div>
+                                                    <span class="d-block text-secondary small text-uppercase mb-1">Recorrência</span>
+                                                    <span class="text-light fs-6">Sim (Dia <?php echo htmlspecialchars($t['DiaVencimento']); ?>)</span>
+                                                </div>
+                                            <?php elseif (!empty($t['TotalParcelas']) && $t['TotalParcelas'] > 1): ?>
+                                                <div>
+                                                    <span class="d-block text-secondary small text-uppercase mb-1">Parcelado</span>
+                                                    <span class="text-light fs-6">Parcela <?php echo $t['ParcelaAtual']; ?> de <?php echo $t['TotalParcelas']; ?></span>
+                                                </div>
+                                            <?php endif; ?>
                                         </div>
 
                                         <div class="d-flex gap-2 w-100 w-md-auto justify-content-end">
@@ -790,25 +837,43 @@ require_once 'geral/header.php';
                                                 <i class="bi bi-pencil-square"></i> <span class="d-none d-sm-inline">Editar</span>
                                             </a>
 
-                                            <?php 
-                                            // Verifica se é uma conta recorrente com projeções futuras
-                                            if ($t['Recorrente'] == 1 && !empty($t['GrupoParcela']) && empty($t['TotalParcelas'])): 
+                                            <?php
+                                            // Identifica o tipo de transação
+                                            $is_recorrente = ($t['Recorrente'] == 1 && !empty($t['GrupoParcela']) && empty($t['TotalParcelas']));
+                                            $is_parcelado  = (!empty($t['TotalParcelas']) && $t['TotalParcelas'] > 1 && !empty($t['GrupoParcela']));
+
+                                            if ($is_recorrente):
                                             ?>
-                                                <button type="button" 
-                                                        class="btn btn-sm btn-outline-danger rounded-pill fw-semibold px-3 d-inline-flex align-items-center gap-1 transition-hover"
-                                                        data-bs-toggle="modal" 
-                                                        data-bs-target="#modalExcluirRecorrente"
-                                                        data-id="<?php echo $t['IDRegistro'] ?>"
-                                                        data-grupo="<?php echo $t['GrupoParcela'] ?>"
-                                                        data-data="<?php echo $t['MomentoRegistro'] ?>">
+                                                <!-- BOTÃO: EXCLUIR RECORRENTE -->
+                                                <button type="button"
+                                                    class="btn btn-sm btn-outline-danger rounded-pill fw-semibold px-3 d-inline-flex align-items-center gap-1 transition-hover"
+                                                    data-bs-toggle="modal"
+                                                    data-bs-target="#modalExcluirRecorrente"
+                                                    data-id="<?php echo $t['IDRegistro'] ?>"
+                                                    data-grupo="<?php echo $t['GrupoParcela'] ?>"
+                                                    data-data="<?php echo $t['MomentoRegistro'] ?>">
                                                     <i class="bi bi-trash3"></i> <span class="d-none d-sm-inline">Excluir</span>
                                                 </button>
+
+                                            <?php elseif ($is_parcelado): ?>
+                                                <!-- BOTÃO: EXCLUIR PARCELADO -->
+                                                <button type="button"
+                                                    class="btn btn-sm btn-outline-danger rounded-pill fw-semibold px-3 d-inline-flex align-items-center gap-1 transition-hover"
+                                                    data-bs-toggle="modal"
+                                                    data-bs-target="#modalExcluirParcelado"
+                                                    data-id="<?php echo $t['IDRegistro'] ?>"
+                                                    data-grupo="<?php echo $t['GrupoParcela'] ?>"
+                                                    data-parcela="<?php echo $t['ParcelaAtual'] ?>">
+                                                    <i class="bi bi-trash3"></i> <span class="d-none d-sm-inline">Excluir</span>
+                                                </button>
+
                                             <?php else: ?>
-                                                <button type="button" 
-                                                        class="btn btn-sm btn-outline-danger rounded-pill fw-semibold px-3 d-inline-flex align-items-center gap-1 transition-hover"
-                                                        data-bs-toggle="modal" 
-                                                        data-bs-target="#modalExcluirNormal"
-                                                        data-id="<?php echo $t['IDRegistro'] ?>">
+                                                <!-- BOTÃO: EXCLUIR NORMAL -->
+                                                <button type="button"
+                                                    class="btn btn-sm btn-outline-danger rounded-pill fw-semibold px-3 d-inline-flex align-items-center gap-1 transition-hover"
+                                                    data-bs-toggle="modal"
+                                                    data-bs-target="#modalExcluirNormal"
+                                                    data-id="<?php echo $t['IDRegistro'] ?>">
                                                     <i class="bi bi-trash3"></i> <span class="d-none d-sm-inline">Excluir</span>
                                                 </button>
                                             <?php endif; ?>
@@ -940,6 +1005,52 @@ require_once 'geral/header.php';
                             Excluir este e os meses futuros pendentes
                         </label>
                         <div class="text-secondary opacity-75" style="font-size: 0.75rem;">Remove esta transação e todas as projeções não pagas/recebidas adiante.</div>
+                    </div>
+                </div>
+                <div class="modal-footer border-top border-secondary-subtle d-flex justify-content-between p-2">
+                    <button type="button" class="btn btn-sm btn-link text-secondary text-decoration-none" data-bs-dismiss="modal">Cancelar</button>
+                    <button type="submit" class="btn btn-sm btn-danger fw-bold px-3 rounded-pill">
+                        Confirmar Exclusão
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+<!-- MODAL: EXCLUIR PARCELADO -->
+<div class="modal fade" id="modalExcluirParcelado" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered modal-sm" style="max-width: 400px;">
+        <div class="modal-content bg-dark border-secondary-subtle shadow-lg rounded-4">
+            <div class="modal-header border-bottom border-secondary-subtle p-3">
+                <h6 class="modal-title text-light fw-bold">
+                    <i class="bi bi-credit-card-2-front me-2 text-danger"></i> Excluir Parcelamento
+                </h6>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <form method="POST" action="">
+                <div class="modal-body p-4">
+                    <p class="text-secondary small mb-3">
+                        Esta transação faz parte de uma compra parcelada. Escolha a opção ideal:
+                    </p>
+                    <input type="hidden" name="action" value="excluir_parcelado_grupo">
+                    <input type="hidden" name="registro_id" id="excluir_parcelado_id">
+                    <input type="hidden" name="grupo_parcela" id="excluir_parcelado_grupo_id">
+                    <input type="hidden" name="parcela_atual" id="excluir_parcela_atual">
+
+                    <div class="form-check mb-3">
+                        <input class="form-check-input" type="radio" name="tipo_exclusao" id="excluir_apenas_esta_parcela" value="apenas_este" checked>
+                        <label class="form-check-label text-light fw-semibold fs-7" for="excluir_apenas_esta_parcela">
+                            Excluir apenas esta parcela
+                        </label>
+                        <div class="text-secondary opacity-75" style="font-size: 0.75rem;">As outras parcelas continuarão ativas no sistema.</div>
+                    </div>
+                    <div class="form-check">
+                        <input class="form-check-input" type="radio" name="tipo_exclusao" id="excluir_parcelas_futuras" value="futuros">
+                        <label class="form-check-label text-light fw-semibold fs-7" for="excluir_parcelas_futuras">
+                            Excluir esta e as próximas parcelas
+                        </label>
+                        <div class="text-secondary opacity-75" style="font-size: 0.75rem;">Apaga esta transação e todas as parcelas restantes.</div>
                     </div>
                 </div>
                 <div class="modal-footer border-top border-secondary-subtle d-flex justify-content-between p-2">
@@ -1164,9 +1275,9 @@ require_once 'geral/header.php';
     // Script para alimentar o Modal de Exclusão de Recorrência
     const modalExcluirRecorrente = document.getElementById('modalExcluirRecorrente');
     if (modalExcluirRecorrente) {
-        modalExcluirRecorrente.addEventListener('show.bs.modal', function (event) {
+        modalExcluirRecorrente.addEventListener('show.bs.modal', function(event) {
             const button = event.relatedTarget;
-            
+
             const id = button.getAttribute('data-id');
             const grupo = button.getAttribute('data-grupo');
             const data = button.getAttribute('data-data');
@@ -1176,12 +1287,23 @@ require_once 'geral/header.php';
             document.getElementById('excluir_data_base').value = data;
         });
     }
-    
+
     const modalExcluirNormal = document.getElementById('modalExcluirNormal');
     if (modalExcluirNormal) {
-        modalExcluirNormal.addEventListener('show.bs.modal', function (event) {
+        modalExcluirNormal.addEventListener('show.bs.modal', function(event) {
             const button = event.relatedTarget;
             document.getElementById('excluir_normal_id').value = button.getAttribute('data-id');
+        });
+    }
+
+    // Script Modal Exclusão de Compra Parcelada
+    const modalExcluirParcelado = document.getElementById('modalExcluirParcelado');
+    if (modalExcluirParcelado) {
+        modalExcluirParcelado.addEventListener('show.bs.modal', function(event) {
+            const button = event.relatedTarget;
+            document.getElementById('excluir_parcelado_id').value = button.getAttribute('data-id');
+            document.getElementById('excluir_parcelado_grupo_id').value = button.getAttribute('data-grupo');
+            document.getElementById('excluir_parcela_atual').value = button.getAttribute('data-parcela');
         });
     }
 </script>
