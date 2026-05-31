@@ -748,7 +748,12 @@ require_once 'geral/header.php';
                                 <div class="d-flex align-items-center gap-2">
                                     <?php echo $iconeTipo ?>
                                     <div>
-                                        <span class="text-light fw-semibold"><?php echo htmlspecialchars($t['Descricao']) ?></span>
+                                        <span class="text-light fw-semibold">
+                                            <?php if ($t['Recorrente'] == 1): ?>
+                                                <i class="bi bi-arrow-repeat me-1" style="color: var(--primary-gold-analysis);" title="Conta Recorrente"></i>
+                                            <?php endif; ?>
+                                            <?php echo htmlspecialchars($t['Descricao']) ?>
+                                        </span>
                                         <?php if (!empty($t['TotalParcelas']) && $t['TotalParcelas'] > 1): ?>
                                             <div>
                                                 <span class="badge bg-secondary bg-opacity-25 text-secondary" style="font-size:0.65rem;">
@@ -797,12 +802,18 @@ require_once 'geral/header.php';
                                                     <?php echo (! empty($t['DataVencimento']) && strtotime($t['DataVencimento'])) ? date('d/m/Y', strtotime($t['DataVencimento'])) : '<span class="text-muted">Não definido</span>' ?>
                                                 </span>
                                             </div>
-                                            <div>
-                                                <span class="d-block text-secondary small text-uppercase mb-1">Recorrência</span>
-                                                <span class="text-light fs-6">
-                                                    <?php echo $t['Recorrente'] ? 'Sim (Dia ' . htmlspecialchars($t['DiaVencimento']) . ')' : 'Não' ?>
-                                                </span>
-                                            </div>
+                                            
+                                            <?php if ($t['Recorrente'] == 1): ?>
+                                                <div>
+                                                    <span class="d-block text-secondary small text-uppercase mb-1">Recorrência</span>
+                                                    <span class="text-light fs-6">Sim (Dia <?php echo htmlspecialchars($t['DiaVencimento']); ?>)</span>
+                                                </div>
+                                            <?php elseif (!empty($t['TotalParcelas']) && $t['TotalParcelas'] > 1): ?>
+                                                <div>
+                                                    <span class="d-block text-secondary small text-uppercase mb-1">Parcelado</span>
+                                                    <span class="text-light fs-6">Parcela <?php echo $t['ParcelaAtual']; ?> de <?php echo $t['TotalParcelas']; ?></span>
+                                                </div>
+                                            <?php endif; ?>
                                         </div>
 
                                         <div class="d-flex gap-2 w-100 w-md-auto justify-content-end">
