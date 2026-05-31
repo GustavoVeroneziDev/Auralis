@@ -754,13 +754,24 @@ require_once 'geral/header.php';
                                             <?php endif; ?>
                                             <?php echo htmlspecialchars($t['Descricao']) ?>
                                         </span>
-                                        <?php if (!empty($t['TotalParcelas']) && $t['TotalParcelas'] > 1): ?>
-                                            <div>
-                                                <span class="badge bg-secondary bg-opacity-25 text-secondary" style="font-size:0.65rem;">
-                                                    <i class="bi bi-credit-card-2-front me-1"></i><?php echo $t['ParcelaAtual'] ?>/<?php echo $t['TotalParcelas'] ?>
-                                                </span>
+
+                                        <div class="mt-1 d-flex flex-wrap gap-1 align-items-center">
+
+                                            <div class="d-md-none">
+                                                <?php if ($isPendente): ?>
+                                                    <span class="badge bg-warning text-dark px-1 py-1" style="font-size: 0.6rem;"><i class="bi bi-clock-history"></i> Pendente</span>
+                                                <?php else: ?>
+                                                    <span class="badge bg-secondary bg-opacity-25 text-light px-1 py-1" style="font-size: 0.6rem;"><i class="bi bi-check2-circle"></i> Efetivado</span>
+                                                <?php endif; ?>
                                             </div>
-                                        <?php endif; ?>
+
+                                            <?php if (!empty($t['TotalParcelas']) && $t['TotalParcelas'] > 1): ?>
+                                                <span class="badge bg-secondary bg-opacity-25 text-secondary px-1 py-1" style="font-size:0.6rem;">
+                                                    <i class="bi bi-credit-card-2-front"></i> <?php echo $t['ParcelaAtual'] ?>/<?php echo $t['TotalParcelas'] ?>
+                                                </span>
+                                            <?php endif; ?>
+
+                                        </div>
                                     </div>
                                 </div>
                             </td>
@@ -802,7 +813,7 @@ require_once 'geral/header.php';
                                                     <?php echo (! empty($t['DataVencimento']) && strtotime($t['DataVencimento'])) ? date('d/m/Y', strtotime($t['DataVencimento'])) : '<span class="text-muted">Não definido</span>' ?>
                                                 </span>
                                             </div>
-                                            
+
                                             <?php if ($t['Recorrente'] == 1): ?>
                                                 <div>
                                                     <span class="d-block text-secondary small text-uppercase mb-1">Recorrência</span>
