@@ -534,80 +534,77 @@ require_once 'geral/header.php';
             <?php endif; ?>
         <?php endif; ?>
 
-        <div class="d-flex flex-wrap justify-content-between align-items-center mb-3 border-bottom border-secondary-subtle pb-3 gap-2">
+        <div class="mb-3 border-bottom border-secondary-subtle pb-3">
+            <div class="d-flex flex-column flex-lg-row justify-content-between align-items-lg-center gap-3">
 
-            <!-- Título + Seletor de mês (agrupados, compactos) -->
-            <div class="d-flex align-items-center gap-2 flex-wrap">
-                <h2 class="fw-bold text-light mb-0" style="white-space: nowrap; font-size: clamp(1rem, 2vw, 1.35rem);">Visão Geral</h2>
+                <div class="d-flex align-items-center justify-content-between justify-content-lg-start gap-2 w-100 w-lg-auto">
 
-                <div class="d-flex align-items-center bg-dark border border-secondary-subtle rounded-pill shadow-sm" style="padding: 2px 4px;">
-                    <a href="<?php echo $link_ant ?>" class="btn btn-sm btn-link text-light opacity-75 transition-hover text-decoration-none d-flex align-items-center justify-content-center" style="width: 30px; height: 30px;">
-                        <i class="bi bi-caret-left-fill" style="font-size: 0.65rem;"></i>
-                    </a>
+                    <h2 class="fw-bold text-light mb-0 d-none d-lg-block me-2" style="white-space: nowrap; font-size: clamp(1rem, 2vw, 1.35rem);">Visão Geral</h2>
 
-                    <button type="button" class="btn btn-link text-light text-decoration-none fw-semibold px-1 transition-hover d-flex align-items-center justify-content-center"
-                        style="font-size: 0.875rem; white-space: nowrap;"
-                        data-bs-toggle="modal" data-bs-target="#modalSeletorMes">
-                        <?php echo $nome_mes ?> <?php echo $ano_atual ?>
-                        <i class="bi bi-chevron-down ms-1 opacity-75" style="font-size: 0.65rem;"></i>
-                    </button>
+                    <div class="d-flex align-items-center bg-dark border border-secondary-subtle rounded-pill shadow-sm flex-shrink-0" style="padding: 2px 4px;">
+                        <a href="<?php echo $link_ant ?>" class="btn btn-sm btn-link text-light opacity-75 transition-hover text-decoration-none d-flex align-items-center justify-content-center" style="width: 30px; height: 30px;">
+                            <i class="bi bi-caret-left-fill" style="font-size: 0.65rem;"></i>
+                        </a>
 
-                    <a href="<?php echo $link_prox ?>" class="btn btn-sm btn-link text-light opacity-75 transition-hover text-decoration-none d-flex align-items-center justify-content-center" style="width: 30px; height: 30px;">
-                        <i class="bi bi-caret-right-fill" style="font-size: 0.65rem;"></i>
-                    </a>
-                </div>
-            </div>
+                        <button type="button" class="btn btn-link text-light text-decoration-none fw-semibold px-1 transition-hover d-flex align-items-center justify-content-center"
+                            style="font-size: 0.875rem; white-space: nowrap;"
+                            data-bs-toggle="modal" data-bs-target="#modalSeletorMes">
+                            <?php echo $nome_mes ?> <span class="d-none d-sm-inline ms-1"><?php echo $ano_atual ?></span>
+                            <i class="bi bi-chevron-down ms-1 opacity-75" style="font-size: 0.65rem;"></i>
+                        </button>
 
-            <!-- Carteira + Botões de ação -->
-            <div class="d-flex align-items-center gap-2 flex-wrap">
+                        <a href="<?php echo $link_prox ?>" class="btn btn-sm btn-link text-light opacity-75 transition-hover text-decoration-none d-flex align-items-center justify-content-center" style="width: 30px; height: 30px;">
+                            <i class="bi bi-caret-right-fill" style="font-size: 0.65rem;"></i>
+                        </a>
+                    </div>
 
-                <div class="dropdown">
-                    <button class="btn border-secondary-subtle text-light shadow-sm fw-semibold dropdown-toggle d-flex align-items-center rounded-3 transition-hover"
-                        type="button" data-bs-toggle="dropdown" aria-expanded="false"
-                        style="font-size: 0.875rem; background-color: var(--bg-charcoal-analysis); max-width: 200px;">
-                        <span class="text-truncate d-flex align-items-center" style="max-width: 140px;">
-                            <i class="bi bi-wallet2 me-2" style="color: var(--primary-gold-analysis); flex-shrink: 0;"></i>
-                            <?php echo htmlspecialchars($nome_carteira_atual); ?>
-                        </span>
-                    </button>
+                    <div class="dropdown flex-shrink-0">
+                        <button class="btn border-secondary-subtle text-light shadow-sm fw-semibold dropdown-toggle d-flex align-items-center rounded-3 transition-hover px-2 px-sm-3"
+                            type="button" data-bs-toggle="dropdown" aria-expanded="false"
+                            style="font-size: 0.875rem; background-color: var(--bg-charcoal-analysis); max-width: 150px;">
+                            <span class="text-truncate d-flex align-items-center">
+                                <i class="bi bi-wallet2 me-1 me-sm-2" style="color: var(--primary-gold-analysis); flex-shrink: 0;"></i>
+                                <?php echo htmlspecialchars($nome_carteira_atual); ?>
+                            </span>
+                        </button>
 
-                    <ul class="dropdown-menu dropdown-menu-dark shadow-lg border-secondary-subtle mt-2 w-100" style="background-color: #1a1d21;">
-                        <li class="px-3 py-1 text-secondary small text-uppercase fw-bold tracking-wide">Alternar Carteira</li>
-                        <li>
-                            <hr class="dropdown-divider border-secondary-subtle">
-                        </li>
-                        <?php foreach ($carteiras as $cart): ?>
+                        <ul class="dropdown-menu dropdown-menu-dark shadow-lg border-secondary-subtle mt-2 w-100" style="background-color: #1a1d21;">
+                            <li class="px-3 py-1 text-secondary small text-uppercase fw-bold tracking-wide">Alternar Carteira</li>
                             <li>
-                                <a class="dropdown-item d-flex align-items-center py-2 transition-hover <?php echo $carteira_selecionada == $cart['IDCarteira'] ? 'active' : '' ?>"
-                                    href="?mes=<?php echo $mes_atual ?>&ano=<?php echo $ano_atual ?>&carteira=<?php echo htmlspecialchars($cart['IDCarteira']) ?>">
-                                    <?php if ($carteira_selecionada == $cart['IDCarteira']): ?>
-                                        <i class="bi bi-check-circle-fill me-2" style="color: var(--primary-gold-analysis);"></i>
-                                        <span class="fw-bold" style="color: var(--primary-gold-analysis);"><?php echo htmlspecialchars($cart['TipoCarteira']); ?></span>
-                                    <?php else: ?>
-                                        <i class="bi bi-circle me-2 text-secondary opacity-50"></i>
-                                        <span class="text-light"><?php echo htmlspecialchars($cart['TipoCarteira']); ?></span>
-                                    <?php endif; ?>
-                                </a>
+                                <hr class="dropdown-divider border-secondary-subtle">
                             </li>
-                        <?php endforeach; ?>
-                    </ul>
+                            <?php foreach ($carteiras as $cart): ?>
+                                <li>
+                                    <a class="dropdown-item d-flex align-items-center py-2 transition-hover <?php echo $carteira_selecionada == $cart['IDCarteira'] ? 'active' : '' ?>"
+                                        href="?mes=<?php echo $mes_atual ?>&ano=<?php echo $ano_atual ?>&carteira=<?php echo htmlspecialchars($cart['IDCarteira']) ?>">
+                                        <?php if ($carteira_selecionada == $cart['IDCarteira']): ?>
+                                            <i class="bi bi-check-circle-fill me-2" style="color: var(--primary-gold-analysis);"></i>
+                                            <span class="fw-bold" style="color: var(--primary-gold-analysis);"><?php echo htmlspecialchars($cart['TipoCarteira']); ?></span>
+                                        <?php else: ?>
+                                            <i class="bi bi-circle me-2 text-secondary opacity-50"></i>
+                                            <span class="text-light"><?php echo htmlspecialchars($cart['TipoCarteira']); ?></span>
+                                        <?php endif; ?>
+                                    </a>
+                                </li>
+                            <?php endforeach; ?>
+                        </ul>
+                    </div>
                 </div>
 
-                <div class="vr bg-secondary opacity-25 mx-1 d-none d-sm-block"></div>
-
-                <div class="d-flex gap-2">
+                <div class="d-flex gap-2 w-100 w-lg-auto mt-1 mt-lg-0">
                     <a href="nova_transacao.php?carteira_id=<?php echo urlencode($carteira_selecionada) ?>&tipo=receita"
-                        class="btn btn-outline-success fw-semibold d-flex align-items-center gap-1 rounded-pill transition-hover shadow-sm"
+                        class="btn btn-outline-success fw-semibold d-flex align-items-center justify-content-center gap-1 rounded-pill transition-hover shadow-sm flex-grow-1"
                         style="font-size: 0.875rem; padding: 0.375rem 0.875rem;">
-                        <i class="bi bi-arrow-up-short fs-6"></i> Receita
+                        <i class="bi bi-arrow-up-short fs-5"></i> Receita
                     </a>
 
                     <a href="nova_transacao.php?carteira_id=<?php echo urlencode($carteira_selecionada) ?>&tipo=despesa"
-                        class="btn btn-outline-danger fw-semibold d-flex align-items-center gap-1 rounded-pill transition-hover shadow-sm"
+                        class="btn btn-outline-danger fw-semibold d-flex align-items-center justify-content-center gap-1 rounded-pill transition-hover shadow-sm flex-grow-1"
                         style="font-size: 0.875rem; padding: 0.375rem 0.875rem;">
-                        <i class="bi bi-arrow-down-short fs-6"></i> Despesa
+                        <i class="bi bi-arrow-down-short fs-5"></i> Despesa
                     </a>
                 </div>
+
             </div>
         </div>
 
@@ -754,13 +751,24 @@ require_once 'geral/header.php';
                                             <?php endif; ?>
                                             <?php echo htmlspecialchars($t['Descricao']) ?>
                                         </span>
-                                        <?php if (!empty($t['TotalParcelas']) && $t['TotalParcelas'] > 1): ?>
-                                            <div>
-                                                <span class="badge bg-secondary bg-opacity-25 text-secondary" style="font-size:0.65rem;">
-                                                    <i class="bi bi-credit-card-2-front me-1"></i><?php echo $t['ParcelaAtual'] ?>/<?php echo $t['TotalParcelas'] ?>
-                                                </span>
+
+                                        <div class="mt-1 d-flex flex-wrap gap-1 align-items-center">
+
+                                            <div class="d-md-none">
+                                                <?php if ($isPendente): ?>
+                                                    <span class="badge bg-warning text-dark px-1 py-1" style="font-size: 0.6rem;"><i class="bi bi-clock-history"></i> Pendente</span>
+                                                <?php else: ?>
+                                                    <span class="badge bg-secondary bg-opacity-25 text-light px-1 py-1" style="font-size: 0.6rem;"><i class="bi bi-check2-circle"></i> Efetivado</span>
+                                                <?php endif; ?>
                                             </div>
-                                        <?php endif; ?>
+
+                                            <?php if (!empty($t['TotalParcelas']) && $t['TotalParcelas'] > 1): ?>
+                                                <span class="badge bg-secondary bg-opacity-25 text-secondary px-1 py-1" style="font-size:0.6rem;">
+                                                    <i class="bi bi-credit-card-2-front"></i> <?php echo $t['ParcelaAtual'] ?>/<?php echo $t['TotalParcelas'] ?>
+                                                </span>
+                                            <?php endif; ?>
+
+                                        </div>
                                     </div>
                                 </div>
                             </td>
@@ -802,7 +810,7 @@ require_once 'geral/header.php';
                                                     <?php echo (! empty($t['DataVencimento']) && strtotime($t['DataVencimento'])) ? date('d/m/Y', strtotime($t['DataVencimento'])) : '<span class="text-muted">Não definido</span>' ?>
                                                 </span>
                                             </div>
-                                            
+
                                             <?php if ($t['Recorrente'] == 1): ?>
                                                 <div>
                                                     <span class="d-block text-secondary small text-uppercase mb-1">Recorrência</span>

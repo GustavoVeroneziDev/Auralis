@@ -141,10 +141,14 @@ $paginaAtual = basename($_SERVER['PHP_SELF']);
     if ($horasRestantes > 0):
     ?>
         <div class="container-fluid px-0">
-            <div class="alert mb-0 text-center shadow-sm" style="background: linear-gradient(90deg, #ca8a04, #eab308); color: #fff; border: none; border-radius: 0; padding: 0.6rem;">
-                <div class="d-flex align-items-center justify-content-center gap-2" style="font-size: 0.95rem; font-weight: 600;">
+            <div class="alert mb-0 text-center shadow-sm" style="background: linear-gradient(90deg, #ca8a04, #eab308); color: #fff; border: none; border-radius: 0; padding: 0.5rem;">
+                <div class="d-none d-md-flex align-items-center justify-content-center gap-2" style="font-size: 0.95rem; font-weight: 600;">
                     <i class="bi bi-clock-history fs-5"></i>
                     Você possui <strong><?php echo $horasRestantes; ?> horas</strong> restantes de Acesso Total. Aproveite para conhecer o Auralis!
+                </div>
+                <div class="d-flex d-md-none align-items-center justify-content-center gap-2" style="font-size: 0.85rem; font-weight: 700;">
+                    <i class="bi bi-clock-history"></i>
+                    Teste VIP: <?php echo $horasRestantes; ?>h restantes
                 </div>
             </div>
         </div>
