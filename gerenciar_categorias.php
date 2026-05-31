@@ -366,30 +366,36 @@ $listaIcones = [
                                         <td class="py-3 border-secondary-subtle text-secondary small text-center fs-7">
                                             <?= $cat['total_usos'] ?> registro(s)
                                         </td>
-                                        <td class="text-end pe-4 py-3 border-secondary-subtle">
-                                            <button type="button"
-                                                class="btn btn-sm btn-outline-warning rounded-pill px-3 me-1 transition-hover"
-                                                data-bs-toggle="modal"
-                                                data-bs-target="#modalEditarCategoria"
-                                                data-id="<?= $cat['IDCategoria'] ?>"
-                                                data-nome="<?= htmlspecialchars($cat['NomeCategoria']) ?>"
-                                                data-tipo="<?= $cat['TipoCategoria'] ?>"
-                                                data-icone="<?= $cat['IconeCategoria'] ?>">
-                                                <i class="bi bi-pencil-square"></i>
-                                            </button>
-
-                                            <?php if ($cat['total_usos'] > 0): ?>
-                                                <button class="btn btn-sm btn-outline-secondary rounded-pill px-3" disabled title="Categoria em uso"><i class="bi bi-trash3"></i></button>
-                                            <?php else: ?>
+                                        <td class="text-end pe-3 pe-md-4 py-3 border-secondary-subtle">
+                                            <div class="d-flex align-items-center justify-content-end gap-2">
                                                 <button type="button"
-                                                    class="btn btn-sm btn-outline-danger rounded-pill px-3 transition-hover"
+                                                    class="btn btn-sm btn-outline-warning rounded-circle transition-hover d-flex align-items-center justify-content-center"
+                                                    style="width: 34px; height: 34px; padding: 0;"
                                                     data-bs-toggle="modal"
-                                                    data-bs-target="#modalExcluirCategoria"
+                                                    data-bs-target="#modalEditarCategoria"
                                                     data-id="<?= $cat['IDCategoria'] ?>"
-                                                    data-nome="<?= htmlspecialchars($cat['NomeCategoria']) ?>">
-                                                    <i class="bi bi-trash3"></i>
+                                                    data-nome="<?= htmlspecialchars($cat['NomeCategoria']) ?>"
+                                                    data-tipo="<?= $cat['TipoCategoria'] ?>"
+                                                    data-icone="<?= $cat['IconeCategoria'] ?>">
+                                                    <i class="bi bi-pencil-square"></i>
                                                 </button>
-                                            <?php endif; ?>
+
+                                                <?php if ($cat['total_usos'] > 0): ?>
+                                                    <button class="btn btn-sm btn-outline-secondary rounded-circle d-flex align-items-center justify-content-center" style="width: 34px; height: 34px; padding: 0;" disabled title="Categoria em uso">
+                                                        <i class="bi bi-trash3"></i>
+                                                    </button>
+                                                <?php else: ?>
+                                                    <button type="button"
+                                                        class="btn btn-sm btn-outline-danger rounded-circle transition-hover d-flex align-items-center justify-content-center"
+                                                        style="width: 34px; height: 34px; padding: 0;"
+                                                        data-bs-toggle="modal"
+                                                        data-bs-target="#modalExcluirCategoria"
+                                                        data-id="<?= $cat['IDCategoria'] ?>"
+                                                        data-nome="<?= htmlspecialchars($cat['NomeCategoria']) ?>">
+                                                        <i class="bi bi-trash3"></i>
+                                                    </button>
+                                                <?php endif; ?>
+                                            </div>
                                         </td>
                                     </tr>
                                 <?php endforeach; ?>
