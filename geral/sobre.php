@@ -1,166 +1,217 @@
 <?php require_once 'header.php'; ?>
 
+<!-- ── HERO ─────────────────────────────────────────────────────────────── -->
 <header class="py-5 text-center border-bottom border-secondary-subtle position-relative overflow-hidden">
-    <div
-        style="position: absolute; top: -50px; left: 50%; transform: translateX(-50%); width: 300px; height: 300px; background: var(--accent); filter: blur(150px); opacity: 0.15; border-radius: 50%; pointer-events: none;">
-    </div>
-
-    <div class="container py-5 position-relative">
-        <h1 class="display-4 fw-bold mb-3 text-primary">Auralis</h1>
-        <h2 class="h3 fw-light text-light mb-4">Gestor Financeiro Familiar Inteligente</h2>
-        <p class="lead text-light opacity-75 mx-auto" style="max-width: 800px;">
-            Transformando finanças familiares em algo simples, justo e eficiente. O
-            Auralis nasceu com a missão de acabar com as discussões por dinheiro e ajudar famílias a economizarem,
-            planejarem e viverem melhor.
+    <div style="position:absolute;top:-60px;left:50%;transform:translateX(-50%);width:400px;height:400px;background:var(--accent);filter:blur(160px);opacity:0.1;border-radius:50%;pointer-events:none;"></div>
+    <div class="container py-4 position-relative">
+        <span class="badge mb-4 px-3 py-2 rounded-pill fw-semibold"
+              style="background:#d4af3715;color:#d4af37;border:1px solid #d4af3740;font-size:0.8rem;">
+            Auralis — Aurum + Analysis
+        </span>
+        <h1 class="fw-bold text-light mb-3" style="font-size:clamp(2rem,5vw,3rem);">
+            A análise de <span style="background:linear-gradient(90deg,#d4af37,#f9e596);-webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text;">ouro</span> das suas finanças
+        </h1>
+        <p class="text-secondary mx-auto" style="max-width:620px;font-size:1.05rem;line-height:1.75;">
+            O Auralis nasceu de uma frustração real: os aplicativos de finanças existentes são ou
+            muito simples demais ou complexos demais. Criamos o meio-termo certo — poderoso por baixo,
+            simples por cima.
         </p>
     </div>
 </header>
 
 <main class="container py-5">
 
-    <div class="row align-items-center py-5 card-animado surgir-baixo">
-        <div class="col-lg-6 order-lg-1 order-2 mt-4 mt-lg-0">
-            <h3 class="fw-bold mb-3 text-primary">A Análise de Ouro</h3>
-            <p class="text-light opacity-75 mb-4">
-                O nome Auralis não foi escolhido por acaso. Ele nasce da combinação de duas palavras poderosas:
+    <!-- ── O QUE É O AURALIS ─────────────────────────────────────────────── -->
+    <div class="row align-items-center py-5 g-5 card-animado surgir-baixo">
+        <div class="col-lg-6">
+            <h2 class="fw-bold text-light mb-4">O nome não foi por acaso</h2>
+            <p class="text-secondary mb-4" style="line-height:1.8;">
+                <strong class="text-light">Aurum</strong> é ouro em latim — representa o valor, a estabilidade e o nível de sofisticação que entregamos. <strong class="text-light">Analysis</strong> é a inteligência que transforma dados financeiros em decisões claras.
             </p>
-            <ul class="list-unstyled text-light opacity-75">
-                <li class="mb-3 d-flex align-items-start">
-                    <i class="bi bi-heptagon-fill text-primary me-3 fs-5"></i>
-                    <div>
-                        <strong class="text-light">Aurum (Ouro em latim):</strong> Representa o aspecto premium, o valor
-                        e a estabilidade financeira que o app transmite.
-                    </div>
-                </li>
-                <li class="mb-3 d-flex align-items-start">
-                    <i class="bi bi-graph-up-arrow text-primary me-3 fs-5"></i>
-                    <div>
-                        <strong class="text-light">Analysis (Análise):</strong> Simboliza a inteligência e o controle
-                        profundo das suas finanças.
-                    </div>
-                </li>
-            </ul>
+            <p class="text-secondary" style="line-height:1.8;">
+                Juntos formam o Auralis: um sistema que vê seu dinheiro como você merece — com clareza, contexto e sem achismos.
+            </p>
         </div>
-        <div class="col-lg-6 order-lg-2 order-1 text-center">
-            <div class="p-5 d-flex justify-content-center align-items-center">
-                <i class="bi bi-gem display-1 text-primary drop-shadow"></i>
+        <div class="col-lg-6">
+            <div class="row g-3">
+                <?php foreach([
+                    ['bi-heptagon-fill',   '#d4af37', 'Padrão Premium',      'Interface dark mode com identidade dourada — funcional e elegante.'],
+                    ['bi-graph-up-arrow',  '#a78bfa', 'Análise Real',        'Comparativos mês a mês por categoria. Não só números, mas contexto.'],
+                    ['bi-shield-lock-fill','#22c55e', 'Segurança Nativa',    'PDO com Prepared Statements em 100% das queries. UUID em todas as PKs.'],
+                    ['bi-phone',           '#38bdf8', 'Mobile-First',        'Parece um app nativo no celular. Responsivo e fluido em qualquer tela.'],
+                ] as [$icon, $color, $title, $desc]): ?>
+                <div class="col-6">
+                    <div class="p-3 rounded-3 h-100" style="background:var(--bg-card);border:1px solid rgba(255,255,255,.06);">
+                        <i class="bi <?php echo $icon ?> mb-2 d-block" style="color:<?php echo $color ?>;font-size:1.25rem;"></i>
+                        <div class="fw-semibold text-light mb-1" style="font-size:0.875rem;"><?php echo $title ?></div>
+                        <div class="text-secondary" style="font-size:0.775rem;line-height:1.5;"><?php echo $desc ?></div>
+                    </div>
+                </div>
+                <?php endforeach; ?>
             </div>
         </div>
     </div>
 
-    <div class="row align-items-center py-5 card-animado surgir-baixo" style="transition-delay: 0.2s;">
-        <div class="col-lg-6 text-center mb-4 mb-lg-0">
-            <div class="p-5 d-flex justify-content-center align-items-center">
-                <i class="bi bi-shield-lock display-1 text-primary drop-shadow"></i>
+    <!-- ── O QUE O SISTEMA FAZ HOJE ──────────────────────────────────────── -->
+    <div class="py-5 border-top border-secondary-subtle card-animado surgir-baixo">
+        <div class="text-center mb-5">
+            <h2 class="fw-bold text-light mb-3">O que o sistema entrega hoje</h2>
+            <p class="text-secondary mx-auto" style="max-width:500px;">Funcionalidades reais, rodando em produção agora.</p>
+        </div>
+
+        <div class="row g-4">
+            <?php
+            $features = [
+                ['bi-speedometer2',        '#d4af37', 'Dashboard Inteligente',
+                 'Saldo calculado dinamicamente (nunca um campo estático). Receitas e despesas do mês com badge de variação percentual vs mês anterior. Saldo projetado incluindo tudo que ainda está pendente.'],
+                ['bi-credit-card-2-front', '#a78bfa', 'Parcelamento Automático',
+                 'Registre uma compra em N vezes e o sistema cria uma entrada por mês automaticamente com a descrição "Produto (1/5)", "(2/5)", etc. Parcelas futuras aparecem como pendentes na previsão de gastos.'],
+                ['bi-arrow-repeat',        '#22c55e', 'Contas Recorrentes',
+                 'Cadastre uma vez — Netflix, aluguel, academia — e o Auralis projeta os próximos meses como pendentes. Elas aparecem na barra de previsão de gastos antes de cair.'],
+                ['bi-hourglass-split',     '#f59e0b', 'Previsão de Gastos do Mês',
+                 'Barra de "Aguardando confirmação" mostra a pagar, a receber e o saldo projetado. Você sabe o que vai acontecer antes de acontecer.'],
+                ['bi-pie-chart-fill',      '#38bdf8', 'Análises por Categoria',
+                 'Gráfico de rosca com % em cada fatia. Clique numa categoria e veja o detalhamento com comparativo ao mês anterior — quanto gastou em Lazer em abril vs maio.'],
+                ['bi-wallet2',             '#fb7185', 'Múltiplas Carteiras',
+                 'Conta Itaú, Nubank, Carteira Física — cada uma com saldo real calculado pela soma das transações. Filtro de carteira em todas as telas.'],
+                ['bi-pencil-square',       '#c084fc', 'Ajuste de Saldo',
+                 'Saldo do sistema diferente da conta real? Informe o valor correto e o Auralis cria um ajuste de receita ou despesa automaticamente, mantendo o histórico íntegro.'],
+                ['bi-stars',               '#fbbf24', 'Sistema de Planos',
+                 'Free, PRO e VIP com ativação automática via Mercado Pago. Assinatura detectada em tempo real sem depender de webhook — ativação imediata ao retornar do pagamento.'],
+            ];
+            foreach($features as $i => [$icon, $color, $title, $desc]):
+                $delay = ($i % 3) * 0.1;
+            ?>
+            <div class="col-12 col-md-6 col-lg-4 card-animado surgir-baixo" style="transition-delay:<?php echo $delay ?>s;">
+                <div class="feature-card h-100">
+                    <div class="d-flex align-items-center gap-3 mb-3">
+                        <div class="rounded-3 flex-shrink-0 d-flex align-items-center justify-content-center"
+                             style="width:40px;height:40px;background:<?php echo $color ?>18;border:1px solid <?php echo $color ?>30;">
+                            <i class="bi <?php echo $icon ?>" style="color:<?php echo $color ?>;font-size:1.1rem;"></i>
+                        </div>
+                        <h6 class="fw-semibold text-light mb-0"><?php echo $title ?></h6>
+                    </div>
+                    <p class="text-secondary mb-0" style="font-size:0.85rem;line-height:1.65;"><?php echo $desc ?></p>
+                </div>
+            </div>
+            <?php endforeach; ?>
+        </div>
+    </div>
+
+    <!-- ── ARQUITETURA ────────────────────────────────────────────────────── -->
+    <div class="row align-items-center py-5 g-5 border-top border-secondary-subtle card-animado surgir-baixo">
+        <div class="col-lg-6">
+            <h2 class="fw-bold text-light mb-4">Construído para durar</h2>
+            <p class="text-secondary mb-4" style="line-height:1.8;">
+                Cada decisão técnica foi tomada pensando em escalabilidade e segurança. O saldo nunca é um campo salvo no banco — é sempre calculado. As PKs são UUID, não autoincrement. Cada query usa Prepared Statements.
+            </p>
+            <div class="d-flex flex-column gap-3">
+                <?php foreach([
+                    ['bi-database-fill-check', '#22c55e', 'MySQL + PDO', 'Prepared Statements em 100% das queries. Zero concatenação de variáveis.'],
+                    ['bi-code-slash',           '#38bdf8', 'PHP 8 + Bootstrap 5.3', 'Arquitetura modular por domínio, sem frameworks pesados.'],
+                    ['bi-git',                  '#f59e0b', 'Deploy via GitHub Actions', 'Push na main → FTP automático para o servidor de produção.'],
+                ] as [$icon, $color, $title, $desc]): ?>
+                <div class="d-flex gap-3 align-items-start">
+                    <div class="rounded-2 flex-shrink-0 d-flex align-items-center justify-content-center"
+                         style="width:36px;height:36px;background:<?php echo $color ?>18;border:1px solid <?php echo $color ?>30;">
+                        <i class="bi <?php echo $icon ?>" style="color:<?php echo $color ?>;font-size:0.9rem;"></i>
+                    </div>
+                    <div>
+                        <div class="text-light fw-semibold" style="font-size:0.875rem;"><?php echo $title ?></div>
+                        <div class="text-secondary" style="font-size:0.8rem;"><?php echo $desc ?></div>
+                    </div>
+                </div>
+                <?php endforeach; ?>
             </div>
         </div>
         <div class="col-lg-6">
-            <h3 class="fw-bold mb-3 text-primary">Justiça e Privacidade Real</h3>
-            <p class="text-light opacity-75 mb-4">
-                Diferente dos aplicativos tradicionais, entendemos a realidade brasileira, onde a privacidade pessoal é
-                fundamental. Criamos uma separação clara entre a visão Pessoal e Familiar.
-            </p>
-            <p class="text-light opacity-75 mb-4">
-                Nosso sistema de rateio inteligente reflete a realidade da sua casa, permitindo divisões justas e
-                flexíveis:
-            </p>
-            <div class="row g-3">
-                <div class="col-sm-6">
-                    <div class="p-3 bg-body-tertiary rounded-3 border border-secondary-subtle">
-                        <i class="bi bi-check2-circle text-primary me-2"></i>Divisão Igual
-                    </div>
-                </div>
-                <div class="col-sm-6">
-                    <div class="p-3 bg-body-tertiary rounded-3 border border-secondary-subtle">
-                        <i class="bi bi-check2-circle text-primary me-2"></i>Por Porcentagem
-                    </div>
-                </div>
-                <div class="col-sm-6">
-                    <div class="p-3 bg-body-tertiary rounded-3 border border-secondary-subtle">
-                        <i class="bi bi-check2-circle text-primary me-2"></i>Valor Manual
-                    </div>
-                </div>
-                <div class="col-sm-6">
-                    <div class="p-3 bg-body-tertiary rounded-3 border border-secondary-subtle">
-                        <i class="bi bi-check2-circle text-primary me-2"></i>Único Pagador
-                    </div>
-                </div>
+            <div class="p-4 rounded-4" style="background:var(--bg-card);border:1px solid rgba(255,255,255,.07);font-family:monospace;font-size:0.8rem;line-height:1.8;">
+                <div class="text-secondary mb-2" style="font-size:0.7rem;">// Saldo nunca é salvo. Sempre calculado.</div>
+                <div><span style="color:#a78bfa;">SELECT</span> <span style="color:#22c55e;">SUM</span>(<span style="color:#f59e0b;">CASE</span></div>
+                <div>&nbsp;&nbsp;<span style="color:#f59e0b;">WHEN</span> TipoRegistro = <span style="color:#34d399;">'receita'</span></div>
+                <div>&nbsp;&nbsp;<span style="color:#f59e0b;">THEN</span> Valor <span style="color:#f59e0b;">ELSE</span> -Valor</div>
+                <div><span style="color:#f59e0b;">END</span>) <span style="color:#a78bfa;">AS</span> saldo</div>
+                <div><span style="color:#a78bfa;">FROM</span> Registro</div>
+                <div><span style="color:#a78bfa;">WHERE</span> StatusRegistro = <span style="color:#34d399;">'efetivado'</span></div>
+                <div>&nbsp;&nbsp;<span style="color:#a78bfa;">AND</span> FKCarteira = <span style="color:#f59e0b;">:carteira_id</span></div>
             </div>
         </div>
     </div>
 
-    <div class="row align-items-center py-5 card-animado surgir-baixo" style="transition-delay: 0.4s;">
-        <div class="col-lg-6 order-lg-1 order-2 mt-4 mt-lg-0">
-            <h3 class="fw-bold mb-3 text-primary">Controle Financeiro que Motiva</h3>
-            <p class="text-light opacity-75 mb-4">
-                Gerenciar dinheiro não precisa ser chato e burocrático. O Auralis conta com um sistema de gamificação
-                emocional que gera recompensas naturais.
-            </p>
-            <ul class="list-unstyled text-light opacity-75">
-                <li class="mb-3"><i class="bi bi-trophy-fill text-primary me-2"></i> <strong>Conquistas e
-                        Badges:</strong> Celebre cada meta atingida, desde o primeiro mês sem gastos extras até grandes
-                    economias.</li>
-                <li class="mb-3"><i class="bi bi-star-fill text-primary me-2"></i> <strong>Níveis de Evolução:</strong>
-                    Suba de Bronze até alcançar o prestigiado nível Constelação.</li>
-                <li class="mb-3"><i class="bi bi-palette-fill text-primary me-2"></i> <strong>Temas Exclusivos:</strong>
-                    Desbloqueie temas visuais únicos, como o Tema Aurora, ao manter sua constância e atingir objetivos.
-                </li>
-            </ul>
-        </div>
-        <div class="col-lg-6 order-lg-2 order-1 text-center">
-            <div class="p-5 d-flex justify-content-center align-items-center">
-                <i class="bi bi-controller display-1 text-primary drop-shadow"></i>
-            </div>
-        </div>
-    </div>
-
-    <div class="py-5 mt-4 border-top border-secondary-subtle card-animado surgir-baixo">
+    <!-- ── EQUIPE ─────────────────────────────────────────────────────────── -->
+    <div class="py-5 border-top border-secondary-subtle card-animado surgir-baixo">
         <div class="text-center mb-5">
-            <h3 class="fw-bold text-primary">Quem faz o Auralis acontecer</h3>
-            <p class="text-light opacity-75">Uma equipe complementar focada em construir a principal plataforma de
-                finanças familiares do Brasil.</p>
+            <h2 class="fw-bold text-light mb-2">Quem faz o Auralis acontecer</h2>
+            <p class="text-secondary">Uma equipe focada em construir a referência em gestão financeira pessoal no Brasil.</p>
         </div>
 
         <div class="row g-4 justify-content-center">
-            <div class="col-md-5">
+            <div class="col-12 col-md-5">
                 <div class="feature-card text-center h-100">
-                    <div class="mb-3">
-                        <i class="bi bi-person-bounding-box display-4 text-primary"></i>
-                    </div>
+                    <i class="bi bi-person-bounding-box mb-3 d-block" style="font-size:2.5rem;color:#d4af37;"></i>
                     <h4 class="fw-bold text-light mb-1">Gunter Eleandro</h4>
-                    <span class="badge bg-primary text-dark mb-3">CEO & Fundador</span>
-                    <p class="text-light opacity-75 small">
-                        Responsável pela visão geral do produto, estratégia de longo prazo, branding e por todo o design
-                        premium da interface e experiência do usuário.
+                    <span class="badge mb-3 px-3 py-1 rounded-pill" style="background:#d4af3718;color:#d4af37;border:1px solid #d4af3744;font-size:0.7rem;">CEO & Fundador</span>
+                    <p class="text-secondary mb-0" style="font-size:0.875rem;line-height:1.65;">
+                        Responsável pela visão do produto, estratégia de longo prazo, branding e por toda a identidade visual premium do Auralis.
                     </p>
                 </div>
             </div>
-
-            <div class="col-md-5">
+            <div class="col-12 col-md-5">
                 <div class="feature-card text-center h-100">
-                    <div class="mb-3">
-                        <i class="bi bi-terminal-dash display-4 text-primary"></i>
-                    </div>
+                    <i class="bi bi-terminal-dash mb-3 d-block" style="font-size:2.5rem;color:#a78bfa;"></i>
                     <h4 class="fw-bold text-light mb-1">Gustavo Veronezi</h4>
-                    <span class="badge bg-primary text-dark mb-3">CTO & COO</span>
-                    <p class="text-light opacity-75 small">
-                        O cérebro técnico. Responsável por toda a arquitetura, desenvolvimento frontend e backend,
-                        infraestrutura e pela implementação das lógicas complexas de rateio e gamificação.
+                    <span class="badge mb-3 px-3 py-1 rounded-pill" style="background:#7c3aed18;color:#a78bfa;border:1px solid #7c3aed44;font-size:0.7rem;">CTO & COO</span>
+                    <p class="text-secondary mb-0" style="font-size:0.875rem;line-height:1.65;">
+                        Arquitetura, backend, frontend, infraestrutura e toda a lógica do sistema — parcelamentos, recorrências, análises comparativas e integração com Mercado Pago.
                     </p>
                 </div>
             </div>
+        </div>
+    </div>
+
+    <!-- ── ROADMAP ────────────────────────────────────────────────────────── -->
+    <div class="py-5 border-top border-secondary-subtle card-animado surgir-baixo">
+        <div class="text-center mb-5">
+            <h2 class="fw-bold text-light mb-2">O que vem por aí</h2>
+            <p class="text-secondary">Já planejado e em desenvolvimento.</p>
+        </div>
+        <div class="row g-3 justify-content-center">
+            <?php foreach([
+                ['bi-credit-card-fill',    '#f59e0b', 'Módulo de Cartão de Crédito', 'Faturas, parcelamentos no cartão e datas de fechamento/vencimento.'],
+                ['bi-people-fill',         '#22c55e', 'Compartilhamento Familiar',   'Até 4 membros por carteira, com permissões de leitura ou escrita.'],
+                ['bi-bullseye',            '#38bdf8', 'Metas Financeiras',            'Defina uma meta de economia e acompanhe o progresso mês a mês.'],
+                ['bi-file-earmark-pdf',    '#fb7185', 'Exportação de Extratos',       'PDF e Excel completos do histórico de transações por carteira.'],
+                ['bi-phone-fill',          '#c084fc', 'App Mobile (Play Store)',      'Versão nativa para Android com a mesma experiência premium.'],
+                ['bi-bank',               '#d4af37', 'Open Finance',                 'Importação automática de extratos bancários via OFX.'],
+            ] as [$icon, $color, $title, $desc]): ?>
+            <div class="col-12 col-sm-6 col-lg-4">
+                <div class="d-flex gap-3 align-items-start p-3 rounded-3" style="background:var(--bg-card);border:1px solid rgba(255,255,255,.06);">
+                    <div class="rounded-2 flex-shrink-0 d-flex align-items-center justify-content-center"
+                         style="width:36px;height:36px;background:<?php echo $color ?>15;border:1px solid <?php echo $color ?>30;">
+                        <i class="bi <?php echo $icon ?>" style="color:<?php echo $color ?>;font-size:0.9rem;"></i>
+                    </div>
+                    <div>
+                        <div class="text-light fw-semibold mb-1" style="font-size:0.85rem;"><?php echo $title ?></div>
+                        <div class="text-secondary" style="font-size:0.775rem;line-height:1.5;"><?php echo $desc ?></div>
+                    </div>
+                </div>
+            </div>
+            <?php endforeach; ?>
         </div>
     </div>
 
 </main>
 
+<!-- ── CTA ───────────────────────────────────────────────────────────────── -->
 <section class="py-5 bg-body-tertiary border-top border-secondary-subtle text-center">
     <div class="container py-4">
-        <h2 class="fw-bold mb-3 text-light">Pronto para assumir o controle?</h2>
-        <p class="text-light opacity-75 mb-4">Junte-se ao Auralis e transforme a maneira como sua família lida com o
-            dinheiro.</p>
+        <h2 class="fw-bold text-light mb-3">Pronto para assumir o controle?</h2>
+        <p class="text-secondary mb-5 mx-auto" style="max-width:440px;">
+            Crie sua conta grátis e transforme a maneira como você lida com o dinheiro.
+        </p>
         <a href="/usuario/cadastro.php"
-            class="btn btn-primary btn-lg px-5 rounded-pill fw-bold shadow-sm cardCentral">
+           class="btn btn-lg px-5 rounded-pill fw-bold shadow-sm"
+           style="background:linear-gradient(135deg,#d4af37,#AA8C2C);color:#121418;">
             Criar Minha Conta Grátis
         </a>
     </div>
