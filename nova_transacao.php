@@ -456,42 +456,69 @@ require_once 'geral/header.php';
                             </div>
                         </div>
 
+                        <?php
+                        // ── INTELIGÊNCIA DE UX: Descobre o que estamos editando ──
+                        $is_parcela    = $is_edicao && !empty($transacao_edit['TotalParcelas']);
+                        $is_recorrente = $is_edicao && ($transacao_edit['Recorrente'] == 1);
+                        ?>
+
                         <div class="accordion accordion-flush mb-5 border border-border-color rounded-3 overflow-hidden auralis-line-input" id="accordionMaisDetalhes">
                             <div class="accordion-item bg-transparent">
                                 <h2 class="accordion-header">
-                                    <button class="accordion-button <?= (!empty($val_venc) || $val_rec) ? '' : 'collapsed' ?> bg-transparent text-secondary-analysis shadow-none py-2 px-3 small fs-7" type="button" data-bs-toggle="collapse" data-bs-target="#collapseDetalhes">
+                                    <button class="accordion-button <?= (!empty($val_venc) || $val_rec || $is_parcela) ? '' : 'collapsed' ?> bg-transparent text-secondary-analysis shadow-none py-2 px-3 small fs-7" type="button" data-bs-toggle="collapse" data-bs-target="#collapseDetalhes">
                                         Mais detalhes (Vencimento, Recorrência)
                                     </button>
                                 </h2>
-                                <div id="collapseDetalhes" class="accordion-collapse collapse <?= (!empty($val_venc) || $val_rec) ? 'show' : '' ?>" data-bs-parent="#accordionMaisDetalhes">
+                                <div id="collapseDetalhes" class="accordion-collapse collapse <?= (!empty($val_venc) || $val_rec || $is_parcela) ? 'show' : '' ?>" data-bs-parent="#accordionMaisDetalhes">
                                     <div class="accordion-body border-top border-border-color pt-3 px-3 fs-7 bg-charcoal">
-                                        <?php
-                                        // Mostra opção de atualizar o grupo apenas se estiver editando uma recorrência ativa
-                                        if ($is_edicao && !empty($transacao_edit['GrupoParcela']) && empty($transacao_edit['TotalParcelas'])):
-                                        ?>
-                                            <div class="form-check form-switch mt-3 pt-3 border-top border-border-color toggle-analysis toggle-analysis-muted">
+
+                                        <?php if ($is_recorrente && !empty($transacao_edit['GrupoParcela'])): ?>
+                                            <div class="form-check form-switch mb-4 pb-3 border-bottom border-border-color toggle-analysis toggle-analysis-muted">
                                                 <input class="form-check-input bg-dark border-border-color shadow-none" type="checkbox" name="editar_futuros" id="editar_futuros" checked>
                                                 <label class="form-check-label text-light fs-7 fw-semibold" for="editar_futuros">
                                                     Aplicar novo valor/descrição neste e em <strong>todos os meses futuros pendentes</strong>.
                                                 </label>
                                             </div>
                                         <?php endif; ?>
+
                                         <div class="mb-3">
                                             <label class="form-label text-secondary-analysis fs-7 mb-1">Data de Vencimento</label>
                                             <input type="date" name="data_vencimento" class="form-control bg-dark border-border-color text-light-analysis fs-7" value="<?= htmlspecialchars($val_venc) ?>">
                                         </div>
 
-                                        <div class="form-check form-switch mb-2 toggle-analysis toggle-analysis-muted">
-                                            <input class="form-check-input bg-dark border-border-color shadow-none" type="checkbox" name="recorrente" id="recorrente" <?= $val_rec ? 'checked' : '' ?>>
-                                            <label class="form-check-label text-muted-analysis fs-7" for="recorrente">Conta recorrente</label>
-                                        </div>
+                                        <?php
+                                        // Só exibe a opção de Recorrência se for uma criação NOVA, ou se já for uma edição de RECORRENTE
+                                        if (!$is_edicao || $is_recorrente):
+                                        ?>
+                                            <div class="form-check form-switch mb-2 toggle-analysis toggle-analysis-muted" <?= $is_recorrente ? 'style="pointer-events: none; opacity: 0.6;"' : '' ?>>
+                                                <input class="form-check-input bg-dark border-border-color shadow-none" type="checkbox" name="recorrente" id="recorrente" <?= $val_rec ? 'checked' : '' ?>>
+                                                <label class="form-check-label text-muted-analysis fs-7" for="recorrente">
+                                                    Conta recorrente <?= $is_recorrente ? '<span class="badge bg-secondary ms-2" style="font-size:0.6rem;">Fixo (Para remover, exclua a transação)</span>' : '' ?>
+                                                </label>
+                                            </div>
 
-                                        <div id="bloco_recorrencia" style="display: <?= $val_rec ? 'block' : 'none' ?>;" class="ps-4 border-start border-border-color mt-2 bg-charcoal">
-                                            <label class="form-label text-secondary-analysis fs-7 mb-1">Dia do mês</label>
-                                            <input type="number" name="dia_vencimento" id="dia_vencimento"
-                                                class="form-control bg-dark border-border-color text-light-analysis form-control-sm w-50 no-spinners fs-7"
-                                                min="1" max="31" placeholder="Ex: 10" value="<?= htmlspecialchars($val_dia) ?>">
-                                        </div>
+                                            <div id="bloco_recorrencia" style="display: <?= $val_rec ? 'block' : 'none' ?>;" class="ps-4 border-start border-border-color mt-2 bg-charcoal">
+                                                <label class="form-label text-secondary-analysis fs-7 mb-1">Dia do mês</label>
+                                                <input type="number" name="dia_vencimento" id="dia_vencimento"
+                                                    class="form-control bg-dark border-border-color text-light-analysis form-control-sm w-50 no-spinners fs-7"
+                                                    min="1" max="31" placeholder="Ex: 10" value="<?= htmlspecialchars($val_dia) ?>" <?= $is_recorrente ? 'readonly' : '' ?>>
+                                            </div>
+                                        <?php endif; ?>
+
+                                        <?php
+                                        // Se for uma Parcela, mostra um crachá bonito avisando o usuário
+                                        if ($is_parcela):
+                                        ?>
+                                            <div class="mt-3 p-3 bg-dark border border-border-color rounded-3 d-flex align-items-center gap-3">
+                                                <div class="bg-warning bg-opacity-10 p-2 rounded-circle">
+                                                    <i class="bi bi-credit-card-2-front fs-5 text-warning"></i>
+                                                </div>
+                                                <div>
+                                                    <strong class="text-light d-block mb-1">Compra Parcelada</strong>
+                                                    <span class="text-secondary fs-7">Você está editando a parcela <strong><?= $transacao_edit['ParcelaAtual'] ?> de <?= $transacao_edit['TotalParcelas'] ?></strong>.<br>Opções de recorrência foram ocultadas.</span>
+                                                </div>
+                                            </div>
+                                        <?php endif; ?>
 
                                     </div>
                                 </div>
