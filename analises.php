@@ -204,6 +204,7 @@ require_once 'geral/header.php';
 
             <div class="d-flex align-items-center gap-2 w-100 w-lg-auto">
 
+                <!-- Seletor de Carteira -->
                 <div class="dropdown flex-grow-1 flex-lg-grow-0">
                     <button class="btn border-secondary-subtle text-light shadow-sm fw-semibold dropdown-toggle d-flex align-items-center justify-content-center rounded-3 transition-hover w-100"
                         type="button" data-bs-toggle="dropdown" aria-expanded="false"
@@ -213,6 +214,28 @@ require_once 'geral/header.php';
                             <?php echo htmlspecialchars($nome_carteira_atual); ?>
                         </span>
                     </button>
+
+                    <!-- Lista de Carteiras -->
+                    <ul class="dropdown-menu dropdown-menu-dark shadow-lg border-secondary-subtle mt-2 w-100" style="background-color: #1a1d21;">
+                        <li class="px-3 py-1 text-secondary small text-uppercase fw-bold tracking-wide">Alternar Carteira</li>
+                        <li>
+                            <hr class="dropdown-divider border-secondary-subtle">
+                        </li>
+                        <?php foreach ($carteiras as $cart): ?>
+                            <li>
+                                <a class="dropdown-item d-flex align-items-center py-2 transition-hover <?php echo $carteira_selecionada == $cart['IDCarteira'] ? 'active' : '' ?>"
+                                    href="?mes=<?php echo $mes_atual ?>&ano=<?php echo $ano_atual ?>&carteira=<?php echo htmlspecialchars($cart['IDCarteira']) ?>">
+                                    <?php if ($carteira_selecionada == $cart['IDCarteira']): ?>
+                                        <i class="bi bi-check-circle-fill me-2" style="color: var(--primary-gold-analysis);"></i>
+                                        <span class="fw-bold" style="color: var(--primary-gold-analysis);"><?php echo htmlspecialchars($cart['TipoCarteira']); ?></span>
+                                    <?php else: ?>
+                                        <i class="bi bi-circle me-2 text-secondary opacity-50"></i>
+                                        <span class="text-light"><?php echo htmlspecialchars($cart['TipoCarteira']); ?></span>
+                                    <?php endif; ?>
+                                </a>
+                            </li>
+                        <?php endforeach; ?>
+                    </ul>
                 </div>
 
                 <div class="d-flex align-items-center bg-dark border border-secondary-subtle rounded-pill shadow-sm flex-grow-1 flex-lg-grow-0 justify-content-center" style="padding: 2px 4px;">
