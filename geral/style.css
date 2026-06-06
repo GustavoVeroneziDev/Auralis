@@ -528,3 +528,86 @@ input[type="number"] {
     justify-content: center;
   }
 }
+
+/* ==========================================================================
+   NAVBAR AUTH — Controle segmentado Login / Criar conta
+   ========================================================================== */
+
+.nav-auth-pill {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  background: rgba(255, 255, 255, 0.05);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 999px;
+  padding: 4px;
+}
+
+.nav-auth-login,
+.nav-auth-signup {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 8px 18px;
+  border-radius: 999px;
+  font-size: 0.85rem;
+  font-weight: 600;
+  text-decoration: none;
+  white-space: nowrap;
+  transition: all 0.25s ease;
+}
+
+/* Login — opção fantasma */
+.nav-auth-login {
+  color: rgba(255, 255, 255, 0.65);
+}
+
+.nav-auth-login:hover {
+  color: #fff;
+  background: rgba(255, 255, 255, 0.08);
+}
+
+/* Criar conta — opção em destaque dourado */
+.nav-auth-signup {
+  background: linear-gradient(135deg, #d4af37, #aa8c2c);
+  color: #121418 !important;
+  font-weight: 700;
+  box-shadow: 0 2px 12px rgba(212, 175, 55, 0.2);
+}
+
+.nav-auth-signup:hover {
+  background: linear-gradient(135deg, #f9e596, #d4af37);
+  color: #121418 !important;
+  box-shadow: 0 4px 20px rgba(212, 175, 55, 0.4);
+  transform: scale(1.03);
+}
+
+/* Mobile (navbar colapsada) */
+@media (max-width: 991.98px) {
+  .nav-auth-pill {
+    width: 100%;
+    border-radius: 1rem;
+    padding: 6px;
+    gap: 6px;
+    flex-direction: column;
+  }
+
+  .nav-auth-login,
+  .nav-auth-signup {
+    width: 100%;
+    justify-content: center;
+    border-radius: 0.75rem;
+    padding: 12px 18px;
+    font-size: 0.9rem;
+  }
+
+  .nav-auth-login {
+    background: rgba(255, 255, 255, 0.05);
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    color: rgba(255, 255, 255, 0.8);
+  }
+
+  .nav-auth-signup {
+    box-shadow: 0 4px 16px rgba(212, 175, 55, 0.25);
+  }
+}
