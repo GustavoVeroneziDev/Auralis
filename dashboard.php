@@ -568,21 +568,26 @@ require_once 'geral/header.php';
                             </span>
                         </button>
 
-                        <ul class="dropdown-menu dropdown-menu-dark shadow-lg border-secondary-subtle mt-2 w-100" style="background-color: #1a1d21;">
-                            <li class="px-3 py-1 text-secondary small text-uppercase fw-bold tracking-wide">Alternar Carteira</li>
+                        <ul class="dropdown-menu dropdown-menu-dark shadow-lg border-secondary-subtle mt-2" style="background-color:#1a1d21; min-width:220px;">
+                            <li class="px-3 pt-2 pb-1 text-secondary small text-uppercase fw-bold tracking-wide">Alternar Carteira</li>
                             <li>
-                                <hr class="dropdown-divider border-secondary-subtle">
+                                <hr class="dropdown-divider border-secondary-subtle my-1">
                             </li>
                             <?php foreach ($carteiras as $cart): ?>
                                 <li>
-                                    <a class="dropdown-item d-flex align-items-center py-2 transition-hover <?php echo $carteira_selecionada == $cart['IDCarteira'] ? 'active' : '' ?>"
-                                        href="?mes=<?php echo $mes_atual ?>&ano=<?php echo $ano_atual ?>&carteira=<?php echo htmlspecialchars($cart['IDCarteira']) ?>">
+                                    <a class="dropdown-item d-flex align-items-center gap-2 py-2 transition-hover <?php echo $carteira_selecionada == $cart['IDCarteira'] ? 'active' : '' ?>"
+                                        href="?mes=<?php echo $mes_atual ?>&ano=<?php echo $ano_atual ?>&carteira=<?php echo htmlspecialchars($cart['IDCarteira']) ?>"
+                                        style="font-size:0.9rem;">
                                         <?php if ($carteira_selecionada == $cart['IDCarteira']): ?>
-                                            <i class="bi bi-check-circle-fill me-2" style="color: var(--primary-gold-analysis);"></i>
-                                            <span class="fw-bold" style="color: var(--primary-gold-analysis);"><?php echo htmlspecialchars($cart['TipoCarteira']); ?></span>
+                                            <i class="bi bi-check-circle-fill flex-shrink-0" style="color:var(--primary-gold-analysis);"></i>
+                                            <span class="fw-bold text-truncate" style="color:var(--primary-gold-analysis); max-width:160px;" title="<?php echo htmlspecialchars($cart['TipoCarteira']); ?>">
+                                                <?php echo htmlspecialchars($cart['TipoCarteira']); ?>
+                                            </span>
                                         <?php else: ?>
-                                            <i class="bi bi-circle me-2 text-secondary opacity-50"></i>
-                                            <span class="text-light"><?php echo htmlspecialchars($cart['TipoCarteira']); ?></span>
+                                            <i class="bi bi-circle flex-shrink-0 text-secondary opacity-50"></i>
+                                            <span class="text-light text-truncate" style="max-width:160px;" title="<?php echo htmlspecialchars($cart['TipoCarteira']); ?>">
+                                                <?php echo htmlspecialchars($cart['TipoCarteira']); ?>
+                                            </span>
                                         <?php endif; ?>
                                     </a>
                                 </li>
