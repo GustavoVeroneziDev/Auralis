@@ -570,7 +570,7 @@ input[type="number"] {
 
 /* Criar conta — opção em destaque dourado */
 .nav-auth-signup {
-  background: linear-gradient(135deg, #d4af37, #aa8c2c);
+  background: linear-gradient(135deg, #ffd035, #d1a71f);
   color: #121418 !important;
   font-weight: 700;
   box-shadow: 0 2px 12px rgba(212, 175, 55, 0.2);
