@@ -561,7 +561,7 @@ require_once 'geral/header.php';
                     <div class="dropdown flex-shrink-0">
                         <button class="btn border-secondary-subtle text-light shadow-sm fw-semibold dropdown-toggle d-flex align-items-center rounded-3 transition-hover px-2 px-sm-3"
                             type="button" data-bs-toggle="dropdown" aria-expanded="false"
-                            style="font-size: 0.875rem; background-color: var(--bg-charcoal-analysis); max-width: 150px;">
+                            style="font-size: 0.875rem; background-color: var(--bg-charcoal-analysis); max-width: 200px;">
                             <span class="text-truncate d-flex align-items-center">
                                 <i class="bi bi-wallet2 me-1 me-sm-2" style="color: var(--primary-gold-analysis); flex-shrink: 0;"></i>
                                 <?php echo htmlspecialchars($nome_carteira_atual); ?>
