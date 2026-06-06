@@ -204,15 +204,49 @@ require_once 'geral/header.php';
 
             <div class="d-flex align-items-center gap-2 w-100 w-lg-auto">
 
-                <div class="dropdown flex-grow-1 flex-lg-grow-0">
-                    <button class="btn border-secondary-subtle text-light shadow-sm fw-semibold dropdown-toggle d-flex align-items-center justify-content-center rounded-3 transition-hover w-100"
+                <!-- Seletor de Carteira -->
+                <div class="dropdown flex-grow-1 flex-lg-grow-0" style="min-width: 0;">
+                    <button class="btn border-secondary-subtle text-light shadow-sm fw-semibold dropdown-toggle d-flex align-items-center justify-content-between rounded-3 transition-hover w-100"
                         type="button" data-bs-toggle="dropdown" aria-expanded="false"
                         style="font-size: 0.875rem; background-color: var(--bg-charcoal-analysis);">
-                        <span class="text-truncate d-flex align-items-center">
-                            <i class="bi bi-wallet2 me-2" style="color: var(--primary-gold-analysis); flex-shrink: 0;"></i>
-                            <?php echo htmlspecialchars($nome_carteira_atual); ?>
-                        </span>
+
+                        <!-- A BASE (Botão): Truncamento aplicado aqui -->
+                        <div class="d-flex align-items-center text-start" style="min-width: 0;">
+                            <i class="bi bi-wallet2 me-2 flex-shrink-0" style="color: var(--primary-gold-analysis);"></i>
+                            <span class="text-truncate" style="max-width: 130px;" title="<?php echo htmlspecialchars($nome_carteira_atual); ?>">
+                                <?php echo htmlspecialchars($nome_carteira_atual); ?>
+                            </span>
+                        </div>
                     </button>
+
+                    <!-- Lista de Carteiras -->
+                    <ul class="dropdown-menu dropdown-menu-dark shadow-lg border-secondary-subtle mt-2 w-100" style="background-color: #1a1d21; min-width: 220px;">
+                        <li class="px-3 py-1 text-secondary small text-uppercase fw-bold tracking-wide">Alternar Carteira</li>
+                        <li>
+                            <hr class="dropdown-divider border-secondary-subtle">
+                        </li>
+                        <?php foreach ($carteiras as $cart): ?>
+                            <li>
+                                <a class="dropdown-item d-flex align-items-center py-2 transition-hover <?php echo $carteira_selecionada == $cart['IDCarteira'] ? 'active' : '' ?>"
+                                    href="?mes=<?php echo $mes_atual ?>&ano=<?php echo $ano_atual ?>&carteira=<?php echo htmlspecialchars($cart['IDCarteira']) ?>"
+                                    title="<?php echo htmlspecialchars($cart['TipoCarteira']); ?>">
+
+                                    <?php if ($carteira_selecionada == $cart['IDCarteira']): ?>
+                                        <i class="bi bi-check-circle-fill me-2 flex-shrink-0" style="color: var(--primary-gold-analysis);"></i>
+                                        <span class="fw-bold text-truncate" style="color: var(--primary-gold-analysis); max-width: 170px;">
+                                            <?php echo htmlspecialchars($cart['TipoCarteira']); ?>
+                                        </span>
+                                    <?php else: ?>
+                                        <i class="bi bi-circle me-2 flex-shrink-0 text-secondary opacity-50"></i>
+                                        <span class="text-light text-truncate" style="max-width: 170px;">
+                                            <?php echo htmlspecialchars($cart['TipoCarteira']); ?>
+                                        </span>
+                                    <?php endif; ?>
+
+                                </a>
+                            </li>
+                        <?php endforeach; ?>
+                    </ul>
                 </div>
 
                 <div class="d-flex align-items-center bg-dark border border-secondary-subtle rounded-pill shadow-sm flex-grow-1 flex-lg-grow-0 justify-content-center" style="padding: 2px 4px;">

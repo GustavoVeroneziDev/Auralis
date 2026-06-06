@@ -124,8 +124,16 @@ $paginaAtual = basename($_SERVER['PHP_SELF']);
                             </ul>
                         </div>
                     <?php else: ?>
-                        <a href="/usuario/login.php" class="btn btn-link text-light text-decoration-none custom-link px-0 px-lg-3 text-start">Login</a>
-                        <a href="/usuario/cadastro.php" class="btn px-4 py-2 rounded-pill fw-bold shadow-sm w-100 w-lg-auto" style="background-color: gold; color: #121418;">Criar Conta</a>
+                        <div class="nav-auth-pill">
+                            <a href="/usuario/login.php" class="nav-auth-login">
+                                <i class="bi bi-person-fill"></i>
+                                <span>Entrar</span>
+                            </a>
+                            <a href="/usuario/cadastro.php" class="nav-auth-signup">
+                                <i class="bi bi-stars"></i>
+                                <span>Criar conta</span>
+                            </a>
+                        </div>
                     <?php endif; ?>
                 </div>
             </div>
