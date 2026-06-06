@@ -98,45 +98,6 @@
         </div>
     </div>
 
-    <!-- ── ARQUITETURA ────────────────────────────────────────────────────── -->
-    <div class="row align-items-center py-5 g-5 border-top border-secondary-subtle card-animado surgir-baixo">
-        <div class="col-lg-6">
-            <h2 class="fw-bold text-light mb-4">Construído para durar</h2>
-            <p class="text-secondary mb-4" style="line-height:1.8;">
-                Cada decisão técnica foi tomada pensando em escalabilidade e segurança. O saldo nunca é um campo salvo no banco — é sempre calculado. As PKs são UUID, não autoincrement. Cada query usa Prepared Statements.
-            </p>
-            <div class="d-flex flex-column gap-3">
-                <?php foreach([
-                    ['bi-database-fill-check', '#22c55e', 'MySQL + PDO', 'Prepared Statements em 100% das queries. Zero concatenação de variáveis.'],
-                    ['bi-code-slash',           '#38bdf8', 'PHP 8 + Bootstrap 5.3', 'Arquitetura modular por domínio, sem frameworks pesados.'],
-                    ['bi-git',                  '#f59e0b', 'Deploy via GitHub Actions', 'Push na main → FTP automático para o servidor de produção.'],
-                ] as [$icon, $color, $title, $desc]): ?>
-                <div class="d-flex gap-3 align-items-start">
-                    <div class="rounded-2 flex-shrink-0 d-flex align-items-center justify-content-center"
-                         style="width:36px;height:36px;background:<?php echo $color ?>18;border:1px solid <?php echo $color ?>30;">
-                        <i class="bi <?php echo $icon ?>" style="color:<?php echo $color ?>;font-size:0.9rem;"></i>
-                    </div>
-                    <div>
-                        <div class="text-light fw-semibold" style="font-size:0.875rem;"><?php echo $title ?></div>
-                        <div class="text-secondary" style="font-size:0.8rem;"><?php echo $desc ?></div>
-                    </div>
-                </div>
-                <?php endforeach; ?>
-            </div>
-        </div>
-        <div class="col-lg-6">
-            <div class="p-4 rounded-4" style="background:var(--bg-card);border:1px solid rgba(255,255,255,.07);font-family:monospace;font-size:0.8rem;line-height:1.8;">
-                <div class="text-secondary mb-2" style="font-size:0.7rem;">// Saldo nunca é salvo. Sempre calculado.</div>
-                <div><span style="color:#a78bfa;">SELECT</span> <span style="color:#22c55e;">SUM</span>(<span style="color:#f59e0b;">CASE</span></div>
-                <div>&nbsp;&nbsp;<span style="color:#f59e0b;">WHEN</span> TipoRegistro = <span style="color:#34d399;">'receita'</span></div>
-                <div>&nbsp;&nbsp;<span style="color:#f59e0b;">THEN</span> Valor <span style="color:#f59e0b;">ELSE</span> -Valor</div>
-                <div><span style="color:#f59e0b;">END</span>) <span style="color:#a78bfa;">AS</span> saldo</div>
-                <div><span style="color:#a78bfa;">FROM</span> Registro</div>
-                <div><span style="color:#a78bfa;">WHERE</span> StatusRegistro = <span style="color:#34d399;">'efetivado'</span></div>
-                <div>&nbsp;&nbsp;<span style="color:#a78bfa;">AND</span> FKCarteira = <span style="color:#f59e0b;">:carteira_id</span></div>
-            </div>
-        </div>
-    </div>
 
     <!-- ── EQUIPE ─────────────────────────────────────────────────────────── -->
     <div class="py-5 border-top border-secondary-subtle card-animado surgir-baixo">
