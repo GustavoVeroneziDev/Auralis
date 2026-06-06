@@ -84,10 +84,18 @@ $paginaAtual = basename($_SERVER['PHP_SELF']);
                         <div class="dropdown w-100 text-start text-lg-end">
                             <a href="#" class="d-flex align-items-center justify-content-start justify-content-lg-end text-light text-decoration-none dropdown-toggle custom-link py-2"
                                 id="menuUsuario" data-bs-toggle="dropdown" aria-expanded="false">
-                                <span class="me-2 text-muted navbar-greeting d-flex align-items-center gap-2">
-                                    Olá, <strong class="text-light"><?php echo htmlspecialchars($primeiroNome); ?></strong>
-                                    <?php echo function_exists('badgePlano') ? badgePlano() : ''; ?>
+
+                                <?php $planoNav = strtolower($_SESSION['plano'] ?? 'free'); ?>
+                                <span class="me-2 text-light fw-semibold navbar-greeting d-flex align-items-center gap-2" style="font-size: 0.95rem;">
+                                    <?php echo htmlspecialchars($primeiroNome); ?>
+
+                                    <?php if ($planoNav === 'vip'): ?>
+                                        <i class="fi fi-ss-gem d-flex align-items-center" style="color: #D4AF37; font-size: 0.85rem;" title="Auralis VIP"></i>
+                                    <?php elseif ($planoNav === 'pro'): ?>
+                                        <i class="fi fi-br-crown d-flex align-items-center" style="color: #7c3aed; font-size: 0.85rem;" title="Auralis PRO"></i>
+                                    <?php endif; ?>
                                 </span>
+
                                 <i style="color: gold !important;" class="bi bi-person-circle fs-4 cardCentral"></i>
                             </a>
 
