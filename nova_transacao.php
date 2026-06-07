@@ -548,36 +548,60 @@ require_once 'geral/header.php';
 
                                                 <div id="bloco_parcelamento" style="display:<?= $val_parcelado ? 'block' : 'none' ?>;"
                                                     class="mt-3 ps-3 border-start border-border-color">
-                                                    <label class="form-label text-secondary-analysis fs-7 mb-1">
-                                                        Em quantas vezes?
-                                                    </label>
-                                                    <div class="d-flex align-items-center gap-3">
+
+                                                    <label class="form-label text-secondary-analysis fs-7 mb-1">Em quantas vezes?</label>
+                                                    <div class="d-flex align-items-center gap-3 mb-3">
                                                         <input type="number" name="num_parcelas" id="num_parcelas"
                                                             class="form-control bg-dark border-border-color text-light-analysis form-control-sm no-spinners fs-7"
-                                                            style="max-width:100px;"
-                                                            min="2" max="48" placeholder="Ex: 3"
+                                                            style="max-width:100px;" min="2" max="48" placeholder="Ex: 3"
                                                             value="<?= htmlspecialchars($val_num_parc) ?>">
                                                         <div id="preview_parcela" class="fs-7"></div>
                                                     </div>
-                                                    <div class="text-secondary mt-1" style="font-size:0.72rem;">
-                                                        Uma entrada por mês a partir da data acima. Mínimo 2x, máximo 48x.
-                                                    </div>
-                                                </div>
-                                            </div>
-                                        <?php endif; ?>
 
-                                        <?php if ($is_parcela): ?>
-                                            <div class="pt-3 border-top border-border-color">
-                                                <div class="p-3 rounded-3 d-flex align-items-center gap-3 border border-border-color" style="background:rgba(255,193,7,.05);">
-                                                    <div class="rounded-circle d-flex align-items-center justify-content-center flex-shrink-0"
-                                                        style="width:36px;height:36px;background:rgba(255,193,7,.1);">
-                                                        <i class="bi bi-credit-card-2-front text-warning"></i>
+                                                    <?php
+                                                    $planoFront      = strtolower($_SESSION['plano'] ?? 'free');
+                                                    $testeFront      = function_exists('obterHorasRestantesTeste') ? (obterHorasRestantesTeste() > 0) : false;
+                                                    $liberaJuros     = ($planoFront === 'pro' || $planoFront === 'vip' || $testeFront);
+                                                    $assinanteNativo = ($planoFront === 'pro' || $planoFront === 'vip');
+                                                    ?>
+                                                    <div class="d-flex gap-3 mb-2">
+                                                        <div class="form-check">
+                                                            <input class="form-check-input bg-dark border-border-color shadow-none"
+                                                                type="radio" name="tipo_juros" id="juros_sem" value="sem" checked>
+                                                            <label class="form-check-label text-light fs-7" for="juros_sem">Sem juros</label>
+                                                        </div>
+                                                        <div class="form-check" <?= !$liberaJuros ? 'title="Exclusivo Auralis PRO" data-bs-toggle="tooltip"' : '' ?>>
+                                                            <input class="form-check-input bg-dark border-border-color shadow-none"
+                                                                type="radio" name="tipo_juros" id="juros_com" value="com"
+                                                                <?= !$liberaJuros ? 'disabled' : '' ?>>
+                                                            <label class="form-check-label text-light fs-7 d-flex align-items-center gap-1" for="juros_com">
+                                                                Com juros
+                                                                <?php if (!$assinanteNativo): ?>
+                                                                    <?= function_exists('badgePremium') ? badgePremium('pro', $testeFront) : '' ?>
+                                                                <?php endif; ?>
+                                                            </label>
+                                                        </div>
                                                     </div>
-                                                    <div>
-                                                        <strong class="text-light d-block fs-7">Compra Parcelada</strong>
-                                                        <span class="text-secondary" style="font-size:0.75rem;">
-                                                            Parcela <strong class="text-light"><?= $transacao_edit['ParcelaAtual'] ?> de <?= $transacao_edit['TotalParcelas'] ?></strong>. Edite individualmente ou delete para remover do grupo.
-                                                        </span>
+
+                                                    <div id="bloco_com_juros" style="display:none;" class="mt-2 bg-charcoal p-3 border border-border-color rounded-3">
+                                                        <label class="form-label text-secondary-analysis fs-7 mb-1">
+                                                            Valor exato de <strong>cada parcela</strong> com juros:
+                                                        </label>
+                                                        <div class="input-group input-group-sm mb-1" style="max-width:200px;">
+                                                            <span class="input-group-text bg-dark border-border-color text-secondary-analysis fs-7">R$</span>
+                                                            <input type="text" inputmode="numeric" name="valor_parcela_juros" id="valor_parcela_juros"
+                                                                class="form-control bg-dark border-border-color text-gold-analysis fw-bold fs-7 no-spinners"
+                                                                placeholder="0,00"
+                                                                oninput="mascaraMoeda(this); atualizarPreviewParcela();">
+                                                        </div>
+                                                        <div class="text-secondary opacity-75 mt-1" style="font-size:0.7rem;" id="preview_total_juros">
+                                                            <i class="bi bi-calculator me-1"></i> Digite o valor da parcela para calcular.
+                                                        </div>
+                                                    </div>
+
+                                                    <div class="text-secondary mt-2" style="font-size:0.72rem;">
+                                                        <i class="bi bi-info-circle me-1"></i>
+                                                        Uma entrada por mês a partir da data acima. Mínimo 2x, máximo 48x.
                                                     </div>
                                                 </div>
                                             </div>
@@ -602,77 +626,6 @@ require_once 'geral/header.php';
                                 </div>
                             </div>
                         </div>
-
-                        <?php if (!$is_edicao): ?>
-                            <!-- ── Parcelamento ──────────────────────────────────── -->
-                            <div class="mb-4 auralis-line-input pb-3">
-                                <div class="d-flex align-items-center justify-content-between mb-2">
-                                    <div class="d-flex align-items-center">
-                                        <i class="bi bi-credit-card-2-front text-secondary-analysis me-3 w-icon text-center"></i>
-                                        <span class="text-light fs-6">Parcelado</span>
-                                    </div>
-                                    <div class="form-check form-switch fs-4 mb-0 toggle-analysis">
-                                        <input class="form-check-input bg-dark border-border-color shadow-none" type="checkbox" name="parcelado" id="toggle_parcelado" role="switch" <?= $val_parcelado ? 'checked' : '' ?>>
-                                    </div>
-                                </div>
-
-                                <?php
-                                $planoFront = strtolower($_SESSION['plano'] ?? 'free');
-                                $testeFront = function_exists('obterHorasRestantesTeste') ? (obterHorasRestantesTeste() > 0) : false;
-
-                                // Tem acesso porque assinou ou porque está no teste
-                                $liberaJuros = ($planoFront === 'pro' || $planoFront === 'vip' || $testeFront);
-                                // É assinante real (não é teste)
-                                $assinanteNativo = ($planoFront === 'pro' || $planoFront === 'vip');
-                                ?>
-
-                                <div id="bloco_parcelamento" style="display: <?= $val_parcelado ? 'block' : 'none' ?>;" class="ps-4 border-start border-border-color mt-2">
-                                    <label class="form-label text-secondary-analysis fs-7 mb-1">Número de parcelas</label>
-                                    <div class="d-flex align-items-center gap-3 mb-3">
-                                        <input type="number" name="num_parcelas" id="num_parcelas"
-                                            class="form-control bg-dark border-border-color text-light-analysis form-control-sm no-spinners fs-7"
-                                            min="2" max="48" placeholder="Ex: 3"
-                                            value="<?= htmlspecialchars($val_num_parc) ?>"
-                                            style="width: 80px;">
-                                        <div id="preview_parcela" class="text-muted fs-7"></div>
-                                    </div>
-
-                                    <div class="d-flex gap-3 mb-2 mt-1">
-                                        <div class="form-check">
-                                            <input class="form-check-input bg-dark border-border-color shadow-none" type="radio" name="tipo_juros" id="juros_sem" value="sem" checked>
-                                            <label class="form-check-label text-light fs-7" for="juros_sem">Sem juros</label>
-                                        </div>
-                                        <div class="form-check" <?= !$liberaJuros ? 'title="Exclusivo Auralis PRO" data-bs-toggle="tooltip"' : '' ?>>
-                                            <input class="form-check-input bg-dark border-border-color shadow-none" type="radio" name="tipo_juros" id="juros_com" value="com" <?= !$liberaJuros ? 'disabled' : '' ?>>
-                                            <label class="form-check-label text-light fs-7 d-flex align-items-center gap-1" for="juros_com">
-                                                Com juros
-                                                <?php
-                                                // Se não for assinante real (Free ou Trial), mostra o selo correspondente
-                                                if (!$assinanteNativo) {
-                                                    echo function_exists('badgePremium') ? badgePremium('pro', $testeFront) : '';
-                                                }
-                                                ?>
-                                            </label>
-                                        </div>
-                                    </div>
-
-                                    <div id="bloco_com_juros" style="display: none;" class="mt-2 bg-charcoal p-3 border border-border-color rounded-3">
-                                        <label class="form-label text-secondary-analysis fs-7 mb-1">Valor exato de <strong>cada parcela</strong> com juros:</label>
-                                        <div class="input-group input-group-sm mb-1" style="max-width: 200px;">
-                                            <span class="input-group-text bg-dark border-border-color text-secondary-analysis fs-7">R$</span>
-                                            <input type="text" inputmode="numeric" name="valor_parcela_juros" id="valor_parcela_juros" class="form-control bg-dark border-border-color text-gold-analysis fw-bold fs-7 no-spinners" placeholder="0,00" oninput="mascaraMoeda(this); atualizarPreviewParcela();">
-                                        </div>
-                                        <div class="text-secondary opacity-75 mt-1" style="font-size: 0.7rem;" id="preview_total_juros">
-                                            <i class="bi bi-calculator me-1"></i> Digite o valor da parcela para calcular.
-                                        </div>
-                                    </div>
-                                    <p class="text-secondary fs-7 mt-3 mb-0">
-                                        <i class="bi bi-info-circle me-1"></i>
-                                        O sistema criará uma entrada por mês, começando na data informada.
-                                    </p>
-                                </div>
-                            </div>
-                        <?php endif; ?>
 
                         <div class="d-grid mt-2">
                             <button id="btnSalvar" type="submit" class="btn btn-gold fw-bold text-dark py-3 rounded-pill fs-6 shadow-lg d-flex align-items-center justify-content-center transition-hover">
