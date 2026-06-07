@@ -274,8 +274,8 @@ require_once 'geral/header.php';
         <div class="col-md-6">
             <div class="card bg-body-tertiary border-secondary-subtle shadow-sm h-100 rounded-4">
                 <div class="card-body p-4 d-flex align-items-center">
-                    <div class="bg-danger bg-opacity-10 p-3 rounded-circle me-3 analise-icon flex-shrink-0">
-                        <i class="bi bi-fire text-danger fs-1"></i>
+                    <div class="bg-danger bg-opacity-10 rounded-circle me-3 analise-icon flex-shrink-0 d-flex justify-content-center align-items-center" style="width: 70px; height: 70px;">
+                        <i class="bi bi-fire text-danger fs-1 mb-0"></i>
                     </div>
                     <div>
                         <p class="text-secondary small mb-1 text-uppercase fw-bold tracking-wide">Maior Fuga de Capital (Gastos)</p>
@@ -299,8 +299,8 @@ require_once 'geral/header.php';
         <div class="col-md-6">
             <div class="card bg-body-tertiary border-secondary-subtle shadow-sm h-100 rounded-4">
                 <div class="card-body p-4 d-flex align-items-center">
-                    <div class="bg-success bg-opacity-10 p-3 rounded-circle me-3 analise-icon flex-shrink-0">
-                        <i class="bi bi-trophy text-success fs-1"></i>
+                    <div class="bg-success bg-opacity-10 rounded-circle me-3 analise-icon flex-shrink-0 d-flex justify-content-center align-items-center" style="width: 70px; height: 70px;">
+                        <i class="bi bi-trophy text-success fs-1 mb-0"></i>
                     </div>
                     <div>
                         <p class="text-secondary small mb-1 text-uppercase fw-bold tracking-wide">Principal Motor de Renda</p>
