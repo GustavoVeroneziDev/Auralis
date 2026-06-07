@@ -1,6 +1,6 @@
 <?php
 // ==============================================================================
-// AGENDA.PHP — Calendário visual de eventos e transações
+// AGENDA.PHP — Calendário visual de eventos e transações (Padrão Auralis)
 // ==============================================================================
 session_start();
 if (!isset($_SESSION['usuario_id'])) {
@@ -43,7 +43,7 @@ try {
             INDEX idx_agenda_usuario_data (FKUsuario, DataEvento)
         )
     ");
-} catch (PDOException $e) { /* silencia se a tabela já existe */
+} catch (PDOException $e) {
 }
 
 
@@ -60,7 +60,6 @@ if (isset($_GET['ajax'])) {
         $inicio = $mes . '-01';
         $fim    = date('Y-m-t', strtotime($inicio));
 
-        // Eventos da agenda
         $stmtEv = $pdo->prepare("
             SELECT IDEvento AS id, Titulo AS titulo, DataEvento AS data,
                    Cor AS cor, Concluido AS concluido, Descricao AS descricao,
@@ -72,19 +71,15 @@ if (isset($_GET['ajax'])) {
         $stmtEv->execute([':u' => $usuario_id, ':ini' => $inicio, ':fim' => $fim]);
         $itens = $stmtEv->fetchAll(PDO::FETCH_ASSOC);
 
-        // Transações do período (opcional, via toggle)
         if (($_GET['transacoes'] ?? '0') === '1') {
             $stmtTr = $pdo->prepare("
-                SELECT IDRegistro AS id,
-                       Descricao AS titulo,
+                SELECT IDRegistro AS id, Descricao AS titulo,
                        COALESCE(DataVencimento, MomentoRegistro) AS data,
                        TipoRegistro AS cor,
                        IF(StatusRegistro = 'efetivado', 1, 0) AS concluido,
-                       Valor AS descricao,
-                       'transacao' AS tipo
+                       Valor AS descricao, 'transacao' AS tipo
                 FROM Registro
-                WHERE FKUsuario = :u
-                  AND COALESCE(DataVencimento, MomentoRegistro) BETWEEN :ini AND :fim
+                WHERE FKUsuario = :u AND COALESCE(DataVencimento, MomentoRegistro) BETWEEN :ini AND :fim
                 ORDER BY data ASC
             ");
             $stmtTr->execute([':u' => $usuario_id, ':ini' => $inicio, ':fim' => $fim]);
@@ -95,7 +90,7 @@ if (isset($_GET['ajax'])) {
         exit;
     }
 
-    // ── SALVAR (criar ou atualizar) ──────────────────────────────────────────
+    // ── SALVAR ──────────────────────────────────────────────────────────────
     if ($acao === 'salvar' && $_SERVER['REQUEST_METHOD'] === 'POST') {
         $id        = trim($_POST['id']        ?? '');
         $titulo    = trim($_POST['titulo']    ?? '');
@@ -107,28 +102,17 @@ if (isset($_GET['ajax'])) {
         $coresValidas = ['roxo', 'azul', 'verde', 'amarelo', 'vermelho', 'cinza'];
         if (!in_array($cor, $coresValidas)) $cor = 'roxo';
 
-        if (empty($titulo)) {
-            echo json_encode(['ok' => false, 'msg' => 'O título não pode ficar em branco.']);
-            exit;
-        }
-        if (empty($data)) {
-            echo json_encode(['ok' => false, 'msg' => 'Selecione uma data para o evento.']);
+        if (empty($titulo) || empty($data)) {
+            echo json_encode(['ok' => false, 'msg' => 'Preencha o título e a data.']);
             exit;
         }
 
         try {
             if ($id) {
-                $stmt = $pdo->prepare("
-                    UPDATE AgendaEvento
-                    SET Titulo=:t, Descricao=:d, DataEvento=:dt, Cor=:c, Concluido=:co
-                    WHERE IDEvento=:id AND FKUsuario=:u
-                ");
+                $stmt = $pdo->prepare("UPDATE AgendaEvento SET Titulo=:t, Descricao=:d, DataEvento=:dt, Cor=:c, Concluido=:co WHERE IDEvento=:id AND FKUsuario=:u");
                 $stmt->execute([':t' => $titulo, ':d' => $descricao, ':dt' => $data, ':c' => $cor, ':co' => $concluido, ':id' => $id, ':u' => $usuario_id]);
             } else {
-                $stmt = $pdo->prepare("
-                    INSERT INTO AgendaEvento (IDEvento, FKUsuario, Titulo, Descricao, DataEvento, Cor, Concluido)
-                    VALUES (:id, :u, :t, :d, :dt, :c, :co)
-                ");
+                $stmt = $pdo->prepare("INSERT INTO AgendaEvento (IDEvento, FKUsuario, Titulo, Descricao, DataEvento, Cor, Concluido) VALUES (:id, :u, :t, :d, :dt, :c, :co)");
                 $stmt->execute([':id' => gerarUuid(), ':u' => $usuario_id, ':t' => $titulo, ':d' => $descricao, ':dt' => $data, ':c' => $cor, ':co' => $concluido]);
             }
             echo json_encode(['ok' => true]);
@@ -150,57 +134,56 @@ if (isset($_GET['ajax'])) {
         }
         exit;
     }
-
-    echo json_encode(['ok' => false, 'msg' => 'Ação inválida.']);
     exit;
 }
 
 require_once 'geral/header.php';
 ?>
 
-<main class="agenda-main flex-grow-1" style="padding: 1.5rem var(--space-page-x, 1.5rem);">
+<main class="container-fluid py-4 mt-2 flex-grow-1" style="max-width: 1500px; padding-inline: var(--space-page-x); min-height: 100vh;">
 
-    <!-- ── Cabeçalho ─────────────────────────────────────────────────── -->
-    <div class="d-flex align-items-center justify-content-between mb-4 pb-3 border-bottom border-secondary-subtle flex-wrap gap-3">
+    <div class="d-flex justify-content-between align-items-center mb-4 border-bottom border-secondary-subtle pb-3 flex-wrap gap-3">
 
         <div class="d-flex align-items-center gap-3">
-            <h2 class="fw-bold text-light mb-0" style="font-size:1.3rem;">
-                <i class="bi bi-calendar3 me-2" style="color:#D4AF37;"></i>
-                Agenda
-            </h2>
-            <span id="badge-mes-ano" class="badge fw-normal"
-                style="background:rgba(170,140,44,0.12);color:#D4AF37;border:1px solid rgba(170,140,44,0.3);font-size:0.8rem;">
-            </span>
+            <div class="icon-circle bg-primary bg-opacity-10 d-flex justify-content-center align-items-center rounded-3 shadow-sm flex-shrink-0" style="width: 48px; height: 48px;">
+                <i class="bi bi-calendar3 text-primary fs-4" style="color: var(--primary-gold-analysis) !important;"></i>
+            </div>
+            <div>
+                <h2 class="fw-bold text-light mb-0">Agenda</h2>
+                <span id="badge-mes-ano" class="text-secondary small text-uppercase tracking-wide fw-semibold"></span>
+            </div>
         </div>
 
         <div class="d-flex align-items-center gap-2 flex-wrap">
-            <!-- Toggle transações financeiras -->
-            <div class="form-check form-switch mb-0 toggle-agenda d-flex align-items-center gap-2 me-1">
-                <input class="form-check-input bg-dark border-secondary shadow-none"
-                    type="checkbox" id="toggle-transacoes" role="switch">
-                <label class="form-check-label" style="font-size:0.8rem;color:#888;cursor:pointer;" for="toggle-transacoes">
-                    <i class="bi bi-arrow-left-right me-1"></i>Transações
-                </label>
+
+            <div class="bg-body-tertiary border border-secondary-subtle rounded-pill px-3 py-1 me-2 d-flex align-items-center transition-hover">
+                <div class="form-check form-switch mb-0 d-flex align-items-center gap-2 toggle-agenda">
+                    <input class="form-check-input shadow-none m-0" type="checkbox" id="toggle-transacoes" role="switch">
+                    <label class="form-check-label text-secondary small fw-semibold cursor-pointer" for="toggle-transacoes" style="padding-top: 2px;">
+                        Incluir Transações
+                    </label>
+                </div>
             </div>
 
-            <a href="dashboard.php" class="btn btn-outline-secondary btn-sm">
-                <i class="bi bi-arrow-left me-1"></i> Voltar
-            </a>
-            <button class="btn btn-sm btn-outline-secondary" onclick="irHoje()">Hoje</button>
-            <button class="btn btn-sm btn-outline-secondary" onclick="mudarMes(-1)" aria-label="Mês anterior">
-                <i class="bi bi-chevron-left"></i>
-            </button>
-            <button class="btn btn-sm btn-outline-secondary" onclick="mudarMes(1)" aria-label="Próximo mês">
-                <i class="bi bi-chevron-right"></i>
-            </button>
-            <button class="btn btn-sm btn-gold fw-semibold text-dark" onclick="abrirNovo(null)">
-                <i class="bi bi-plus-lg me-1"></i> Novo evento
+            <div class="btn-group bg-body-tertiary border border-secondary-subtle rounded-pill overflow-hidden shadow-sm">
+                <button class="btn btn-sm btn-link text-secondary text-decoration-none transition-hover px-3" onclick="mudarMes(-1)">
+                    <i class="bi bi-chevron-left"></i>
+                </button>
+                <button class="btn btn-sm btn-link text-light text-decoration-none fw-semibold transition-hover px-3 border-start border-end border-secondary-subtle" onclick="irHoje()">
+                    Hoje
+                </button>
+                <button class="btn btn-sm btn-link text-secondary text-decoration-none transition-hover px-3" onclick="mudarMes(1)">
+                    <i class="bi bi-chevron-right"></i>
+                </button>
+            </div>
+
+            <button class="btn btn-gold btn-sm rounded-pill px-4 fw-bold text-dark transition-hover shadow-sm ms-2" onclick="abrirNovo(null)">
+                <i class="bi bi-plus-lg me-1"></i> Novo
             </button>
         </div>
     </div>
 
-    <!-- ── Grade do calendário ──────────────────────────────────────── -->
-    <div class="agenda-cal">
+    <div class="agenda-cal shadow-sm">
         <div class="cal-semana">
             <div>Dom</div>
             <div>Seg</div>
@@ -213,82 +196,56 @@ require_once 'geral/header.php';
         <div id="cal-grid" class="cal-grade">
             <div class="cal-carregando">
                 <div class="spinner-border spinner-border-sm text-secondary me-2"></div>
-                <span class="text-secondary" style="font-size:0.85rem;">Carregando...</span>
+                <span class="text-secondary fw-semibold">Sincronizando agenda...</span>
             </div>
         </div>
     </div>
 
-    <!-- Legenda das cores de eventos -->
-    <div class="d-flex align-items-center gap-3 mt-3 flex-wrap" style="font-size:0.72rem;color:#555;">
-        <span><i class="bi bi-circle-fill me-1" style="color:#7c3aed;font-size:0.6rem;"></i>Roxo</span>
-        <span><i class="bi bi-circle-fill me-1" style="color:#2563eb;font-size:0.6rem;"></i>Azul</span>
-        <span><i class="bi bi-circle-fill me-1" style="color:#059669;font-size:0.6rem;"></i>Verde</span>
-        <span><i class="bi bi-circle-fill me-1" style="color:#AA8C2C;font-size:0.6rem;"></i>Âmbar</span>
-        <span><i class="bi bi-circle-fill me-1" style="color:#dc2626;font-size:0.6rem;"></i>Vermelho</span>
-        <span><i class="bi bi-circle-fill me-1" style="color:#6b7280;font-size:0.6rem;"></i>Cinza</span>
-        <span class="ms-1 text-secondary" style="border-left:1px solid #333;padding-left:10px;">
-            <i class="bi bi-dash me-1"></i>borda tracejada = transação financeira
-        </span>
+    <div class="d-flex justify-content-center align-items-center gap-4 mt-4 flex-wrap text-secondary small fw-semibold opacity-75">
+        <span><i class="bi bi-circle-fill me-1" style="color:#7c3aed;font-size:0.5rem;"></i> Pessoal</span>
+        <span><i class="bi bi-circle-fill me-1" style="color:#AA8C2C;font-size:0.5rem;"></i> Importante</span>
+        <span><i class="bi bi-dash-lg me-1" style="color:#059669;"></i> Receita (Automática)</span>
+        <span><i class="bi bi-dash-lg me-1" style="color:#dc2626;"></i> Despesa (Automática)</span>
     </div>
 
 </main>
 
-
-<!-- ==============================================================
-     MODAL — Criar / Editar evento
-     ============================================================== -->
-<div class="modal fade" id="modalEvento" tabindex="-1" aria-labelledby="modalEventoLabel">
+<div class="modal fade" id="modalEvento" tabindex="-1" aria-hidden="true">
     <div class="modal-dialog modal-dialog-centered">
-        <div class="modal-content" style="background:#2A2A2A;border:1px solid #333;">
+        <div class="modal-content bg-dark border-secondary-subtle shadow-lg rounded-4">
 
-            <div class="modal-header" style="border-color:#333;">
-                <h5 class="modal-title text-light fw-semibold" style="font-size:0.95rem;" id="modalEventoLabel">
-                    <i class="bi bi-calendar-plus me-2" style="color:#D4AF37;"></i>
-                    <span id="modal-titulo-texto">Novo evento</span>
+            <div class="modal-header border-bottom border-secondary-subtle p-3">
+                <h5 class="modal-title text-light fw-bold d-flex align-items-center gap-2">
+                    <i class="bi bi-calendar-event text-primary" style="color: var(--primary-gold-analysis) !important;"></i>
+                    <span id="modal-titulo-texto">Novo Evento</span>
                 </h5>
-                <button type="button" class="btn-close btn-close-white opacity-50" data-bs-dismiss="modal"></button>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
             </div>
 
-            <div class="modal-body">
-
-                <!-- Erro inline no modal -->
-                <div id="modal-erro" class="d-none d-flex align-items-center gap-2 rounded-3 px-3 py-2 mb-3"
-                    style="background-color:rgba(120,0,0,0.35);border:1px solid rgba(200,50,50,0.45);color:#f28b8b;">
-                    <i class="bi bi-exclamation-triangle-fill flex-shrink-0" style="font-size:0.85rem;"></i>
-                    <span id="modal-erro-msg" style="font-size:0.85rem;font-weight:500;"></span>
+            <div class="modal-body p-4">
+                <div id="modal-erro" class="alert alert-danger d-none d-flex align-items-center gap-2 rounded-3 shadow-sm border-0 bg-danger bg-opacity-10 text-danger fw-semibold py-2 px-3 mb-4">
+                    <i class="bi bi-exclamation-triangle-fill"></i> <span id="modal-erro-msg"></span>
                 </div>
 
                 <input type="hidden" id="ev-id">
 
                 <div class="mb-3">
-                    <label class="form-label text-secondary mb-1" style="font-size:0.8rem;">
-                        Título <span class="text-danger">*</span>
-                    </label>
-                    <input type="text" id="ev-titulo"
-                        class="form-control bg-dark border-secondary text-light shadow-none"
-                        placeholder="Ex: Reunião, Pagamento, Consulta..." maxlength="255"
-                        style="font-size:0.9rem;">
+                    <label class="form-label text-secondary small fw-semibold">Título <span class="text-danger">*</span></label>
+                    <input type="text" id="ev-titulo" class="form-control bg-body-tertiary border-secondary-subtle text-light shadow-none fw-semibold" placeholder="Ex: Pagamento do IPTU">
                 </div>
 
                 <div class="mb-3">
-                    <label class="form-label text-secondary mb-1" style="font-size:0.8rem;">
-                        Data <span class="text-danger">*</span>
-                    </label>
-                    <input type="date" id="ev-data"
-                        class="form-control bg-dark border-secondary text-light shadow-none"
-                        style="font-size:0.9rem;">
+                    <label class="form-label text-secondary small fw-semibold">Data <span class="text-danger">*</span></label>
+                    <input type="date" id="ev-data" class="form-control bg-body-tertiary border-secondary-subtle text-light shadow-none fw-semibold">
                 </div>
 
                 <div class="mb-3">
-                    <label class="form-label text-secondary mb-1" style="font-size:0.8rem;">Observação</label>
-                    <textarea id="ev-descricao" rows="2"
-                        class="form-control bg-dark border-secondary text-light shadow-none"
-                        placeholder="Detalhes opcionais..."
-                        style="font-size:0.88rem;resize:none;"></textarea>
+                    <label class="form-label text-secondary small fw-semibold">Observação (Opcional)</label>
+                    <textarea id="ev-descricao" rows="2" class="form-control bg-body-tertiary border-secondary-subtle text-light shadow-none" placeholder="Detalhes adicionais..."></textarea>
                 </div>
 
-                <div class="mb-3">
-                    <label class="form-label text-secondary mb-2" style="font-size:0.8rem;">Cor</label>
+                <div class="mb-4">
+                    <label class="form-label text-secondary small fw-semibold mb-2">Classificação por Cor</label>
                     <div class="d-flex gap-2 flex-wrap" id="cor-picker">
                         <?php
                         $cores = [
@@ -301,46 +258,39 @@ require_once 'geral/header.php';
                         ];
                         foreach ($cores as $val => [$hex, $label]):
                         ?>
-                            <label class="cor-opcao" data-cor="<?= $val ?>">
+                            <label class="cor-opcao transition-hover">
                                 <input type="radio" name="ev-cor" value="<?= $val ?>" <?= $val === 'roxo' ? 'checked' : '' ?> hidden>
-                                <span class="cor-bolinha" style="background:<?= $hex ?>;"></span>
-                                <span><?= $label ?></span>
+                                <span class="cor-bolinha shadow-sm" style="background:<?= $hex ?>;"></span>
+                                <span class="cor-texto fw-semibold small"><?= $label ?></span>
                             </label>
                         <?php endforeach; ?>
                     </div>
                 </div>
 
-                <div class="form-check form-switch toggle-agenda">
-                    <input class="form-check-input bg-dark border-secondary shadow-none"
-                        type="checkbox" id="ev-concluido" role="switch">
-                    <label class="form-check-label" style="font-size:0.85rem;color:#888;" for="ev-concluido">
-                        Marcar como concluído
-                    </label>
+                <div class="form-check form-switch toggle-agenda bg-body-tertiary p-3 rounded-3 border border-secondary-subtle d-flex align-items-center justify-content-between m-0">
+                    <label class="form-check-label text-light fw-semibold m-0" for="ev-concluido">Marcar como concluído</label>
+                    <input class="form-check-input m-0 shadow-none cursor-pointer" type="checkbox" id="ev-concluido" role="switch">
                 </div>
-
             </div>
 
-            <div class="modal-footer" style="border-color:#333;">
-                <!-- Confirmação de exclusão inline -->
+            <div class="modal-footer border-top border-secondary-subtle p-3 d-flex justify-content-between">
+
                 <div id="confirmar-exclusao" class="d-none w-100 d-flex align-items-center justify-content-between">
-                    <span style="font-size:0.82rem;color:#f28b8b;">
-                        <i class="bi bi-exclamation-triangle me-1"></i> Excluir este evento?
-                    </span>
+                    <span class="text-danger fw-semibold small"><i class="bi bi-exclamation-triangle-fill me-1"></i> Confirmar exclusão?</span>
                     <div class="d-flex gap-2">
-                        <button class="btn btn-sm btn-outline-secondary" onclick="cancelarExclusao()">Não</button>
-                        <button class="btn btn-sm btn-danger" onclick="confirmarExclusao()">Sim, excluir</button>
+                        <button class="btn btn-sm btn-outline-secondary rounded-pill fw-semibold" onclick="cancelarExclusao()">Cancelar</button>
+                        <button class="btn btn-sm btn-danger rounded-pill fw-bold px-3" onclick="confirmarExclusao()" id="btn-confirmar-excluir">Sim, excluir</button>
                     </div>
                 </div>
 
-                <!-- Rodapé normal -->
                 <div id="rodape-normal" class="w-100 d-flex justify-content-between align-items-center">
-                    <button id="btn-excluir" class="btn btn-sm btn-outline-danger d-none" onclick="pedirExclusao()">
-                        <i class="bi bi-trash me-1"></i> Excluir
+                    <button id="btn-excluir" class="btn btn-sm btn-outline-danger rounded-pill fw-semibold d-none" onclick="pedirExclusao()">
+                        <i class="bi bi-trash3 me-1"></i> Excluir
                     </button>
                     <div class="d-flex gap-2 ms-auto">
-                        <button class="btn btn-sm btn-outline-secondary" data-bs-dismiss="modal">Cancelar</button>
-                        <button class="btn btn-sm btn-gold fw-semibold text-dark" onclick="salvarEvento()">
-                            <i class="bi bi-check-lg me-1"></i> Salvar
+                        <button class="btn btn-link text-secondary text-decoration-none fw-semibold" data-bs-dismiss="modal">Cancelar</button>
+                        <button class="btn btn-gold rounded-pill px-4 fw-bold text-dark d-flex align-items-center" onclick="salvarEvento()" id="btn-salvar-evento">
+                            <i class="bi bi-check-lg me-2"></i> Salvar
                         </button>
                     </div>
                 </div>
@@ -350,29 +300,17 @@ require_once 'geral/header.php';
     </div>
 </div>
 
-
-<!-- ==============================================================
-     ESTILOS
-     ============================================================== -->
 <style>
     :root {
         --primary-gold-analysis: #AA8C2C;
         --bg-card-analysis: #2A2A2A;
         --bg-charcoal-analysis: #222222;
         --border-color-analysis: #333333;
-        --text-light-analysis: #E0E0E0;
-        --text-muted-analysis: #888888;
-        --text-gold-analysis: #D4AF37;
     }
 
-    /* ── Layout geral ───────────────────────────────────── */
-    .agenda-main {
-        max-width: 1600px;
-        margin: 0 auto;
-    }
-
-    /* ── Grade do calendário ────────────────────────────── */
+    /* ── Calendário ─────────────────────────────────────── */
     .agenda-cal {
+        background-color: var(--border-color-analysis);
         border: 1px solid var(--border-color-analysis);
         border-radius: 12px;
         overflow: hidden;
@@ -381,77 +319,82 @@ require_once 'geral/header.php';
     .cal-semana {
         display: grid;
         grid-template-columns: repeat(7, 1fr);
-        background: #1a1a1a;
-        border-bottom: 1px solid var(--border-color-analysis);
+        background: #1a1d21;
+        gap: 1px;
+        padding-bottom: 1px;
     }
 
     .cal-semana>div {
-        text-align: center;
-        padding: 10px 0;
-        font-size: 0.7rem;
+        text-align: right;
+        padding: 8px 12px;
+        font-size: 0.75rem;
         font-weight: 600;
-        letter-spacing: 0.07em;
-        text-transform: uppercase;
-        color: var(--text-muted-analysis);
+        text-transform: lowercase;
+        color: #888;
+        background-color: var(--bg-charcoal-analysis);
     }
 
     .cal-grade {
         display: grid;
         grid-template-columns: repeat(7, 1fr);
-        background: var(--border-color-analysis);
         gap: 1px;
+        background-color: var(--border-color-analysis);
     }
 
     .cal-carregando {
         grid-column: 1 / -1;
-        background: #1F1F1F;
+        background: var(--bg-charcoal-analysis);
         display: flex;
         align-items: center;
         justify-content: center;
-        padding: 3rem 0;
+        padding: 4rem 0;
     }
 
-    /* ── Célula do dia ──────────────────────────────────── */
     .cal-celula {
-        background: #1F1F1F;
-        min-height: 115px;
-        padding: 7px 7px 5px;
-        position: relative;
-        transition: background 0.12s;
+        background: var(--bg-card-analysis);
+        min-height: 120px;
+        padding: 8px;
+        display: flex;
+        flex-direction: column;
+        transition: background-color 0.2s ease;
     }
 
     .cal-celula:hover {
-        background: #232323;
-    }
-
-    .cal-celula:hover .btn-add-ev {
-        opacity: 1;
+        background: #2c2f35;
     }
 
     .cal-celula.outro-mes {
-        background: #191919;
+        background: var(--bg-charcoal-analysis);
     }
 
     .cal-celula.outro-mes .num-dia-num {
-        color: #404040;
+        opacity: 0.3;
     }
 
     .cal-celula.eh-hoje {
-        background: #1e1c14;
+        background: rgba(170, 140, 44, 0.05);
     }
 
-    /* Número do dia */
+    /* Números */
     .num-dia {
         display: flex;
         align-items: center;
         justify-content: space-between;
-        margin-bottom: 5px;
+        margin-bottom: 8px;
+        flex-direction: row-reverse;
+        /* Número na direita, botão na esquerda */
     }
 
     .num-dia-num {
-        font-size: 0.75rem;
+        font-size: 0.85rem;
+        color: #aaaaaa;
         font-weight: 500;
-        color: var(--text-muted-analysis);
+    }
+
+    .num-dia-num.hoje-circulo {
+        background: var(--primary-gold-analysis);
+        color: #000;
+        font-weight: bold;
         width: 24px;
         height: 24px;
         display: flex;
@@ -460,197 +403,194 @@ require_once 'geral/header.php';
         border-radius: 50%;
     }
 
-    .num-dia-num.hoje-circulo {
-        background: #e74c3c;
-        color: #fff;
-        font-weight: 600;
-    }
-
-    /* Botão + hover */
+    /* Botão Adicionar do Dia */
     .btn-add-ev {
         background: transparent;
         border: none;
-        color: var(--text-muted-analysis);
-        font-size: 0.8rem;
-        padding: 0 2px;
-        cursor: pointer;
+        color: var(--primary-gold-analysis);
         opacity: 0;
-        transition: opacity 0.12s, color 0.12s;
-        line-height: 1;
+        transition: opacity 0.2s;
+        padding: 0;
+        margin-top: -2px;
+    }
+
+    .cal-celula:hover .btn-add-ev {
+        opacity: 1;
     }
 
     .btn-add-ev:hover {
-        color: #D4AF37;
-        opacity: 1 !important;
+        filter: brightness(1.2);
     }
 
-    /* ── Pílulas de evento ──────────────────────────────── */
+    /* Pílulas */
     .ev-pill {
-        font-size: 0.68rem;
-        padding: 2px 6px;
+        font-size: 0.72rem;
+        padding: 4px 6px;
         border-radius: 4px;
-        margin-bottom: 2px;
+        margin-bottom: 4px;
         cursor: pointer;
         white-space: nowrap;
         overflow: hidden;
         text-overflow: ellipsis;
         display: flex;
         align-items: center;
-        gap: 4px;
-        border-left: 3px solid transparent;
-        transition: filter 0.12s;
-        max-width: 100%;
+        gap: 6px;
+        font-weight: 500;
+        transition: filter 0.2s;
     }
 
     .ev-pill:hover {
-        filter: brightness(1.18);
+        filter: brightness(1.2);
     }
 
-    .ev-pill .ev-icon {
-        flex-shrink: 0;
-        font-size: 0.6rem;
-    }
-
-    .ev-pill .ev-nome {
+    .ev-nome {
         overflow: hidden;
         text-overflow: ellipsis;
         flex: 1;
     }
 
-    .ev-pill .ev-ok {
-        font-size: 0.55rem;
-        background: rgba(255, 255, 255, 0.18);
-        border-radius: 3px;
-        padding: 1px 3px;
+    .ev-icon {
         flex-shrink: 0;
+        font-size: 0.65rem;
     }
 
-    /* Cores dos eventos */
+    /* Cores das Pílulas */
     .ev-roxo {
-        background: rgba(124, 58, 237, 0.2);
+        background: rgba(124, 58, 237, 0.15);
         color: #c4b5fd;
-        border-left-color: #7c3aed;
     }
 
     .ev-azul {
-        background: rgba(37, 99, 235, 0.2);
+        background: rgba(37, 99, 235, 0.15);
         color: #93c5fd;
-        border-left-color: #2563eb;
     }
 
     .ev-verde {
-        background: rgba(5, 150, 105, 0.2);
+        background: rgba(5, 150, 105, 0.15);
         color: #6ee7b7;
-        border-left-color: #059669;
     }
 
     .ev-amarelo {
-        background: rgba(170, 140, 44, 0.2);
+        background: rgba(170, 140, 44, 0.15);
         color: #D4AF37;
-        border-left-color: #AA8C2C;
     }
 
     .ev-vermelho {
-        background: rgba(220, 38, 38, 0.2);
+        background: rgba(220, 38, 38, 0.15);
         color: #fca5a5;
-        border-left-color: #dc2626;
     }
 
     .ev-cinza {
-        background: rgba(107, 114, 128, 0.2);
+        background: rgba(107, 114, 128, 0.15);
         color: #d1d5db;
-        border-left-color: #6b7280;
     }
 
-    /* Transações financeiras (borda tracejada) */
     .ev-receita {
-        background: rgba(5, 150, 105, 0.15);
+        background: rgba(5, 150, 105, 0.1);
+        border-left: 2px dashed #059669;
         color: #6ee7b7;
-        border-left: 3px dashed #059669;
     }
 
     .ev-despesa {
-        background: rgba(220, 38, 38, 0.15);
+        background: rgba(220, 38, 38, 0.1);
+        border-left: 2px dashed #dc2626;
         color: #fca5a5;
-        border-left: 3px dashed #dc2626;
     }
 
-    /* ── Seletor de cor ─────────────────────────────────── */
+    /* ── Seletor de Cores Moderno ───────────────────────── */
     .cor-opcao {
         display: flex;
         align-items: center;
         gap: 6px;
-        padding: 4px 10px;
+        padding: 6px 12px;
         border-radius: 20px;
-        border: 1px solid #3a3a3a;
+        border: 1px solid var(--border-color-analysis);
         cursor: pointer;
-        font-size: 0.78rem;
-        color: #888;
-        transition: all 0.15s;
+        background: transparent;
     }
 
     .cor-opcao:has(input:checked) {
-        border-color: #666;
-        color: #E0E0E0;
-        background: rgba(255, 255, 255, 0.05);
+        border-color: var(--primary-gold-analysis);
+        background: rgba(170, 140, 44, 0.1);
+    }
+
+    .cor-opcao:has(input:checked) .cor-texto {
+        color: var(--primary-gold-analysis) !important;
     }
 
     .cor-bolinha {
-        width: 10px;
-        height: 10px;
+        width: 12px;
+        height: 12px;
         border-radius: 50%;
-        flex-shrink: 0;
     }
 
-    /* ── Toggle switch ──────────────────────────────────── */
+    .cor-texto {
+        color: #888;
+    }
+
+    /* Switch Customizado */
     .toggle-agenda .form-check-input:checked {
         background-color: var(--primary-gold-analysis);
         border-color: var(--primary-gold-analysis);
     }
 
-    /* ── Botão gold ─────────────────────────────────────── */
-    .btn-gold {
-        background: linear-gradient(135deg, #FFB800 0%, #D4AF37 100%);
-        border: none;
+    .cursor-pointer {
+        cursor: pointer;
     }
 
-    .btn-gold:hover {
-        background: linear-gradient(135deg, #FFD04F 0%, #E7C665 100%);
-        color: #000 !important;
-    }
+    /* ── Responsividade Auralis (Modo Lista no Celular) ─── */
+    @media (max-width: 768px) {
+        .cal-semana {
+            display: none;
+        }
 
-    /* ── Focus inputs no modal ──────────────────────────── */
-    #modalEvento .form-control:focus,
-    #modalEvento .form-select:focus {
-        border-color: var(--primary-gold-analysis) !important;
-        box-shadow: none;
+        .cal-grade {
+            grid-template-columns: 1fr;
+            gap: 0;
+        }
+
+        .cal-celula {
+            min-height: auto;
+            border-bottom: 1px solid var(--border-color-analysis);
+            padding: 15px;
+            flex-direction: column;
+        }
+
+        .cal-celula.outro-mes {
+            display: none;
+        }
+
+        /* Esconde dias vazios no celular */
+        .num-dia {
+            flex-direction: row;
+            justify-content: flex-start;
+            gap: 15px;
+            margin-bottom: 10px;
+        }
+
+        .btn-add-ev {
+            opacity: 1;
+            font-size: 1.2rem;
+            margin-top: 0;
+        }
     }
 </style>
 
 
-<!-- ==============================================================
-     JAVASCRIPT
-     ============================================================== -->
 <script>
-    // ──────────────────────────────────────────────────────────
-    // ESTADO GLOBAL
-    // ──────────────────────────────────────────────────────────
     const HOJE = new Date();
     let anoAtual = HOJE.getFullYear();
-    let mesAtual = HOJE.getMonth(); // 0-indexed
+    let mesAtual = HOJE.getMonth();
     let itensMes = [];
 
-    const MESES_PT = [
-        'Janeiro', 'Fevereiro', 'Março', 'Abril', 'Maio', 'Junho',
-        'Julho', 'Agosto', 'Setembro', 'Outubro', 'Novembro', 'Dezembro'
-    ];
+    const MESES_PT = ['Janeiro', 'Fevereiro', 'Março', 'Abril', 'Maio', 'Junho', 'Julho', 'Agosto', 'Setembro', 'Outubro', 'Novembro', 'Dezembro'];
 
-    // ──────────────────────────────────────────────────────────
-    // CARREGA EVENTOS VIA AJAX
-    // ──────────────────────────────────────────────────────────
+    // Instância do Modal
+    const bsModal = new bootstrap.Modal(document.getElementById('modalEvento'));
+
     async function carregarMes(ano, mes) {
         const grid = document.getElementById('cal-grid');
-        grid.innerHTML = '<div class="cal-carregando"><div class="spinner-border spinner-border-sm text-secondary me-2"></div><span class="text-secondary" style="font-size:0.85rem;">Carregando...</span></div>';
+        grid.innerHTML = '<div class="cal-carregando"><div class="spinner-border spinner-border-sm text-secondary me-2"></div><span class="text-secondary fw-semibold">Sincronizando agenda...</span></div>';
 
         const mesStr = String(mes + 1).padStart(2, '0');
         const comTrans = document.getElementById('toggle-transacoes').checked ? '1' : '0';
@@ -666,14 +606,11 @@ require_once 'geral/header.php';
         renderCalendario(ano, mes);
     }
 
-    // ──────────────────────────────────────────────────────────
-    // RENDERIZA A GRADE DO CALENDÁRIO
-    // ──────────────────────────────────────────────────────────
     function renderCalendario(ano, mes) {
-        document.getElementById('badge-mes-ano').textContent = MESES_PT[mes] + ' · ' + ano;
+        document.getElementById('badge-mes-ano').textContent = `${MESES_PT[mes]} ${ano}`;
 
         const grid = document.getElementById('cal-grid');
-        const primeiroDia = new Date(ano, mes, 1).getDay(); // 0=Dom
+        const primeiroDia = new Date(ano, mes, 1).getDay();
         const diasNoMes = new Date(ano, mes + 1, 0).getDate();
         const diasAnt = new Date(ano, mes, 0).getDate();
         const totalCelulas = Math.ceil((primeiroDia + diasNoMes) / 7) * 7;
@@ -700,13 +637,9 @@ require_once 'geral/header.php';
             const dateStr = `${dtCelula.getFullYear()}-${String(dtCelula.getMonth()+1).padStart(2,'0')}-${String(dtCelula.getDate()).padStart(2,'0')}`;
             const ehHoje = dtCelula.toDateString() === HOJE.toDateString();
 
-            // ── Célula ──
             const cell = document.createElement('div');
-            cell.className = 'cal-celula' +
-                (outroMes ? ' outro-mes' : '') +
-                (ehHoje ? ' eh-hoje' : '');
+            cell.className = 'cal-celula' + (outroMes ? ' outro-mes' : '') + (ehHoje ? ' eh-hoje' : '');
 
-            // Número do dia + botão adicionar
             const numDiv = document.createElement('div');
             numDiv.className = 'num-dia';
 
@@ -718,48 +651,37 @@ require_once 'geral/header.php';
             const btnAdd = document.createElement('button');
             btnAdd.className = 'btn-add-ev';
             btnAdd.title = 'Adicionar evento';
-            btnAdd.innerHTML = '<i class="bi bi-plus-circle"></i>';
+            btnAdd.innerHTML = '<i class="bi bi-plus-circle-fill"></i>';
             btnAdd.onclick = (e) => {
                 e.stopPropagation();
                 abrirNovo(dateStr);
             };
             numDiv.appendChild(btnAdd);
+
             cell.appendChild(numDiv);
 
-            // ── Eventos do dia ──
             const itensHoje = itensMes.filter(it => it.data && it.data.startsWith(dateStr));
 
             itensHoje.forEach(item => {
                 const pill = document.createElement('div');
 
                 if (item.tipo === 'transacao') {
-                    // Transação financeira — leva para edição ao clicar
                     const isReceita = item.cor === 'receita';
-                    const valorFmt = parseFloat(item.descricao || 0)
-                        .toLocaleString('pt-BR', {
-                            style: 'currency',
-                            currency: 'BRL'
-                        });
+                    const valorFmt = parseFloat(item.descricao || 0).toLocaleString('pt-BR', {
+                        style: 'currency',
+                        currency: 'BRL'
+                    });
 
                     pill.className = `ev-pill ev-${escHtml(item.cor)}`;
-                    pill.title = `${item.titulo} — ${valorFmt}${item.concluido == 1 ? ' (efetivado)' : ' (pendente)'}`;
-                    pill.innerHTML = `<i class="bi bi-${isReceita ? 'arrow-down-circle' : 'arrow-up-circle'} ev-icon"></i>` +
-                        `<span class="ev-nome">${escHtml(item.titulo)}</span>` +
-                        (item.concluido == 1 ? '<span class="ev-ok">✓</span>' : '');
-                    pill.onclick = () => {
-                        window.location.href = `nova_transacao.php?editar=${encodeURIComponent(item.id)}`;
-                    };
-
+                    pill.title = `${item.titulo} — ${valorFmt}`;
+                    pill.innerHTML = `<i class="bi bi-${isReceita ? 'arrow-down-short' : 'arrow-up-short'} ev-icon fs-6"></i> <span class="ev-nome">${escHtml(item.titulo)}</span>`;
+                    pill.onclick = () => window.location.href = `nova_transacao.php?editar=${encodeURIComponent(item.id)}`;
                 } else {
-                    // Evento da agenda — abre modal de edição
                     pill.className = `ev-pill ev-${escHtml(item.cor)}`;
                     pill.title = item.descricao ? `${item.titulo}: ${item.descricao}` : item.titulo;
-                    pill.innerHTML = `<i class="bi bi-${item.concluido == 1 ? 'check-circle-fill' : 'circle'} ev-icon"></i>` +
-                        `<span class="ev-nome">${escHtml(item.titulo)}</span>` +
-                        (item.concluido == 1 ? '<span class="ev-ok">✓</span>' : '');
+                    pill.innerHTML = `<i class="bi bi-${item.concluido == 1 ? 'check-circle-fill' : 'circle'} ev-icon"></i> <span class="ev-nome">${escHtml(item.titulo)}</span>`;
                     pill.onclick = () => abrirEditar(item);
                 }
-
                 cell.appendChild(pill);
             });
 
@@ -767,9 +689,6 @@ require_once 'geral/header.php';
         }
     }
 
-    // ──────────────────────────────────────────────────────────
-    // NAVEGAÇÃO DO MÊS
-    // ──────────────────────────────────────────────────────────
     function mudarMes(delta) {
         mesAtual += delta;
         if (mesAtual > 11) {
@@ -789,11 +708,6 @@ require_once 'geral/header.php';
         carregarMes(anoAtual, mesAtual);
     }
 
-    // ──────────────────────────────────────────────────────────
-    // MODAL — ABRIR / FECHAR
-    // ──────────────────────────────────────────────────────────
-    const bsModal = new bootstrap.Modal(document.getElementById('modalEvento'));
-
     function limparModal() {
         document.getElementById('ev-id').value = '';
         document.getElementById('ev-titulo').value = '';
@@ -803,14 +717,12 @@ require_once 'geral/header.php';
         document.querySelector('input[name="ev-cor"][value="roxo"]').checked = true;
         document.getElementById('btn-excluir').classList.add('d-none');
         document.getElementById('modal-erro').classList.add('d-none');
-        document.getElementById('confirmar-exclusao').classList.add('d-none');
-        document.getElementById('rodape-normal').classList.remove('d-none');
+        cancelarExclusao();
     }
 
     function abrirNovo(data) {
         limparModal();
-        document.getElementById('modal-titulo-texto').textContent = 'Novo evento';
-        document.querySelector('#modalEventoLabel i').className = 'bi bi-calendar-plus me-2';
+        document.getElementById('modal-titulo-texto').textContent = 'Novo Evento';
         if (data) document.getElementById('ev-data').value = data;
         bsModal.show();
         setTimeout(() => document.getElementById('ev-titulo').focus(), 300);
@@ -828,42 +740,35 @@ require_once 'geral/header.php';
         if (radioCorEl) radioCorEl.checked = true;
 
         document.getElementById('btn-excluir').classList.remove('d-none');
-        document.getElementById('modal-titulo-texto').textContent = 'Editar evento';
+        document.getElementById('modal-titulo-texto').textContent = 'Editar Evento';
         bsModal.show();
     }
 
-    // ──────────────────────────────────────────────────────────
-    // MODAL — ERRO INLINE
-    // ──────────────────────────────────────────────────────────
-    function mostrarErroModal(msg) {
-        const box = document.getElementById('modal-erro');
-        document.getElementById('modal-erro-msg').textContent = msg;
-        box.classList.remove('d-none');
-    }
-
-    // ──────────────────────────────────────────────────────────
-    // SALVAR EVENTO
-    // ──────────────────────────────────────────────────────────
     async function salvarEvento() {
         const id = document.getElementById('ev-id').value;
         const titulo = document.getElementById('ev-titulo').value.trim();
         const data = document.getElementById('ev-data').value;
-        const descricao = document.getElementById('ev-descricao').value.trim();
-        const cor = document.querySelector('input[name="ev-cor"]:checked')?.value || 'roxo';
-        const concluido = document.getElementById('ev-concluido').checked;
+        const btnSalvar = document.getElementById('btn-salvar-evento');
 
-        if (!titulo) return mostrarErroModal('O título não pode ficar em branco.');
-        if (!data) return mostrarErroModal('Selecione uma data para o evento.');
+        if (!titulo || !data) {
+            document.getElementById('modal-erro-msg').textContent = 'Preencha o título e a data.';
+            document.getElementById('modal-erro').classList.remove('d-none');
+            return;
+        }
 
+        // Anti-spam UX
+        const textoOriginal = btnSalvar.innerHTML;
+        btnSalvar.disabled = true;
+        btnSalvar.innerHTML = '<span class="spinner-border spinner-border-sm me-2"></span> Salvando...';
         document.getElementById('modal-erro').classList.add('d-none');
 
         const body = new FormData();
         body.append('id', id);
         body.append('titulo', titulo);
         body.append('data', data);
-        body.append('descricao', descricao);
-        body.append('cor', cor);
-        if (concluido) body.append('concluido', '1');
+        body.append('descricao', document.getElementById('ev-descricao').value.trim());
+        body.append('cor', document.querySelector('input[name="ev-cor"]:checked')?.value || 'roxo');
+        if (document.getElementById('ev-concluido').checked) body.append('concluido', '1');
 
         try {
             const res = await fetch('agenda.php?ajax=1&acao=salvar', {
@@ -874,15 +779,19 @@ require_once 'geral/header.php';
             if (json.ok) {
                 bsModal.hide();
                 carregarMes(anoAtual, mesAtual);
-            } else mostrarErroModal(json.msg || 'Erro ao salvar o evento.');
+            } else {
+                document.getElementById('modal-erro-msg').textContent = json.msg || 'Erro ao salvar.';
+                document.getElementById('modal-erro').classList.remove('d-none');
+            }
         } catch (e) {
-            mostrarErroModal('Erro de conexão. Tente novamente.');
+            document.getElementById('modal-erro-msg').textContent = 'Erro de conexão.';
+            document.getElementById('modal-erro').classList.remove('d-none');
+        } finally {
+            btnSalvar.disabled = false;
+            btnSalvar.innerHTML = textoOriginal;
         }
     }
 
-    // ──────────────────────────────────────────────────────────
-    // EXCLUIR EVENTO (confirmação inline, sem alert() nativo)
-    // ──────────────────────────────────────────────────────────
     function pedirExclusao() {
         document.getElementById('confirmar-exclusao').classList.remove('d-none');
         document.getElementById('rodape-normal').classList.add('d-none');
@@ -894,39 +803,32 @@ require_once 'geral/header.php';
     }
 
     async function confirmarExclusao() {
-        const id = document.getElementById('ev-id').value;
+        const btnExcluir = document.getElementById('btn-confirmar-excluir');
+        btnExcluir.disabled = true;
+        btnExcluir.innerHTML = '<span class="spinner-border spinner-border-sm"></span>';
+
         const body = new FormData();
-        body.append('id', id);
+        body.append('id', document.getElementById('ev-id').value);
         try {
             const res = await fetch('agenda.php?ajax=1&acao=excluir', {
                 method: 'POST',
                 body
             });
-            const json = await res.json();
-            if (json.ok) {
+            if ((await res.json()).ok) {
                 bsModal.hide();
                 carregarMes(anoAtual, mesAtual);
             }
-        } catch (e) {}
+        } catch (e) {} finally {
+            btnExcluir.disabled = false;
+            btnExcluir.innerHTML = 'Sim, excluir';
+        }
     }
 
-    // ──────────────────────────────────────────────────────────
-    // UTILITÁRIO
-    // ──────────────────────────────────────────────────────────
     function escHtml(str) {
-        return String(str ?? '')
-            .replace(/&/g, '&amp;').replace(/</g, '&lt;')
-            .replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+        return String(str ?? '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
     }
 
-    // ──────────────────────────────────────────────────────────
-    // INIT
-    // ──────────────────────────────────────────────────────────
-    document.getElementById('toggle-transacoes').addEventListener('change', () => {
-        carregarMes(anoAtual, mesAtual);
-    });
-
-    // Reseta a confirmação de exclusão ao fechar o modal
+    document.getElementById('toggle-transacoes').addEventListener('change', () => carregarMes(anoAtual, mesAtual));
     document.getElementById('modalEvento').addEventListener('hidden.bs.modal', cancelarExclusao);
 
     carregarMes(anoAtual, mesAtual);
