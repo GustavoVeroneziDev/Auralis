@@ -2,3 +2,4 @@ config/conexao.php
 usuario/chaves_google.php
 upgrade_manual_vip.sql
 upgrade_manual_pro.sql
+downgrade_manual_free.sql

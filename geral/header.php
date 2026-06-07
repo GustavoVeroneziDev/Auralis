@@ -93,7 +93,7 @@ $paginaAtual = basename($_SERVER['PHP_SELF']);
 
                                 if ($planoNav === 'vip') {
                                     $corPlano = '#D4AF37'; // Dourado VIP
-                                    $iconePlano = '<i class="fi fi-ss-gem d-flex align-items-center" style="font-size: 1rem; margin-top: 2px;" title="Auralis VIP"></i>';
+                                    $iconePlano = '<i class="fi fi-br-membership-vip d-flex align-items-center" style="font-size: 1rem; margin-top: 2px;" title="Auralis VIP"></i>';
                                 } elseif ($planoNav === 'pro') {
                                     $corPlano = '#7c3aed'; // Roxo PRO
                                     $iconePlano = '<i class="fi fi-br-crown d-flex align-items-center" style="font-size: 1rem; margin-top: 2px;" title="Auralis PRO"></i>';
