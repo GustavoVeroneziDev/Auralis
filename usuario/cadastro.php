@@ -19,7 +19,7 @@ require_once '../geral/header.php';
                 <?php if (isset($_GET['erro'])): ?>
                     <?php
                     $mensagemErro = "Ocorreu um erro ao processar seu cadastro."; // Mensagem padrão
-                
+
                     if ($_GET['erro'] === 'email_existe') {
                         $mensagemErro = "Este e-mail já está cadastrado. Tente fazer login ou recupere sua senha.";
                     } elseif ($_GET['erro'] === 'senhas_diferentes') {
@@ -75,6 +75,16 @@ require_once '../geral/header.php';
                             </div>
                         </div>
                     </div>
+                    <div class="form-check mb-4 text-start toggle-analysis">
+                        <input class="form-check-input bg-dark border-secondary shadow-none" type="checkbox" id="aceita_termos" name="aceita_termos" required>
+                        <label class="form-check-label text-secondary small selection-none" for="aceita_termos" style="font-size: 0.8rem; line-height: 1.4;">
+                            Li e aceito os <a href="../termos.php" target="_blank" class="text-decoration-none" style="color: var(--primary-gold-analysis);">Termos de Uso</a>
+                            e a <a href="../privacidade.php" target="_blank" class="text-decoration-none" style="color: var(--primary-gold-analysis);">Política de Privacidade</a> do Auralis.
+                        </label>
+                        <div class="invalid-feedback" style="font-size: 0.75rem;">
+                            É necessário aceitar os termos para prosseguir.
+                        </div>
+                    </div>
 
                     <div class="d-grid mt-4">
                         <button type="submit"
@@ -124,7 +134,7 @@ require_once '../geral/header.php';
     const inputConfirmaSenha = document.getElementById('confirma_senha');
 
     if (formCadastro) {
-        formCadastro.addEventListener('submit', function (e) {
+        formCadastro.addEventListener('submit', function(e) {
             // Se as senhas forem diferentes...
             if (inputSenha.value !== inputConfirmaSenha.value) {
                 e.preventDefault(); // Impede o formulário de ir para o banco!
@@ -136,7 +146,7 @@ require_once '../geral/header.php';
         });
 
         // Limpa o erro (tira o vermelho) assim que a pessoa começa a apagar/digitar de novo
-        inputConfirmaSenha.addEventListener('input', function () {
+        inputConfirmaSenha.addEventListener('input', function() {
             inputConfirmaSenha.classList.remove('is-invalid');
         });
     }

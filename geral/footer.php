@@ -23,9 +23,9 @@
         </p>
 
     </div>
-    <div class="col-md-6 text-center text-md-end">
-        <a href="#" class="text-light opacity-50 text-decoration-none me-3 small custom-link">Termos de Uso</a>
-        <a href="#" class="text-light opacity-50 text-decoration-none small custom-link" style="margin-right: 10px;">Política de Privacidade</a>
+    <div class="text-center mt-4 mb-2">
+        <a href="termos.php" class="text-secondary small text-decoration-none me-3 hover-text-light">Termos de Uso</a>
+        <a href="privacidade.php" class="text-secondary small text-decoration-none hover-text-light">Privacidade</a>
     </div>
 </div>
 </footer>
@@ -40,7 +40,9 @@
                     entry.target.classList.add('mostrar');
                 }
             });
-        }, { threshold: 0.1 });
+        }, {
+            threshold: 0.1
+        });
         const elementosOcultos = document.querySelectorAll('.card-animado');
         elementosOcultos.forEach((el) => observer.observe(el));
     });
