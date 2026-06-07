@@ -17,6 +17,8 @@ $paginaAtual = basename($_SERVER['PHP_SELF']);
     <link href="/geral/fonts/inter.css" rel="stylesheet">
     <link href="/geral/css/bootstrap.min.css" rel="stylesheet">
     <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.css" rel="stylesheet">
+    <link rel='stylesheet' href='https://cdn-uicons.flaticon.com/uicons-bold-rounded/css/uicons-bold-rounded.css'>
+    <link rel='stylesheet' href='https://cdn-uicons.flaticon.com/uicons-solid-straight/css/uicons-solid-straight.css'>
     <link rel="stylesheet" href="/geral/style.css">
 </head>
 
@@ -90,9 +92,9 @@ $paginaAtual = basename($_SERVER['PHP_SELF']);
                                     <?php echo htmlspecialchars($primeiroNome); ?>
 
                                     <?php if ($planoNav === 'vip'): ?>
-                                        <i class="bi bi-gem d-flex align-items-center" style="color: #D4AF37; font-size: 0.85rem;" title="Auralis VIP"></i>
+                                        <i class="fi fi-ss-gem d-flex align-items-center" style="color: #D4AF37; font-size: 0.85rem; margin-top: 2px;" title="Auralis VIP"></i>
                                     <?php elseif ($planoNav === 'pro'): ?>
-                                        <i class="bi bi-patch-check-fill d-flex align-items-center" style="color: #7c3aed; font-size: 0.85rem;" title="Auralis PRO"></i>
+                                        <i class="fi fi-br-crown d-flex align-items-center" style="color: #7c3aed; font-size: 0.85rem; margin-top: 2px;" title="Auralis PRO"></i>
                                     <?php endif; ?>
                                 </span>
 
