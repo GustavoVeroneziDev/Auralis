@@ -382,9 +382,10 @@ require_once 'geral/header.php';
             </div>
 
             <?php if ($erro): ?>
-                <div class="alert alert-danger d-flex align-items-center gap-2 rounded-3">
-                    <i class="bi bi-exclamation-triangle-fill"></i>
-                    <span><?= htmlspecialchars($erro) ?></span>
+                <div class="d-flex align-items-center gap-2 rounded-3 px-4 py-3 mb-3"
+                    style="background-color: rgba(120,0,0,0.35); border: 1px solid rgba(200,50,50,0.45); color: #f28b8b;">
+                    <i class="bi bi-exclamation-triangle-fill flex-shrink-0" style="font-size:0.95rem;"></i>
+                    <span style="font-size:0.9rem; font-weight:500;"><?= htmlspecialchars($erro) ?></span>
                 </div>
             <?php endif; ?>
 
