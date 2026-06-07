@@ -125,9 +125,9 @@ require_once '../geral/header.php';
             <a href="../dashboard.php" class="btn btn-outline-secondary btn-sm rounded-pill px-3 transition-hover d-flex align-items-center">
                 <i class="bi bi-arrow-left me-1"></i> Voltar
             </a>
-            <a href="nova_carteira.php" class="btn btn-gold btn-sm rounded-pill px-4 fw-bold text-dark transition-hover shadow-sm d-flex align-items-center">
+            <button type="button" onclick="abrirModalCarteira()" class="btn btn-gold btn-sm rounded-pill px-4 fw-bold text-dark transition-hover shadow-sm d-flex align-items-center">
                 <i class="bi bi-plus-circle me-2"></i> Nova Carteira
-            </a>
+            </button>
         </div>
     </div>
 
@@ -176,13 +176,10 @@ require_once '../geral/header.php';
                                         </button>
                                     </li>
                                     <li>
-                                        <form method="POST" action="" class="m-0" onsubmit="return confirm('Deseja realmente excluir a carteira \'<?= htmlspecialchars($cart['TipoCarteira']) ?>\'?');">
-                                            <input type="hidden" name="action" value="excluir_carteira">
-                                            <input type="hidden" name="carteira_id" value="<?= $cart['IDCarteira'] ?>">
-                                            <button type="submit" class="dropdown-item text-danger d-flex align-items-center transition-hover py-2">
-                                                <i class="bi bi-trash3 me-2"></i> Excluir Carteira
-                                            </button>
-                                        </form>
+                                        <button type="button" class="dropdown-item text-danger d-flex align-items-center transition-hover py-2"
+                                            onclick="abrirModalExcluirCarteira('<?= $cart['IDCarteira'] ?>', '<?= htmlspecialchars($cart['TipoCarteira'], ENT_QUOTES) ?>')">
+                                            <i class="bi bi-trash3 me-2"></i> Excluir Carteira
+                                        </button>
                                     </li>
                                 </ul>
                             </div>
@@ -373,6 +370,45 @@ require_once '../geral/header.php';
     </div>
 </div>
 
+<!-- MODAL: EXCLUIR CARTEIRA -->
+<div class="modal fade" id="modalExcluirCarteira" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered modal-sm" style="max-width: 400px;">
+        <div class="modal-content bg-dark border-secondary-subtle shadow-lg rounded-4">
+            <div class="modal-header border-bottom border-secondary-subtle p-3">
+                <h6 class="modal-title text-light fw-bold">
+                    <i class="bi bi-trash3 me-2 text-danger"></i> Excluir Carteira
+                </h6>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+
+            <!-- A action vazia ("") diz ao formulário para processar na mesma página,
+                 onde a lógica PHP de exclusão que já existe lá no topo fará o trabalho. -->
+            <form method="POST" action="">
+                <div class="modal-body p-4 text-center">
+                    <input type="hidden" name="action" value="excluir_carteira">
+                    <input type="hidden" name="carteira_id" id="input_excluir_carteira_id">
+
+                    <div class="mb-3 d-inline-flex justify-content-center align-items-center bg-danger bg-opacity-10 rounded-circle" style="width: 60px; height: 60px;">
+                        <i class="bi bi-exclamation-triangle-fill text-danger fs-3"></i>
+                    </div>
+
+                    <p class="text-secondary mb-0 fs-6">
+                        Tem certeza que deseja excluir a carteira <br>
+                        <strong class="text-light fs-5" id="text_excluir_carteira_nome"></strong>?
+                    </p>
+                    <p class="text-danger small mt-2 fw-semibold opacity-75">Essa ação não pode ser desfeita.</p>
+                </div>
+                <div class="modal-footer border-top border-secondary-subtle d-flex justify-content-between p-2">
+                    <button type="button" class="btn btn-sm btn-link text-secondary text-decoration-none" data-bs-dismiss="modal">Cancelar</button>
+                    <button type="submit" class="btn btn-sm btn-danger fw-bold px-4 rounded-pill">
+                        Confirmar
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
 <script>
     // Dinâmica do Modal (Alterna entre Modo Criar e Modo Editar perfeitamente)
     function abrirModalCarteira(id = '', nome = '') {
@@ -401,6 +437,13 @@ require_once '../geral/header.php';
         new bootstrap.Modal(document.getElementById('modalCarteira')).show();
     }
 
+    // Alimenta o modal de exclusão dinamicamente com os dados da carteira clicada
+    function abrirModalExcluirCarteira(id, nome) {
+        document.getElementById('input_excluir_carteira_id').value = id;
+        document.getElementById('text_excluir_carteira_nome').textContent = nome;
+        new bootstrap.Modal(document.getElementById('modalExcluirCarteira')).show();
+    }
+    
     // Trava de Anti-Spam (Blindagem no clique duplo)
     const formCarteira = document.getElementById('formCarteira');
     const btnSalvarCarteira = document.getElementById('btnSalvarCarteira');
