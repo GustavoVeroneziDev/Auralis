@@ -112,7 +112,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     elseif (!in_array($statusRegistro, ['pendente', 'efetivado'])) $erro = "Status inválido.";
     elseif (empty($carteiraId)) $erro = "Selecione uma carteira.";
     elseif ($recorrente && ($diaVencimento < 1 || $diaVencimento > 31)) $erro = "Dia de vencimento inválido (1 a 31).";
-    elseif ($parcelado && ($numParcelas < 2 || $numParcelas > 48)) $erro = "Número de parcelas deve ser entre 2 e 48.";
+    elseif ($parcelado && intval($_POST['num_parcelas'] ?? 0) === 1) $erro = "O número de parcelas não pode ser 1. Se não quiser parcelar, desative a opção de parcelamento.";
     elseif ($parcelado && $recorrente) $erro = "Uma transação não pode ser parcelada E recorrente ao mesmo tempo.";
 
     if (!$erro) {
@@ -202,9 +202,20 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
                     if ($parcelaComJuros > 0) {
                         $valorTotalComJuros = $parcelaComJuros * $numParcelas;
-                        $valorJurosTotal    = $valorTotalComJuros - $valor;
-                        $valor              = $valorTotalComJuros;
+
+                        // Bloqueia se o total com juros for menor ou igual ao valor original
+                        if ($valorTotalComJuros <= (float)$valorRaw) {
+                            $erro = "O valor total com juros (R$ " . number_format($valorTotalComJuros, 2, ',', '.') . ") deve ser maior que o valor original (R$ " . number_format((float)$valorRaw, 2, ',', '.') . "). Corrija o valor da parcela.";
+                        } else {
+                            $valorJurosTotal = $valorTotalComJuros - $valor;
+                            $valor           = $valorTotalComJuros;
+                        }
                     }
+                }
+
+                // Se a validação de juros gerou um erro, interrompe o bloco de inserção
+                if ($erro) {
+                    goto fim_processamento;
                 }
 
                 $valorParcela = floor(($valor / $numParcelas) * 100) / 100;
@@ -256,7 +267,10 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                         ':tot_parc'  => $numParcelas
                     ]);
                 }
-                header("Location: dashboard.php?sucesso=parcelado&parcelas={$numParcelas}");
+                fim_processamento:
+                if (!$erro) {
+                    header("Location: dashboard.php?sucesso=parcelado&parcelas={$numParcelas}");
+                }
             } elseif ($recorrente) {
                 // ── CRIAÇÃO RECORRENTE (Fix NULL e Pulo de Mês) ──────────────
                 $grupoRecorrencia = gerarUuid();
@@ -511,7 +525,7 @@ require_once 'geral/header.php';
                                                 <div id="bloco_recorrencia" style="display:<?= $val_rec ? 'block' : 'none' ?>;"
                                                     class="mt-3 ps-3 border-start border-border-color">
                                                     <label class="form-label text-secondary-analysis fs-7 mb-1">
-                                                        todo mês vence em <span class="text-light fw-semibold">qual</span> dia vence?
+                                                        todo mês vence em <span class="text-light fw-semibold">qual</span> dia?
                                                     </label>
                                                     <input type="number" name="dia_vencimento" id="dia_vencimento"
                                                         class="form-control bg-dark border-border-color text-light-analysis form-control-sm no-spinners fs-7"
@@ -965,6 +979,45 @@ require_once 'geral/header.php';
 
     if (formTransacao) {
         formTransacao.addEventListener('submit', function(event) {
+
+            // ── VALIDAÇÃO 1: Parcelas igual a 1 ──────────────────────────
+            const toggleParc = document.getElementById('toggle_parcelado');
+            const inputNumParcelas = document.getElementById('num_parcelas');
+            if (toggleParc && toggleParc.checked && inputNumParcelas) {
+                const numParc = parseInt(inputNumParcelas.value, 10);
+                if (numParc === 1) {
+                    event.preventDefault();
+                    alert('⚠️ O número de parcelas não pode ser 1. Se não quiser parcelar, desative a opção de parcelamento.');
+                    inputNumParcelas.focus();
+                    return false;
+                }
+            }
+
+            // ── VALIDAÇÃO 2: Juros não pode deixar o total ≤ valor original ─
+            const radioJurosComCheck = document.getElementById('juros_com');
+            const inputJurosCheck = document.getElementById('valor_parcela_juros');
+            const inputValorCheck = document.getElementById('valor');
+            if (toggleParc && toggleParc.checked && radioJurosComCheck && radioJurosComCheck.checked && inputJurosCheck && inputValorCheck && inputNumParcelas) {
+                const numParc = parseInt(inputNumParcelas.value, 10) || 0;
+                const rawJuros = parseFloat(inputJurosCheck.value.replace(/\D/g, '')) / 100 || 0;
+                const rawOriginal = parseFloat(inputValorCheck.value.replace(/\D/g, '')) / 100 || 0;
+                const totalComJuros = rawJuros * numParc;
+
+                if (rawJuros > 0 && numParc >= 2 && totalComJuros <= rawOriginal) {
+                    event.preventDefault();
+                    const totalFmt = totalComJuros.toLocaleString('pt-BR', {
+                        style: 'currency',
+                        currency: 'BRL'
+                    });
+                    const origFmt = rawOriginal.toLocaleString('pt-BR', {
+                        style: 'currency',
+                        currency: 'BRL'
+                    });
+                    alert(`⚠️ O valor total com juros (${totalFmt}) deve ser maior que o valor original (${origFmt}). Corrija o valor da parcela.`);
+                    inputJurosCheck.focus();
+                    return false;
+                }
+            }
 
             // Se o trinco já estiver trancado, bloqueia a tentativa e para tudo!
             if (enviando) {
