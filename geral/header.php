@@ -90,9 +90,9 @@ $paginaAtual = basename($_SERVER['PHP_SELF']);
                                     <?php echo htmlspecialchars($primeiroNome); ?>
 
                                     <?php if ($planoNav === 'vip'): ?>
-                                        <i class="fi fi-ss-gem d-flex align-items-center" style="color: #D4AF37; font-size: 0.85rem;" title="Auralis VIP"></i>
+                                        <i class="bi bi-gem d-flex align-items-center" style="color: #D4AF37; font-size: 0.85rem;" title="Auralis VIP"></i>
                                     <?php elseif ($planoNav === 'pro'): ?>
-                                        <i class="fi fi-br-crown d-flex align-items-center" style="color: #7c3aed; font-size: 0.85rem;" title="Auralis PRO"></i>
+                                        <i class="bi bi-patch-check-fill d-flex align-items-center" style="color: #7c3aed; font-size: 0.85rem;" title="Auralis PRO"></i>
                                     <?php endif; ?>
                                 </span>
 
