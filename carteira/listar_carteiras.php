@@ -18,7 +18,7 @@ $erro = null;
 // --- PROCESSA A EXCLUSÃO DE CARTEIRA ---
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action']) && $_POST['action'] === 'excluir_carteira') {
     $id_carteira = $_POST['carteira_id'];
-    
+
     try {
         // Trava de Segurança: Verifica se a carteira tem transações atreladas
         $sqlCheck = "SELECT COUNT(*) FROM Registro WHERE FKCarteira = :cid";
@@ -33,7 +33,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action']) && $_POST['
             $sqlDel = "DELETE FROM Carteira WHERE IDCarteira = :cid AND FKUsuarioDono = :uid";
             $stmtDel = $pdo->prepare($sqlDel);
             $stmtDel->execute([':cid' => $id_carteira, ':uid' => $usuario_id]);
-            
+
             // PRG: Redireciona para evitar reenvio de formulário
             header("Location: listar_carteiras.php?sucesso=excluida");
             exit;
@@ -86,6 +86,11 @@ if (isset($_GET['sucesso'])) {
     if ($_GET['sucesso'] === 'editada') $sucesso = "Carteira atualizada com sucesso!";
     if ($_GET['sucesso'] === 'mesclada') $sucesso = "Carteiras mescladas com sucesso!";
 }
+if (isset($_GET['erro'])) {
+    if ($_GET['erro'] === 'duplicada') $erro = "Já existe uma carteira com este nome exato.";
+    if ($_GET['erro'] === 'vazio') $erro = "O nome da carteira não pode ficar vazio.";
+    if ($_GET['erro'] === 'banco') $erro = "Ocorreu um erro interno ao salvar a carteira.";
+}
 
 // --- BUSCA AS CARTEIRAS E CALCULA O SALDO DE CADA UMA ---
 $carteiras = [];
@@ -113,16 +118,16 @@ require_once '../geral/header.php';
 ?>
 
 <main class="container-fluid py-4 mt-2 flex-grow-1" style="max-width: 1500px; padding-inline: var(--space-page-x); min-height: 100vh;">
-    
+
     <div class="d-flex justify-content-between align-items-center mb-4 border-bottom border-secondary-subtle pb-3 flex-wrap gap-3">
         <h2 class="fw-bold text-light mb-0">Minhas Carteiras</h2>
         <div class="d-flex gap-2">
             <a href="../dashboard.php" class="btn btn-outline-secondary btn-sm rounded-pill px-3 transition-hover d-flex align-items-center">
                 <i class="bi bi-arrow-left me-1"></i> Voltar
             </a>
-            <a href="nova_carteira.php" class="btn btn-gold btn-sm rounded-pill px-4 fw-bold text-dark transition-hover shadow-sm d-flex align-items-center">
+            <button type="button" onclick="abrirModalCarteira()" class="btn btn-gold btn-sm rounded-pill px-4 fw-bold text-dark transition-hover shadow-sm d-flex align-items-center">
                 <i class="bi bi-plus-circle me-2"></i> Nova Carteira
-            </a>
+            </button>
         </div>
     </div>
 
@@ -139,7 +144,7 @@ require_once '../geral/header.php';
     <?php endif; ?>
 
     <div class="row g-4">
-        
+
         <?php foreach ($carteiras as $cart): ?>
             <div class="col-md-6 col-lg-4">
                 <div class="card bg-body-tertiary border-secondary-subtle shadow-sm h-100 rounded-4 auralis-wallet-card position-relative overflow-hidden">
@@ -159,24 +164,22 @@ require_once '../geral/header.php';
                                 </button>
                                 <ul class="dropdown-menu dropdown-menu-end bg-dark border-secondary-subtle shadow-lg">
                                     <li>
-                                        <a class="dropdown-item text-light d-flex align-items-center transition-hover py-2" href="nova_carteira.php?editar=<?= $cart['IDCarteira'] ?>">
+                                        <button type="button" class="dropdown-item text-light d-flex align-items-center transition-hover py-2"
+                                            onclick="abrirModalCarteira('<?= $cart['IDCarteira'] ?>', '<?= htmlspecialchars($cart['TipoCarteira'], ENT_QUOTES) ?>')">
                                             <i class="bi bi-pencil-square me-2 text-warning"></i> <span class="text-warning">Editar Nome</span>
-                                        </a>
+                                        </button>
                                     </li>
                                     <li>
-                                        <button type="button" class="dropdown-item text-info d-flex align-items-center transition-hover py-2" 
-                                                onclick="abrirModalMescla('<?= $cart['IDCarteira'] ?>', '<?= htmlspecialchars($cart['TipoCarteira']) ?>')">
+                                        <button type="button" class="dropdown-item text-info d-flex align-items-center transition-hover py-2"
+                                            onclick="abrirModalMescla('<?= $cart['IDCarteira'] ?>', '<?= htmlspecialchars($cart['TipoCarteira']) ?>')">
                                             <i class="bi bi-shuffle me-2"></i> Mesclar / Transferir
                                         </button>
                                     </li>
                                     <li>
-                                        <form method="POST" action="" class="m-0" onsubmit="return confirm('Deseja realmente excluir a carteira \'<?= htmlspecialchars($cart['TipoCarteira']) ?>\'?');">
-                                            <input type="hidden" name="action" value="excluir_carteira">
-                                            <input type="hidden" name="carteira_id" value="<?= $cart['IDCarteira'] ?>">
-                                            <button type="submit" class="dropdown-item text-danger d-flex align-items-center transition-hover py-2">
-                                                <i class="bi bi-trash3 me-2"></i> Excluir Carteira
-                                            </button>
-                                        </form>
+                                        <button type="button" class="dropdown-item text-danger d-flex align-items-center transition-hover py-2"
+                                            onclick="abrirModalExcluirCarteira('<?= $cart['IDCarteira'] ?>', '<?= htmlspecialchars($cart['TipoCarteira'], ENT_QUOTES) ?>')">
+                                            <i class="bi bi-trash3 me-2"></i> Excluir Carteira
+                                        </button>
                                     </li>
                                 </ul>
                             </div>
@@ -194,7 +197,7 @@ require_once '../geral/header.php';
         <?php endforeach; ?>
 
         <div class="col-md-6 col-lg-4">
-            <a href="nova_carteira.php" class="text-decoration-none">
+            <a href="#" onclick="abrirModalCarteira(); return false;" class="text-decoration-none">
                 <div class="card h-100 rounded-4 d-flex align-items-center justify-content-center auralis-add-card transition-hover" style="min-height: 180px;">
                     <div class="card-body text-center d-flex flex-column align-items-center justify-content-center p-4">
                         <div class="rounded-circle d-flex align-items-center justify-content-center mb-3" style="width: 50px; height: 50px; background-color: rgba(170, 140, 44, 0.1);">
@@ -220,11 +223,11 @@ require_once '../geral/header.php';
                 <div class="modal-body p-4">
                     <input type="hidden" name="action" value="mesclar_carteira">
                     <input type="hidden" name="carteira_origem" id="id_carteira_origem">
-                    
+
                     <p class="text-light mb-4">
                         Todas as transações da carteira <strong class="text-warning" id="nome_carteira_origem"></strong> serão movidas. A carteira original será <strong>excluída</strong> após a transferência.
                     </p>
-                    
+
                     <div class="mb-3">
                         <label for="carteira_destino" class="form-label text-secondary small">Transferir tudo para:</label>
                         <select name="carteira_destino" id="carteira_destino" class="form-select form-select-lg bg-transparent border-secondary-subtle text-light shadow-none" required>
@@ -273,16 +276,23 @@ require_once '../geral/header.php';
         --border-color-analysis: #333333;
         --text-light-analysis: #E0E0E0;
     }
-    
-    .bg-dark { background-color: var(--bg-charcoal-analysis) !important; }
-    .card.bg-body-tertiary { background-color: var(--bg-card-analysis) !important; border-color: var(--border-color-analysis) !important; }
-    
+
+    .bg-dark {
+        background-color: var(--bg-charcoal-analysis) !important;
+    }
+
+    .card.bg-body-tertiary {
+        background-color: var(--bg-card-analysis) !important;
+        border-color: var(--border-color-analysis) !important;
+    }
+
     .auralis-wallet-card {
         transition: transform 0.2s ease, box-shadow 0.2s ease;
     }
+
     .auralis-wallet-card:hover {
         transform: translateY(-4px);
-        box-shadow: 0 12px 24px rgba(0,0,0,0.4) !important;
+        box-shadow: 0 12px 24px rgba(0, 0, 0, 0.4) !important;
         border-color: rgba(170, 140, 44, 0.3) !important;
     }
 
@@ -291,10 +301,12 @@ require_once '../geral/header.php';
         border: 2px dashed var(--border-color-analysis) !important;
         transition: all 0.2s ease;
     }
+
     .auralis-add-card:hover {
         border-color: var(--primary-gold-analysis) !important;
         background-color: rgba(170, 140, 44, 0.05) !important;
     }
+
     .auralis-add-card:hover h6 {
         color: var(--text-light-analysis) !important;
     }
@@ -303,25 +315,165 @@ require_once '../geral/header.php';
         background: linear-gradient(135deg, #FFB800 0%, #D4AF37 100%);
         border: none;
     }
+
     .btn-gold:hover {
         background: linear-gradient(135deg, #FFD04F 0%, #E7C665 100%);
         color: #000 !important;
         box-shadow: 0 4px 15px rgba(212, 175, 55, 0.4) !important;
     }
 
-    .tracking-wide { letter-spacing: 0.05em; }
-    
+    .tracking-wide {
+        letter-spacing: 0.05em;
+    }
+
     .dropdown-item:hover {
         background-color: rgba(255, 255, 255, 0.05);
     }
 </style>
+<!-- MODAL: CRIAR / EDITAR CARTEIRA -->
+<div class="modal fade" id="modalCarteira" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content bg-dark border-secondary-subtle shadow-lg rounded-4">
+            <div class="modal-header border-bottom border-secondary-subtle p-3">
+                <h5 class="modal-title text-light fw-bold" id="modalCarteiraTitle">
+                    <i class="bi bi-wallet-fill me-2" style="color: var(--primary-gold-analysis) !important;" id="modalCarteiraIcon"></i>
+                    <span id="modalCarteiraTitleText">Nova Carteira</span>
+                </h5>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <form action="processa_carteira.php" method="POST" id="formCarteira">
+                <div class="modal-body p-4">
+                    <!-- Escondidos: ID para edição e Origem para voltar à página correta -->
+                    <input type="hidden" name="id_carteira" id="input_id_carteira" value="">
+                    <input type="hidden" name="origem" value="listar_carteiras">
+
+                    <div class="mb-3">
+                        <label for="input_tipo_carteira" class="form-label text-secondary small fw-semibold">Nome ou Tipo da Carteira</label>
+                        <div class="input-group input-group-lg shadow-sm">
+                            <span class="input-group-text bg-body-tertiary border-secondary-subtle text-secondary border-end-0">
+                                <i class="bi bi-tag-fill"></i>
+                            </span>
+                            <input type="text" class="form-control bg-body-tertiary border-secondary-subtle border-start-0 text-light shadow-none fw-semibold"
+                                id="input_tipo_carteira" name="tipo_carteira" required
+                                placeholder="Ex: Conta Pessoal, Nubank...">
+                        </div>
+                    </div>
+                </div>
+                <div class="modal-footer border-top border-secondary-subtle p-3 d-flex justify-content-between">
+                    <button type="button" class="btn btn-link text-secondary text-decoration-none fw-semibold" data-bs-dismiss="modal">Cancelar</button>
+                    <button type="submit" class="btn btn-gold rounded-pill px-4 fw-bold text-dark d-flex align-items-center" id="btnSalvarCarteira">
+                        <i class="bi bi-check-lg me-2" id="modalCarteiraBtnIcon"></i> <span id="modalCarteiraBtnText">Salvar Carteira</span>
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+<!-- MODAL: EXCLUIR CARTEIRA -->
+<div class="modal fade" id="modalExcluirCarteira" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered modal-sm" style="max-width: 400px;">
+        <div class="modal-content bg-dark border-secondary-subtle shadow-lg rounded-4">
+            <div class="modal-header border-bottom border-secondary-subtle p-3">
+                <h6 class="modal-title text-light fw-bold">
+                    <i class="bi bi-trash3 me-2 text-danger"></i> Excluir Carteira
+                </h6>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+
+            <!-- A action vazia ("") diz ao formulário para processar na mesma página,
+                 onde a lógica PHP de exclusão que já existe lá no topo fará o trabalho. -->
+            <form method="POST" action="">
+                <div class="modal-body p-4 text-center">
+                    <input type="hidden" name="action" value="excluir_carteira">
+                    <input type="hidden" name="carteira_id" id="input_excluir_carteira_id">
+
+                    <div class="mb-3 d-inline-flex justify-content-center align-items-center bg-danger bg-opacity-10 rounded-circle" style="width: 60px; height: 60px;">
+                        <i class="bi bi-exclamation-triangle-fill text-danger fs-3"></i>
+                    </div>
+
+                    <p class="text-secondary mb-0 fs-6">
+                        Tem certeza que deseja excluir a carteira <br>
+                        <strong class="text-light fs-5" id="text_excluir_carteira_nome"></strong>?
+                    </p>
+                    <p class="text-danger small mt-2 fw-semibold opacity-75">Essa ação não pode ser desfeita.</p>
+                </div>
+                <div class="modal-footer border-top border-secondary-subtle d-flex justify-content-between p-2">
+                    <button type="button" class="btn btn-sm btn-link text-secondary text-decoration-none" data-bs-dismiss="modal">Cancelar</button>
+                    <button type="submit" class="btn btn-sm btn-danger fw-bold px-4 rounded-pill">
+                        Confirmar
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
 
 <script>
+    // Dinâmica do Modal (Alterna entre Modo Criar e Modo Editar perfeitamente)
+    function abrirModalCarteira(id = '', nome = '') {
+        document.getElementById('input_id_carteira').value = id;
+        document.getElementById('input_tipo_carteira').value = nome;
+
+        const titleText = document.getElementById('modalCarteiraTitleText');
+        const icon = document.getElementById('modalCarteiraIcon');
+        const btnText = document.getElementById('modalCarteiraBtnText');
+        const btnIcon = document.getElementById('modalCarteiraBtnIcon');
+
+        if (id !== '') {
+            // MODO EDIÇÃO
+            titleText.textContent = 'Editar Carteira';
+            icon.className = 'bi bi-pencil-square me-2';
+            btnText.textContent = 'Atualizar Carteira';
+            btnIcon.className = 'bi bi-arrow-repeat me-2';
+        } else {
+            // MODO CRIAÇÃO
+            titleText.textContent = 'Nova Carteira';
+            icon.className = 'bi bi-wallet-fill me-2';
+            btnText.textContent = 'Salvar Carteira';
+            btnIcon.className = 'bi bi-check-lg me-2';
+        }
+
+        new bootstrap.Modal(document.getElementById('modalCarteira')).show();
+    }
+
+    // Alimenta o modal de exclusão dinamicamente com os dados da carteira clicada
+    function abrirModalExcluirCarteira(id, nome) {
+        document.getElementById('input_excluir_carteira_id').value = id;
+        document.getElementById('text_excluir_carteira_nome').textContent = nome;
+        new bootstrap.Modal(document.getElementById('modalExcluirCarteira')).show();
+    }
+    
+    // Trava de Anti-Spam (Blindagem no clique duplo)
+    const formCarteira = document.getElementById('formCarteira');
+    const btnSalvarCarteira = document.getElementById('btnSalvarCarteira');
+
+    if (formCarteira) {
+        formCarteira.addEventListener('submit', function() {
+            btnSalvarCarteira.disabled = true;
+            btnSalvarCarteira.innerHTML = '<span class="spinner-border spinner-border-sm me-2" role="status" aria-hidden="true"></span> Salvando...';
+        });
+    }
+
+    // Limpeza da URL para erros e sucessos
+    if (window.history.replaceState) {
+        const url = new URL(window.location);
+        if (url.searchParams.has('sucesso') || url.searchParams.has('erro')) {
+            url.searchParams.delete('sucesso');
+            url.searchParams.delete('erro');
+            window.history.replaceState({
+                path: url.href
+            }, '', url.href);
+        }
+    }
+
     if (window.history.replaceState) {
         const url = new URL(window.location);
         if (url.searchParams.has('sucesso')) {
             url.searchParams.delete('sucesso');
-            window.history.replaceState({path: url.href}, '', url.href);
+            window.history.replaceState({
+                path: url.href
+            }, '', url.href);
         }
     }
 </script>
