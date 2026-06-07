@@ -511,7 +511,7 @@ require_once 'geral/header.php';
                                                 <div id="bloco_recorrencia" style="display:<?= $val_rec ? 'block' : 'none' ?>;"
                                                     class="mt-3 ps-3 border-start border-border-color">
                                                     <label class="form-label text-secondary-analysis fs-7 mb-1">
-                                                        Todo dia <span class="text-light fw-semibold">qual</span> do mês vence?
+                                                        todo mês vence em <span class="text-light fw-semibold">qual</span> dia vence?
                                                     </label>
                                                     <input type="number" name="dia_vencimento" id="dia_vencimento"
                                                         class="form-control bg-dark border-border-color text-light-analysis form-control-sm no-spinners fs-7"
