@@ -78,8 +78,8 @@ require_once '../geral/header.php';
                     <div class="form-check mb-4 text-start toggle-analysis">
                         <input class="form-check-input bg-dark border-secondary shadow-none" type="checkbox" id="aceita_termos" name="aceita_termos" required>
                         <label class="form-check-label text-secondary small selection-none" for="aceita_termos" style="font-size: 0.8rem; line-height: 1.4;">
-                            Li e aceito os <a href="termos.php" target="_blank" class="text-decoration-none" style="color: var(--primary-gold-analysis);">Termos de Uso</a>
-                            e a <a href="privacidade.php" target="_blank" class="text-decoration-none" style="color: var(--primary-gold-analysis);">Política de Privacidade</a> do Auralis.
+                            Li e aceito os <a href="../termos.php" target="_blank" class="text-decoration-none" style="color: var(--primary-gold-analysis);">Termos de Uso</a>
+                            e a <a href="../privacidade.php" target="_blank" class="text-decoration-none" style="color: var(--primary-gold-analysis);">Política de Privacidade</a> do Auralis.
                         </label>
                         <div class="invalid-feedback" style="font-size: 0.75rem;">
                             É necessário aceitar os termos para prosseguir.
