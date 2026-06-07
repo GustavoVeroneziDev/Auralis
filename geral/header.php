@@ -87,18 +87,28 @@ $paginaAtual = basename($_SERVER['PHP_SELF']);
                             <a href="#" class="d-flex align-items-center justify-content-start justify-content-lg-end text-light text-decoration-none dropdown-toggle custom-link py-2"
                                 id="menuUsuario" data-bs-toggle="dropdown" aria-expanded="false">
 
-                                <?php $planoNav = strtolower($_SESSION['plano'] ?? 'free'); ?>
-                                <span class="me-2 text-light fw-semibold navbar-greeting d-flex align-items-center gap-2" style="font-size: 0.95rem;">
-                                    <?php echo htmlspecialchars($primeiroNome); ?>
+                                <?php
+                                // Define as configurações visuais baseadas no plano
+                                $planoNav = strtolower($_SESSION['plano'] ?? 'free');
 
-                                    <?php if ($planoNav === 'vip'): ?>
-                                        <i class="fi fi-ss-gem d-flex align-items-center" style="color: #D4AF37; font-size: 0.85rem; margin-top: 2px;" title="Auralis VIP"></i>
-                                    <?php elseif ($planoNav === 'pro'): ?>
-                                        <i class="fi fi-br-crown d-flex align-items-center" style="color: #7c3aed; font-size: 0.85rem; margin-top: 2px;" title="Auralis PRO"></i>
-                                    <?php endif; ?>
+                                if ($planoNav === 'vip') {
+                                    $corPlano = '#D4AF37'; // Dourado VIP
+                                    $iconePlano = '<i class="fi fi-ss-gem d-flex align-items-center" style="font-size: 1rem; margin-top: 2px;" title="Auralis VIP"></i>';
+                                } elseif ($planoNav === 'pro') {
+                                    $corPlano = '#7c3aed'; // Roxo PRO
+                                    $iconePlano = '<i class="fi fi-br-crown d-flex align-items-center" style="font-size: 1rem; margin-top: 2px;" title="Auralis PRO"></i>';
+                                } else {
+                                    $corPlano = '#E0E0E0'; // Branco/Cinza claro para Free
+                                    $iconePlano = '';      // Free não tem ícone extra
+                                }
+                                ?>
+
+                                <span class="me-2 fw-semibold navbar-greeting d-flex align-items-center gap-2" style="font-size: 1rem; color: <?php echo $corPlano; ?>;">
+                                    <?php echo htmlspecialchars($primeiroNome); ?>
+                                    <?php echo $iconePlano; ?>
                                 </span>
 
-                                <i style="color: gold !important;" class="bi bi-person-circle fs-4 cardCentral"></i>
+                                <i class="bi bi-person-circle cardCentral" style="color: <?php echo $corPlano; ?> !important; font-size: 1.75rem;"></i>
                             </a>
 
                             <ul class="dropdown-menu dropdown-menu-lg-end shadow-lg border border-secondary-subtle mt-2 bg-dark w-100 w-lg-auto" aria-labelledby="menuUsuario">
