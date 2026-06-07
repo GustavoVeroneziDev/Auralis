@@ -737,8 +737,9 @@ require_once 'geral/header.php';
                         $sinalValor    = $isDespesa ? '-' : '+';
                         $corValor      = $isDespesa ? 'text-danger' : 'text-success';
                         $dataFormatada = date('d/m/Y', strtotime($t['MomentoRegistro']));
-                        $iconeTipo     = $isDespesa ? '<i class="bi bi-arrow-down-short fs-5 text-danger bg-danger bg-opacity-10 rounded-circle p-1 me-3"></i>'
-                            : '<i class="bi bi-arrow-up-short fs-5 text-success bg-success bg-opacity-10 rounded-circle p-1 me-3"></i>';
+                        $iconeTipo = $isDespesa
+                            ? '<span class="d-inline-flex align-items-center justify-content-center rounded-circle bg-danger bg-opacity-10 flex-shrink-0 me-3" style="width:32px;height:32px;min-width:32px;"><i class="bi bi-arrow-down-short text-danger" style="font-size:1.1rem;"></i></span>'
+                            : '<span class="d-inline-flex align-items-center justify-content-center rounded-circle bg-success bg-opacity-10 flex-shrink-0 me-3" style="width:32px;height:32px;min-width:32px;"><i class="bi bi-arrow-up-short text-success" style="font-size:1.1rem;"></i></span>';
 
                         $rowId           = "transacao-" . $index;
                         $isPendente      = ($t['StatusRegistro'] === 'pendente');

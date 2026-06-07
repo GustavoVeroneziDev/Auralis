@@ -112,7 +112,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     elseif (!in_array($statusRegistro, ['pendente', 'efetivado'])) $erro = "Status inválido.";
     elseif (empty($carteiraId)) $erro = "Selecione uma carteira.";
     elseif ($recorrente && ($diaVencimento < 1 || $diaVencimento > 31)) $erro = "Dia de vencimento inválido (1 a 31).";
-    elseif ($parcelado && ($numParcelas < 2 || $numParcelas > 48)) $erro = "Número de parcelas deve ser entre 2 e 48.";
+    elseif ($parcelado && intval($_POST['num_parcelas'] ?? 0) === 1) $erro = "O número de parcelas não pode ser 1. Se não quiser parcelar, desative a opção de parcelamento.";
     elseif ($parcelado && $recorrente) $erro = "Uma transação não pode ser parcelada E recorrente ao mesmo tempo.";
 
     if (!$erro) {
@@ -202,9 +202,20 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
                     if ($parcelaComJuros > 0) {
                         $valorTotalComJuros = $parcelaComJuros * $numParcelas;
-                        $valorJurosTotal    = $valorTotalComJuros - $valor;
-                        $valor              = $valorTotalComJuros;
+
+                        // Bloqueia se o total com juros for menor ou igual ao valor original
+                        if ($valorTotalComJuros <= (float)$valorRaw) {
+                            $erro = "O valor total com juros (R$ " . number_format($valorTotalComJuros, 2, ',', '.') . ") deve ser maior que o valor original (R$ " . number_format((float)$valorRaw, 2, ',', '.') . "). Corrija o valor da parcela.";
+                        } else {
+                            $valorJurosTotal = $valorTotalComJuros - $valor;
+                            $valor           = $valorTotalComJuros;
+                        }
                     }
+                }
+
+                // Se a validação de juros gerou um erro, interrompe o bloco de inserção
+                if ($erro) {
+                    goto fim_processamento;
                 }
 
                 $valorParcela = floor(($valor / $numParcelas) * 100) / 100;
@@ -256,7 +267,10 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                         ':tot_parc'  => $numParcelas
                     ]);
                 }
-                header("Location: dashboard.php?sucesso=parcelado&parcelas={$numParcelas}");
+                fim_processamento:
+                if (!$erro) {
+                    header("Location: dashboard.php?sucesso=parcelado&parcelas={$numParcelas}");
+                }
             } elseif ($recorrente) {
                 // ── CRIAÇÃO RECORRENTE (Fix NULL e Pulo de Mês) ──────────────
                 $grupoRecorrencia = gerarUuid();
@@ -368,9 +382,10 @@ require_once 'geral/header.php';
             </div>
 
             <?php if ($erro): ?>
-                <div class="alert alert-danger d-flex align-items-center gap-2 rounded-3">
-                    <i class="bi bi-exclamation-triangle-fill"></i>
-                    <span><?= htmlspecialchars($erro) ?></span>
+                <div class="d-flex align-items-center gap-2 rounded-3 px-4 py-3 mb-3"
+                    style="background-color: rgba(120,0,0,0.35); border: 1px solid rgba(200,50,50,0.45); color: #f28b8b;">
+                    <i class="bi bi-exclamation-triangle-fill flex-shrink-0" style="font-size:0.95rem;"></i>
+                    <span style="font-size:0.9rem; font-weight:500;"><?= htmlspecialchars($erro) ?></span>
                 </div>
             <?php endif; ?>
 
@@ -465,136 +480,172 @@ require_once 'geral/header.php';
                         <div class="accordion accordion-flush mb-5 border border-border-color rounded-3 overflow-hidden auralis-line-input" id="accordionMaisDetalhes">
                             <div class="accordion-item bg-transparent">
                                 <h2 class="accordion-header">
-                                    <button class="accordion-button <?= (!empty($val_venc) || $val_rec || $is_parcela) ? '' : 'collapsed' ?> bg-transparent text-secondary-analysis shadow-none py-2 px-3 small fs-7" type="button" data-bs-toggle="collapse" data-bs-target="#collapseDetalhes">
-                                        Mais detalhes (Vencimento, Recorrência)
+                                    <button class="accordion-button <?= (!empty($val_venc) || $val_rec || $is_parcela) ? '' : 'collapsed' ?> bg-transparent text-secondary-analysis shadow-none py-2 px-3 small fs-7"
+                                        type="button" data-bs-toggle="collapse" data-bs-target="#collapseDetalhes">
+                                        <i class="bi bi-sliders me-2"></i> Configurações do lançamento
                                     </button>
                                 </h2>
-                                <div id="collapseDetalhes" class="accordion-collapse collapse <?= (!empty($val_venc) || $val_rec || $is_parcela) ? 'show' : '' ?>" data-bs-parent="#accordionMaisDetalhes">
-                                    <div class="accordion-body border-top border-border-color pt-3 px-3 fs-7 bg-charcoal">
+                                <div id="collapseDetalhes" class="accordion-collapse collapse <?= (!empty($val_venc) || $val_rec || $is_parcela) ? 'show' : '' ?>"
+                                    data-bs-parent="#accordionMaisDetalhes">
+                                    <div class="accordion-body border-top border-border-color pt-3 px-3 pb-4 bg-charcoal d-flex flex-column gap-4">
 
                                         <?php if ($is_recorrente && !empty($transacao_edit['GrupoParcela'])): ?>
-                                            <div class="form-check form-switch mb-4 pb-3 border-bottom border-border-color toggle-analysis toggle-analysis-muted">
-                                                <input class="form-check-input bg-dark border-border-color shadow-none" type="checkbox" name="editar_futuros" id="editar_futuros" checked>
-                                                <label class="form-check-label text-light fs-7 fw-semibold" for="editar_futuros">
-                                                    Aplicar novo valor/descrição neste e em <strong>todos os meses futuros pendentes</strong>.
-                                                </label>
+                                            <div class="p-3 rounded-3 border border-border-color" style="background:rgba(255,255,255,.03);">
+                                                <div class="form-check form-switch toggle-analysis toggle-analysis-muted">
+                                                    <input class="form-check-input bg-dark border-border-color shadow-none" type="checkbox"
+                                                        name="editar_futuros" id="editar_futuros" checked>
+                                                    <label class="form-check-label text-light fs-7 fw-semibold" for="editar_futuros">
+                                                        Aplicar alterações em <strong>todos os meses futuros pendentes</strong>
+                                                    </label>
+                                                </div>
                                             </div>
                                         <?php endif; ?>
 
-                                        <div class="mb-3">
-                                            <label class="form-label text-secondary-analysis fs-7 mb-1">Data de Vencimento</label>
-                                            <input type="date" name="data_vencimento" class="form-control bg-dark border-border-color text-light-analysis fs-7" value="<?= htmlspecialchars($val_venc) ?>">
+                                        <?php if (!$is_edicao || $is_recorrente): ?>
+                                            <!-- ── 1. RECORRENTE ──────────────────────────────────── -->
+                                            <div>
+                                                <div class="d-flex align-items-start justify-content-between gap-3"
+                                                    <?= $is_recorrente ? 'style="pointer-events:none;opacity:0.6;"' : '' ?>>
+                                                    <div>
+                                                        <div class="text-light fw-semibold fs-7 mb-1 d-flex align-items-center gap-2">
+                                                            <i class="bi bi-arrow-repeat text-success"></i>
+                                                            Conta recorrente
+                                                            <?= $is_recorrente ? '<span class="badge bg-secondary" style="font-size:0.6rem;">Fixo</span>' : '' ?>
+                                                        </div>
+                                                        <div class="text-secondary" style="font-size:0.75rem;">
+                                                            Repete todo mês na mesma data — assinaturas, aluguel, academia.
+                                                        </div>
+                                                    </div>
+                                                    <div class="form-check form-switch fs-4 mb-0 toggle-analysis flex-shrink-0 mt-1">
+                                                        <input class="form-check-input bg-dark border-border-color shadow-none"
+                                                            type="checkbox" name="recorrente" id="recorrente"
+                                                            <?= $val_rec ? 'checked' : '' ?>>
+                                                    </div>
+                                                </div>
+
+                                                <div id="bloco_recorrencia" style="display:<?= $val_rec ? 'block' : 'none' ?>;"
+                                                    class="mt-3 ps-3 border-start border-border-color">
+                                                    <label class="form-label text-secondary-analysis fs-7 mb-1">
+                                                        todo mês vence em <span class="text-light fw-semibold">qual</span> dia?
+                                                    </label>
+                                                    <input type="number" name="dia_vencimento" id="dia_vencimento"
+                                                        class="form-control bg-dark border-border-color text-light-analysis form-control-sm no-spinners fs-7"
+                                                        style="max-width:100px;"
+                                                        min="1" max="31" placeholder="Ex: 10"
+                                                        value="<?= htmlspecialchars($val_dia) ?>"
+                                                        <?= $is_recorrente ? 'readonly' : '' ?>>
+                                                    <div class="text-secondary mt-1" style="font-size:0.72rem;">
+                                                        Insira o dia que a cobrança cai todo mês (1 a 31).
+                                                    </div>
+                                                </div>
+                                            </div>
+                                        <?php endif; ?>
+
+                                        <?php if (!$is_edicao): ?>
+                                            <!-- ── 2. PARCELADO ───────────────────────────────────── -->
+                                            <div class="pt-3 border-top border-border-color">
+                                                <div class="d-flex align-items-start justify-content-between gap-3">
+                                                    <div>
+                                                        <div class="text-light fw-semibold fs-7 mb-1 d-flex align-items-center gap-2">
+                                                            <i class="bi bi-credit-card-2-front" style="color:#a78bfa;"></i>
+                                                            <?= $tipo_sugerido === 'receita' ? 'Recebimento parcelado' : 'Compra parcelada' ?>
+                                                        </div>
+                                                        <div class="text-secondary" style="font-size:0.75rem;">
+                                                            <?= $tipo_sugerido === 'receita'
+                                                                ? 'Valor recebido em partes — comissão, prestação de serviço, etc.'
+                                                                : 'Divide o valor em N meses — cartão ou carnê.' ?>
+                                                        </div>
+                                                    </div>
+                                                    <div class="form-check form-switch fs-4 mb-0 toggle-analysis flex-shrink-0 mt-1">
+                                                        <input class="form-check-input bg-dark border-border-color shadow-none"
+                                                            type="checkbox" name="parcelado" id="toggle_parcelado"
+                                                            <?= $val_parcelado ? 'checked' : '' ?>>
+                                                    </div>
+                                                </div>
+
+                                                <div id="bloco_parcelamento" style="display:<?= $val_parcelado ? 'block' : 'none' ?>;"
+                                                    class="mt-3 ps-3 border-start border-border-color">
+
+                                                    <label class="form-label text-secondary-analysis fs-7 mb-1">Em quantas vezes?</label>
+                                                    <div class="d-flex align-items-center gap-3 mb-3">
+                                                        <input type="number" name="num_parcelas" id="num_parcelas"
+                                                            class="form-control bg-dark border-border-color text-light-analysis form-control-sm no-spinners fs-7"
+                                                            style="max-width:100px;" min="2" max="48" placeholder="Ex: 3"
+                                                            value="<?= htmlspecialchars($val_num_parc) ?>">
+                                                        <div id="preview_parcela" class="fs-7"></div>
+                                                    </div>
+
+                                                    <?php
+                                                    $planoFront      = strtolower($_SESSION['plano'] ?? 'free');
+                                                    $testeFront      = function_exists('obterHorasRestantesTeste') ? (obterHorasRestantesTeste() > 0) : false;
+                                                    $liberaJuros     = ($planoFront === 'pro' || $planoFront === 'vip' || $testeFront);
+                                                    $assinanteNativo = ($planoFront === 'pro' || $planoFront === 'vip');
+                                                    ?>
+                                                    <div class="d-flex gap-3 mb-2">
+                                                        <div class="form-check">
+                                                            <input class="form-check-input bg-dark border-border-color shadow-none"
+                                                                type="radio" name="tipo_juros" id="juros_sem" value="sem" checked>
+                                                            <label class="form-check-label text-light fs-7" for="juros_sem">Sem juros</label>
+                                                        </div>
+                                                        <div class="form-check" <?= !$liberaJuros ? 'title="Exclusivo Auralis PRO" data-bs-toggle="tooltip"' : '' ?>>
+                                                            <input class="form-check-input bg-dark border-border-color shadow-none"
+                                                                type="radio" name="tipo_juros" id="juros_com" value="com"
+                                                                <?= !$liberaJuros ? 'disabled' : '' ?>>
+                                                            <label class="form-check-label text-light fs-7 d-flex align-items-center gap-1" for="juros_com">
+                                                                Com juros
+                                                                <?php if (!$assinanteNativo): ?>
+                                                                    <?= function_exists('badgePremium') ? badgePremium('pro', $testeFront) : '' ?>
+                                                                <?php endif; ?>
+                                                            </label>
+                                                        </div>
+                                                    </div>
+
+                                                    <div id="bloco_com_juros" style="display:none;" class="mt-2 bg-charcoal p-3 border border-border-color rounded-3">
+                                                        <label class="form-label text-secondary-analysis fs-7 mb-1">
+                                                            Valor exato de <strong>cada parcela</strong> com juros:
+                                                        </label>
+                                                        <div class="input-group input-group-sm mb-1" style="max-width:200px;">
+                                                            <span class="input-group-text bg-dark border-border-color text-secondary-analysis fs-7">R$</span>
+                                                            <input type="text" inputmode="numeric" name="valor_parcela_juros" id="valor_parcela_juros"
+                                                                class="form-control bg-dark border-border-color text-gold-analysis fw-bold fs-7 no-spinners"
+                                                                placeholder="0,00"
+                                                                oninput="mascaraMoeda(this); atualizarPreviewParcela();">
+                                                        </div>
+                                                        <div class="text-secondary opacity-75 mt-1" style="font-size:0.7rem;" id="preview_total_juros">
+                                                            <i class="bi bi-calculator me-1"></i> Digite o valor da parcela para calcular.
+                                                        </div>
+                                                    </div>
+
+                                                    <div class="text-secondary mt-2" style="font-size:0.72rem;">
+                                                        <i class="bi bi-info-circle me-1"></i>
+                                                        <?= $tipo_sugerido === 'receita'
+                                                            ? 'Um recebimento por mês a partir da data acima. Mínimo 2x, máximo 48x.'
+                                                            : 'Uma entrada por mês a partir da data acima. Mínimo 2x, máximo 48x.'
+                                                        ?>
+                                                    </div>
+                                                </div>
+                                            </div>
+                                        <?php endif; ?>
+
+                                        <!-- ── 3. DATA LIMITE PARA PAGAMENTO ─────────────────── -->
+                                        <div class="pt-3 border-top border-border-color">
+                                            <label class="text-light fw-semibold fs-7 mb-1 d-flex align-items-center gap-2">
+                                                <i class="bi bi-calendar-x text-danger"></i>
+                                                Data limite para pagamento
+                                                <span class="badge bg-secondary fw-normal" style="font-size:0.62rem;">Opcional</span>
+                                            </label>
+                                            <div class="text-secondary mb-2" style="font-size:0.75rem;">
+                                                Quando essa conta expira ou vence — ex: boleto, fatura de cartão.
+                                            </div>
+                                            <input type="date" name="data_vencimento"
+                                                class="form-control bg-dark border-border-color text-light-analysis fs-7"
+                                                value="<?= htmlspecialchars($val_venc) ?>">
                                         </div>
-
-                                        <?php
-                                        // Só exibe a opção de Recorrência se for uma criação NOVA, ou se já for uma edição de RECORRENTE
-                                        if (!$is_edicao || $is_recorrente):
-                                        ?>
-                                            <div class="form-check form-switch mb-2 toggle-analysis toggle-analysis-muted" <?= $is_recorrente ? 'style="pointer-events: none; opacity: 0.6;"' : '' ?>>
-                                                <input class="form-check-input bg-dark border-border-color shadow-none" type="checkbox" name="recorrente" id="recorrente" <?= $val_rec ? 'checked' : '' ?>>
-                                                <label class="form-check-label text-muted-analysis fs-7" for="recorrente">
-                                                    Conta recorrente <?= $is_recorrente ? '<span class="badge bg-secondary ms-2" style="font-size:0.6rem;">Fixo (Para remover, exclua a transação)</span>' : '' ?>
-                                                </label>
-                                            </div>
-
-                                            <div id="bloco_recorrencia" style="display: <?= $val_rec ? 'block' : 'none' ?>;" class="ps-4 border-start border-border-color mt-2 bg-charcoal">
-                                                <label class="form-label text-secondary-analysis fs-7 mb-1">Dia do mês</label>
-                                                <input type="number" name="dia_vencimento" id="dia_vencimento"
-                                                    class="form-control bg-dark border-border-color text-light-analysis form-control-sm w-50 no-spinners fs-7"
-                                                    min="1" max="31" placeholder="Ex: 10" value="<?= htmlspecialchars($val_dia) ?>" <?= $is_recorrente ? 'readonly' : '' ?>>
-                                            </div>
-                                        <?php endif; ?>
-
-                                        <?php
-                                        // Se for uma Parcela, mostra um crachá bonito avisando o usuário
-                                        if ($is_parcela):
-                                        ?>
-                                            <div class="mt-3 p-3 bg-dark border border-border-color rounded-3 d-flex align-items-center gap-3">
-                                                <div class="bg-warning bg-opacity-10 p-2 rounded-circle">
-                                                    <i class="bi bi-credit-card-2-front fs-5 text-warning"></i>
-                                                </div>
-                                                <div>
-                                                    <strong class="text-light d-block mb-1">Compra Parcelada</strong>
-                                                    <span class="text-secondary fs-7">Você está editando a parcela <strong><?= $transacao_edit['ParcelaAtual'] ?> de <?= $transacao_edit['TotalParcelas'] ?></strong>.
-                                                </div>
-                                            </div>
-                                        <?php endif; ?>
 
                                     </div>
                                 </div>
                             </div>
                         </div>
-
-                        <?php if (!$is_edicao): ?>
-                            <!-- ── Parcelamento ──────────────────────────────────── -->
-                            <div class="mb-4 auralis-line-input pb-3">
-                                <div class="d-flex align-items-center justify-content-between mb-2">
-                                    <div class="d-flex align-items-center">
-                                        <i class="bi bi-credit-card-2-front text-secondary-analysis me-3 w-icon text-center"></i>
-                                        <span class="text-light fs-6">Parcelado</span>
-                                    </div>
-                                    <div class="form-check form-switch fs-4 mb-0 toggle-analysis">
-                                        <input class="form-check-input bg-dark border-border-color shadow-none" type="checkbox" name="parcelado" id="toggle_parcelado" role="switch" <?= $val_parcelado ? 'checked' : '' ?>>
-                                    </div>
-                                </div>
-
-                                <?php
-                                $planoFront = strtolower($_SESSION['plano'] ?? 'free');
-                                $testeFront = function_exists('obterHorasRestantesTeste') ? (obterHorasRestantesTeste() > 0) : false;
-
-                                // Tem acesso porque assinou ou porque está no teste
-                                $liberaJuros = ($planoFront === 'pro' || $planoFront === 'vip' || $testeFront);
-                                // É assinante real (não é teste)
-                                $assinanteNativo = ($planoFront === 'pro' || $planoFront === 'vip');
-                                ?>
-
-                                <div id="bloco_parcelamento" style="display: <?= $val_parcelado ? 'block' : 'none' ?>;" class="ps-4 border-start border-border-color mt-2">
-                                    <label class="form-label text-secondary-analysis fs-7 mb-1">Número de parcelas</label>
-                                    <div class="d-flex align-items-center gap-3 mb-3">
-                                        <input type="number" name="num_parcelas" id="num_parcelas"
-                                            class="form-control bg-dark border-border-color text-light-analysis form-control-sm no-spinners fs-7"
-                                            min="2" max="48" placeholder="Ex: 3"
-                                            value="<?= htmlspecialchars($val_num_parc) ?>"
-                                            style="width: 80px;">
-                                        <div id="preview_parcela" class="text-muted fs-7"></div>
-                                    </div>
-
-                                    <div class="d-flex gap-3 mb-2 mt-1">
-                                        <div class="form-check">
-                                            <input class="form-check-input bg-dark border-border-color shadow-none" type="radio" name="tipo_juros" id="juros_sem" value="sem" checked>
-                                            <label class="form-check-label text-light fs-7" for="juros_sem">Sem juros</label>
-                                        </div>
-                                        <div class="form-check" <?= !$liberaJuros ? 'title="Exclusivo Auralis PRO" data-bs-toggle="tooltip"' : '' ?>>
-                                            <input class="form-check-input bg-dark border-border-color shadow-none" type="radio" name="tipo_juros" id="juros_com" value="com" <?= !$liberaJuros ? 'disabled' : '' ?>>
-                                            <label class="form-check-label text-light fs-7 d-flex align-items-center gap-1" for="juros_com">
-                                                Com juros
-                                                <?php
-                                                // Se não for assinante real (Free ou Trial), mostra o selo correspondente
-                                                if (!$assinanteNativo) {
-                                                    echo function_exists('badgePremium') ? badgePremium('pro', $testeFront) : '';
-                                                }
-                                                ?>
-                                            </label>
-                                        </div>
-                                    </div>
-
-                                    <div id="bloco_com_juros" style="display: none;" class="mt-2 bg-charcoal p-3 border border-border-color rounded-3">
-                                        <label class="form-label text-secondary-analysis fs-7 mb-1">Valor exato de <strong>cada parcela</strong> com juros:</label>
-                                        <div class="input-group input-group-sm mb-1" style="max-width: 200px;">
-                                            <span class="input-group-text bg-dark border-border-color text-secondary-analysis fs-7">R$</span>
-                                            <input type="text" inputmode="numeric" name="valor_parcela_juros" id="valor_parcela_juros" class="form-control bg-dark border-border-color text-gold-analysis fw-bold fs-7 no-spinners" placeholder="0,00" oninput="mascaraMoeda(this); atualizarPreviewParcela();">
-                                        </div>
-                                        <div class="text-secondary opacity-75 mt-1" style="font-size: 0.7rem;" id="preview_total_juros">
-                                            <i class="bi bi-calculator me-1"></i> Digite o valor da parcela para calcular.
-                                        </div>
-                                    </div>
-                                    <p class="text-secondary fs-7 mt-3 mb-0">
-                                        <i class="bi bi-info-circle me-1"></i>
-                                        O sistema criará uma entrada por mês, começando na data informada.
-                                    </p>
-                                </div>
-                            </div>
-                        <?php endif; ?>
 
                         <div class="d-grid mt-2">
                             <button id="btnSalvar" type="submit" class="btn btn-gold fw-bold text-dark py-3 rounded-pill fs-6 shadow-lg d-flex align-items-center justify-content-center transition-hover">
@@ -927,8 +978,67 @@ require_once 'geral/header.php';
     // O nosso "Trinco" lógico
     let enviando = false;
 
+    // Exibe erro inline no mesmo estilo do PHP, sem alert() do navegador
+    function mostrarErroInline(mensagem, campoFoco = null) {
+        let caixa = document.getElementById('erro-inline-js');
+        if (!caixa) {
+            caixa = document.createElement('div');
+            caixa.id = 'erro-inline-js';
+            // Insere antes do formulário
+            formTransacao.parentNode.insertBefore(caixa, formTransacao);
+        }
+        caixa.innerHTML = `
+            <div class="d-flex align-items-center gap-2 rounded-3 px-4 py-3 mb-3"
+                style="background-color:rgba(120,0,0,0.35);border:1px solid rgba(200,50,50,0.45);color:#f28b8b;">
+                <i class="bi bi-exclamation-triangle-fill flex-shrink-0" style="font-size:0.95rem;"></i>
+                <span style="font-size:0.9rem;font-weight:500;">${mensagem}</span>
+            </div>`;
+        caixa.scrollIntoView({
+            behavior: 'smooth',
+            block: 'center'
+        });
+        if (campoFoco) campoFoco.focus();
+    }
+
     if (formTransacao) {
         formTransacao.addEventListener('submit', function(event) {
+
+            // ── VALIDAÇÃO 1: Parcelas igual a 1 ──────────────────────────
+            const toggleParc = document.getElementById('toggle_parcelado');
+            const inputNumParcelas = document.getElementById('num_parcelas');
+            if (toggleParc && toggleParc.checked && inputNumParcelas) {
+                const numParc = parseInt(inputNumParcelas.value, 10);
+                if (numParc === 1) {
+                    event.preventDefault();
+                    mostrarErroInline('O número de parcelas não pode ser 1. Se não quiser parcelar, desative a opção de parcelamento.', inputNumParcelas);
+                    return false;
+                }
+            }
+
+            // ── VALIDAÇÃO 2: Juros não pode deixar o total ≤ valor original ─
+            const radioJurosComCheck = document.getElementById('juros_com');
+            const inputJurosCheck = document.getElementById('valor_parcela_juros');
+            const inputValorCheck = document.getElementById('valor');
+            if (toggleParc && toggleParc.checked && radioJurosComCheck && radioJurosComCheck.checked && inputJurosCheck && inputValorCheck && inputNumParcelas) {
+                const numParc = parseInt(inputNumParcelas.value, 10) || 0;
+                const rawJuros = parseFloat(inputJurosCheck.value.replace(/\D/g, '')) / 100 || 0;
+                const rawOriginal = parseFloat(inputValorCheck.value.replace(/\D/g, '')) / 100 || 0;
+                const totalComJuros = rawJuros * numParc;
+
+                if (rawJuros > 0 && numParc >= 2 && totalComJuros <= rawOriginal) {
+                    event.preventDefault();
+                    const totalFmt = totalComJuros.toLocaleString('pt-BR', {
+                        style: 'currency',
+                        currency: 'BRL'
+                    });
+                    const origFmt = rawOriginal.toLocaleString('pt-BR', {
+                        style: 'currency',
+                        currency: 'BRL'
+                    });
+                    mostrarErroInline(`O valor total com juros (${totalFmt}) deve ser maior que o valor original (${origFmt}). Corrija o valor da parcela.`, inputJurosCheck);
+                    return false;
+                }
+            }
 
             // Se o trinco já estiver trancado, bloqueia a tentativa e para tudo!
             if (enviando) {
