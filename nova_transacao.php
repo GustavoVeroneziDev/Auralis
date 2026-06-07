@@ -533,10 +533,12 @@ require_once 'geral/header.php';
                                                     <div>
                                                         <div class="text-light fw-semibold fs-7 mb-1 d-flex align-items-center gap-2">
                                                             <i class="bi bi-credit-card-2-front" style="color:#a78bfa;"></i>
-                                                            Compra parcelada
+                                                            <?= $tipo_sugerido === 'receita' ? 'Recebimento parcelado' : 'Compra parcelada' ?>
                                                         </div>
                                                         <div class="text-secondary" style="font-size:0.75rem;">
-                                                            Divide o valor em N meses — cartão ou carnê.
+                                                            <?= $tipo_sugerido === 'receita'
+                                                                ? 'Valor recebido em partes — comissão, prestação de serviço, etc.'
+                                                                : 'Divide o valor em N meses — cartão ou carnê.' ?>
                                                         </div>
                                                     </div>
                                                     <div class="form-check form-switch fs-4 mb-0 toggle-analysis flex-shrink-0 mt-1">
@@ -601,7 +603,10 @@ require_once 'geral/header.php';
 
                                                     <div class="text-secondary mt-2" style="font-size:0.72rem;">
                                                         <i class="bi bi-info-circle me-1"></i>
-                                                        Uma entrada por mês a partir da data acima. Mínimo 2x, máximo 48x.
+                                                        <?= $tipo_sugerido === 'receita'
+                                                            ? 'Um recebimento por mês a partir da data acima. Mínimo 2x, máximo 48x.'
+                                                            : 'Uma entrada por mês a partir da data acima. Mínimo 2x, máximo 48x.'
+                                                        ?>
                                                     </div>
                                                 </div>
                                             </div>
