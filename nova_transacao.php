@@ -978,6 +978,28 @@ require_once 'geral/header.php';
     // O nosso "Trinco" lógico
     let enviando = false;
 
+    // Exibe erro inline no mesmo estilo do PHP, sem alert() do navegador
+    function mostrarErroInline(mensagem, campoFoco = null) {
+        let caixa = document.getElementById('erro-inline-js');
+        if (!caixa) {
+            caixa = document.createElement('div');
+            caixa.id = 'erro-inline-js';
+            // Insere antes do formulário
+            formTransacao.parentNode.insertBefore(caixa, formTransacao);
+        }
+        caixa.innerHTML = `
+            <div class="d-flex align-items-center gap-2 rounded-3 px-4 py-3 mb-3"
+                style="background-color:rgba(120,0,0,0.35);border:1px solid rgba(200,50,50,0.45);color:#f28b8b;">
+                <i class="bi bi-exclamation-triangle-fill flex-shrink-0" style="font-size:0.95rem;"></i>
+                <span style="font-size:0.9rem;font-weight:500;">${mensagem}</span>
+            </div>`;
+        caixa.scrollIntoView({
+            behavior: 'smooth',
+            block: 'center'
+        });
+        if (campoFoco) campoFoco.focus();
+    }
+
     if (formTransacao) {
         formTransacao.addEventListener('submit', function(event) {
 
@@ -988,8 +1010,7 @@ require_once 'geral/header.php';
                 const numParc = parseInt(inputNumParcelas.value, 10);
                 if (numParc === 1) {
                     event.preventDefault();
-                    alert('⚠️ O número de parcelas não pode ser 1. Se não quiser parcelar, desative a opção de parcelamento.');
-                    inputNumParcelas.focus();
+                    mostrarErroInline('O número de parcelas não pode ser 1. Se não quiser parcelar, desative a opção de parcelamento.', inputNumParcelas);
                     return false;
                 }
             }
@@ -1014,8 +1035,7 @@ require_once 'geral/header.php';
                         style: 'currency',
                         currency: 'BRL'
                     });
-                    alert(`⚠️ O valor total com juros (${totalFmt}) deve ser maior que o valor original (${origFmt}). Corrija o valor da parcela.`);
-                    inputJurosCheck.focus();
+                    mostrarErroInline(`O valor total com juros (${totalFmt}) deve ser maior que o valor original (${origFmt}). Corrija o valor da parcela.`, inputJurosCheck);
                     return false;
                 }
             }
