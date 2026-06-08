@@ -209,7 +209,7 @@ require_once 'geral/header.php';
                 <button class="btn btn-sm btn-link text-light px-3 py-1 text-decoration-none fw-semibold"
                     onclick="irHoje()"
                     style="font-size:.825rem;border-inline:1px solid rgba(255,255,255,.08);">
-                    Hoje
+                    Este mês
                 </button>
                 <button class="btn btn-sm btn-link text-secondary px-3 py-1 text-decoration-none" onclick="mudarMes(1)">
                     <i class="bi bi-chevron-right" style="font-size:.75rem;"></i>
