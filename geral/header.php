@@ -60,6 +60,11 @@ $paginaAtual = basename($_SERVER['PHP_SELF']);
                             </a>
                         </li>
                         <li class="nav-item">
+                            <a class="nav-link custom-link py-3 py-lg-2 <?php echo ($paginaAtual == 'agenda.php') ? 'text-warning active' : ''; ?>" href="/agenda.php">
+                                <i class="bi bi-calendar3 me-2"></i> Agenda
+                            </a>
+                        </li>
+                        <li class="nav-item">
                             <a class="nav-link custom-link py-3 py-lg-2 <?php echo ($paginaAtual == 'listar_carteiras.php') ? 'text-warning active' : ''; ?>" href="/carteira/listar_carteiras.php">
                                 <i class="bi bi-wallet me-2"></i> Carteiras
                             </a>
