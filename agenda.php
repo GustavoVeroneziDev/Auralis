@@ -2,6 +2,7 @@
 // ==============================================================================
 // AGENDA.PHP — Calendário financeiro (somente visualização de transações)
 // ==============================================================================
+ob_start(); // Captura qualquer output acidental (BOM, warnings, includes) antes do JSON
 session_start();
 require_once 'config/conexao.php';
 exigirAcessoMinimo(1);
@@ -13,53 +14,72 @@ $hoje       = date('Y-m-d');
 // AJAX — só leitura
 // ==============================================================================
 if (isset($_GET['ajax']) && $_GET['acao'] === 'listar') {
-    header('Content-Type: application/json');
+    ob_clean(); // Descarta qualquer output anterior (BOM, warnings de includes, etc.)
+    header('Content-Type: application/json; charset=utf-8');
 
     $mes      = preg_replace('/[^0-9\-]/', '', $_GET['mes'] ?? date('Y-m'));
     $carteira = $_GET['carteira'] ?? '';
     $inicio   = $mes . '-01';
     $fim      = date('Y-m-t', strtotime($inicio));
 
-    $where  = "FKUsuario = :u AND COALESCE(DataVencimento, MomentoRegistro) BETWEEN :ini AND :fim";
+    $where  = "FKUsuario = :u AND DATE(COALESCE(r.DataVencimento, r.MomentoRegistro)) BETWEEN :ini AND :fim";
     $params = [':u' => $usuario_id, ':ini' => $inicio, ':fim' => $fim];
 
     if ($carteira) {
-        $where           .= " AND FKCarteira = :cart";
+        $where           .= " AND r.FKCarteira = :cart";
         $params[':cart']  = $carteira;
     }
 
-    $stmt = $pdo->prepare("
-        SELECT r.IDRegistro AS id,
-               r.Descricao  AS titulo,
-               COALESCE(r.DataVencimento, r.MomentoRegistro) AS data,
-               r.TipoRegistro  AS tipo_reg,
-               r.StatusRegistro AS status_reg,
-               r.Valor         AS valor,
-               r.ParcelaAtual,
-               r.TotalParcelas,
-               r.Recorrente,
-               c.NomeCategoria AS categoria
-        FROM Registro r
-        LEFT JOIN Categoria c ON r.FKCategoria = c.IDCategoria
-        WHERE $where
-        ORDER BY data ASC
-    ");
-    $stmt->execute($params);
-    $rows = $stmt->fetchAll(PDO::FETCH_ASSOC);
+    try {
+        $stmt = $pdo->prepare("
+            SELECT r.IDRegistro AS id,
+                   r.Descricao  AS titulo,
+                   DATE(COALESCE(r.DataVencimento, r.MomentoRegistro)) AS data,
+                   r.TipoRegistro   AS tipo_reg,
+                   r.StatusRegistro AS status_reg,
+                   r.Valor          AS valor,
+                   r.ParcelaAtual,
+                   r.TotalParcelas,
+                   r.Recorrente,
+                   c.NomeCategoria  AS categoria
+            FROM Registro r
+            LEFT JOIN Categoria c ON r.FKCategoria = c.IDCategoria
+            WHERE $where
+            ORDER BY data ASC
+        ");
+        $stmt->execute($params);
+        $rows = $stmt->fetchAll(PDO::FETCH_ASSOC);
+    } catch (Exception $e) {
+        echo json_encode(['ok' => false, 'msg' => 'Erro na consulta.', 'itens' => []]);
+        exit;
+    }
 
-    // Adiciona urgência
+    // Adiciona urgência — comparação segura com substr() para evitar problema com datetime
     foreach ($rows as &$r) {
+        $dataStr = substr((string)($r['data'] ?? ''), 0, 10); // garante 'YYYY-MM-DD'
         if ($r['status_reg'] === 'pendente') {
-            if ($r['data'] < $hoje)      $r['urgencia'] = 'atrasada';
-            elseif ($r['data'] === $hoje)    $r['urgencia'] = 'hoje';
-            else                              $r['urgencia'] = 'pendente';
+            if ($dataStr < $hoje)         $r['urgencia'] = 'atrasada';
+            elseif ($dataStr === $hoje)   $r['urgencia'] = 'hoje';
+            else                          $r['urgencia'] = 'pendente';
         } else {
             $r['urgencia'] = 'efetivado';
+        }
+        // Garante que strings sejam UTF-8 válido para json_encode não silenciar
+        foreach ($r as $k => $v) {
+            if (is_string($v)) {
+                $r[$k] = mb_convert_encoding($v, 'UTF-8', 'UTF-8, ISO-8859-1, Windows-1252');
+            }
         }
     }
     unset($r);
 
-    echo json_encode(['ok' => true, 'itens' => $rows, 'hoje' => $hoje]);
+    $json = json_encode(['ok' => true, 'itens' => $rows, 'hoje' => $hoje], JSON_UNESCAPED_UNICODE);
+    if ($json === false) {
+        // json_encode falhou (caractere inválido) — serializa sem os valores problemáticos
+        echo json_encode(['ok' => false, 'msg' => 'Erro ao serializar dados.', 'itens' => []]);
+    } else {
+        echo $json;
+    }
     exit;
 }
 
@@ -593,8 +613,10 @@ require_once 'geral/header.php';
         try {
             const r = await fetch(`agenda.php?ajax=1&acao=listar&mes=${ano}-${mesStr}${cart?'&carteira='+cart:''}`);
             const j = await r.json();
-            itens = j.ok ? j.itens : [];
+            if (!j.ok) console.warn('[Agenda] AJAX retornou erro:', j.msg);
+            itens = Array.isArray(j.itens) ? j.itens : [];
         } catch (e) {
+            console.error('[Agenda] Falha ao carregar eventos:', e);
             itens = [];
         }
 
@@ -630,7 +652,7 @@ require_once 'geral/header.php';
 
             const dStr = ds(dt);
             const ehHoje = dStr === hojeStr;
-            const diaItens = itens.filter(it => (it.data || '').startsWith(dStr));
+            const diaItens = itens.filter(it => (it.data ?? '').slice(0, 10) === dStr);
             const temAtras = diaItens.some(it => it.urgencia === 'atrasada');
             const temHoje = diaItens.some(it => it.urgencia === 'hoje');
             const vazio = diaItens.length === 0;
