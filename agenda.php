@@ -9,23 +9,6 @@ if (!isset($_SESSION['usuario_id'])) {
 }
 require_once 'config/conexao.php';
 
-// ── FUNÇÃO VITAL: Gerador de UUID ─────────────────────────────────────────────
-if (!function_exists('gerarUuid')) {
-    function gerarUuid()
-    {
-        return sprintf(
-            '%04x%04x-%04x-%04x-%04x-%04x%04x%04x',
-            mt_rand(0, 0xffff),
-            mt_rand(0, 0xffff),
-            mt_rand(0, 0xffff),
-            mt_rand(0, 0x0fff) | 0x4000,
-            mt_rand(0, 0x3fff) | 0x8000,
-            mt_rand(0, 0xffff),
-            mt_rand(0, 0xffff),
-            mt_rand(0, 0xffff)
-        );
-    }
-}
 
 $usuario_id = $_SESSION['usuario_id'];
 
@@ -793,7 +776,7 @@ require_once 'geral/header.php';
     let mesAtual = HOJE_JS.getMonth();
     let itensMes = [];
 
-    const bsModal = new bootstrap.Modal(document.getElementById('modalEvento'));
+    let bsModal; // Agora a variável só é declarada aqui, e instanciada mais tarde!
 
     // Utilitários
     const padZ = n => String(n).padStart(2, '0');
@@ -1041,12 +1024,17 @@ require_once 'geral/header.php';
         }
     }
 
-    // Inicializadores e Gatilhos
-    document.getElementById('toggle-transacoes').addEventListener('change', () => carregarMes(anoAtual, mesAtual));
-    document.getElementById('modalEvento').addEventListener('hidden.bs.modal', cancelarExclusao);
+    // ── GATILHO PRINCIPAL (Só roda quando a página inteira estiver pronta) ───────
+    document.addEventListener('DOMContentLoaded', () => {
+        // Agora o Bootstrap já existe, podemos criar o modal em paz!
+        bsModal = new bootstrap.Modal(document.getElementById('modalEvento'));
 
-    // Carrega o calendário imediatamente para o mês e ano atuais
-    carregarMes(anoAtual, mesAtual);
+        document.getElementById('toggle-transacoes').addEventListener('change', () => carregarMes(anoAtual, mesAtual));
+        document.getElementById('modalEvento').addEventListener('hidden.bs.modal', cancelarExclusao);
+
+        // Dá a ordem para carregar o mês atual
+        carregarMes(anoAtual, mesAtual);
+    });
 </script>
 
 <?php require_once 'geral/footer.php'; ?>
