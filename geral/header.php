@@ -11,7 +11,7 @@ $paginaAtual = basename($_SERVER['PHP_SELF']);
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <meta name="theme-color" content="#121418">
-    <title>Auralis | Gestão Financeira</title>
+    <title>Auralis</title>
     <link rel="shortcut icon" href="/geral/img/icone.ico" type="image/x-icon">
 
     <link href="/geral/fonts/inter.css" rel="stylesheet">
