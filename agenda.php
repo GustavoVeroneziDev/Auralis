@@ -186,7 +186,11 @@ try {
     }
     unset($r);
 } catch (PDOException $e) {
-    // O calendário renderizará em branco de forma limpa
+    die("<div style='background:#dc2626; color:white; padding:20px; border-radius:8px; margin-bottom:20px;'>
+            <h3>🚨 Erro SQL Detectado!</h3>
+            <p>O MySQL recusou a consulta do calendário pelo seguinte motivo:</p>
+            <code style='color: #ffcccc; font-size: 1.1rem;'>" . $e->getMessage() . "</code>
+         </div>");
 }
 
 // JSON gerado com segurança extra (HEX tags) para evitar quebra de script
