@@ -11,10 +11,10 @@ $usuario_id = $_SESSION['usuario_id'];
 $hoje       = date('Y-m-d');
 
 // ==============================================================================
-// AJAX — só leitura
+// AJAX — só leitura (Usado apenas para navegação futura entre meses)
 // ==============================================================================
 if (isset($_GET['ajax']) && $_GET['acao'] === 'listar') {
-    ob_clean(); // Descarta qualquer output anterior (BOM, warnings de includes, etc.)
+    ob_clean(); // Descarta qualquer output anterior
     header('Content-Type: application/json; charset=utf-8');
 
     $mes      = preg_replace('/[^0-9\-]/', '', $_GET['mes'] ?? date('Y-m'));
@@ -50,9 +50,8 @@ if (isset($_GET['ajax']) && $_GET['acao'] === 'listar') {
         $stmt->execute($params);
         $rows = $stmt->fetchAll(PDO::FETCH_ASSOC);
 
-        // Adiciona urgência — comparação segura com substr() para evitar problema com datetime
         foreach ($rows as &$r) {
-            $dataStr = substr((string)($r['data'] ?? ''), 0, 10); // garante 'YYYY-MM-DD'
+            $dataStr = substr((string)($r['data'] ?? ''), 0, 10);
             if ($r['status_reg'] === 'pendente') {
                 if ($dataStr < $hoje)         $r['urgencia'] = 'atrasada';
                 elseif ($dataStr === $hoje)   $r['urgencia'] = 'hoje';
@@ -60,20 +59,14 @@ if (isset($_GET['ajax']) && $_GET['acao'] === 'listar') {
             } else {
                 $r['urgencia'] = 'efetivado';
             }
-
-            // Garante que strings sejam UTF-8 válido para json_encode não silenciar o JSON inteiro
             foreach ($r as $k => $v) {
-                if (is_string($v)) {
-                    $r[$k] = mb_convert_encoding($v, 'UTF-8', 'UTF-8, ISO-8859-1, Windows-1252');
-                }
+                if (is_string($v)) $r[$k] = mb_convert_encoding($v, 'UTF-8', 'UTF-8, ISO-8859-1, Windows-1252');
             }
         }
         unset($r);
 
         $json = json_encode(['ok' => true, 'itens' => $rows, 'hoje' => $hoje], JSON_UNESCAPED_UNICODE);
-
         if ($json === false) {
-            // json_encode falhou — serializa avisando do erro
             echo json_encode(['ok' => false, 'msg' => 'Erro ao serializar dados.', 'itens' => []]);
         } else {
             echo $json;
@@ -144,6 +137,43 @@ $stmtP = $pdo->prepare("SELECT COALESCE(SUM(CASE WHEN TipoRegistro='despesa' THE
 $stmtP->execute($psP);
 $pendentes = $stmtP->fetch();
 
+// ==============================================================================
+// CARGA INICIAL DA GRADE DO CALENDÁRIO (SSR - Injeção Direta)
+// ==============================================================================
+$whereIni  = "FKUsuario = :u AND DATE(COALESCE(r.DataVencimento, r.MomentoRegistro)) BETWEEN :ini AND :fim";
+$paramsIni = [':u' => $usuario_id, ':ini' => $iniMes, ':fim' => $fimMes];
+
+if ($carteira_sel) {
+    $whereIni .= " AND r.FKCarteira = :cart";
+    $paramsIni[':cart'] = $carteira_sel;
+}
+
+$stmtIni = $pdo->prepare("
+    SELECT r.IDRegistro AS id, r.Descricao  AS titulo, DATE(COALESCE(r.DataVencimento, r.MomentoRegistro)) AS data, r.TipoRegistro AS tipo_reg, r.StatusRegistro AS status_reg, r.Valor AS valor, r.ParcelaAtual, r.TotalParcelas, r.Recorrente, c.NomeCategoria  AS categoria
+    FROM Registro r LEFT JOIN Categoria c ON r.FKCategoria = c.IDCategoria
+    WHERE $whereIni ORDER BY data ASC
+");
+$stmtIni->execute($paramsIni);
+$rowsIni = $stmtIni->fetchAll(PDO::FETCH_ASSOC);
+
+foreach ($rowsIni as &$r) {
+    $dataStr = substr((string)($r['data'] ?? ''), 0, 10);
+    if ($r['status_reg'] === 'pendente') {
+        if ($dataStr < $hoje)         $r['urgencia'] = 'atrasada';
+        elseif ($dataStr === $hoje)   $r['urgencia'] = 'hoje';
+        else                          $r['urgencia'] = 'pendente';
+    } else {
+        $r['urgencia'] = 'efetivado';
+    }
+    foreach ($r as $k => $v) {
+        if (is_string($v)) $r[$k] = mb_convert_encoding($v, 'UTF-8', 'UTF-8, ISO-8859-1, Windows-1252');
+    }
+}
+unset($r);
+// JSON gerado com segurança extra (HEX tags) para evitar quebra de script
+$json_iniciais = json_encode($rowsIni, JSON_UNESCAPED_UNICODE | JSON_HEX_TAG | JSON_HEX_APOS | JSON_HEX_QUOT | JSON_HEX_AMP) ?: '[]';
+
+// Utilitários 
 function fv(float $v): string
 {
     return 'R$ ' . number_format($v, 2, ',', '.');
@@ -188,7 +218,6 @@ require_once 'geral/header.php';
 <main class="container-fluid py-4 mt-2 flex-grow-1"
     style="max-width:1500px;padding-inline:var(--space-page-x);min-height:100vh;">
 
-    <!-- ── CABEÇALHO ─────────────────────────────────────────────────────── -->
     <div class="d-flex flex-wrap justify-content-between align-items-center mb-4 border-bottom border-secondary-subtle pb-3 gap-3">
 
         <div class="d-flex align-items-center gap-3">
@@ -205,7 +234,6 @@ require_once 'geral/header.php';
 
         <div class="d-flex align-items-center gap-2 flex-wrap">
 
-            <!-- Filtro de carteira -->
             <?php if (count($carteiras) > 1): ?>
                 <form method="get" class="d-flex" id="formCarteira">
                     <select name="carteira" class="form-select form-select-sm border-secondary-subtle text-light rounded-pill"
@@ -222,7 +250,6 @@ require_once 'geral/header.php';
                 </form>
             <?php endif; ?>
 
-            <!-- Navegação de mês -->
             <div class="d-flex align-items-center border border-secondary-subtle rounded-pill"
                 style="background:#1e2126;padding:3px;">
                 <button class="btn btn-sm btn-link text-secondary px-3 py-1 text-decoration-none" onclick="mudarMes(-1)">
@@ -238,7 +265,6 @@ require_once 'geral/header.php';
                 </button>
             </div>
 
-            <!-- Botão nova transação -->
             <a href="nova_transacao.php<?= $carteira_sel ? '?carteira_id=' . urlencode($carteira_sel) : '' ?>"
                 class="btn btn-sm rounded-pill px-4 fw-bold"
                 style="background:linear-gradient(135deg,#d4af37,#AA8C2C);color:#121418;border:none;">
@@ -247,7 +273,6 @@ require_once 'geral/header.php';
         </div>
     </div>
 
-    <!-- ── RESUMO DO MÊS ──────────────────────────────────────────────────── -->
     <div class="row g-3 mb-4">
         <?php
         $resumo = [
@@ -271,10 +296,8 @@ require_once 'geral/header.php';
         <?php endforeach; ?>
     </div>
 
-    <!-- ── LAYOUT: calendário + painel ───────────────────────────────────── -->
     <div class="row g-4 align-items-start">
 
-        <!-- CALENDÁRIO -->
         <div class="col-lg-8">
             <div class="agenda-cal">
                 <div class="cal-semana">
@@ -283,14 +306,9 @@ require_once 'geral/header.php';
                     <?php endforeach; ?>
                 </div>
                 <div id="cal-grid" class="cal-grade">
-                    <div class="cal-loading">
-                        <div class="spinner-border spinner-border-sm text-secondary me-2"></div>
-                        <span class="text-secondary" style="font-size:.875rem;">Carregando...</span>
-                    </div>
                 </div>
             </div>
 
-            <!-- Legenda -->
             <div class="d-flex flex-wrap gap-3 mt-3 px-1" style="font-size:.72rem;color:#6b7280;">
                 <span><span class="leg" style="background:#dc2626;"></span> Atrasada</span>
                 <span><span class="leg" style="background:#d4af37;"></span> Vence hoje</span>
@@ -299,7 +317,6 @@ require_once 'geral/header.php';
             </div>
         </div>
 
-        <!-- PAINEL LATERAL -->
         <div class="col-lg-4 d-flex flex-column gap-3">
 
             <?php if ($atrasadas): ?>
@@ -576,9 +593,11 @@ require_once 'geral/header.php';
 <script>
     const HOJE_JS = new Date();
     const MESES = ['Janeiro', 'Fevereiro', 'Março', 'Abril', 'Maio', 'Junho', 'Julho', 'Agosto', 'Setembro', 'Outubro', 'Novembro', 'Dezembro'];
-    let anoAtual = HOJE_JS.getFullYear();
-    let mesAtual = HOJE_JS.getMonth();
-    let itens = [];
+
+    // Injeção PHP direta (SSR) para carga inicial imediata e sem erros de atraso
+    let anoAtual = <?= (int)date('Y') ?>;
+    let mesAtual = <?= (int)date('n') - 1 ?>;
+    let itens = <?= $json_iniciais ?>;
 
     function padZ(n) {
         return String(n).padStart(2, '0');
@@ -723,7 +742,10 @@ require_once 'geral/header.php';
         carregarMes(anoAtual, mesAtual);
     }
 
-    carregarMes(anoAtual, mesAtual);
+    // A mágica acontece aqui: ao invés de chamar carregarMes() (que causava o delay do fetch), 
+    // nós apenas imprimimos o título e renderizamos os dados que o PHP já entregou instantaneamente!
+    document.getElementById('badge-mes-ano').textContent = `${MESES[mesAtual]} ${anoAtual}`;
+    renderCal(anoAtual, mesAtual);
 </script>
 
 <?php require_once 'geral/footer.php'; ?>
