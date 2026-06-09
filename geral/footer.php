@@ -18,7 +18,7 @@
             echo htmlspecialchars($versaoAtual);
             ?>
         </p>
-        
+
         <a href="http://gustavoveronezi.com" target="_blank" class="text-decoration-none">
             <p class="text-light opacity-50 mb-0 small mt-1">
                 Desenvolvido por <strong class="text-primary">GV Tech</strong>.

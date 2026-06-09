@@ -30,7 +30,7 @@ $paginaAtual = basename($_SERVER['PHP_SELF']);
         <div class="container-fluid px-3 px-xl-5" style="max-width: 1500px;">
 
             <a class="navbar-brand fw-bold fs-3 d-flex align-items-center" href="<?php echo isset($_SESSION['usuario_id']) ? '/dashboard.php' : '/geral/index.php'; ?>" style="letter-spacing: -0.05em;">
-                <img src="/geral/img/logoAuralis-SemFundo.png" alt="Logo Auralis" class="me-2" style="height: 38px; width: auto; object-fit: contain;">
+                <img src="/geral/img/LogoAuralisSemEscudo.png" alt="Logo Auralis" class="me-2" style="height: 38px; width: auto; object-fit: contain;">
                 <span style="color: gold !important;">Aura</span><span class="text-light">lis</span>
             </a>
 
