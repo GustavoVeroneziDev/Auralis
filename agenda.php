@@ -59,9 +59,7 @@ if (isset($_GET['ajax']) && $_GET['acao'] === 'listar') {
             } else {
                 $r['urgencia'] = 'efetivado';
             }
-            foreach ($r as $k => $v) {
-                if (is_string($v)) $r[$k] = mb_convert_encoding($v, 'UTF-8', 'UTF-8, ISO-8859-1, Windows-1252');
-            }
+            // Remoção do mb_convert_encoding() que causava quebra fatal se a extensão não estivesse habilitada.
         }
         unset($r);
 
@@ -72,7 +70,7 @@ if (isset($_GET['ajax']) && $_GET['acao'] === 'listar') {
             echo $json;
         }
         exit;
-    } catch (Exception $e) {
+    } catch (PDOException $e) {
         echo json_encode(['ok' => false, 'msg' => 'Erro na consulta.', 'itens' => []]);
         exit;
     }
@@ -83,132 +81,159 @@ if (isset($_GET['ajax']) && $_GET['acao'] === 'listar') {
 // ==============================================================================
 $carteira_sel = $_GET['carteira'] ?? '';
 
-// Carteiras do usuário para o filtro
-$stmtCart = $pdo->prepare("SELECT IDCarteira, TipoCarteira FROM Carteira WHERE FKUsuarioDono = :u ORDER BY TipoCarteira ASC");
-$stmtCart->execute([':u' => $usuario_id]);
-$carteiras = $stmtCart->fetchAll();
+// Inicialização segura para garantir que as variáveis existam mesmo se o banco falhar
+$carteiras   = [];
+$atrasadas   = [];
+$vencem_hoje = [];
+$proximos    = [];
+$saldo_mes   = 0.0;
+$pendentes   = ['pend_desp' => 0, 'pend_rec' => 0];
 
-// Filtro de carteira nas queries do painel
-$wherePanel  = "FKUsuario = :u AND StatusRegistro = 'pendente'";
-$paramsPanel = [':u' => $usuario_id];
-if ($carteira_sel) {
-    $wherePanel            .= " AND FKCarteira = :cart";
-    $paramsPanel[':cart']   = $carteira_sel;
-}
-
-// Atrasadas
-$stmtAt = $pdo->prepare("SELECT IDRegistro AS id, Descricao AS titulo, COALESCE(DataVencimento,MomentoRegistro) AS data, TipoRegistro AS tipo_reg, Valor AS valor FROM Registro WHERE $wherePanel AND COALESCE(DataVencimento,MomentoRegistro) < :hoje ORDER BY data ASC LIMIT 30");
-$stmtAt->execute(array_merge($paramsPanel, [':hoje' => $hoje]));
-$atrasadas = $stmtAt->fetchAll();
-
-// Hoje
-$stmtHj = $pdo->prepare("SELECT IDRegistro AS id, Descricao AS titulo, COALESCE(DataVencimento,MomentoRegistro) AS data, TipoRegistro AS tipo_reg, Valor AS valor FROM Registro WHERE $wherePanel AND COALESCE(DataVencimento,MomentoRegistro) = :hoje ORDER BY data ASC LIMIT 30");
-$stmtHj->execute(array_merge($paramsPanel, [':hoje' => $hoje]));
-$vencem_hoje = $stmtHj->fetchAll();
-
-// Próximos 7 dias
-$d1 = date('Y-m-d', strtotime('+1 day'));
-$d7 = date('Y-m-d', strtotime('+7 days'));
-$stmtPx = $pdo->prepare("SELECT IDRegistro AS id, Descricao AS titulo, COALESCE(DataVencimento,MomentoRegistro) AS data, TipoRegistro AS tipo_reg, Valor AS valor FROM Registro WHERE $wherePanel AND COALESCE(DataVencimento,MomentoRegistro) BETWEEN :d1 AND :d7 ORDER BY data ASC LIMIT 30");
-$stmtPx->execute(array_merge($paramsPanel, [':d1' => $d1, ':d7' => $d7]));
-$proximos = $stmtPx->fetchAll();
-
-// Saldo do mês corrente (efetivados)
 $iniMes = date('Y-m-01');
 $fimMes = date('Y-m-t');
-$whereS = "FKUsuario=:u AND StatusRegistro='efetivado' AND MomentoRegistro BETWEEN :ini AND :fim";
-$psS    = [':u' => $usuario_id, ':ini' => $iniMes, ':fim' => $fimMes];
-if ($carteira_sel) {
-    $whereS .= " AND FKCarteira=:cart";
-    $psS[':cart'] = $carteira_sel;
-}
-$stmtS = $pdo->prepare("SELECT COALESCE(SUM(CASE WHEN TipoRegistro='receita' THEN Valor ELSE -Valor END),0) AS saldo FROM Registro WHERE $whereS");
-$stmtS->execute($psS);
-$saldo_mes = (float)$stmtS->fetchColumn();
 
-// Pendentes do mês
-$whereP = "FKUsuario=:u AND StatusRegistro='pendente' AND COALESCE(DataVencimento,MomentoRegistro) BETWEEN :ini AND :fim";
-$psP    = [':u' => $usuario_id, ':ini' => $iniMes, ':fim' => $fimMes];
-if ($carteira_sel) {
-    $whereP .= " AND FKCarteira=:cart";
-    $psP[':cart'] = $carteira_sel;
+try {
+    // Carteiras do usuário para o filtro
+    $stmtCart = $pdo->prepare("SELECT IDCarteira, TipoCarteira FROM Carteira WHERE FKUsuarioDono = :u ORDER BY TipoCarteira ASC");
+    $stmtCart->execute([':u' => $usuario_id]);
+    $carteiras = $stmtCart->fetchAll();
+
+    // Filtro de carteira nas queries do painel
+    $wherePanel  = "FKUsuario = :u AND StatusRegistro = 'pendente'";
+    $paramsPanel = [':u' => $usuario_id];
+    if ($carteira_sel) {
+        $wherePanel            .= " AND FKCarteira = :cart";
+        $paramsPanel[':cart']   = $carteira_sel;
+    }
+
+    // Atrasadas
+    $stmtAt = $pdo->prepare("SELECT IDRegistro AS id, Descricao AS titulo, COALESCE(DataVencimento,MomentoRegistro) AS data, TipoRegistro AS tipo_reg, Valor AS valor FROM Registro WHERE $wherePanel AND COALESCE(DataVencimento,MomentoRegistro) < :hoje ORDER BY data ASC LIMIT 30");
+    $stmtAt->execute(array_merge($paramsPanel, [':hoje' => $hoje]));
+    $atrasadas = $stmtAt->fetchAll();
+
+    // Hoje
+    $stmtHj = $pdo->prepare("SELECT IDRegistro AS id, Descricao AS titulo, COALESCE(DataVencimento,MomentoRegistro) AS data, TipoRegistro AS tipo_reg, Valor AS valor FROM Registro WHERE $wherePanel AND COALESCE(DataVencimento,MomentoRegistro) = :hoje ORDER BY data ASC LIMIT 30");
+    $stmtHj->execute(array_merge($paramsPanel, [':hoje' => $hoje]));
+    $vencem_hoje = $stmtHj->fetchAll();
+
+    // Próximos 7 dias
+    $d1 = date('Y-m-d', strtotime('+1 day'));
+    $d7 = date('Y-m-d', strtotime('+7 days'));
+    $stmtPx = $pdo->prepare("SELECT IDRegistro AS id, Descricao AS titulo, COALESCE(DataVencimento,MomentoRegistro) AS data, TipoRegistro AS tipo_reg, Valor AS valor FROM Registro WHERE $wherePanel AND COALESCE(DataVencimento,MomentoRegistro) BETWEEN :d1 AND :d7 ORDER BY data ASC LIMIT 30");
+    $stmtPx->execute(array_merge($paramsPanel, [':d1' => $d1, ':d7' => $d7]));
+    $proximos = $stmtPx->fetchAll();
+
+    // Saldo do mês corrente (efetivados)
+    $whereS = "FKUsuario=:u AND StatusRegistro='efetivado' AND MomentoRegistro BETWEEN :ini AND :fim";
+    $psS    = [':u' => $usuario_id, ':ini' => $iniMes, ':fim' => $fimMes];
+    if ($carteira_sel) {
+        $whereS .= " AND FKCarteira=:cart";
+        $psS[':cart'] = $carteira_sel;
+    }
+    $stmtS = $pdo->prepare("SELECT COALESCE(SUM(CASE WHEN TipoRegistro='receita' THEN Valor ELSE -Valor END),0) AS saldo FROM Registro WHERE $whereS");
+    $stmtS->execute($psS);
+    $saldo_mes = (float)$stmtS->fetchColumn();
+
+    // Pendentes do mês
+    $whereP = "FKUsuario=:u AND StatusRegistro='pendente' AND COALESCE(DataVencimento,MomentoRegistro) BETWEEN :ini AND :fim";
+    $psP    = [':u' => $usuario_id, ':ini' => $iniMes, ':fim' => $fimMes];
+    if ($carteira_sel) {
+        $whereP .= " AND FKCarteira=:cart";
+        $psP[':cart'] = $carteira_sel;
+    }
+    $stmtP = $pdo->prepare("SELECT COALESCE(SUM(CASE WHEN TipoRegistro='despesa' THEN Valor ELSE 0 END),0) AS pend_desp, COALESCE(SUM(CASE WHEN TipoRegistro='receita' THEN Valor ELSE 0 END),0) AS pend_rec FROM Registro WHERE $whereP");
+    $stmtP->execute($psP);
+    $fetchP = $stmtP->fetch();
+    if ($fetchP) {
+        $pendentes = $fetchP;
+    }
+} catch (PDOException $e) {
+    // Falha silenciosa: A página carrega vazia ao invés de exibir Erro 500
 }
-$stmtP = $pdo->prepare("SELECT COALESCE(SUM(CASE WHEN TipoRegistro='despesa' THEN Valor ELSE 0 END),0) AS pend_desp, COALESCE(SUM(CASE WHEN TipoRegistro='receita' THEN Valor ELSE 0 END),0) AS pend_rec FROM Registro WHERE $whereP");
-$stmtP->execute($psP);
-$pendentes = $stmtP->fetch();
 
 // ==============================================================================
 // CARGA INICIAL DA GRADE DO CALENDÁRIO (SSR - Injeção Direta)
 // ==============================================================================
-$whereIni  = "FKUsuario = :u AND DATE(COALESCE(r.DataVencimento, r.MomentoRegistro)) BETWEEN :ini AND :fim";
-$paramsIni = [':u' => $usuario_id, ':ini' => $iniMes, ':fim' => $fimMes];
+$rowsIni = [];
 
-if ($carteira_sel) {
-    $whereIni .= " AND r.FKCarteira = :cart";
-    $paramsIni[':cart'] = $carteira_sel;
+try {
+    $whereIni  = "FKUsuario = :u AND DATE(COALESCE(r.DataVencimento, r.MomentoRegistro)) BETWEEN :ini AND :fim";
+    $paramsIni = [':u' => $usuario_id, ':ini' => $iniMes, ':fim' => $fimMes];
+
+    if ($carteira_sel) {
+        $whereIni .= " AND r.FKCarteira = :cart";
+        $paramsIni[':cart'] = $carteira_sel;
+    }
+
+    $stmtIni = $pdo->prepare("
+        SELECT r.IDRegistro AS id, r.Descricao  AS titulo, DATE(COALESCE(r.DataVencimento, r.MomentoRegistro)) AS data, r.TipoRegistro AS tipo_reg, r.StatusRegistro AS status_reg, r.Valor AS valor, r.ParcelaAtual, r.TotalParcelas, r.Recorrente, c.NomeCategoria  AS categoria
+        FROM Registro r LEFT JOIN Categoria c ON r.FKCategoria = c.IDCategoria
+        WHERE $whereIni ORDER BY data ASC
+    ");
+    $stmtIni->execute($paramsIni);
+    $rowsIni = $stmtIni->fetchAll(PDO::FETCH_ASSOC);
+
+    foreach ($rowsIni as &$r) {
+        $dataStr = substr((string)($r['data'] ?? ''), 0, 10);
+        if ($r['status_reg'] === 'pendente') {
+            if ($dataStr < $hoje)         $r['urgencia'] = 'atrasada';
+            elseif ($dataStr === $hoje)   $r['urgencia'] = 'hoje';
+            else                          $r['urgencia'] = 'pendente';
+        } else {
+            $r['urgencia'] = 'efetivado';
+        }
+        // Remoção do mb_convert_encoding() 
+    }
+    unset($r);
+} catch (PDOException $e) {
+    // O calendário renderizará em branco de forma limpa
 }
 
-$stmtIni = $pdo->prepare("
-    SELECT r.IDRegistro AS id, r.Descricao  AS titulo, DATE(COALESCE(r.DataVencimento, r.MomentoRegistro)) AS data, r.TipoRegistro AS tipo_reg, r.StatusRegistro AS status_reg, r.Valor AS valor, r.ParcelaAtual, r.TotalParcelas, r.Recorrente, c.NomeCategoria  AS categoria
-    FROM Registro r LEFT JOIN Categoria c ON r.FKCategoria = c.IDCategoria
-    WHERE $whereIni ORDER BY data ASC
-");
-$stmtIni->execute($paramsIni);
-$rowsIni = $stmtIni->fetchAll(PDO::FETCH_ASSOC);
-
-foreach ($rowsIni as &$r) {
-    $dataStr = substr((string)($r['data'] ?? ''), 0, 10);
-    if ($r['status_reg'] === 'pendente') {
-        if ($dataStr < $hoje)         $r['urgencia'] = 'atrasada';
-        elseif ($dataStr === $hoje)   $r['urgencia'] = 'hoje';
-        else                          $r['urgencia'] = 'pendente';
-    } else {
-        $r['urgencia'] = 'efetivado';
-    }
-    foreach ($r as $k => $v) {
-        if (is_string($v)) $r[$k] = mb_convert_encoding($v, 'UTF-8', 'UTF-8, ISO-8859-1, Windows-1252');
-    }
-}
-unset($r);
 // JSON gerado com segurança extra (HEX tags) para evitar quebra de script
 $json_iniciais = json_encode($rowsIni, JSON_UNESCAPED_UNICODE | JSON_HEX_TAG | JSON_HEX_APOS | JSON_HEX_QUOT | JSON_HEX_AMP) ?: '[]';
 
-// Utilitários 
-function fv(float $v): string
-{
-    return 'R$ ' . number_format($v, 2, ',', '.');
+// Utilitários protegidos contra re-declaração (conflito de cache)
+if (!function_exists('fv')) {
+    function fv(float $v): string
+    {
+        return 'R$ ' . number_format($v, 2, ',', '.');
+    }
 }
-function fd(string $d): string
-{
-    $m = ['', 'Jan', 'Fev', 'Mar', 'Abr', 'Mai', 'Jun', 'Jul', 'Ago', 'Set', 'Out', 'Nov', 'Dez'];
-    [$y, $mo, $day] = explode('-', $d);
-    return intval($day) . ' ' . $m[intval($mo)];
+if (!function_exists('fd')) {
+    function fd(string $d): string
+    {
+        $m = ['', 'Jan', 'Fev', 'Mar', 'Abr', 'Mai', 'Jun', 'Jul', 'Ago', 'Set', 'Out', 'Nov', 'Dez'];
+        [$y, $mo, $day] = explode('-', $d);
+        return intval($day) . ' ' . $m[intval($mo)];
+    }
 }
-function itemLinha(array $r, string $urgencia = ''): string
-{
-    $isRec = $r['tipo_reg'] === 'receita';
-    $bg    = $isRec ? 'rgba(34,197,94,.12)'  : 'rgba(220,38,38,.12)';
-    $icon  = $isRec ? 'bi-arrow-up-short text-success' : 'bi-arrow-down-short text-danger';
-    $cor   = $isRec ? '#22c55e' : '#f87171';
-    $sinal = $isRec ? '+' : '-';
-    $data  = fd($r['data']);
-    $label = htmlspecialchars($r['titulo']);
-    $valor = fv((float)$r['valor']);
-    return "
-    <a href='nova_transacao.php?editar=" . urlencode($r['id']) . "'
-       class='d-flex align-items-center justify-content-between gap-2 py-2 text-decoration-none border-bottom border-secondary-subtle panel-row' style='color:inherit;'>
-        <div class='d-flex align-items-center gap-2 min-w-0'>
-            <span class='d-inline-flex align-items-center justify-content-center rounded-circle flex-shrink-0'
-                  style='width:26px;height:26px;min-width:26px;background:{$bg};'>
-                <i class='bi {$icon}' style='font-size:.85rem;'></i>
-            </span>
-            <div class='min-w-0'>
-                <div class='text-light fw-semibold text-truncate' style='font-size:.78rem;max-width:145px;' title='" . htmlspecialchars($r['titulo']) . "'>{$label}</div>
-                <div style='font-size:.68rem;color:#6b7280;'>{$data}</div>
+if (!function_exists('itemLinha')) {
+    function itemLinha(array $r, string $urgencia = ''): string
+    {
+        $isRec = $r['tipo_reg'] === 'receita';
+        $bg    = $isRec ? 'rgba(34,197,94,.12)'  : 'rgba(220,38,38,.12)';
+        $icon  = $isRec ? 'bi-arrow-up-short text-success' : 'bi-arrow-down-short text-danger';
+        $cor   = $isRec ? '#22c55e' : '#f87171';
+        $sinal = $isRec ? '+' : '-';
+        $data  = fd($r['data']);
+        $label = htmlspecialchars($r['titulo']);
+        $valor = fv((float)$r['valor']);
+        return "
+        <a href='nova_transacao.php?editar=" . urlencode($r['id']) . "'
+           class='d-flex align-items-center justify-content-between gap-2 py-2 text-decoration-none border-bottom border-secondary-subtle panel-row' style='color:inherit;'>
+            <div class='d-flex align-items-center gap-2 min-w-0'>
+                <span class='d-inline-flex align-items-center justify-content-center rounded-circle flex-shrink-0'
+                      style='width:26px;height:26px;min-width:26px;background:{$bg};'>
+                    <i class='bi {$icon}' style='font-size:.85rem;'></i>
+                </span>
+                <div class='min-w-0'>
+                    <div class='text-light fw-semibold text-truncate' style='font-size:.78rem;max-width:145px;' title='" . htmlspecialchars($r['titulo']) . "'>{$label}</div>
+                    <div style='font-size:.68rem;color:#6b7280;'>{$data}</div>
+                </div>
             </div>
-        </div>
-        <span class='fw-bold flex-shrink-0' style='font-size:.78rem;color:{$cor};'>{$sinal}{$valor}</span>
-    </a>";
+            <span class='fw-bold flex-shrink-0' style='font-size:.78rem;color:{$cor};'>{$sinal}{$valor}</span>
+        </a>";
+    }
 }
 
 $pageTitle = "Agenda — Auralis";
