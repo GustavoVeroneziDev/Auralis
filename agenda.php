@@ -50,53 +50,39 @@ if (isset($_GET['ajax']) && $_GET['acao'] === 'listar') {
         $stmt->execute($params);
         $rows = $stmt->fetchAll(PDO::FETCH_ASSOC);
 
-        // Adiciona a inteligência de urgência para estilizar as pílulas corretamente
+        // Adiciona urgência — comparação segura com substr() para evitar problema com datetime
         foreach ($rows as &$r) {
+            $dataStr = substr((string)($r['data'] ?? ''), 0, 10); // garante 'YYYY-MM-DD'
             if ($r['status_reg'] === 'pendente') {
-                if ($r['data'] < $hoje)       $r['urgencia'] = 'atrasada';
-                elseif ($r['data'] === $hoje) $r['urgencia'] = 'hoje';
+                if ($dataStr < $hoje)         $r['urgencia'] = 'atrasada';
+                elseif ($dataStr === $hoje)   $r['urgencia'] = 'hoje';
                 else                          $r['urgencia'] = 'pendente';
             } else {
                 $r['urgencia'] = 'efetivado';
             }
+
+            // Garante que strings sejam UTF-8 válido para json_encode não silenciar o JSON inteiro
+            foreach ($r as $k => $v) {
+                if (is_string($v)) {
+                    $r[$k] = mb_convert_encoding($v, 'UTF-8', 'UTF-8, ISO-8859-1, Windows-1252');
+                }
+            }
         }
         unset($r);
 
-        echo json_encode(['ok' => true, 'itens' => $rows, 'hoje' => $hoje]);
-        exit;
+        $json = json_encode(['ok' => true, 'itens' => $rows, 'hoje' => $hoje], JSON_UNESCAPED_UNICODE);
 
+        if ($json === false) {
+            // json_encode falhou — serializa avisando do erro
+            echo json_encode(['ok' => false, 'msg' => 'Erro ao serializar dados.', 'itens' => []]);
+        } else {
+            echo $json;
+        }
+        exit;
     } catch (Exception $e) {
         echo json_encode(['ok' => false, 'msg' => 'Erro na consulta.', 'itens' => []]);
         exit;
     }
-}
-    // Adiciona urgência — comparação segura com substr() para evitar problema com datetime
-    foreach ($rows as &$r) {
-        $dataStr = substr((string)($r['data'] ?? ''), 0, 10); // garante 'YYYY-MM-DD'
-        if ($r['status_reg'] === 'pendente') {
-            if ($dataStr < $hoje)         $r['urgencia'] = 'atrasada';
-            elseif ($dataStr === $hoje)   $r['urgencia'] = 'hoje';
-            else                          $r['urgencia'] = 'pendente';
-        } else {
-            $r['urgencia'] = 'efetivado';
-        }
-        // Garante que strings sejam UTF-8 válido para json_encode não silenciar
-        foreach ($r as $k => $v) {
-            if (is_string($v)) {
-                $r[$k] = mb_convert_encoding($v, 'UTF-8', 'UTF-8, ISO-8859-1, Windows-1252');
-            }
-        }
-    }
-    unset($r);
-
-    $json = json_encode(['ok' => true, 'itens' => $rows, 'hoje' => $hoje], JSON_UNESCAPED_UNICODE);
-    if ($json === false) {
-        // json_encode falhou (caractere inválido) — serializa sem os valores problemáticos
-        echo json_encode(['ok' => false, 'msg' => 'Erro ao serializar dados.', 'itens' => []]);
-    } else {
-        echo $json;
-    }
-    exit;
 }
 
 // ==============================================================================
