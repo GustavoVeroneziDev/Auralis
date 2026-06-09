@@ -49,11 +49,27 @@ if (isset($_GET['ajax']) && $_GET['acao'] === 'listar') {
         ");
         $stmt->execute($params);
         $rows = $stmt->fetchAll(PDO::FETCH_ASSOC);
+
+        // Adiciona a inteligência de urgência para estilizar as pílulas corretamente
+        foreach ($rows as &$r) {
+            if ($r['status_reg'] === 'pendente') {
+                if ($r['data'] < $hoje)       $r['urgencia'] = 'atrasada';
+                elseif ($r['data'] === $hoje) $r['urgencia'] = 'hoje';
+                else                          $r['urgencia'] = 'pendente';
+            } else {
+                $r['urgencia'] = 'efetivado';
+            }
+        }
+        unset($r);
+
+        echo json_encode(['ok' => true, 'itens' => $rows, 'hoje' => $hoje]);
+        exit;
+
     } catch (Exception $e) {
         echo json_encode(['ok' => false, 'msg' => 'Erro na consulta.', 'itens' => []]);
         exit;
     }
-
+}
     // Adiciona urgência — comparação segura com substr() para evitar problema com datetime
     foreach ($rows as &$r) {
         $dataStr = substr((string)($r['data'] ?? ''), 0, 10); // garante 'YYYY-MM-DD'
