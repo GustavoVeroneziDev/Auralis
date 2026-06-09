@@ -190,8 +190,16 @@ try {
 }
 
 // JSON gerado com segurança extra (HEX tags) para evitar quebra de script
-$json_iniciais = json_encode($rowsIni, JSON_UNESCAPED_UNICODE | JSON_HEX_TAG | JSON_HEX_APOS | JSON_HEX_QUOT | JSON_HEX_AMP) ?: '[]';
+$json_iniciais = json_encode($rowsIni, JSON_UNESCAPED_UNICODE | JSON_HEX_TAG | JSON_HEX_APOS | JSON_HEX_QUOT | JSON_HEX_AMP);
 
+// Se o JSON falhar, a página vai gritar o motivo exato com uma tarja vermelha
+if ($json_iniciais === false) {
+    die("<div style='background:#dc2626; color:white; padding:20px; margin-bottom:20px; border-radius:8px; font-family:sans-serif;'>
+            <h3>🚨 Raio-X do Erro Ativado</h3>
+            <p><strong>Motivo da falha do JSON:</strong> " . json_last_error_msg() . "</p>
+            <p>Isso geralmente significa que há um caractere corrompido no banco de dados que não é um UTF-8 válido.</p>
+         </div>");
+}
 // Utilitários protegidos contra re-declaração (conflito de cache)
 if (!function_exists('fv')) {
     function fv(float $v): string
