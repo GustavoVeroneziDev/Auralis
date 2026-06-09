@@ -11,7 +11,7 @@ $paginaAtual = basename($_SERVER['PHP_SELF']);
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <meta name="theme-color" content="#121418">
-    <title>Auralis | Gestão Financeira</title>
+    <title>Auralis</title>
     <link rel="shortcut icon" href="/geral/img/icone.ico" type="image/x-icon">
 
     <link href="/geral/fonts/inter.css" rel="stylesheet">
@@ -30,7 +30,7 @@ $paginaAtual = basename($_SERVER['PHP_SELF']);
         <div class="container-fluid px-3 px-xl-5" style="max-width: 1500px;">
 
             <a class="navbar-brand fw-bold fs-3 d-flex align-items-center" href="<?php echo isset($_SESSION['usuario_id']) ? '/dashboard.php' : '/geral/index.php'; ?>" style="letter-spacing: -0.05em;">
-                <img src="/geral/img/logoAuralis-SemFundo.png" alt="Logo Auralis" class="me-2" style="height: 38px; width: auto; object-fit: contain;">
+                <img src="/geral/img/LogoAuralisSemEscudo.png" alt="Logo Auralis" class="me-2" style="height: 38px; width: auto; object-fit: contain;">
                 <span style="color: gold !important;">Aura</span><span class="text-light">lis</span>
             </a>
 
@@ -57,6 +57,11 @@ $paginaAtual = basename($_SERVER['PHP_SELF']);
                         <li class="nav-item">
                             <a class="nav-link custom-link py-3 py-lg-2 <?php echo ($paginaAtual == 'analises.php') ? 'text-warning active' : ''; ?>" href="/analises.php">
                                 <i class="bi bi-graph-up-arrow me-2"></i> Análises
+                            </a>
+                        </li>
+                        <li class="nav-item">
+                            <a class="nav-link custom-link py-3 py-lg-2 <?php echo ($paginaAtual == 'agenda.php') ? 'text-warning active' : ''; ?>" href="/agenda.php">
+                                <i class="bi bi-calendar3 me-2"></i> Agenda
                             </a>
                         </li>
                         <li class="nav-item">
