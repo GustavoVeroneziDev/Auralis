@@ -1,6 +1,21 @@
 <?php
 // config/funcoes.php — Compatível com PHP 7.4+
 
+if (!defined('AURALIS_COOKIE_SECRET')) {
+    define('AURALIS_COOKIE_SECRET', 'Auralis2026_UltraSecretKey');
+}
+
+if (!function_exists('gerarUuid')) {
+    function gerarUuid()
+    {
+        return sprintf('%04x%04x-%04x-%04x-%04x-%04x%04x%04x',
+            mt_rand(0, 0xffff), mt_rand(0, 0xffff),
+            mt_rand(0, 0xffff), mt_rand(0, 0x0fff) | 0x4000,
+            mt_rand(0, 0x3fff) | 0x8000, mt_rand(0, 0xffff),
+            mt_rand(0, 0xffff), mt_rand(0, 0xffff));
+    }
+}
+
 if (!function_exists('obterNivelAcesso')) {
     function obterNivelAcesso()
     {

@@ -1,9 +1,10 @@
 <?php
-
-// MODO DEBUG: LIGA A LANTERNA PARA VER O ERRO REAL
-ini_set('display_errors', 1);
-ini_set('display_startup_errors', 1);
-error_reporting(E_ALL);
+// MODO DEBUG: ativar apenas em desenvolvimento local
+if ($_SERVER['HTTP_HOST'] === 'localhost' || $_SERVER['HTTP_HOST'] === '127.0.0.1') {
+    ini_set('display_errors', 1);
+    ini_set('display_startup_errors', 1);
+    error_reporting(E_ALL);
+}
 session_start();
 
 if (!isset($_SESSION['usuario_id'])) {
@@ -14,14 +15,6 @@ if (!isset($_SESSION['usuario_id'])) {
 // 2. Conecta ao banco de dados
 require_once 'config/conexao.php';
 require_once 'config/funcoes.php';
-
-// Função auxiliar para gerar UUID no padrão MySQL
-if (!function_exists('gerarUuid')) {
-    function gerarUuid()
-    {
-        return sprintf('%04x%04x-%04x-%04x-%04x-%04x%04x%04x', mt_rand(0, 0xffff), mt_rand(0, 0xffff), mt_rand(0, 0xffff), mt_rand(0, 0x0fff) | 0x4000, mt_rand(0, 0x3fff) | 0x8000, mt_rand(0, 0xffff), mt_rand(0, 0xffff), mt_rand(0, 0xffff));
-    }
-}
 
 $usuario_id = $_SESSION['usuario_id'];
 $carteiras  = [];
