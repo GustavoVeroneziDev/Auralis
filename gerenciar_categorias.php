@@ -251,7 +251,7 @@ $listaIcones = [
                                     <div class="d-flex flex-wrap gap-2 justify-content-center">
                                         <?php foreach ($icones as $icone): ?>
                                             <div>
-                                                <input type="radio" class="btn-check" name="icone" id="icone_<?= $icone ?>" value="<?= $icone ?>" autocomplete="off" required>
+                                                <input type="radio" class="btn-check" name="icone_categoria" id="icone_<?= $icone ?>" value="<?= $icone ?>" autocomplete="off" required>
                                                 <label class="btn-icon-select" for="icone_<?= $icone ?>" style="width: 45px; padding: 0;">
                                                     <i class="bi <?= $icone ?> fs-5"></i>
                                                 </label>

@@ -89,7 +89,7 @@ require_once '../geral/header.php';
                     <div class="form-check text-start mb-4">
                         <input class="form-check-input bg-dark border-secondary" type="checkbox" name="lembrar" value="sim" id="lembrar">
                         <label class="form-check-label text-light opacity-75" for="lembrar">
-                            Salvar neste computador
+                            Salvar neste dispositivo
                         </label>
                     </div>
 
