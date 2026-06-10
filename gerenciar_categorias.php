@@ -251,7 +251,7 @@ $listaIcones = [
                                     <div class="d-flex flex-wrap gap-2 justify-content-center">
                                         <?php foreach ($icones as $icone): ?>
                                             <div>
-                                                <input type="radio" class="btn-check" name="icone" id="icone_<?= $icone ?>" value="<?= $icone ?>" autocomplete="off" required>
+                                                <input type="radio" class="btn-check" name="icone_categoria" id="icone_<?= $icone ?>" value="<?= $icone ?>" autocomplete="off" required>
                                                 <label class="btn-icon-select" for="icone_<?= $icone ?>" style="width: 45px; padding: 0;">
                                                     <i class="bi <?= $icone ?> fs-5"></i>
                                                 </label>
@@ -275,7 +275,7 @@ $listaIcones = [
 
             <div class="card bg-dark border-secondary-subtle shadow-sm rounded-4 overflow-hidden mb-4">
                 <div class="card-header bg-charcoal-analysis border-secondary-subtle py-3 d-flex align-items-center">
-                    <div class="p-2 bg-danger bg-opacity-10 rounded-circle me-3 d-flex">
+                    <div class="bg-danger bg-opacity-10 rounded-circle me-3 d-flex align-items-center justify-content-center" style="width: 36px; height: 36px; flex-shrink: 0;">
                         <i class="bi bi-arrow-down-short text-danger fs-5"></i>
                     </div>
                     <h6 class="mb-0 text-light fw-bold fs-5">Categorias de Despesa</h6>
@@ -342,7 +342,7 @@ $listaIcones = [
 
             <div class="card bg-dark border-secondary-subtle shadow-sm rounded-4 overflow-hidden">
                 <div class="card-header bg-charcoal-analysis border-secondary-subtle py-3 d-flex align-items-center">
-                    <div class="p-2 bg-success bg-opacity-10 rounded-circle me-3 d-flex">
+                    <div class="bg-success bg-opacity-10 rounded-circle me-3 d-flex align-items-center justify-content-center" style="width: 36px; height: 36px; flex-shrink: 0;">
                         <i class="bi bi-arrow-up-short text-success fs-5"></i>
                     </div>
                     <h6 class="mb-0 text-light fw-bold fs-5">Categorias de Receita</h6>
