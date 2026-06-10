@@ -1,783 +1,485 @@
 <?php
 // ==============================================================================
-// AGENDA.PHP — Calendário financeiro (somente visualização de transações)
+// AGENDA.PHP — Calendário financeiro e Resumos Sincronizados
 // ==============================================================================
-ob_start(); // Captura qualquer output acidental (BOM, warnings, includes) antes do JSON
+ob_start();
 session_start();
+
+if (!isset($_SESSION['usuario_id'])) {
+    if (isset($_GET['ajax'])) {
+        echo json_encode(['sucesso' => false, 'erro' => 'Não autenticado']);
+        exit;
+    }
+    header("Location: usuario/login.php");
+    exit;
+}
+
 require_once 'config/conexao.php';
-exigirAcessoMinimo(1);
 
 $usuario_id = $_SESSION['usuario_id'];
-$hoje       = date('Y-m-d');
 
 // ==============================================================================
-// AJAX — só leitura (Usado apenas para navegação futura entre meses)
+// 1. MOTOR AJAX (Retorna as Transações da Grelha + Saldos Calculados)
 // ==============================================================================
 if (isset($_GET['ajax']) && $_GET['acao'] === 'listar') {
-    ob_clean(); // Descarta qualquer output anterior
+    ob_clean();
     header('Content-Type: application/json; charset=utf-8');
 
-    $mes      = preg_replace('/[^0-9\-]/', '', $_GET['mes'] ?? date('Y-m'));
-    $carteira = $_GET['carteira'] ?? '';
-    $inicio   = $mes . '-01';
-    $fim      = date('Y-m-t', strtotime($inicio));
+    $mes_str  = $_GET['mes'] ?? date('Y-m');
+    $carteira = $_GET['carteira'] ?? 'todas';
 
-    $where  = "r.FKUsuario = :u AND DATE(COALESCE(r.DataVencimento, r.MomentoRegistro)) BETWEEN :ini AND :fim";
-    $params = [':u' => $usuario_id, ':ini' => $inicio, ':fim' => $fim];
+    $mes_alvo = (int)date('m', strtotime($mes_str . '-01'));
+    $ano_alvo = (int)date('Y', strtotime($mes_str . '-01'));
 
-    if ($carteira) {
-        $where           .= " AND r.FKCarteira = :cart";
-        $params[':cart']  = $carteira;
+    // ─── QUERY DA GRELHA (Visual) ─────────────────────────────────────────────
+    $whereTransacoes = "r.FKUsuario = :uid AND MONTH(COALESCE(r.DataVencimento, r.MomentoRegistro)) = :mes AND YEAR(COALESCE(r.DataVencimento, r.MomentoRegistro)) = :ano";
+    $params = [':uid' => $usuario_id, ':mes' => $mes_alvo, ':ano' => $ano_alvo];
+
+    if ($carteira !== 'todas' && $carteira !== '') {
+        $whereTransacoes .= " AND r.FKCarteira = :cid";
+        $params[':cid'] = $carteira;
     }
 
     try {
-        $stmt = $pdo->prepare("
-            SELECT r.IDRegistro AS id,
-                   r.Descricao  AS titulo,
-                   DATE(COALESCE(r.DataVencimento, r.MomentoRegistro)) AS data,
-                   r.TipoRegistro   AS tipo_reg,
-                   r.StatusRegistro AS status_reg,
-                   r.Valor          AS valor,
-                   r.ParcelaAtual,
-                   r.TotalParcelas,
+        $sqlGrelha = "
+            SELECT r.IDRegistro as id,
+                   r.TipoRegistro as tipo,
+                   r.Descricao as titulo,
+                   r.Valor as valor,
+                   r.StatusRegistro as status,
                    r.Recorrente,
-                   c.NomeCategoria  AS categoria
+                   COALESCE(r.DataVencimento, r.MomentoRegistro) as data_evento,
+                   c.NomeCategoria as categoria,
+                   COALESCE(c.IconeCategoria, 'bi-tag') as icone
             FROM Registro r
             LEFT JOIN Categoria c ON r.FKCategoria = c.IDCategoria
-            WHERE $where
-            ORDER BY data ASC
-        ");
-        $stmt->execute($params);
-        $rows = $stmt->fetchAll(PDO::FETCH_ASSOC);
+            WHERE $whereTransacoes
+            ORDER BY data_evento ASC
+        ";
+        $stmtGrelha = $pdo->prepare($sqlGrelha);
+        $stmtGrelha->execute($params);
+        $transacoesGrelha = $stmtGrelha->fetchAll(PDO::FETCH_ASSOC);
 
-        foreach ($rows as &$r) {
-            $dataStr = substr((string)($r['data'] ?? ''), 0, 10);
-            if ($r['status_reg'] === 'pendente') {
-                if ($dataStr < $hoje)         $r['urgencia'] = 'atrasada';
-                elseif ($dataStr === $hoje)   $r['urgencia'] = 'hoje';
-                else                          $r['urgencia'] = 'pendente';
+        // ─── QUERY DE SALDOS (Lógica idêntica ao Dashboard) ───────────────────
+        $whereSaldos = "FKUsuario = :uid AND MONTH(MomentoRegistro) = :mes AND YEAR(MomentoRegistro) = :ano";
+        if ($carteira !== 'todas' && $carteira !== '') {
+            $whereSaldos .= " AND FKCarteira = :cid";
+        }
+
+        $sqlSaldos = "SELECT Valor, TipoRegistro, StatusRegistro FROM Registro WHERE $whereSaldos";
+        $stmtSaldos = $pdo->prepare($sqlSaldos);
+        $stmtSaldos->execute($params);
+        $transacoesSoma = $stmtSaldos->fetchAll(PDO::FETCH_ASSOC);
+
+        $totRecEfet = 0;
+        $totDesEfet = 0;
+        $totRecPend = 0;
+        $totDesPend = 0;
+
+        foreach ($transacoesSoma as $t) {
+            $v = (float)$t['Valor'];
+            if ($t['TipoRegistro'] === 'receita') {
+                if ($t['StatusRegistro'] === 'efetivado') $totRecEfet += $v;
+                else $totRecPend += $v;
             } else {
-                $r['urgencia'] = 'efetivado';
+                if ($t['StatusRegistro'] === 'efetivado') $totDesEfet += $v;
+                else $totDesPend += $v;
             }
-            // Remoção do mb_convert_encoding() que causava quebra fatal se a extensão não estivesse habilitada.
         }
-        unset($r);
 
-        $json = json_encode(['ok' => true, 'itens' => $rows, 'hoje' => $hoje], JSON_UNESCAPED_UNICODE);
-        if ($json === false) {
-            echo json_encode(['ok' => false, 'msg' => 'Erro ao serializar dados.', 'itens' => []]);
-        } else {
-            echo $json;
-        }
-        exit;
+        $saldos_calculados = [
+            'efetivado' => $totRecEfet - $totDesEfet,
+            'pago'      => $totDesEfet,
+            'esperado'  => ($totRecEfet + $totRecPend) - ($totDesEfet + $totDesPend)
+        ];
+
+        echo json_encode(['sucesso' => true, 'dados' => $transacoesGrelha, 'saldos' => $saldos_calculados]);
     } catch (PDOException $e) {
-        echo json_encode(['ok' => false, 'msg' => 'Erro na consulta.', 'itens' => []]);
-        exit;
+        echo json_encode(['sucesso' => false, 'erro' => $e->getMessage()]);
     }
+    exit;
 }
 
 // ==============================================================================
-// PRÉ-CARREGAMENTO — painel lateral
+// 2. RENDERIZAÇÃO DA PÁGINA NORMAL
 // ==============================================================================
-$carteira_sel = $_GET['carteira'] ?? '';
 
-// Inicialização segura para garantir que as variáveis existam mesmo se o banco falhar
-$carteiras   = [];
-$atrasadas   = [];
-$vencem_hoje = [];
-$proximos    = [];
-$saldo_mes   = 0.0;
-$pendentes   = ['pend_desp' => 0, 'pend_rec' => 0];
-
-$iniMes = date('Y-m-01');
-$fimMes = date('Y-m-t');
-
+$carteiras = [];
 try {
-    // Carteiras do usuário para o filtro
-    $stmtCart = $pdo->prepare("SELECT IDCarteira, TipoCarteira FROM Carteira WHERE FKUsuarioDono = :u ORDER BY TipoCarteira ASC");
-    $stmtCart->execute([':u' => $usuario_id]);
+    $sqlCart = "SELECT IDCarteira, TipoCarteira FROM Carteira WHERE FKUsuarioDono = :uid ORDER BY TipoCarteira ASC";
+    $stmtCart = $pdo->prepare($sqlCart);
+    $stmtCart->execute([':uid' => $usuario_id]);
     $carteiras = $stmtCart->fetchAll();
-
-    // Filtro de carteira nas queries do painel
-    $wherePanel  = "FKUsuario = :u AND StatusRegistro = 'pendente'";
-    $paramsPanel = [':u' => $usuario_id];
-    if ($carteira_sel) {
-        $wherePanel            .= " AND FKCarteira = :cart";
-        $paramsPanel[':cart']   = $carteira_sel;
-    }
-
-    // Atrasadas
-    $stmtAt = $pdo->prepare("SELECT IDRegistro AS id, Descricao AS titulo, COALESCE(DataVencimento,MomentoRegistro) AS data, TipoRegistro AS tipo_reg, Valor AS valor FROM Registro WHERE $wherePanel AND COALESCE(DataVencimento,MomentoRegistro) < :hoje ORDER BY data ASC LIMIT 30");
-    $stmtAt->execute(array_merge($paramsPanel, [':hoje' => $hoje]));
-    $atrasadas = $stmtAt->fetchAll();
-
-    // Hoje
-    $stmtHj = $pdo->prepare("SELECT IDRegistro AS id, Descricao AS titulo, COALESCE(DataVencimento,MomentoRegistro) AS data, TipoRegistro AS tipo_reg, Valor AS valor FROM Registro WHERE $wherePanel AND COALESCE(DataVencimento,MomentoRegistro) = :hoje ORDER BY data ASC LIMIT 30");
-    $stmtHj->execute(array_merge($paramsPanel, [':hoje' => $hoje]));
-    $vencem_hoje = $stmtHj->fetchAll();
-
-    // Próximos 7 dias
-    $d1 = date('Y-m-d', strtotime('+1 day'));
-    $d7 = date('Y-m-d', strtotime('+7 days'));
-    $stmtPx = $pdo->prepare("SELECT IDRegistro AS id, Descricao AS titulo, COALESCE(DataVencimento,MomentoRegistro) AS data, TipoRegistro AS tipo_reg, Valor AS valor FROM Registro WHERE $wherePanel AND COALESCE(DataVencimento,MomentoRegistro) BETWEEN :d1 AND :d7 ORDER BY data ASC LIMIT 30");
-    $stmtPx->execute(array_merge($paramsPanel, [':d1' => $d1, ':d7' => $d7]));
-    $proximos = $stmtPx->fetchAll();
-
-    // Saldo do mês corrente (efetivados)
-    $whereS = "FKUsuario=:u AND StatusRegistro='efetivado' AND MomentoRegistro BETWEEN :ini AND :fim";
-    $psS    = [':u' => $usuario_id, ':ini' => $iniMes, ':fim' => $fimMes];
-    if ($carteira_sel) {
-        $whereS .= " AND FKCarteira=:cart";
-        $psS[':cart'] = $carteira_sel;
-    }
-    $stmtS = $pdo->prepare("SELECT COALESCE(SUM(CASE WHEN TipoRegistro='receita' THEN Valor ELSE -Valor END),0) AS saldo FROM Registro WHERE $whereS");
-    $stmtS->execute($psS);
-    $saldo_mes = (float)$stmtS->fetchColumn();
-
-    // Pendentes do mês
-    $whereP = "FKUsuario=:u AND StatusRegistro='pendente' AND COALESCE(DataVencimento,MomentoRegistro) BETWEEN :ini AND :fim";
-    $psP    = [':u' => $usuario_id, ':ini' => $iniMes, ':fim' => $fimMes];
-    if ($carteira_sel) {
-        $whereP .= " AND FKCarteira=:cart";
-        $psP[':cart'] = $carteira_sel;
-    }
-    $stmtP = $pdo->prepare("SELECT COALESCE(SUM(CASE WHEN TipoRegistro='despesa' THEN Valor ELSE 0 END),0) AS pend_desp, COALESCE(SUM(CASE WHEN TipoRegistro='receita' THEN Valor ELSE 0 END),0) AS pend_rec FROM Registro WHERE $whereP");
-    $stmtP->execute($psP);
-    $fetchP = $stmtP->fetch();
-    if ($fetchP) {
-        $pendentes = $fetchP;
-    }
 } catch (PDOException $e) {
-    // Falha silenciosa: A página carrega vazia ao invés de exibir Erro 500
 }
 
-// ==============================================================================
-// CARGA INICIAL DA GRADE DO CALENDÁRIO (SSR - Injeção Direta)
-// ==============================================================================
-$rowsIni = [];
+$carteira_selecionada = $_GET['carteira'] ?? 'todas';
+$nome_carteira_atual = 'Todas as Carteiras';
 
-try {
-    $whereIni  = "r.FKUsuario = :u AND DATE(COALESCE(r.DataVencimento, r.MomentoRegistro)) BETWEEN :ini AND :fim";
-    $paramsIni = [':u' => $usuario_id, ':ini' => $iniMes, ':fim' => $fimMes];
-
-    if ($carteira_sel) {
-        $whereIni .= " AND r.FKCarteira = :cart";
-        $paramsIni[':cart'] = $carteira_sel;
-    }
-
-    $stmtIni = $pdo->prepare("
-        SELECT r.IDRegistro AS id, r.Descricao  AS titulo, DATE(COALESCE(r.DataVencimento, r.MomentoRegistro)) AS data, r.TipoRegistro AS tipo_reg, r.StatusRegistro AS status_reg, r.Valor AS valor, r.ParcelaAtual, r.TotalParcelas, r.Recorrente, c.NomeCategoria  AS categoria
-        FROM Registro r LEFT JOIN Categoria c ON r.FKCategoria = c.IDCategoria
-        WHERE $whereIni ORDER BY data ASC
-    ");
-    $stmtIni->execute($paramsIni);
-    $rowsIni = $stmtIni->fetchAll(PDO::FETCH_ASSOC);
-
-    foreach ($rowsIni as &$r) {
-        $dataStr = substr((string)($r['data'] ?? ''), 0, 10);
-        if ($r['status_reg'] === 'pendente') {
-            if ($dataStr < $hoje)         $r['urgencia'] = 'atrasada';
-            elseif ($dataStr === $hoje)   $r['urgencia'] = 'hoje';
-            else                          $r['urgencia'] = 'pendente';
-        } else {
-            $r['urgencia'] = 'efetivado';
+if ($carteira_selecionada !== 'todas') {
+    foreach ($carteiras as $c) {
+        if ($c['IDCarteira'] == $carteira_selecionada) {
+            $nome_carteira_atual = $c['TipoCarteira'];
+            break;
         }
-        // Remoção do mb_convert_encoding() 
-    }
-    unset($r);
-} catch (PDOException $e) {
-}
-
-// JSON gerado com segurança extra (HEX tags) para evitar quebra de script
-$json_iniciais = json_encode($rowsIni, JSON_UNESCAPED_UNICODE | JSON_HEX_TAG | JSON_HEX_APOS | JSON_HEX_QUOT | JSON_HEX_AMP);
-
-// Se o JSON falhar, a página vai gritar o motivo exato com uma tarja vermelha
-if ($json_iniciais === false) {
-    die("<div style='background:#dc2626; color:white; padding:20px; margin-bottom:20px; border-radius:8px; font-family:sans-serif;'>
-            <h3>🚨 Raio-X do Erro Ativado</h3>
-            <p><strong>Motivo da falha do JSON:</strong> " . json_last_error_msg() . "</p>
-            <p>Isso geralmente significa que há um caractere corrompido no banco de dados que não é um UTF-8 válido.</p>
-         </div>");
-}
-// Utilitários protegidos contra re-declaração (conflito de cache)
-if (!function_exists('fv')) {
-    function fv(float $v): string
-    {
-        return 'R$ ' . number_format($v, 2, ',', '.');
-    }
-}
-if (!function_exists('fd')) {
-    function fd(string $d): string
-    {
-        $m = ['', 'Jan', 'Fev', 'Mar', 'Abr', 'Mai', 'Jun', 'Jul', 'Ago', 'Set', 'Out', 'Nov', 'Dez'];
-        [$y, $mo, $day] = explode('-', $d);
-        return intval($day) . ' ' . $m[intval($mo)];
-    }
-}
-if (!function_exists('itemLinha')) {
-    function itemLinha(array $r, string $urgencia = ''): string
-    {
-        $isRec = $r['tipo_reg'] === 'receita';
-        $bg    = $isRec ? 'rgba(34,197,94,.12)'  : 'rgba(220,38,38,.12)';
-        $icon  = $isRec ? 'bi-arrow-up-short text-success' : 'bi-arrow-down-short text-danger';
-        $cor   = $isRec ? '#22c55e' : '#f87171';
-        $sinal = $isRec ? '+' : '-';
-        $data  = fd($r['data']);
-        $label = htmlspecialchars($r['titulo']);
-        $valor = fv((float)$r['valor']);
-        return "
-        <a href='nova_transacao.php?editar=" . urlencode($r['id']) . "'
-           class='d-flex align-items-center justify-content-between gap-2 py-2 text-decoration-none border-bottom border-secondary-subtle panel-row' style='color:inherit;'>
-            <div class='d-flex align-items-center gap-2 min-w-0'>
-                <span class='d-inline-flex align-items-center justify-content-center rounded-circle flex-shrink-0'
-                      style='width:26px;height:26px;min-width:26px;background:{$bg};'>
-                    <i class='bi {$icon}' style='font-size:.85rem;'></i>
-                </span>
-                <div class='min-w-0'>
-                    <div class='text-light fw-semibold text-truncate' style='font-size:.78rem;max-width:145px;' title='" . htmlspecialchars($r['titulo']) . "'>{$label}</div>
-                    <div style='font-size:.68rem;color:#6b7280;'>{$data}</div>
-                </div>
-            </div>
-            <span class='fw-bold flex-shrink-0' style='font-size:.78rem;color:{$cor};'>{$sinal}{$valor}</span>
-        </a>";
     }
 }
 
-$pageTitle = "Agenda — Auralis";
 require_once 'geral/header.php';
 ?>
 
-<main class="container-fluid py-4 mt-2 flex-grow-1"
-    style="max-width:1500px;padding-inline:var(--space-page-x);min-height:100vh;">
+<main class="container-fluid py-4 mt-2 flex-grow-1" style="max-width: 1500px; padding-inline: var(--space-page-x); min-height: 100vh;">
 
-    <div class="d-flex flex-wrap justify-content-between align-items-center mb-4 border-bottom border-secondary-subtle pb-3 gap-3">
+    <div class="mb-4 border-bottom border-secondary-subtle pb-3">
+        <div class="d-flex flex-column flex-lg-row justify-content-between align-items-lg-center gap-3">
 
-        <div class="d-flex align-items-center gap-3">
-            <div class="d-flex align-items-center justify-content-center rounded-3 flex-shrink-0"
-                style="width:44px;height:44px;background:rgba(212,175,55,.12);border:1px solid rgba(212,175,55,.25);">
-                <i class="bi bi-calendar3" style="color:var(--accent);font-size:1.25rem;"></i>
-            </div>
-            <div>
-                <h2 class="fw-bold text-light mb-0">Agenda Financeira</h2>
-                <span id="badge-mes-ano" class="text-secondary fw-semibold text-uppercase"
-                    style="font-size:.7rem;letter-spacing:.06em;"></span>
-            </div>
-        </div>
+            <h2 class="fw-bold text-light mb-0 d-flex align-items-center gap-2" style="font-size: clamp(1.2rem, 3vw, 1.5rem);">
+                Agenda Financeira
+            </h2>
 
-        <div class="d-flex align-items-center gap-2 flex-wrap">
+            <div class="d-flex align-items-center gap-3 w-100 w-lg-auto">
 
-            <?php if (count($carteiras) > 1): ?>
-                <form method="get" class="d-flex" id="formCarteira">
-                    <select name="carteira" class="form-select form-select-sm border-secondary-subtle text-light rounded-pill"
-                        style="background:#252a31;font-size:.8rem;max-width:160px;cursor:pointer;"
-                        onchange="this.form.submit()">
-                        <option value="">Todas as carteiras</option>
-                        <?php foreach ($carteiras as $c): ?>
-                            <option value="<?= htmlspecialchars($c['IDCarteira']) ?>"
-                                <?= $carteira_sel === $c['IDCarteira'] ? 'selected' : '' ?>>
-                                <?= htmlspecialchars($c['TipoCarteira']) ?>
-                            </option>
+                <div class="dropdown flex-grow-1 flex-lg-grow-0" style="min-width: 0;">
+                    <button class="btn border-secondary-subtle text-light shadow-sm fw-semibold dropdown-toggle d-flex align-items-center justify-content-between rounded-3 transition-hover w-100"
+                        type="button" data-bs-toggle="dropdown" style="font-size: 0.875rem; background-color: #222222; padding: 0.45rem 1rem;">
+                        <div class="d-flex align-items-center text-start" style="min-width: 0;">
+                            <i class="bi bi-wallet2 me-2 flex-shrink-0" style="color: #AA8C2C;"></i>
+                            <span class="text-truncate" style="max-width: 140px;"><?php echo htmlspecialchars($nome_carteira_atual); ?></span>
+                        </div>
+                    </button>
+
+                    <ul class="dropdown-menu dropdown-menu-dark shadow-lg border-secondary-subtle mt-2 w-100" style="background-color: #1a1d21; min-width: 220px;">
+                        <li class="px-3 py-1 text-secondary small text-uppercase fw-bold tracking-wide">Filtrar Escopo</li>
+                        <li>
+                            <hr class="dropdown-divider border-secondary-subtle">
+                        </li>
+
+                        <li>
+                            <a class="dropdown-item d-flex align-items-center py-2 transition-hover <?php echo $carteira_selecionada === 'todas' ? 'active' : '' ?>" href="?carteira=todas">
+                                <i class="bi <?php echo $carteira_selecionada === 'todas' ? 'bi-check-circle-fill' : 'bi-circle'; ?> me-2 flex-shrink-0" style="color: <?php echo $carteira_selecionada === 'todas' ? '#ffffff' : 'rgba(255,255,255,0.5)'; ?>"></i>
+                                <span class="<?php echo $carteira_selecionada === 'todas' ? 'fw-bold' : ''; ?>" style="color: <?php echo $carteira_selecionada === 'todas' ? '#AA8C2C' : 'inherit'; ?>">Todas as Carteiras</span>
+                            </a>
+                        </li>
+
+                        <?php foreach ($carteiras as $cart): ?>
+                            <li>
+                                <a class="dropdown-item d-flex align-items-center py-2 transition-hover <?php echo $carteira_selecionada == $cart['IDCarteira'] ? 'active' : '' ?>" href="?carteira=<?php echo htmlspecialchars($cart['IDCarteira']); ?>">
+                                    <i class="bi <?php echo $carteira_selecionada == $cart['IDCarteira'] ? 'bi-check-circle-fill' : 'bi-circle'; ?> me-2 flex-shrink-0" style="color: <?php echo $carteira_selecionada == $cart['IDCarteira'] ? '#ffffff' : 'rgba(255,255,255,0.5)'; ?>"></i>
+                                    <span class="text-truncate <?php echo $carteira_selecionada == $cart['IDCarteira'] ? 'fw-bold' : ''; ?>" style="max-width: 170px; color: <?php echo $carteira_selecionada == $cart['IDCarteira'] ? '#ffffff' : 'inherit'; ?>">
+                                        <?php echo htmlspecialchars($cart['TipoCarteira']); ?>
+                                    </span>
+                                </a>
+                            </li>
                         <?php endforeach; ?>
-                    </select>
-                </form>
-            <?php endif; ?>
+                    </ul>
+                </div>
 
-            <div class="d-flex align-items-center border border-secondary-subtle rounded-pill"
-                style="background:#1e2126;padding:3px;">
-                <button class="btn btn-sm btn-link text-secondary px-3 py-1 text-decoration-none" onclick="mudarMes(-1)">
-                    <i class="bi bi-chevron-left" style="font-size:.75rem;"></i>
-                </button>
-                <button class="btn btn-sm btn-link text-light px-3 py-1 text-decoration-none fw-semibold"
-                    onclick="irHoje()"
-                    style="font-size:.825rem;border-inline:1px solid rgba(255,255,255,.08);">
-                    Este mês
-                </button>
-                <button class="btn btn-sm btn-link text-secondary px-3 py-1 text-decoration-none" onclick="mudarMes(1)">
-                    <i class="bi bi-chevron-right" style="font-size:.75rem;"></i>
-                </button>
+                <div class="d-flex align-items-center bg-dark border border-secondary-subtle rounded-pill shadow-sm justify-content-center px-2 py-1 gap-1">
+                    <button type="button" class="btn btn-sm btn-link text-secondary shadow-none" onclick="window.mudarMes(-1)">
+                        <i class="bi bi-chevron-left fs-6"></i>
+                    </button>
+                    <span id="mesAnoTitulo" class="text-light fw-bold fs-6 mx-2" style="min-width: 140px; text-align: center;">Carregando...</span>
+                    <button type="button" class="btn btn-sm btn-link text-secondary shadow-none" onclick="window.mudarMes(1)">
+                        <i class="bi bi-chevron-right fs-6"></i>
+                    </button>
+                    <button type="button" class="btn btn-sm btn-outline-secondary rounded-pill ms-1 px-3" style="font-size: 0.75rem;" onclick="window.irHoje()">Hoje</button>
+                </div>
+
             </div>
-
-            <a href="nova_transacao.php<?= $carteira_sel ? '?carteira_id=' . urlencode($carteira_sel) : '' ?>"
-                class="btn btn-sm rounded-pill px-4 fw-bold"
-                style="background:linear-gradient(135deg,#d4af37,#AA8C2C);color:#121418;border:none;">
-                <i class="bi bi-plus-lg me-1"></i> Nova transação
-            </a>
         </div>
     </div>
 
-    <div class="row g-3 mb-4">
-        <?php
-        $resumo = [
-            ['Efetivado no mês',  $saldo_mes,              $saldo_mes >= 0 ? '#22c55e' : '#f87171', 'bi-check-circle',    ($saldo_mes >= 0 ? '+' : '') . fv($saldo_mes)],
-            ['A pagar no mês',    (float)$pendentes['pend_desp'], '#f87171',  'bi-hourglass-split', '- ' . fv((float)$pendentes['pend_desp'])],
-            ['A receber no mês',  (float)$pendentes['pend_rec'],  '#22c55e',  'bi-clock',           '+ ' . fv((float)$pendentes['pend_rec'])],
-        ];
-        foreach ($resumo as [$label, $val, $cor, $icon, $fmt]):
-        ?>
-            <div class="col-4 col-lg-4">
-                <div class="card rounded-4 border-secondary-subtle h-100" style="background:var(--bg-card);">
-                    <div class="card-body py-3 px-3">
-                        <div class="d-flex align-items-center gap-2 mb-1">
-                            <i class="bi <?= $icon ?>" style="color:<?= $cor ?>;font-size:.9rem;"></i>
-                            <span class="text-secondary" style="font-size:.72rem;font-weight:600;"><?= $label ?></span>
-                        </div>
-                        <div class="fw-bold" style="font-size:clamp(.85rem,2vw,1.1rem);color:<?= $cor ?>;"><?= $fmt ?></div>
-                    </div>
-                </div>
-            </div>
-        <?php endforeach; ?>
-    </div>
-
-    <div class="row g-4 align-items-start">
-
-        <div class="col-lg-8">
-            <div class="agenda-cal">
-                <div class="cal-semana">
-                    <?php foreach (['Dom', 'Seg', 'Ter', 'Qua', 'Qui', 'Sex', 'Sáb'] as $d): ?>
-                        <div><?= $d ?></div>
-                    <?php endforeach; ?>
-                </div>
-                <div id="cal-grid" class="cal-grade">
-                </div>
-            </div>
-
-            <div class="d-flex flex-wrap gap-3 mt-3 px-1" style="font-size:.72rem;color:#6b7280;">
-                <span><span class="leg" style="background:#dc2626;"></span> Atrasada</span>
-                <span><span class="leg" style="background:#d4af37;"></span> Vence hoje</span>
-                <span><span class="leg" style="background:#3b82f6;"></span> Pendente</span>
-                <span><span class="leg" style="background:#22c55e;"></span> Efetivada</span>
+    <div class="card bg-dark border-secondary-subtle shadow-sm rounded-4 p-4 mb-5">
+        <div class="d-flex justify-content-between align-items-center mb-4 flex-wrap gap-2">
+            <h5 class="text-light fw-bold mb-0">
+                <i class="bi bi-grid-3x3-gap text-secondary me-2"></i> Fluxo Mensal Detalhado
+            </h5>
+            <div class="d-flex gap-3 text-secondary small align-items-center fw-semibold">
+                <div><span class="badge rounded-circle p-1 me-1" style="background-color: rgba(6, 214, 160, 0.2);"></span> Receita</div>
+                <div><span class="badge rounded-circle p-1 me-1" style="background-color: rgba(230, 57, 70, 0.2);"></span> Despesa</div>
+                <div><span class="badge rounded-circle p-1 me-1" style="border: 2px solid #FFB800;"></span> Pendente</div>
             </div>
         </div>
 
-        <div class="col-lg-4 d-flex flex-column gap-3">
-
-            <?php if ($atrasadas): ?>
-                <div class="card rounded-4 border-0"
-                    style="background:rgba(220,38,38,.06);border:1px solid rgba(220,38,38,.18) !important;">
-                    <div class="card-body p-3">
-                        <div class="d-flex align-items-center gap-2 mb-2">
-                            <i class="bi bi-exclamation-triangle-fill text-danger" style="font-size:.9rem;"></i>
-                            <span class="fw-bold text-danger" style="font-size:.825rem;">
-                                Atrasadas <span class="opacity-75">(<?= count($atrasadas) ?>)</span>
-                            </span>
-                        </div>
-                        <?php foreach ($atrasadas as $r) echo itemLinha($r); ?>
-                    </div>
-                </div>
-            <?php endif; ?>
-
-            <?php if ($vencem_hoje): ?>
-                <div class="card rounded-4 border-0"
-                    style="background:rgba(212,175,55,.06);border:1px solid rgba(212,175,55,.22) !important;">
-                    <div class="card-body p-3">
-                        <div class="d-flex align-items-center gap-2 mb-2">
-                            <i class="bi bi-alarm-fill" style="color:#d4af37;font-size:.9rem;"></i>
-                            <span class="fw-bold" style="font-size:.825rem;color:#d4af37;">
-                                Vencem hoje <span class="opacity-75">(<?= count($vencem_hoje) ?>)</span>
-                            </span>
-                        </div>
-                        <?php foreach ($vencem_hoje as $r) echo itemLinha($r); ?>
-                    </div>
-                </div>
-            <?php endif; ?>
-
-            <?php if ($proximos): ?>
-                <div class="card rounded-4 border-secondary-subtle" style="background:var(--bg-card);">
-                    <div class="card-body p-3">
-                        <div class="d-flex align-items-center gap-2 mb-2">
-                            <i class="bi bi-calendar-week text-secondary" style="font-size:.9rem;"></i>
-                            <span class="fw-bold text-secondary" style="font-size:.825rem;">
-                                Próximos 7 dias <span class="opacity-75">(<?= count($proximos) ?>)</span>
-                            </span>
-                        </div>
-                        <?php foreach ($proximos as $r) echo itemLinha($r); ?>
-                    </div>
-                </div>
-            <?php endif; ?>
-
-            <?php if (!$atrasadas && !$vencem_hoje && !$proximos): ?>
-                <div class="card rounded-4 border-secondary-subtle text-center p-4" style="background:var(--bg-card);">
-                    <i class="bi bi-check-circle-fill text-success mb-2" style="font-size:2rem;"></i>
-                    <div class="fw-semibold text-light mb-1" style="font-size:.875rem;">Tudo em dia!</div>
-                    <div class="text-secondary" style="font-size:.8rem;">Nenhum vencimento pendente nos próximos dias.</div>
-                </div>
-            <?php endif; ?>
-
+        <div id="agenda-grid" class="calendar-grid">
         </div>
     </div>
+
 </main>
 
 <style>
-    /* ── Calendário ─────────────────────────────────────────────── */
-    .agenda-cal {
-        background: rgba(255, 255, 255, .04);
-        border: 1px solid rgba(255, 255, 255, .07);
+    .calendar-grid {
+        display: grid;
+        grid-template-columns: repeat(7, 1fr);
+        gap: 1px;
+        background-color: #333333;
+        border: 1px solid #333333;
         border-radius: 12px;
         overflow: hidden;
     }
 
-    .cal-semana {
-        display: grid;
-        grid-template-columns: repeat(7, 1fr);
-        background: #1a1d21;
-        gap: 1px;
-        padding-bottom: 1px;
+    .calendar-day-header {
+        background-color: #1a1d21;
+        color: #AA8C2C;
+        text-align: center;
+        padding: 12px 8px;
+        font-weight: 700;
+        font-size: 0.8rem;
+        text-transform: uppercase;
+        letter-spacing: 0.05em;
     }
 
-    .cal-semana>div {
-        padding: 8px 10px;
-        font-size: .7rem;
-        font-weight: 600;
-        text-transform: lowercase;
-        letter-spacing: .04em;
-        color: #555;
-        background: #1e2126;
-        text-align: right;
-    }
-
-    .cal-grade {
-        display: grid;
-        grid-template-columns: repeat(7, 1fr);
-        gap: 1px;
-        background: rgba(255, 255, 255, .04);
-    }
-
-    .cal-loading {
-        grid-column: 1/-1;
-        background: #1e2126;
-        display: flex;
-        align-items: center;
-        justify-content: center;
-        padding: 4rem 0;
-    }
-
-    /* Células */
-    .cal-celula {
-        background: #1e2126;
-        min-height: 100px;
-        padding: 5px;
+    .calendar-day {
+        background-color: #1c1f24;
+        min-height: 125px;
+        padding: 8px;
         display: flex;
         flex-direction: column;
         position: relative;
-        transition: background .15s;
+        transition: background-color 0.2s ease;
     }
 
-    .cal-celula:hover {
-        background: #252a31;
+    .calendar-day:hover:not(.empty) {
+        background-color: #21252b;
     }
 
-    .cal-celula.outro {
-        background: #181a1f;
+    .calendar-day.empty {
+        background-color: #15171a;
+        opacity: 0.4;
     }
 
-    .cal-celula.outro .num {
-        opacity: .2;
+    .calendar-day.today {
+        background-color: rgba(170, 140, 44, 0.04);
+        box-shadow: inset 0 0 0 1px #AA8C2C;
     }
 
-    /* Hoje */
-    .cal-celula.eh-hoje::before {
-        content: '';
-        position: absolute;
-        top: 0;
-        left: 0;
-        right: 0;
-        height: 2px;
-        background: linear-gradient(90deg, #d4af37, #AA8C2C);
-    }
-
-    /* Status de urgência na célula */
-    .cal-celula.cel-atrasada {
-        background: rgba(220, 38, 38, .05);
-    }
-
-    .cal-celula.cel-hoje {
-        background: rgba(212, 175, 55, .04);
-    }
-
-    /* Número do dia */
-    .num-wrap {
-        display: flex;
-        align-items: center;
-        justify-content: flex-end;
-        margin-bottom: 4px;
-    }
-
-    .num {
-        font-size: .75rem;
-        color: #666;
-        font-weight: 500;
-        line-height: 1;
-    }
-
-    .num.circulo {
-        background: var(--accent);
+    .calendar-day.today .day-number {
+        background-color: #AA8C2C;
         color: #121418;
-        font-weight: 700;
+        border-radius: 50%;
         width: 22px;
         height: 22px;
         display: flex;
         align-items: center;
         justify-content: center;
-        border-radius: 50%;
-        font-size: .7rem;
     }
 
-    /* Pills */
-    .ev-pill {
-        font-size: .66rem;
-        padding: 2px 5px;
-        border-radius: 3px;
-        margin-bottom: 2px;
-        cursor: pointer;
+    .day-number {
+        font-weight: 700;
+        font-size: 0.85rem;
+        color: #888888;
+        margin-bottom: 6px;
+    }
+
+    .day-events {
         display: flex;
-        align-items: center;
-        gap: 3px;
-        font-weight: 600;
-        border-left: 2px solid transparent;
-        white-space: nowrap;
-        overflow: hidden;
-        transition: filter .15s, opacity .15s;
+        flex-direction: column;
+        gap: 4px;
+        overflow-y: auto;
+        flex-grow: 1;
+        max-height: 100px;
+        padding-right: 2px;
     }
 
-    .ev-pill:hover {
-        filter: brightness(1.25);
+    .day-events::-webkit-scrollbar {
+        width: 4px;
     }
 
-    .ev-nome {
-        overflow: hidden;
-        text-overflow: ellipsis;
-        flex: 1;
-        min-width: 0;
+    .day-events::-webkit-scrollbar-thumb {
+        background-color: #444;
+        border-radius: 10px;
     }
 
-    .ev-atrasada {
-        background: rgba(220, 38, 38, .14);
-        color: #fca5a5;
-        border-left-color: #dc2626;
-    }
-
-    .ev-hoje {
-        background: rgba(212, 175, 55, .14);
-        color: #d4af37;
-        border-left-color: #d4af37;
-    }
-
-    .ev-pendente {
-        background: rgba(59, 130, 246, .12);
-        color: #93c5fd;
-        border-left-color: #3b82f6;
-    }
-
-    .ev-efetivado {
-        background: rgba(34, 197, 94, .08);
-        color: #86efac;
-        border-left-color: #22c55e;
-        opacity: .7;
-    }
-
-    /* Legenda */
-    .leg {
-        display: inline-block;
-        width: 8px;
-        height: 8px;
-        border-radius: 50%;
-        margin-right: 3px;
-    }
-
-    /* Painel lateral */
-    .panel-row:hover {
-        background: rgba(255, 255, 255, .03);
+    .calendar-event {
+        font-size: 0.72rem;
+        padding: 4px 6px;
         border-radius: 6px;
+        display: flex;
+        flex-direction: column;
+        line-height: 1.3;
+        font-weight: 600;
+        cursor: pointer;
+        transition: transform 0.1s ease, filter 0.1s ease;
     }
 
-    /* Mobile */
-    @media (max-width:767.98px) {
-        .cal-semana {
-            display: none;
-        }
+    .calendar-event:hover {
+        transform: translateY(-1px);
+        filter: brightness(1.2);
+    }
 
-        .cal-grade {
-            grid-template-columns: 1fr;
-            gap: 0;
-        }
+    .calendar-event.receita {
+        background-color: rgba(6, 214, 160, 0.12);
+        color: #06D6A0;
+    }
 
-        .cal-celula {
-            min-height: auto;
-            padding: 10px;
-            border-bottom: 1px solid rgba(255, 255, 255, .05);
-        }
+    .calendar-event.despesa {
+        background-color: rgba(230, 57, 70, 0.12);
+        color: #E63946;
+    }
 
-        .cal-celula.outro {
-            display: none;
-        }
+    .calendar-event.pendente {
+        border-left: 3px solid #FFB800;
+    }
 
-        .cal-celula.vazio {
-            display: none;
-        }
+    .event-value {
+        font-family: 'Inter', sans-serif;
+        font-weight: 700;
+    }
 
-        .num-wrap {
-            justify-content: flex-start;
-            margin-bottom: 6px;
-        }
+    .event-desc {
+        opacity: 0.8;
+        font-weight: 500;
     }
 </style>
 
 <script>
+    // ==========================================================================
+    // LÓGICA DO CALENDÁRIO AJAX (Blindado Globalmente)
+    // ==========================================================================
+    console.log("[Auralis] Motor de Agenda Iniciado.");
+
+    const carteiraAtual = "<?php echo htmlspecialchars($carteira_selecionada, ENT_QUOTES, 'UTF-8'); ?>";
+    let anoAtual = new Date().getFullYear();
+    let mesAtual = new Date().getMonth(); // 0 a 11
     const HOJE_JS = new Date();
-    const MESES = ['Janeiro', 'Fevereiro', 'Março', 'Abril', 'Maio', 'Junho', 'Julho', 'Agosto', 'Setembro', 'Outubro', 'Novembro', 'Dezembro'];
 
-    // Injeção PHP direta (SSR) para carga inicial imediata e sem erros de atraso
-    let anoAtual = <?= (int)date('Y') ?>;
-    let mesAtual = <?= (int)date('n') - 1 ?>;
-    let itens = <?= $json_iniciais ?>;
+    const mesesNomes = ['Janeiro', 'Fevereiro', 'Março', 'Abril', 'Maio', 'Junho', 'Julho', 'Agosto', 'Setembro', 'Outubro', 'Novembro', 'Dezembro'];
+    const diasSemana = ['Dom', 'Seg', 'Ter', 'Qua', 'Qui', 'Sex', 'Sáb'];
 
-    function padZ(n) {
-        return String(n).padStart(2, '0');
-    }
-
-    function ds(d) {
-        return `${d.getFullYear()}-${padZ(d.getMonth()+1)}-${padZ(d.getDate())}`;
-    }
-
-    function esc(s) {
-        return String(s ?? '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
-    }
-
-    function brl(v) {
-        return parseFloat(v || 0).toLocaleString('pt-BR', {
+    function formatarMoeda(valor) {
+        return new Intl.NumberFormat('pt-BR', {
             style: 'currency',
             currency: 'BRL'
-        });
+        }).format(valor);
     }
 
-    function carteiraSel() {
-        const s = document.querySelector('select[name="carteira"]');
-        return s ? encodeURIComponent(s.value) : '';
+    function esc(str) {
+        const div = document.createElement('div');
+        div.innerText = str;
+        return div.innerHTML;
     }
 
-    async function carregarMes(ano, mes) {
-        const grid = document.getElementById('cal-grid');
-        grid.innerHTML = '<div class="cal-loading"><div class="spinner-border spinner-border-sm text-secondary me-2"></div><span class="text-secondary" style="font-size:.875rem;">Carregando...</span></div>';
-
-        document.getElementById('badge-mes-ano').textContent = `${MESES[mes]} ${ano}`;
-
-        const mesStr = padZ(mes + 1);
-        const cart = carteiraSel();
-        try {
-            const r = await fetch(`agenda.php?ajax=1&acao=listar&mes=${ano}-${mesStr}${cart?'&carteira='+cart:''}`);
-            const j = await r.json();
-            if (!j.ok) console.warn('[Agenda] AJAX retornou erro:', j.msg);
-            itens = Array.isArray(j.itens) ? j.itens : [];
-        } catch (e) {
-            console.error('[Agenda] Falha ao carregar eventos:', e);
-            itens = [];
+    // Exportação explícita para o Window (Evita erros de "is not defined" no onclick do HTML)
+    window.mudarMes = function(delta) {
+        mesAtual += delta;
+        if (mesAtual > 11) {
+            mesAtual = 0;
+            anoAtual++;
+        } else if (mesAtual < 0) {
+            mesAtual = 11;
+            anoAtual--;
         }
+        window.carregarMes(anoAtual, mesAtual);
+    };
 
-        renderCal(ano, mes);
+    window.irHoje = function() {
+        anoAtual = HOJE_JS.getFullYear();
+        mesAtual = HOJE_JS.getMonth();
+        window.carregarMes(anoAtual, mesAtual);
+    };
+
+    window.carregarMes = async function(ano, mes) {
+        document.getElementById('mesAnoTitulo').innerText = `${mesesNomes[mes]} ${ano}`;
+        const mesStr = ano + '-' + String(mes + 1).padStart(2, '0');
+
+        try {
+            const response = await fetch(`agenda.php?ajax=1&acao=listar&mes=${mesStr}&carteira=${carteiraAtual}`);
+            const json = await response.json();
+
+            if (json.sucesso) {
+                renderizarGrelha(ano, mes, json.dados);
+                atualizarSaldos(json.saldos);
+            } else {
+                console.error("Erro do servidor:", json.erro);
+                alert("Erro ao carregar dados do calendário.");
+            }
+        } catch (e) {
+            console.error("Erro na requisição AJAX", e);
+        }
+    };
+
+    function atualizarSaldos(saldos) {
+        const elEfetivado = document.getElementById('saldoEfetivado');
+        const elPago = document.getElementById('saldoPago');
+        const elEsperado = document.getElementById('saldoEsperado');
+
+        elEfetivado.classList.remove('placeholder-glow');
+        elPago.classList.remove('placeholder-glow');
+        elEsperado.classList.remove('placeholder-glow');
+
+        elEfetivado.innerHTML = formatarMoeda(saldos.efetivado);
+        elEfetivado.className = `fw-bold mb-0 ${saldos.efetivado >= 0 ? 'text-success' : 'text-danger'}`;
+
+        elPago.innerHTML = formatarMoeda(saldos.pago);
+        elEsperado.innerHTML = formatarMoeda(saldos.esperado);
     }
 
-    function renderCal(ano, mes) {
-        const grid = document.getElementById('cal-grid');
-        const hojeStr = ds(HOJE_JS);
-        const primeiro = new Date(ano, mes, 1).getDay();
-        const diasMes = new Date(ano, mes + 1, 0).getDate();
-        const diasAnt = new Date(ano, mes, 0).getDate();
-        const total = Math.ceil((primeiro + diasMes) / 7) * 7;
-
+    function renderizarGrelha(ano, mes, transacoes) {
+        const grid = document.getElementById('agenda-grid');
         grid.innerHTML = '';
 
-        for (let i = 0; i < total; i++) {
-            let dia, outro = false,
-                dt;
+        diasSemana.forEach(d => {
+            const hdr = document.createElement('div');
+            hdr.className = 'calendar-day-header';
+            hdr.innerText = d;
+            grid.appendChild(hdr);
+        });
 
-            if (i < primeiro) {
-                dia = diasAnt - primeiro + i + 1;
-                outro = true;
-                dt = new Date(ano, mes - 1, dia);
-            } else if (i >= primeiro + diasMes) {
-                dia = i - primeiro - diasMes + 1;
-                outro = true;
-                dt = new Date(ano, mes + 1, dia);
-            } else {
-                dia = i - primeiro + 1;
-                dt = new Date(ano, mes, dia);
-            }
+        const primeiroDia = new Date(ano, mes, 1).getDay();
+        const totalDias = new Date(ano, mes + 1, 0).getDate();
 
-            const dStr = ds(dt);
-            const ehHoje = dStr === hojeStr;
-            const diaItens = itens.filter(it => (it.data ?? '').slice(0, 10) === dStr);
-            const temAtras = diaItens.some(it => it.urgencia === 'atrasada');
-            const temHoje = diaItens.some(it => it.urgencia === 'hoje');
-            const vazio = diaItens.length === 0;
+        for (let i = 0; i < primeiroDia; i++) {
+            const empty = document.createElement('div');
+            empty.className = 'calendar-day empty';
+            grid.appendChild(empty);
+        }
+
+        for (let dia = 1; dia <= totalDias; dia++) {
+            const dataAtualStr = `${ano}-${String(mes+1).padStart(2,'0')}-${String(dia).padStart(2,'0')}`;
+            const isHoje = (dia === HOJE_JS.getDate() && mes === HOJE_JS.getMonth() && ano === HOJE_JS.getFullYear());
 
             const cel = document.createElement('div');
-            cel.className = [
-                'cal-celula',
-                outro ? 'outro' : '',
-                ehHoje ? 'eh-hoje' : '',
-                temAtras ? 'cel-atrasada' : '',
-                (temHoje && !temAtras) ? 'cel-hoje' : '',
-                (vazio && outro) ? 'vazio' : '',
-            ].filter(Boolean).join(' ');
+            cel.className = `calendar-day ${isHoje ? 'today' : ''}`;
 
-            // Número
-            const numW = document.createElement('div');
-            numW.className = 'num-wrap';
-            const numS = document.createElement('span');
-            numS.className = 'num' + (ehHoje ? ' circulo' : '');
-            numS.textContent = dia;
-            numW.appendChild(numS);
-            cel.appendChild(numW);
+            const num = document.createElement('div');
+            num.className = 'day-number';
+            num.innerText = dia;
+            cel.appendChild(num);
 
-            // Pills de transações
-            diaItens.forEach(item => {
-                const isRec = item.tipo_reg === 'receita';
-                const icon = isRec ? 'bi-arrow-up-short text-success' : 'bi-arrow-down-short text-danger';
-                const pill = document.createElement('div');
+            const eventsDiv = document.createElement('div');
+            eventsDiv.className = 'day-events';
 
-                pill.className = `ev-pill ev-${esc(item.urgencia||'pendente')}`;
-
-                // Badge de parcela
-                let extra = '';
-                if (item.TotalParcelas > 1) {
-                    extra = ` <span style="opacity:.6;font-size:.6rem;">${item.ParcelaAtual}/${item.TotalParcelas}</span>`;
-                } else if (item.Recorrente == 1) {
-                    extra = ` <i class="bi bi-arrow-repeat" style="opacity:.6;font-size:.6rem;"></i>`;
-                }
-
-                pill.innerHTML = `<i class="bi ${icon} flex-shrink-0" style="font-size:.8rem;"></i><span class="ev-nome">${esc(item.titulo)}${extra}</span>`;
-                pill.title = `${item.titulo} — ${brl(item.valor)}${item.categoria ? ' · '+item.categoria : ''}`;
-                pill.onclick = () => window.location.href = `nova_transacao.php?editar=${encodeURIComponent(item.id)}`;
-                cel.appendChild(pill);
+            const tDia = transacoes.filter(t => {
+                const dataLimpa = t.data_evento ? t.data_evento.split(' ')[0] : '';
+                return dataLimpa === dataAtualStr;
             });
 
+            tDia.forEach(t => {
+                const isReceita = t.tipo === 'receita';
+                const isPendente = t.status === 'pendente';
+
+                const pill = document.createElement('div');
+                pill.className = `calendar-event ${isReceita ? 'receita' : 'despesa'} ${isPendente ? 'pendente' : ''}`;
+                pill.title = `${t.titulo} — ${formatarMoeda(t.valor)}`;
+                pill.onclick = () => window.location.href = `nova_transacao.php?editar=${encodeURIComponent(t.id)}`;
+
+                const iconHtml = `<i class="bi ${esc(t.icone)} flex-shrink-0 me-1" style="font-size:0.75rem;"></i>`;
+                const repHtml = (t.Recorrente == 1) ? `<i class="bi bi-arrow-repeat ms-1" style="opacity:0.6;font-size:0.7rem;"></i>` : '';
+                const valHtml = `<span class="event-value">${isReceita ? '+' : '-'} ${formatarMoeda(t.valor)}</span>`;
+                const descHtml = `<span class="event-desc text-truncate w-100 d-inline-block">${esc(t.titulo)} ${repHtml}</span>`;
+
+                pill.innerHTML = `<div class="d-flex align-items-center mb-1">${iconHtml} ${valHtml}</div>${descHtml}`;
+                eventsDiv.appendChild(pill);
+            });
+
+            cel.appendChild(eventsDiv);
             grid.appendChild(cel);
         }
     }
 
-    function mudarMes(d) {
-        mesAtual += d;
-        if (mesAtual > 11) {
-            mesAtual = 0;
-            anoAtual++;
-        }
-        if (mesAtual < 0) {
-            mesAtual = 11;
-            anoAtual--;
-        }
-        carregarMes(anoAtual, mesAtual);
-    }
-
-    function irHoje() {
-        anoAtual = HOJE_JS.getFullYear();
-        mesAtual = HOJE_JS.getMonth();
-        carregarMes(anoAtual, mesAtual);
-    }
-
-    // A mágica acontece aqui: ao invés de chamar carregarMes() (que causava o delay do fetch), 
-    // nós apenas imprimimos o título e renderizamos os dados que o PHP já entregou instantaneamente!
-    document.getElementById('badge-mes-ano').textContent = `${MESES[mesAtual]} ${anoAtual}`;
-    renderCal(anoAtual, mesAtual);
+    document.addEventListener("DOMContentLoaded", () => {
+        window.carregarMes(anoAtual, mesAtual);
+    });
 </script>
 
 <?php require_once 'geral/footer.php'; ?>
