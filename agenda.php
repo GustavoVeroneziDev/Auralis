@@ -253,10 +253,6 @@ require_once 'geral/header.php';
     <div class="d-flex flex-wrap justify-content-between align-items-center mb-4 border-bottom border-secondary-subtle pb-3 gap-3">
 
         <div class="d-flex align-items-center gap-3">
-            <div class="d-flex align-items-center justify-content-center rounded-3 flex-shrink-0"
-                style="width:44px;height:44px;background:rgba(212,175,55,.12);border:1px solid rgba(212,175,55,.25);">
-                <i class="bi bi-calendar3" style="color:var(--accent);font-size:1.25rem;"></i>
-            </div>
             <div>
                 <h2 class="fw-bold text-light mb-0">Agenda Financeira</h2>
                 <span id="badge-mes-ano" class="text-secondary fw-semibold text-uppercase"
@@ -299,7 +295,7 @@ require_once 'geral/header.php';
 
             <a href="nova_transacao.php<?= $carteira_sel ? '?carteira_id=' . urlencode($carteira_sel) : '' ?>"
                 class="btn btn-sm rounded-pill px-4 fw-bold"
-                style="background:linear-gradient(135deg,#d4af37,#AA8C2C);color:#121418;border:none;">
+                style="background:linear-gradient(135deg,##fcba03,#d19a00);color:#121418;border:none;">
                 <i class="bi bi-plus-lg me-1"></i> Nova transação
             </a>
         </div>
@@ -308,7 +304,7 @@ require_once 'geral/header.php';
     <div class="row g-3 mb-4">
         <?php
         $resumo = [
-            ['Efetivado no mês',  $saldo_mes,              $saldo_mes >= 0 ? '#22c55e' : '#f87171', 'bi-check-circle',    ($saldo_mes >= 0 ? '+' : '') . fv($saldo_mes)],
+            ['Saldo Atual',  $saldo_mes,              $saldo_mes >= 0 ? '#22c55e' : '#f87171', 'bi-check-circle',    ($saldo_mes >= 0 ? '+' : '') . fv($saldo_mes)],
             ['A pagar no mês',    (float)$pendentes['pend_desp'], '#f87171',  'bi-hourglass-split', '- ' . fv((float)$pendentes['pend_desp'])],
             ['A receber no mês',  (float)$pendentes['pend_rec'],  '#22c55e',  'bi-clock',           '+ ' . fv((float)$pendentes['pend_rec'])],
         ];
