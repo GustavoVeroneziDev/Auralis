@@ -367,7 +367,7 @@ require_once 'geral/header.php';
 
             <div class="d-flex justify-content-between align-items-center mb-4 border-bottom border-secondary-subtle pb-3">
                 <h2 class="fw-bold text-light mb-0"><?= $id_editar ? 'Editar Transação' : 'Nova Transação' ?></h2>
-                <a href="dashboard.php" class="btn btn-outline-secondary btn-sm">
+                <a href="<?= htmlspecialchars($_GET['voltar'] ?? 'dashboard.php') ?>" class="btn btn-outline-secondary btn-sm">
                     <i class="bi bi-arrow-left me-1"></i> Voltar
                 </a>
             </div>

@@ -191,7 +191,7 @@ require_once 'geral/header.php';
                 </div>
 
                 <!-- Nova transação -->
-                <a href="nova_transacao.php" class="btn btn-gold fw-bold text-dark rounded-pill px-3 d-flex align-items-center gap-2 flex-shrink-0" style="white-space:nowrap;">
+                <a href="nova_transacao.php?voltar=agenda.php" class="btn btn-gold fw-bold text-dark rounded-pill px-3 d-flex align-items-center gap-2 flex-shrink-0" style="white-space:nowrap;">
                     <i class="bi bi-plus-lg"></i> Nova transação
                 </a>
 
@@ -563,7 +563,7 @@ require_once 'geral/header.php';
             `<i class="bi bi-arrow-down-short" style="color:#f87171;font-size:1.15rem;flex-shrink:0;"></i>`;
 
         return `<div class="sidebar-item"
-                     onclick="window.location.href='nova_transacao.php?editar=${encodeURIComponent(item.id)}'">
+                     onclick="window.location.href='nova_transacao.php?voltar=agenda.php&editar=${encodeURIComponent(item.id)}'">
             <div class="d-flex align-items-center gap-2" style="min-width:0;">
                 ${arrow}
                 <div style="min-width:0;">
@@ -659,7 +659,7 @@ require_once 'geral/header.php';
                     const pill = document.createElement('div');
                     pill.className = `calendar-event ${cls}`;
                     pill.title = `${t.titulo} — ${formatarMoeda(t.valor)}`;
-                    pill.onclick = () => window.location.href = `nova_transacao.php?editar=${encodeURIComponent(t.id)}`;
+                    pill.onclick = () => window.location.href = `nova_transacao.php?voltar=agenda.php&editar=${encodeURIComponent(t.id)}`;
 
                     const arrow = isRec ?
                         `<i class="bi bi-arrow-up-short" style="color:#6ee7c7;font-size:0.95rem;flex-shrink:0;line-height:1;"></i>` :
