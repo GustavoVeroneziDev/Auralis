@@ -295,7 +295,7 @@ require_once 'geral/header.php';
 
             <a href="nova_transacao.php<?= $carteira_sel ? '?carteira_id=' . urlencode($carteira_sel) : '' ?>"
                 class="btn btn-sm rounded-pill px-4 fw-bold"
-                style="background:linear-gradient(135deg,##fcba03,#d19a00);color:#121418;border:none;">
+                style="background:linear-gradient(135deg,#fcba03,#d19a00);color:#121418;border:none;">
                 <i class="bi bi-plus-lg me-1"></i> Nova transação
             </a>
         </div>
