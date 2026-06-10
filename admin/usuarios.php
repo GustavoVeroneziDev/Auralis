@@ -242,9 +242,13 @@ require_once '../geral/header.php';
                             <!-- Plano -->
                             <td>
                                 <?php if ($plano === 'vip'): ?>
-                                    <span class="badge rounded-pill" style="background:rgba(212,175,55,0.15);color:#d4af37;border:1px solid rgba(212,175,55,0.4);font-size:0.7rem;padding:4px 9px;">⭐ VIP</span>
+                                    <span class="badge rounded-pill d-inline-flex align-items-center gap-1" style="background:rgba(212,175,55,0.15);color:#d4af37;border:1px solid rgba(212,175,55,0.4);font-size:0.7rem;padding:4px 9px;">
+                                        <i class="fi fi-ss-gem d-flex align-items-center" style="font-size:0.8rem;margin-top:1px;"></i> VIP
+                                    </span>
                                 <?php elseif ($plano === 'pro'): ?>
-                                    <span class="badge rounded-pill" style="background:rgba(124,58,237,0.15);color:#a78bfa;border:1px solid rgba(124,58,237,0.4);font-size:0.7rem;padding:4px 9px;">👑 PRO</span>
+                                    <span class="badge rounded-pill d-inline-flex align-items-center gap-1" style="background:rgba(124,58,237,0.15);color:#a78bfa;border:1px solid rgba(124,58,237,0.4);font-size:0.7rem;padding:4px 9px;">
+                                        <i class="fi fi-br-crown d-flex align-items-center" style="font-size:0.8rem;margin-top:1px;"></i> PRO
+                                    </span>
                                 <?php else: ?>
                                     <span class="text-secondary" style="font-size:0.8rem;">Free</span>
                                 <?php endif; ?>
@@ -378,16 +382,16 @@ require_once '../geral/header.php';
                         <div class="d-flex gap-3">
                             <div class="flex-grow-1">
                                 <input type="radio" class="btn-check" name="plano" id="plano_pro" value="pro" required>
-                                <label class="btn w-100 fw-bold rounded-3 py-2" for="plano_pro"
-                                    style="background:rgba(124,58,237,0.1);color:#a78bfa;border:1px solid rgba(124,58,237,0.4);">
-                                    👑 PRO
+                                <label class="btn-plano w-100 fw-bold rounded-3 py-2 d-flex align-items-center justify-content-center gap-2" for="plano_pro"
+                                    style="background:rgba(124,58,237,0.1);color:#a78bfa;border:1px solid rgba(124,58,237,0.4);cursor:pointer;transition:all .18s ease;">
+                                    <i class="fi fi-br-crown d-flex align-items-center" style="font-size:1.05rem;margin-top:1px;"></i> PRO
                                 </label>
                             </div>
                             <div class="flex-grow-1">
                                 <input type="radio" class="btn-check" name="plano" id="plano_vip" value="vip" required>
-                                <label class="btn w-100 fw-bold rounded-3 py-2" for="plano_vip"
-                                    style="background:rgba(212,175,55,0.1);color:#d4af37;border:1px solid rgba(212,175,55,0.4);">
-                                    ⭐ VIP
+                                <label class="btn-plano w-100 fw-bold rounded-3 py-2 d-flex align-items-center justify-content-center gap-2" for="plano_vip"
+                                    style="background:rgba(212,175,55,0.1);color:#d4af37;border:1px solid rgba(212,175,55,0.4);cursor:pointer;transition:all .18s ease;">
+                                    <i class="fi fi-ss-gem d-flex align-items-center" style="font-size:1.05rem;margin-top:1px;"></i> VIP
                                 </label>
                             </div>
                         </div>
@@ -475,6 +479,21 @@ require_once '../geral/header.php';
 
     .opacity-40 {
         opacity: 0.4;
+    }
+
+    /* Botões de seleção de plano */
+    #plano_pro:checked + .btn-plano {
+        background: rgba(124, 58, 237, 0.28) !important;
+        border-color: #a78bfa !important;
+        box-shadow: 0 0 0 2px rgba(124, 58, 237, 0.35);
+        transform: scale(1.04);
+    }
+
+    #plano_vip:checked + .btn-plano {
+        background: rgba(212, 175, 55, 0.28) !important;
+        border-color: #d4af37 !important;
+        box-shadow: 0 0 0 2px rgba(212, 175, 55, 0.35);
+        transform: scale(1.04);
     }
 </style>
 
