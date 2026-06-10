@@ -134,7 +134,7 @@ require_once 'geral/header.php';
         <div class="d-flex flex-column flex-lg-row justify-content-between align-items-lg-center gap-3">
 
             <h2 class="fw-bold text-light mb-0 d-flex align-items-center gap-2" style="font-size: clamp(1.2rem, 3vw, 1.5rem);">
-                <i class="bi bi-calendar3" style="color: #AA8C2C !important;"></i> Agenda Financeira
+                Agenda Financeira
             </h2>
 
             <div class="d-flex align-items-center gap-3 w-100 w-lg-auto">
@@ -185,50 +185,6 @@ require_once 'geral/header.php';
                     <button type="button" class="btn btn-sm btn-outline-secondary rounded-pill ms-1 px-3" style="font-size: 0.75rem;" onclick="window.irHoje()">Hoje</button>
                 </div>
 
-            </div>
-        </div>
-    </div>
-
-    <div class="row g-4 mb-4">
-        <div class="col-md-4">
-            <div class="card bg-body-tertiary border-secondary-subtle shadow-sm rounded-4 h-100">
-                <div class="card-body p-4 d-flex align-items-center">
-                    <div class="rounded-circle me-3 d-flex justify-content-center align-items-center flex-shrink-0" style="width: 60px; height: 60px; background-color: rgba(6, 214, 160, 0.1);">
-                        <i class="bi bi-cash-coin text-success fs-2"></i>
-                    </div>
-                    <div>
-                        <p class="text-secondary small mb-1 text-uppercase fw-bold" style="letter-spacing: 0.05em;">Saldo Efetivado</p>
-                        <h3 id="saldoEfetivado" class="fw-bold mb-0 text-light placeholder-glow"><span class="placeholder col-8"></span></h3>
-                    </div>
-                </div>
-            </div>
-        </div>
-
-        <div class="col-md-4">
-            <div class="card bg-body-tertiary border-secondary-subtle shadow-sm rounded-4 h-100">
-                <div class="card-body p-4 d-flex align-items-center">
-                    <div class="rounded-circle me-3 d-flex justify-content-center align-items-center flex-shrink-0" style="width: 60px; height: 60px; background-color: rgba(230, 57, 70, 0.1);">
-                        <i class="bi bi-credit-card text-danger fs-2"></i>
-                    </div>
-                    <div>
-                        <p class="text-secondary small mb-1 text-uppercase fw-bold" style="letter-spacing: 0.05em;">Total Pago</p>
-                        <h3 id="saldoPago" class="fw-bold text-light mb-0 placeholder-glow"><span class="placeholder col-8"></span></h3>
-                    </div>
-                </div>
-            </div>
-        </div>
-
-        <div class="col-md-4">
-            <div class="card bg-body-tertiary border-secondary-subtle shadow-sm rounded-4 h-100">
-                <div class="card-body p-4 d-flex align-items-center">
-                    <div class="rounded-circle me-3 d-flex justify-content-center align-items-center flex-shrink-0" style="width: 60px; height: 60px; background-color: rgba(212, 175, 55, 0.1); border: 1px solid rgba(212, 175, 55, 0.25);">
-                        <i class="bi bi-hourglass-split text-warning fs-2" style="color: #D4AF37 !important;"></i>
-                    </div>
-                    <div>
-                        <p class="text-secondary small mb-1 text-uppercase fw-bold" style="letter-spacing: 0.05em;">Saldo Esperado</p>
-                        <h3 id="saldoEsperado" class="fw-bold mb-0 placeholder-glow" style="color: #FFB800;"><span class="placeholder col-8"></span></h3>
-                    </div>
-                </div>
             </div>
         </div>
     </div>
