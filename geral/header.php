@@ -74,6 +74,14 @@ $paginaAtual = basename($_SERVER['PHP_SELF']);
                                 <i class="bi bi-star me-2"></i> Planos
                             </a>
                         </li>
+                        <?php if (in_array(strtolower($_SESSION['nivel_acesso'] ?? ''), ['admin', 'supremo'])): ?>
+                        <li class="nav-item">
+                            <a class="nav-link custom-link py-3 py-lg-2 <?php echo ($paginaAtual == 'usuarios.php') ? 'text-warning active' : ''; ?>" href="/admin/usuarios.php">
+                                <i class="bi bi-shield-fill-check me-2" style="color:#E63946;"></i>
+                                <span style="color:#E63946;">Admin</span>
+                            </a>
+                        </li>
+                        <?php endif; ?>
                     <?php else: ?>
                         <li class="nav-item">
                             <a class="nav-link custom-link py-3 py-lg-2" href="/geral/index.php">Início</a>
