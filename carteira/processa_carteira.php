@@ -6,13 +6,7 @@ if (!isset($_SESSION['usuario_id'])) {
 }
 
 require_once '../config/conexao.php';
-
-if (!function_exists('gerarUuid')) {
-    function gerarUuid()
-    {
-        return sprintf('%04x%04x-%04x-%04x-%04x-%04x%04x%04x', mt_rand(0, 0xffff), mt_rand(0, 0xffff), mt_rand(0, 0xffff), mt_rand(0, 0x0fff) | 0x4000, mt_rand(0, 0x3fff) | 0x8000, mt_rand(0, 0xffff), mt_rand(0, 0xffff), mt_rand(0, 0xffff));
-    }
-}
+require_once '../config/funcoes.php';
 
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
@@ -55,7 +49,17 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
             header("Location: listar_carteiras.php?sucesso=editada");
         } else {
-            // Criação
+            // Criação — verificar limite do plano
+            $limites = limitesDoPlano();
+            if ($limites['carteiras'] !== PHP_INT_MAX) {
+                $stmtCount = $pdo->prepare("SELECT COUNT(*) FROM Carteira WHERE FKUsuarioDono = :uid");
+                $stmtCount->execute([':uid' => $usuarioId]);
+                if ($stmtCount->fetchColumn() >= $limites['carteiras']) {
+                    header("Location: listar_carteiras.php?erro=limite_plano");
+                    exit;
+                }
+            }
+
             $sql = "INSERT INTO Carteira (IDCarteira, TipoCarteira, FKUsuarioDono) VALUES (:idCarteira, :tipoCarteira, :usuarioId)";
             $stmt = $pdo->prepare($sql);
             $stmt->execute([':idCarteira' => gerarUuid(), ':tipoCarteira' => $tipoCarteira, ':usuarioId' => $usuarioId]);

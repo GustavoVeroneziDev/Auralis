@@ -90,6 +90,7 @@ if (isset($_GET['erro'])) {
     if ($_GET['erro'] === 'duplicada') $erro = "Já existe uma carteira com este nome exato.";
     if ($_GET['erro'] === 'vazio') $erro = "O nome da carteira não pode ficar vazio.";
     if ($_GET['erro'] === 'banco') $erro = "Ocorreu um erro interno ao salvar a carteira.";
+    if ($_GET['erro'] === 'limite_plano') $erro = "Seu plano não permite criar mais carteiras. Faça upgrade para adicionar mais.";
 }
 
 // --- BUSCA AS CARTEIRAS E CALCULA O SALDO DE CADA UMA ---

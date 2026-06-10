@@ -1,23 +1,19 @@
 <?php
-ini_set('display_errors', '1');
-error_reporting(E_ALL);
 // ==============================================================================
 // 1. LÓGICA PHP (Processamento de Dados)
 // ==============================================================================
+if ($_SERVER['HTTP_HOST'] === 'localhost' || $_SERVER['HTTP_HOST'] === '127.0.0.1') {
+    ini_set('display_errors', 1);
+    ini_set('display_startup_errors', 1);
+    error_reporting(E_ALL);
+}
 session_start();
 if (!isset($_SESSION['usuario_id'])) {
     header("Location: usuario/login.php");
     exit;
 }
 require_once 'config/conexao.php';
-
-// Função auxiliar para gerar UUID no padrão MySQL
-if (!function_exists('gerarUuid')) {
-    function gerarUuid()
-    {
-        return sprintf('%04x%04x-%04x-%04x-%04x-%04x%04x%04x', mt_rand(0, 0xffff), mt_rand(0, 0xffff), mt_rand(0, 0xffff), mt_rand(0, 0x0fff) | 0x4000, mt_rand(0, 0x3fff) | 0x8000, mt_rand(0, 0xffff), mt_rand(0, 0xffff), mt_rand(0, 0xffff));
-    }
-}
+require_once 'config/funcoes.php';
 
 $usuario_id = $_SESSION['usuario_id'];
 $sucesso = null;

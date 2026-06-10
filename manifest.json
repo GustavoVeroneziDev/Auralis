@@ -1,19 +1,20 @@
 {
-  "name": "Nome Completo do Seu App",
-  "short_name": "Nome Curto",
-  "description": "Descrição do seu aplicativo",
-  "start_url": "/",
-  "display": "standalone", 
+  "name": "Auralis - Gestão Financeira",
+  "short_name": "Auralis",
+  "description": "Gerencie suas finanças pessoais e familiares de forma simples, segura e inteligente.",
+  "start_url": "/dashboard.php",
+  "display": "standalone",
   "background_color": "#121418",
-  "theme_color": "#ca8a04",
+  "theme_color": "#d4af37",
+  "lang": "pt-BR",
   "icons": [
     {
-      "src": "/caminho/para/seu/icone-192x192.png",
+      "src": "/geral/img/iconeAuralis-FundoPreto.png",
       "sizes": "192x192",
       "type": "image/png"
     },
     {
-      "src": "/caminho/para/seu/icone-512x512.png",
+      "src": "/geral/img/iconeAuralis-FundoPreto.png",
       "sizes": "512x512",
       "type": "image/png"
     }

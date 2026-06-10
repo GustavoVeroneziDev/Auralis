@@ -4,6 +4,7 @@ session_start();
 
 // 2. Puxa a conexão com o banco
 require_once '../config/conexao.php';
+require_once '../config/funcoes.php';
 
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $email = trim($_POST['email']);
@@ -44,8 +45,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             $_SESSION['plano'] = strtolower($usuario['Plano'] ?? 'free');
 
             if ($lembrar_me) {
-                $chave_secreta = "Auralis2026_UltraSecretKey";
-                $assinatura = hash_hmac('sha256', $usuario['IDUsuario'], $chave_secreta);
+                $assinatura = hash_hmac('sha256', $usuario['IDUsuario'], AURALIS_COOKIE_SECRET);
                 $conteudo_cookie = $usuario['IDUsuario'] . ':' . $assinatura;
                 // Cookie válido por 30 dias
                 setcookie('auralis_remember', $conteudo_cookie, time() + (86400 * 30), "/");
