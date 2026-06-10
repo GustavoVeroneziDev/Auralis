@@ -12,7 +12,7 @@ require_once 'config/conexao.php';
 $usuario_id = $_SESSION['usuario_id'];
 
 // --- LÓGICA DE NAVEGAÇÃO DE TEMPO ---
-$mes_atual = isset($_GET['mes']) ? (int) $_GET['GET']['mes'] : (int) date('m');
+$mes_atual = isset($_GET['mes']) ? (int) $_GET['mes'] : (int) date('m');
 $ano_atual = isset($_GET['ano']) ? (int) $_GET['ano'] : (int) date('Y');
 
 $mes_ant = $mes_atual - 1;
@@ -46,7 +46,7 @@ $meses_pt = [
 $nome_mes = $meses_pt[$mes_atual];
 
 // ==============================================================================
-// LÓGICA DO SELETOR DE CARTEIRAS (Capacidade igual ao Dashboard + Opção "Todas")
+// LÓGICA DO SELETOR DE CARTEIRAS (Capacidade do Dashboard + Opção "Todas")
 // ==============================================================================
 $carteiras = [];
 try {
@@ -55,10 +55,8 @@ try {
     $stmtCart->execute([':usuario_id' => $usuario_id]);
     $carteiras = $stmtCart->fetchAll();
 } catch (PDOException $e) {
-    // Tratamento de exceção silencioso para manter estabilidade da UI
 }
 
-// Descobre a carteira pela URL. Se não definida ou for 'todas', assume Visão Geral.
 $carteira_selecionada = $_GET['carteira'] ?? 'todas';
 
 $nome_carteira_atual = 'Todas as Carteiras';
@@ -71,7 +69,6 @@ if ($carteira_selecionada !== 'todas') {
     }
 }
 
-// Mantém os parâmetros de estado da navegação temporal e de carteira nos links
 $link_ant  = "?mes={$mes_ant}&ano={$ano_ant}&carteira={$carteira_selecionada}";
 $link_prox = "?mes={$mes_prox}&ano={$ano_prox}&carteira={$carteira_selecionada}";
 
@@ -85,7 +82,6 @@ $totalReceitasPendentes   = 0;
 $totalDespesasPendentes   = 0;
 
 try {
-    // Montagem dinâmica da query respeitando o filtro de escopo de carteiras
     $sqlAgenda = "
         SELECT r.*, 
                COALESCE(c.NomeCategoria, 'Sem Categoria') as Categoria,
@@ -108,13 +104,12 @@ try {
         $params[':carteira_id'] = $carteira_selecionada;
     }
 
-    $sqlAgenda .= " ORDER BY r.MomentoRegistro ASC";
+    $sqlAgenda .= " ORDER BY r.MomentoRegistro ASC, r.TipoRegistro DESC";
 
     $stmtAgenda = $pdo->prepare($sqlAgenda);
     $stmtAgenda->execute($params);
     $transacoes = $stmtAgenda->fetchAll(PDO::FETCH_ASSOC);
 
-    // Processamento aritmético idêntico ao motor lógico do Dashboard
     foreach ($transacoes as $t) {
         $valor = (float)$t['Valor'];
         if ($t['TipoRegistro'] === 'receita') {
@@ -132,13 +127,21 @@ try {
         }
     }
 } catch (PDOException $e) {
-    // Evita crash na interface em caso de falha de banco de dados
 }
 
-// Computação final das métricas de exibição
 $saldo_efetivado = $totalReceitasEfetivadas - $totalDespesasEfetivadas;
 $total_pago      = $totalDespesasEfetivadas;
 $saldo_esperado  = ($totalReceitasEfetivadas + $totalReceitasPendentes) - ($totalDespesasEfetivadas + $totalDespesasPendentes);
+
+// --- ESTRUTURAÇÃO DOS DIAS PARA A GRELHA DO CALENDÁRIO ---
+$num_dias_mes = date('t', mktime(0, 0, 0, $mes_atual, 1, $ano_atual));
+$primeiro_dia_semana = date('w', mktime(0, 0, 0, $mes_atual, 1, $ano_atual));
+
+$transacoes_por_dia = [];
+foreach ($transacoes as $t) {
+    $dia = (int)date('d', strtotime($t['MomentoRegistro']));
+    $transacoes_por_dia[$dia][] = $t;
+}
 
 require_once 'geral/header.php';
 ?>
@@ -168,7 +171,7 @@ require_once 'geral/header.php';
                     </button>
 
                     <ul class="dropdown-menu dropdown-menu-dark shadow-lg border-secondary-subtle mt-2 w-100" style="background-color: #1a1d21; min-width: 220px;">
-                        <li class="px-3 py-1 text-secondary small text-uppercase fw-bold tracking-wide">Filtrar Escopo</li>
+                        <li class="px-3 py-1 text-secondary small text-uppercase fw-bold tracking-wide">Filtrar Carteira</li>
                         <li>
                             <hr class="dropdown-divider border-secondary-subtle">
                         </li>
@@ -177,7 +180,7 @@ require_once 'geral/header.php';
                                 href="?mes=<?php echo $mes_atual ?>&ano=<?php echo $ano_atual ?>&carteira=todas">
                                 <?php if ($carteira_selecionada === 'todas'): ?>
                                     <i class="bi bi-check-circle-fill me-2 flex-shrink-0" style="color: #AA8C2C;"></i>
-                                    <span class="fw-bold text-truncate" style="color: #AA8C2C;">Todas as Carteiras</span>
+                                    <span class="fw-bold text-truncate" style="color: #AA8C2C;">Todas las Carteiras</span>
                                 <?php else: ?>
                                     <i class="bi bi-circle me-2 flex-shrink-0 text-secondary opacity-50"></i>
                                     <span class="text-light text-truncate">Todas as Carteiras</span>
@@ -229,7 +232,6 @@ require_once 'geral/header.php';
     </div>
 
     <div class="row g-4 mb-5">
-
         <div class="col-md-4">
             <div class="card bg-body-tertiary border-secondary-subtle shadow-sm rounded-4">
                 <div class="card-body p-4 d-flex align-items-center">
@@ -280,67 +282,185 @@ require_once 'geral/header.php';
                 </div>
             </div>
         </div>
-
     </div>
 
-    <div class="card bg-dark border-secondary-subtle shadow-sm rounded-4 p-4">
-        <h5 class="text-light fw-bold mb-4"><i class="bi bi-list-stars text-secondary me-2"></i> Fluxo de Lançamentos para o Período</h5>
+    <div class="card bg-dark border-secondary-subtle shadow-sm rounded-4 p-4 mb-4">
+        <div class="d-flex justify-content-between align-items-center mb-4">
+            <h5 class="text-light fw-bold mb-0">
+                <i class="bi bi-grid-3x3-gap text-secondary me-2"></i> Fluxo Mensal Detalhado
+            </h5>
+            <div class="d-flex gap-3 text-secondary small align-items-center">
+                <div><span class="badge bg-success-subtle border border-success-subtle rounded-circle p-1 me-1"></span> Receita</div>
+                <div><span class="badge bg-danger-subtle border border-danger-subtle rounded-circle p-1 me-1"></span> Despesa</div>
+                <div><span class="badge border border-warning rounded-circle p-1 me-1" style="background: #FFB800;"></span> Pendente</div>
+            </div>
+        </div>
 
-        <?php if (empty($transacoes)): ?>
-            <div class="text-center py-5 text-secondary">
-                <i class="bi bi-calendar-x fs-1 mb-3 d-block opacity-50"></i>
-                Nenhum lançamento registrado ou agendado para este período.
-            </div>
-        <?php else: ?>
-            <div class="table-responsive">
-                <table class="table table-dark table-hover align-middle mb-0">
-                    <thead>
-                        <tr class="text-secondary small text-uppercase" style="font-size: 0.75rem;">
-                            <th class="ps-4">Data</th>
-                            <th>Descrição</th>
-                            <th>Categoria</th>
-                            <th>Status</th>
-                            <th class="text-end pe-4">Valor</th>
-                        </tr>
-                    </thead>
-                    <tbody>
-                        <?php foreach ($transacoes as $t):
-                            $dateObj = new DateTime($t['MomentoRegistro']);
-                            $isReceita = $t['TipoRegistro'] === 'receita';
-                            $isEfetivado = $t['StatusRegistro'] === 'efetivado';
-                        ?>
-                            <tr>
-                                <td class="ps-4 fw-semibold text-secondary" style="font-size: 0.875rem;">
-                                    <?php echo $dateObj->format('d/m/Y'); ?>
-                                </td>
-                                <td>
-                                    <span class="text-light fw-bold" style="font-size: 0.9rem;"><?php echo htmlspecialchars($t['Descricao']); ?></span>
-                                </td>
-                                <td>
-                                    <div class="d-flex align-items-center gap-2">
-                                        <i class="bi <?php echo htmlspecialchars($t['Icone']); ?> text-secondary"></i>
-                                        <span class="text-light-analysis small"><?php echo htmlspecialchars($t['Categoria']); ?></span>
-                                    </div>
-                                </td>
-                                <td>
-                                    <?php if ($isEfetivado): ?>
-                                        <span class="badge bg-success bg-opacity-10 text-success rounded-pill px-2 py-1" style="font-size: 0.7rem;">Efetivado</span>
-                                    <?php else: ?>
-                                        <span class="badge bg-warning bg-opacity-10 text-warning rounded-pill px-2 py-1" style="font-size: 0.7rem;">Pendente</span>
-                                    <?php endif; ?>
-                                </td>
-                                <td class="text-end pe-4 fw-bold <?php echo $isReceita ? 'text-success' : 'text-danger'; ?>" style="font-size: 0.95rem;">
-                                    <?php echo $isReceita ? '+' : '-'; ?> R$ <?php echo number_format($t['Valor'], 2, ',', '.'); ?>
-                                </td>
-                            </tr>
-                        <?php endforeach; ?>
-                    </tbody>
-                </table>
-            </div>
-        <?php endif; ?>
+        <div class="calendar-grid">
+            <?php
+            $dias_semana = ['Dom', 'Seg', 'Ter', 'Qua', 'Qui', 'Sex', 'Sáb'];
+            foreach ($dias_semana as $ds) {
+                echo "<div class='calendar-day-header'>$ds</div>";
+            }
+
+            for ($i = 0; $i < $primeiro_dia_semana; $i++) {
+                echo "<div class='calendar-day empty'></div>";
+            }
+
+            $hoje_dia = (int)date('d');
+            $hoje_mes = (int)date('m');
+            $hoje_ano = (int)date('Y');
+
+            for ($dia = 1; $dia <= $num_dias_mes; $dia++) {
+                $isToday = ($dia == $hoje_dia && $mes_atual == $hoje_mes && $ano_atual == $hoje_ano) ? 'today' : '';
+                echo "<div class='calendar-day $isToday'>";
+                echo "<div class='day-number'>$dia</div>";
+                echo "<div class='day-events'>";
+
+                if (isset($transacoes_por_dia[$dia])) {
+                    foreach ($transacoes_por_dia[$dia] as $t) {
+                        $classe_tipo = $t['TipoRegistro'] === 'receita' ? 'receita' : 'despesa';
+                        $classe_status = $t['StatusRegistro'] === 'pendente' ? 'pendente' : '';
+                        $sinal = $t['TipoRegistro'] === 'receita' ? '+' : '-';
+                        $valFmt = number_format($t['Valor'], 2, ',', '.');
+                        $descEscaped = htmlspecialchars($t['Descricao']);
+
+                        echo "<div class='calendar-event {$classe_tipo} {$classe_status}' title='{$descEscaped}: R$ {$valFmt}'>";
+                        echo "<span class='event-value'>{$sinal} R$ {$valFmt}</span>";
+                        echo "<span class='event-desc'>{$descEscaped}</span>";
+                        echo "</div>";
+                    }
+                }
+
+                echo "</div>";
+                echo "</div>";
+            }
+            ?>
+        </div>
     </div>
 
 </main>
+
+<style>
+    .calendar-grid {
+        display: grid;
+        grid-template-columns: repeat(7, 1fr);
+        gap: 1px;
+        background-color: #333333;
+        border: 1px solid #333333;
+        border-radius: 12px;
+        overflow: hidden;
+    }
+
+    .calendar-day-header {
+        background-color: #1a1d21;
+        color: #AA8C2C;
+        text-align: center;
+        padding: 12px 8px;
+        font-weight: 700;
+        font-size: 0.8rem;
+        text-transform: uppercase;
+        letter-spacing: 0.05em;
+    }
+
+    .calendar-day {
+        background-color: #1c1f24;
+        min-height: 125px;
+        padding: 8px;
+        display: flex;
+        flex-direction: column;
+        position: relative;
+        transition: background-color 0.2s ease;
+    }
+
+    .calendar-day:hover:not(.empty) {
+        background-color: #21252b;
+    }
+
+    .calendar-day.empty {
+        background-color: #15171a;
+        opacity: 0.4;
+    }
+
+    .calendar-day.today {
+        background-color: rgba(170, 140, 44, 0.04);
+        box-shadow: inset 0 0 0 1px #AA8C2C;
+    }
+
+    .calendar-day.today .day-number {
+        background-color: #AA8C2C;
+        color: #121418;
+        border-radius: 50%;
+        width: 22px;
+        height: 22px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+    }
+
+    .day-number {
+        font-weight: 700;
+        font-size: 0.85rem;
+        color: #888888;
+        margin-bottom: 6px;
+    }
+
+    .day-events {
+        display: flex;
+        flex-direction: column;
+        gap: 4px;
+        overflow-y: auto;
+        flex-grow: 1;
+        max-height: 90px;
+        padding-right: 2px;
+    }
+
+    .day-events::-webkit-scrollbar {
+        width: 3px;
+    }
+
+    .day-events::-webkit-scrollbar-thumb {
+        background-color: #444;
+        border-radius: 10px;
+    }
+
+    .calendar-event {
+        font-size: 0.72rem;
+        padding: 3px 6px;
+        border-radius: 6px;
+        display: flex;
+        flex-direction: column;
+        line-height: 1.2;
+        font-weight: 600;
+    }
+
+    .calendar-event.receita {
+        background-color: rgba(6, 214, 160, 0.1);
+        color: #06D6A0;
+    }
+
+    .calendar-event.despesa {
+        background-color: rgba(230, 57, 70, 0.1);
+        color: #E63946;
+    }
+
+    .calendar-event.pendente {
+        border-left: 3px solid #FFB800;
+    }
+
+    .event-value {
+        font-family: 'Inter', sans-serif;
+        font-weight: 700;
+    }
+
+    .event-desc {
+        opacity: 0.75;
+        font-weight: 500;
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
+    }
+</style>
 
 <div class="modal fade" id="modalSeletorMes" tabindex="-1" aria-hidden="true">
     <div class="modal-dialog modal-dialog-centered modal-sm">
@@ -352,7 +472,6 @@ require_once 'geral/header.php';
                 <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
             </div>
             <div class="modal-body p-4 text-center">
-
                 <div class="d-flex justify-content-between align-items-center mb-4 rounded-pill p-2 border border-secondary-subtle mx-auto" style="max-width: 220px; background-color: #222222;">
                     <button type="button" class="btn btn-sm btn-link text-secondary shadow-none px-3" onclick="mudarAnoModal(-1)">
                         <i class="bi bi-chevron-left fs-5"></i>
@@ -363,7 +482,6 @@ require_once 'geral/header.php';
                         <i class="bi bi-chevron-right fs-5"></i>
                     </button>
                 </div>
-
                 <div class="row g-2">
                     <?php
                     $mesesAbrev = [1 => 'Jan', 2 => 'Fev', 3 => 'Mar', 4 => 'Abr', 5 => 'Mai', 6 => 'Jun', 7 => 'Jul', 8 => 'Ago', 9 => 'Set', 10 => 'Out', 11 => 'Nov', 12 => 'Dez'];
@@ -383,7 +501,6 @@ require_once 'geral/header.php';
                         </div>
                     <?php endforeach; ?>
                 </div>
-
             </div>
         </div>
     </div>
