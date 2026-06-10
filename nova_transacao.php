@@ -184,11 +184,11 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 $jurosPorParcela = null;
 
                 // 1. VERIFICAÇÃO DE ACESSO (PRO, VIP OU TESTE)
-                $planoUsuarioLogado = strtolower($_SESSION['plano'] ?? 'free');
+                $planoUsuarioLogado  = strtolower($_SESSION['plano'] ?? 'free');
                 $horasTesteRestantes = function_exists('obterHorasRestantesTeste') ? obterHorasRestantesTeste() : 0;
                 $acessoLiberadoJuros = ($planoUsuarioLogado === 'pro' || $planoUsuarioLogado === 'vip' || $horasTesteRestantes > 0);
 
-                // 2. LÓGICA DE JUROS (COM TRAVA DE SEGURANÇA)
+                // 2. LÓGICA DE JUROS (COM TRAVA DE SEGURANÇA) — só calcula; não insere ainda
                 if ($acessoLiberadoJuros && isset($_POST['tipo_juros']) && $_POST['tipo_juros'] === 'com') {
                     $valJurosLimpo = preg_replace('/[^\d.,]/', '', $_POST['valor_parcela_juros'] ?? '0');
                     if (strpos($valJurosLimpo, ',') !== false) {
@@ -213,63 +213,61 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                     }
                 }
 
-                // Se a validação de juros gerou um erro, interrompe o bloco de inserção
-                if ($erro) {
-                    goto fim_processamento;
-                }
-
-                $valorParcela = floor(($valor / $numParcelas) * 100) / 100;
-                $resto        = $valor - ($valorParcela * $numParcelas);
-
-                // Divide o juros total pelo número de parcelas para salvar em cada linha
-                if ($valorJurosTotal > 0) {
-                    $jurosPorParcela = round($valorJurosTotal / $numParcelas, 2);
-                }
-
-                $sqlParcela = "
-                    INSERT INTO Registro (
-                        IDRegistro, TipoRegistro, Valor, ValorJuros, Descricao, MomentoRegistro, DataVencimento,
-                        StatusRegistro, Recorrente, DiaVencimento, FKCarteira, FKUsuario, FKCategoria,
-                        GrupoParcela, ParcelaAtual, TotalParcelas
-                    ) VALUES (
-                        :id, :tipo, :valor, :juros, :descricao, :momento, :vencimento,
-                        :status, 0, NULL, :carteira, :usuario, :categoria,
-                        :grupo, :parc_atual, :tot_parc
-                    )
-                ";
-                $stmtP = $pdo->prepare($sqlParcela);
-
-                for ($i = 0; $i < $numParcelas; $i++) {
-                    $mesAlvo = (int)$dataBase->format('m') + $i;
-                    $anoAlvo = (int)$dataBase->format('Y') + floor(($mesAlvo - 1) / 12);
-                    $mesAlvo = (($mesAlvo - 1) % 12) + 1;
-                    $diaAlvo = (int)$dataBase->format('d');
-                    $diaCorreto = min($diaAlvo, date('t', strtotime(sprintf('%04d-%02d-01', $anoAlvo, $mesAlvo))));
-                    $dataStr = sprintf('%04d-%02d-%02d', $anoAlvo, $mesAlvo, $diaCorreto);
-
-                    $valAtual = ($i === 0) ? ($valorParcela + $resto) : $valorParcela;
-                    $statusP  = ($i === 0) ? $statusRegistro : 'pendente';
-
-                    $stmtP->execute([
-                        ':id'         => gerarUuid(),
-                        ':tipo'      => $tipoRegistro,
-                        ':valor'      => $valAtual,
-                        ':juros'     => $jurosPorParcela,
-                        ':descricao'  => $descricao,
-                        ':momento'   => $dataStr,
-                        ':vencimento' => $dataStr,
-                        ':status'    => $statusP,
-                        ':carteira'   => $carteiraId,
-                        ':usuario'   => $usuario_id,
-                        ':categoria'  => $categoriaId,
-                        ':grupo'     => $grupoParcela,
-                        ':parc_atual' => ($i + 1),
-                        ':tot_parc'  => $numParcelas
-                    ]);
-                }
-                fim_processamento:
+                // 3. Se a validação de juros gerou um erro, não insere nada — cai no bloco de exibição de erro
                 if (!$erro) {
+                    $valorParcela = floor(($valor / $numParcelas) * 100) / 100;
+                    $resto        = $valor - ($valorParcela * $numParcelas);
+
+                    // Divide o juros total pelo número de parcelas para salvar em cada linha
+                    if ($valorJurosTotal > 0) {
+                        $jurosPorParcela = round($valorJurosTotal / $numParcelas, 2);
+                    }
+
+                    // 4. INSERT parcelado — usa ValorJuros (requer ALTER TABLE, ver migration abaixo)
+                    $sqlParcela = "
+                        INSERT INTO Registro (
+                            IDRegistro, TipoRegistro, Valor, ValorJuros, Descricao, MomentoRegistro, DataVencimento,
+                            StatusRegistro, Recorrente, DiaVencimento, FKCarteira, FKUsuario, FKCategoria,
+                            GrupoParcela, ParcelaAtual, TotalParcelas
+                        ) VALUES (
+                            :id, :tipo, :valor, :juros, :descricao, :momento, :vencimento,
+                            :status, 0, NULL, :carteira, :usuario, :categoria,
+                            :grupo, :parc_atual, :tot_parc
+                        )
+                    ";
+                    $stmtP = $pdo->prepare($sqlParcela);
+
+                    for ($i = 0; $i < $numParcelas; $i++) {
+                        $mesAlvo    = (int)$dataBase->format('m') + $i;
+                        $anoAlvo    = (int)$dataBase->format('Y') + (int)floor(($mesAlvo - 1) / 12);
+                        $mesAlvo    = (($mesAlvo - 1) % 12) + 1;
+                        $diaAlvo    = (int)$dataBase->format('d');
+                        $diaCorreto = min($diaAlvo, (int)date('t', strtotime(sprintf('%04d-%02d-01', $anoAlvo, $mesAlvo))));
+                        $dataStr    = sprintf('%04d-%02d-%02d', $anoAlvo, $mesAlvo, $diaCorreto);
+
+                        $valAtual = ($i === 0) ? ($valorParcela + $resto) : $valorParcela;
+                        $statusP  = ($i === 0) ? $statusRegistro : 'pendente';
+
+                        $stmtP->execute([
+                            ':id'        => gerarUuid(),
+                            ':tipo'      => $tipoRegistro,
+                            ':valor'     => $valAtual,
+                            ':juros'     => $jurosPorParcela,
+                            ':descricao' => $descricao,
+                            ':momento'   => $dataStr,
+                            ':vencimento' => $dataStr,
+                            ':status'    => $statusP,
+                            ':carteira'  => $carteiraId,
+                            ':usuario'   => $usuario_id,
+                            ':categoria' => $categoriaId,
+                            ':grupo'     => $grupoParcela,
+                            ':parc_atual' => ($i + 1),
+                            ':tot_parc'  => $numParcelas,
+                        ]);
+                    }
+
                     header("Location: dashboard.php?sucesso=parcelado&parcelas={$numParcelas}");
+                    exit;
                 }
             } elseif ($recorrente) {
                 // ── CRIAÇÃO RECORRENTE (Fix NULL e Pulo de Mês) ──────────────
