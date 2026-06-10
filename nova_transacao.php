@@ -348,13 +348,20 @@ $val_valor  = $_POST['valor'] ?? ($transacao_edit ? $transacao_edit['Valor'] : '
 $val_desc   = $_POST['descricao'] ?? ($transacao_edit ? $transacao_edit['Descricao'] : '');
 $val_data   = $_POST['data_registro'] ?? ($transacao_edit ? date('Y-m-d', strtotime($transacao_edit['MomentoRegistro'])) : date('Y-m-d'));
 $val_status = $_POST['status_registro'] ?? ($transacao_edit ? $transacao_edit['StatusRegistro'] : 'efetivado');
+
 $val_cart   = $_POST['carteira_id'] ?? ($transacao_edit ? $transacao_edit['FKCarteira'] : ($_GET['carteira_id'] ?? ''));
+// Se só tiver 1 carteira, já seleciona ela automaticamente (tanto na criação quanto na edição)
+if (empty($val_cart) && count($carteiras) === 1) {
+    $val_cart = $carteiras[0]['IDCarteira'];
+}
+
 $val_cat    = $_POST['categoria_id'] ?? ($transacao_edit ? $transacao_edit['FKCategoria'] : '');
 $val_venc   = $_POST['data_vencimento'] ?? ($transacao_edit ? $transacao_edit['DataVencimento'] : '');
 $val_rec    = isset($_POST['recorrente']) ? true : ($transacao_edit ? $transacao_edit['Recorrente'] : false);
 $val_dia        = $_POST['dia_vencimento'] ?? ($transacao_edit ? $transacao_edit['DiaVencimento'] : '');
 $val_parcelado  = isset($_POST['parcelado']) ? true : false;
 $val_num_parc   = $_POST['num_parcelas'] ?? 2;
+
 // Na edição, parcelamento não está disponível para evitar inconsistências
 $is_edicao      = !empty($id_editar);
 
