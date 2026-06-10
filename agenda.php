@@ -156,7 +156,7 @@ require_once 'geral/header.php';
 
                         <li>
                             <a class="dropdown-item d-flex align-items-center py-2 transition-hover <?php echo $carteira_selecionada === 'todas' ? 'active' : '' ?>" href="?carteira=todas">
-                                <i class="bi <?php echo $carteira_selecionada === 'todas' ? 'bi-check-circle-fill' : 'bi-circle'; ?> me-2 flex-shrink-0" style="color: <?php echo $carteira_selecionada === 'todas' ? '#AA8C2C' : 'rgba(255,255,255,0.5)'; ?>"></i>
+                                <i class="bi <?php echo $carteira_selecionada === 'todas' ? 'bi-check-circle-fill' : 'bi-circle'; ?> me-2 flex-shrink-0" style="color: <?php echo $carteira_selecionada === 'todas' ? '#ffffff' : 'rgba(255,255,255,0.5)'; ?>"></i>
                                 <span class="<?php echo $carteira_selecionada === 'todas' ? 'fw-bold' : ''; ?>" style="color: <?php echo $carteira_selecionada === 'todas' ? '#AA8C2C' : 'inherit'; ?>">Todas as Carteiras</span>
                             </a>
                         </li>
@@ -164,8 +164,8 @@ require_once 'geral/header.php';
                         <?php foreach ($carteiras as $cart): ?>
                             <li>
                                 <a class="dropdown-item d-flex align-items-center py-2 transition-hover <?php echo $carteira_selecionada == $cart['IDCarteira'] ? 'active' : '' ?>" href="?carteira=<?php echo htmlspecialchars($cart['IDCarteira']); ?>">
-                                    <i class="bi <?php echo $carteira_selecionada == $cart['IDCarteira'] ? 'bi-check-circle-fill' : 'bi-circle'; ?> me-2 flex-shrink-0" style="color: <?php echo $carteira_selecionada == $cart['IDCarteira'] ? '#AA8C2C' : 'rgba(255,255,255,0.5)'; ?>"></i>
-                                    <span class="text-truncate <?php echo $carteira_selecionada == $cart['IDCarteira'] ? 'fw-bold' : ''; ?>" style="max-width: 170px; color: <?php echo $carteira_selecionada == $cart['IDCarteira'] ? '#AA8C2C' : 'inherit'; ?>">
+                                    <i class="bi <?php echo $carteira_selecionada == $cart['IDCarteira'] ? 'bi-check-circle-fill' : 'bi-circle'; ?> me-2 flex-shrink-0" style="color: <?php echo $carteira_selecionada == $cart['IDCarteira'] ? '#ffffff' : 'rgba(255,255,255,0.5)'; ?>"></i>
+                                    <span class="text-truncate <?php echo $carteira_selecionada == $cart['IDCarteira'] ? 'fw-bold' : ''; ?>" style="max-width: 170px; color: <?php echo $carteira_selecionada == $cart['IDCarteira'] ? '#ffffff' : 'inherit'; ?>">
                                         <?php echo htmlspecialchars($cart['TipoCarteira']); ?>
                                     </span>
                                 </a>
