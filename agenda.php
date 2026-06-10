@@ -2,7 +2,7 @@
 // ==============================================================================
 // AGENDA.PHP — Calendário financeiro e Resumos Sincronizados
 // ==============================================================================
-ob_start(); // Previne qualquer espaço em branco ou erro quebrando o JSON do AJAX
+ob_start();
 session_start();
 
 if (!isset($_SESSION['usuario_id'])) {
@@ -15,7 +15,6 @@ if (!isset($_SESSION['usuario_id'])) {
 }
 
 require_once 'config/conexao.php';
-// require_once 'config/funcoes.php'; // Remova o comentário se usar a exigirAcessoMinimo(1)
 
 $usuario_id = $_SESSION['usuario_id'];
 
@@ -23,19 +22,16 @@ $usuario_id = $_SESSION['usuario_id'];
 // 1. MOTOR AJAX (Retorna as Transações da Grelha + Saldos Calculados)
 // ==============================================================================
 if (isset($_GET['ajax']) && $_GET['acao'] === 'listar') {
-    ob_clean(); // Limpa sujeiras do buffer para garantir que a resposta seja 100% JSON
+    ob_clean();
     header('Content-Type: application/json; charset=utf-8');
 
-    $mes_str  = $_GET['mes'] ?? date('Y-m'); // Ex: 2026-06
+    $mes_str  = $_GET['mes'] ?? date('Y-m');
     $carteira = $_GET['carteira'] ?? 'todas';
 
-    // Para o SQL compreender mês e ano exatos
     $mes_alvo = (int)date('m', strtotime($mes_str . '-01'));
     $ano_alvo = (int)date('Y', strtotime($mes_str . '-01'));
 
     // ─── QUERY DA GRELHA (Visual) ─────────────────────────────────────────────
-    // Usa a Data de Vencimento preferencialmente para posicionar no calendário
-    // CORREÇÃO: "r.FKUsuario" resolve a ambiguidade do Erro 1052
     $whereTransacoes = "r.FKUsuario = :uid AND MONTH(COALESCE(r.DataVencimento, r.MomentoRegistro)) = :mes AND YEAR(COALESCE(r.DataVencimento, r.MomentoRegistro)) = :ano";
     $params = [':uid' => $usuario_id, ':mes' => $mes_alvo, ':ano' => $ano_alvo];
 
@@ -65,7 +61,6 @@ if (isset($_GET['ajax']) && $_GET['acao'] === 'listar') {
         $transacoesGrelha = $stmtGrelha->fetchAll(PDO::FETCH_ASSOC);
 
         // ─── QUERY DE SALDOS (Lógica idêntica ao Dashboard) ───────────────────
-        // O Dashboard baseia o mês financeiro estritamente no MomentoRegistro
         $whereSaldos = "FKUsuario = :uid AND MONTH(MomentoRegistro) = :mes AND YEAR(MomentoRegistro) = :ano";
         if ($carteira !== 'todas' && $carteira !== '') {
             $whereSaldos .= " AND FKCarteira = :cid";
@@ -109,7 +104,6 @@ if (isset($_GET['ajax']) && $_GET['acao'] === 'listar') {
 // 2. RENDERIZAÇÃO DA PÁGINA NORMAL
 // ==============================================================================
 
-// Busca carteiras para o Seletor
 $carteiras = [];
 try {
     $sqlCart = "SELECT IDCarteira, TipoCarteira FROM Carteira WHERE FKUsuarioDono = :uid ORDER BY TipoCarteira ASC";
@@ -181,14 +175,14 @@ require_once 'geral/header.php';
                 </div>
 
                 <div class="d-flex align-items-center bg-dark border border-secondary-subtle rounded-pill shadow-sm justify-content-center px-2 py-1 gap-1">
-                    <button type="button" class="btn btn-sm btn-link text-secondary shadow-none" onclick="mudarMes(-1)">
+                    <button type="button" class="btn btn-sm btn-link text-secondary shadow-none" onclick="window.mudarMes(-1)">
                         <i class="bi bi-chevron-left fs-6"></i>
                     </button>
                     <span id="mesAnoTitulo" class="text-light fw-bold fs-6 mx-2" style="min-width: 140px; text-align: center;">Carregando...</span>
-                    <button type="button" class="btn btn-sm btn-link text-secondary shadow-none" onclick="mudarMes(1)">
+                    <button type="button" class="btn btn-sm btn-link text-secondary shadow-none" onclick="window.mudarMes(1)">
                         <i class="bi bi-chevron-right fs-6"></i>
                     </button>
-                    <button type="button" class="btn btn-sm btn-outline-secondary rounded-pill ms-1 px-3" style="font-size: 0.75rem;" onclick="irHoje()">Hoje</button>
+                    <button type="button" class="btn btn-sm btn-outline-secondary rounded-pill ms-1 px-3" style="font-size: 0.75rem;" onclick="window.irHoje()">Hoje</button>
                 </div>
 
             </div>
@@ -258,7 +252,6 @@ require_once 'geral/header.php';
 </main>
 
 <style>
-    /* ESTILIZAÇÃO DA GRELHA (Seu formato visual original restaurado) */
     .calendar-grid {
         display: grid;
         grid-template-columns: repeat(7, 1fr);
@@ -385,9 +378,11 @@ require_once 'geral/header.php';
 
 <script>
     // ==========================================================================
-    // LÓGICA DO CALENDÁRIO AJAX 
+    // LÓGICA DO CALENDÁRIO AJAX (Blindado Globalmente)
     // ==========================================================================
-    const carteiraAtual = "<?= htmlspecialchars($carteira_selecionada) ?>";
+    console.log("[Auralis] Motor de Agenda Iniciado.");
+
+    const carteiraAtual = "<?php echo htmlspecialchars($carteira_selecionada, ENT_QUOTES, 'UTF-8'); ?>";
     let anoAtual = new Date().getFullYear();
     let mesAtual = new Date().getMonth(); // 0 a 11
     const HOJE_JS = new Date();
@@ -402,17 +397,33 @@ require_once 'geral/header.php';
         }).format(valor);
     }
 
-    // Escapa HTML para prevenir XSS nos títulos
     function esc(str) {
         const div = document.createElement('div');
         div.innerText = str;
         return div.innerHTML;
     }
 
-    async function carregarMes(ano, mes) {
-        document.getElementById('mesAnoTitulo').innerText = `${mesesNomes[mes]} ${ano}`;
+    // Exportação explícita para o Window (Evita erros de "is not defined" no onclick do HTML)
+    window.mudarMes = function(delta) {
+        mesAtual += delta;
+        if (mesAtual > 11) {
+            mesAtual = 0;
+            anoAtual++;
+        } else if (mesAtual < 0) {
+            mesAtual = 11;
+            anoAtual--;
+        }
+        window.carregarMes(anoAtual, mesAtual);
+    };
 
-        // Mês base 1, com Zero padding (ex: 2026-06)
+    window.irHoje = function() {
+        anoAtual = HOJE_JS.getFullYear();
+        mesAtual = HOJE_JS.getMonth();
+        window.carregarMes(anoAtual, mesAtual);
+    };
+
+    window.carregarMes = async function(ano, mes) {
+        document.getElementById('mesAnoTitulo').innerText = `${mesesNomes[mes]} ${ano}`;
         const mesStr = ano + '-' + String(mes + 1).padStart(2, '0');
 
         try {
@@ -424,24 +435,22 @@ require_once 'geral/header.php';
                 atualizarSaldos(json.saldos);
             } else {
                 console.error("Erro do servidor:", json.erro);
-                alert("Erro ao carregar os dados. Verifique a conexão.");
+                alert("Erro ao carregar dados do calendário.");
             }
         } catch (e) {
             console.error("Erro na requisição AJAX", e);
         }
-    }
+    };
 
     function atualizarSaldos(saldos) {
         const elEfetivado = document.getElementById('saldoEfetivado');
         const elPago = document.getElementById('saldoPago');
         const elEsperado = document.getElementById('saldoEsperado');
 
-        // Remove a classe de carregamento (placeholder)
         elEfetivado.classList.remove('placeholder-glow');
         elPago.classList.remove('placeholder-glow');
         elEsperado.classList.remove('placeholder-glow');
 
-        // Preenche com valores calculados
         elEfetivado.innerHTML = formatarMoeda(saldos.efetivado);
         elEfetivado.className = `fw-bold mb-0 ${saldos.efetivado >= 0 ? 'text-success' : 'text-danger'}`;
 
@@ -451,9 +460,8 @@ require_once 'geral/header.php';
 
     function renderizarGrelha(ano, mes, transacoes) {
         const grid = document.getElementById('agenda-grid');
-        grid.innerHTML = ''; // Limpa a grade atual
+        grid.innerHTML = '';
 
-        // Cria a linha dos dias da semana
         diasSemana.forEach(d => {
             const hdr = document.createElement('div');
             hdr.className = 'calendar-day-header';
@@ -464,14 +472,12 @@ require_once 'geral/header.php';
         const primeiroDia = new Date(ano, mes, 1).getDay();
         const totalDias = new Date(ano, mes + 1, 0).getDate();
 
-        // Blocos vazios antes do dia 1
         for (let i = 0; i < primeiroDia; i++) {
             const empty = document.createElement('div');
             empty.className = 'calendar-day empty';
             grid.appendChild(empty);
         }
 
-        // Renderiza cada dia do mês
         for (let dia = 1; dia <= totalDias; dia++) {
             const dataAtualStr = `${ano}-${String(mes+1).padStart(2,'0')}-${String(dia).padStart(2,'0')}`;
             const isHoje = (dia === HOJE_JS.getDate() && mes === HOJE_JS.getMonth() && ano === HOJE_JS.getFullYear());
@@ -487,9 +493,7 @@ require_once 'geral/header.php';
             const eventsDiv = document.createElement('div');
             eventsDiv.className = 'day-events';
 
-            // Filtra transações que caem neste dia específico
             const tDia = transacoes.filter(t => {
-                // Separa YYYY-MM-DD da data do banco
                 const dataLimpa = t.data_evento ? t.data_evento.split(' ')[0] : '';
                 return dataLimpa === dataAtualStr;
             });
@@ -517,27 +521,8 @@ require_once 'geral/header.php';
         }
     }
 
-    function mudarMes(delta) {
-        mesAtual += delta;
-        if (mesAtual > 11) {
-            mesAtual = 0;
-            anoAtual++;
-        } else if (mesAtual < 0) {
-            mesAtual = 11;
-            anoAtual--;
-        }
-        carregarMes(anoAtual, mesAtual);
-    }
-
-    function irHoje() {
-        anoAtual = HOJE_JS.getFullYear();
-        mesAtual = HOJE_JS.getMonth();
-        carregarMes(anoAtual, mesAtual);
-    }
-
-    // Arranque inicial da página
     document.addEventListener("DOMContentLoaded", () => {
-        carregarMes(anoAtual, mesAtual);
+        window.carregarMes(anoAtual, mesAtual);
     });
 </script>
 
