@@ -157,7 +157,7 @@ require_once 'geral/header.php';
                         <li>
                             <a class="dropdown-item d-flex align-items-center py-2 transition-hover <?php echo $carteira_selecionada === 'todas' ? 'active' : '' ?>" href="?carteira=todas">
                                 <i class="bi <?php echo $carteira_selecionada === 'todas' ? 'bi-check-circle-fill' : 'bi-circle'; ?> me-2 flex-shrink-0" style="color: <?php echo $carteira_selecionada === 'todas' ? '#ffffff' : 'rgba(255,255,255,0.5)'; ?>"></i>
-                                <span class="<?php echo $carteira_selecionada === 'todas' ? 'fw-bold' : ''; ?>" style="color: <?php echo $carteira_selecionada === 'todas' ? '#AA8C2C' : 'inherit'; ?>">Todas as Carteiras</span>
+                                <span class="<?php echo $carteira_selecionada === 'todas' ? 'fw-bold text-truncate' : ''; ?>" style="color: <?php echo $carteira_selecionada === 'todas' ? '#AA8C2C' : 'inherit'; ?>">Todas as Carteiras</span>
                             </a>
                         </li>
 
