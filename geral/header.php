@@ -21,6 +21,7 @@ $paginaAtual = basename($_SERVER['PHP_SELF']);
     <link rel="apple-touch-icon" href="/geral/img/LogoAuralisSemEscudo.png">
 
     <link href="/geral/fonts/inter.css" rel="stylesheet">
+    <link href="/geral/fonts/aquire.css" rel="stylesheet">
     <link href="/geral/css/bootstrap.min.css" rel="stylesheet">
     <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.css" rel="stylesheet">
     <link rel='stylesheet' href='https://cdn-uicons.flaticon.com/uicons-bold-rounded/css/uicons-bold-rounded.css'>
@@ -35,9 +36,10 @@ $paginaAtual = basename($_SERVER['PHP_SELF']);
 
         <div class="container-fluid px-3 px-xl-5" style="max-width: 1500px;">
 
-            <a class="navbar-brand fw-bold fs-3 d-flex align-items-center" href="<?php echo isset($_SESSION['usuario_id']) ? '/dashboard.php' : '/geral/index.php'; ?>" style="letter-spacing: -0.05em;">
-                <img src="/geral/img/LogoAuralisSemEscudo.png" alt="Logo Auralis" class="me-2" style="height: 38px; width: auto; object-fit: contain;">
-                <span style="color: gold !important;">Aura</span><span class="text-light">lis</span>
+            <a class="navbar-brand d-flex align-items-center" href="<?php echo isset($_SESSION['usuario_id']) ? '/dashboard.php' : '/geral/index.php'; ?>"
+                style="font-family: 'Aquire', sans-serif; font-weight: 700; font-size: 1.6rem; letter-spacing: 0.04em; text-decoration: none;">
+                <img src="/geral/img/LogoAuralisSemEscudo.png" alt="Logo Auralis" class="me-2" style="height: 36px; width: auto; object-fit: contain;">
+                <span style="color: gold;">Aura</span><span class="text-light" style="font-weight: 700;"></span>lis</span>
             </a>
 
             <button class="navbar-toggler border-0 shadow-none p-2" type="button" data-bs-toggle="collapse"
@@ -81,12 +83,12 @@ $paginaAtual = basename($_SERVER['PHP_SELF']);
                             </a>
                         </li>
                         <?php if (in_array(strtolower($_SESSION['nivel_acesso'] ?? ''), ['admin', 'supremo'])): ?>
-                        <li class="nav-item">
-                            <a class="nav-link custom-link py-3 py-lg-2 <?php echo ($paginaAtual == 'usuarios.php') ? 'text-warning active' : ''; ?>" href="/admin/usuarios.php">
-                                <i class="bi bi-shield-fill-check me-2" style="color:#E63946;"></i>
-                                <span style="color:#E63946;">Admin</span>
-                            </a>
-                        </li>
+                            <li class="nav-item">
+                                <a class="nav-link custom-link py-3 py-lg-2 <?php echo ($paginaAtual == 'usuarios.php') ? 'text-warning active' : ''; ?>" href="/admin/usuarios.php">
+                                    <i class="bi bi-shield-fill-check me-2" style="color:#E63946;"></i>
+                                    <span style="color:#E63946;">Admin</span>
+                                </a>
+                            </li>
                         <?php endif; ?>
                     <?php else: ?>
                         <li class="nav-item">
@@ -221,19 +223,21 @@ $paginaAtual = basename($_SERVER['PHP_SELF']);
 
                         <div class="mb-4 d-inline-flex justify-content-center align-items-center bg-dark border border-secondary-subtle rounded-circle shadow-lg"
                             style="width: 80px; height: 80px;">
-                            <i class="bi bi-phone" style="font-size: 2.2rem; color: var(--accent);"></i>
+                            <i id="installModalIcon" class="bi bi-phone" style="font-size: 2.2rem; color: var(--accent);"></i>
                         </div>
 
-                        <h4 class="text-light fw-bold mb-2">Instale o Auralis</h4>
-                        <p class="text-secondary mb-4" style="font-size: 0.9rem; line-height: 1.6;">
-                            Acesse suas finanças direto da tela inicial do seu celular — sem abrir o navegador, sem digitar endereço. Rápido como um app nativo.
+                        <h4 id="installModalTitle" class="text-light fw-bold mb-2">Instale o Auralis</h4>
+                        <p id="installModalDesc" class="text-secondary mb-4" style="font-size: 0.9rem; line-height: 1.6;">
+                            Acesse suas finanças direto da tela inicial — sem abrir o navegador, sem digitar endereço. Rápido como um app nativo.
                         </p>
 
-                        <button onclick="auralisInstalar(); bootstrap.Modal.getInstance(document.getElementById('modalInstalarApp')).hide();"
-                            class="btn w-100 fw-bold text-dark rounded-pill py-3 mb-3 shadow-lg"
-                            style="background: linear-gradient(135deg, #FFB800 0%, #D4AF37 100%); font-size: 0.95rem;">
-                            <i class="bi bi-download me-2"></i> Instalar Agora
-                        </button>
+                        <div id="installModalAction">
+                            <button onclick="auralisInstalar(); bootstrap.Modal.getInstance(document.getElementById('modalInstalarApp')).hide();"
+                                class="btn w-100 fw-bold text-dark rounded-pill py-3 mb-3 shadow-lg"
+                                style="background: linear-gradient(135deg, #FFB800 0%, #D4AF37 100%); font-size: 0.95rem;">
+                                <i class="bi bi-download me-2"></i> Instalar Agora
+                            </button>
+                        </div>
 
                         <button type="button"
                             class="btn btn-link text-secondary text-decoration-none w-100"

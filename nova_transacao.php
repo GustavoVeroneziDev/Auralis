@@ -64,6 +64,55 @@ try {
     $categorias = [];
 }
 
+// Busca comprovantes existentes (modo edição)
+$comprovantes = [];
+if ($id_editar && $transacao_edit) {
+    try {
+        $stmtComp = $pdo->prepare("SELECT * FROM Comprovante WHERE FKRegistro = :reg AND FKUsuario = :uid ORDER BY MomentoUpload ASC");
+        $stmtComp->execute([':reg' => $id_editar, ':uid' => $usuario_id]);
+        $comprovantes = $stmtComp->fetchAll(PDO::FETCH_ASSOC);
+    } catch (PDOException $e) {
+        $comprovantes = [];
+    }
+}
+
+// Helper: processa e salva arquivos enviados para um registro
+function processarComprovantes(PDO $pdo, string $registroId, string $usuarioId): void
+{
+    if (empty($_FILES['comprovantes']['tmp_name'][0])) return;
+    $allowed = ['image/jpeg', 'image/png', 'image/webp', 'image/gif', 'application/pdf'];
+    $maxSize = 5 * 1024 * 1024;
+    foreach ($_FILES['comprovantes']['tmp_name'] as $i => $tmp) {
+        if ($_FILES['comprovantes']['error'][$i] !== UPLOAD_ERR_OK) continue;
+        if ($_FILES['comprovantes']['size'][$i] > $maxSize) continue;
+        $mime = mime_content_type($tmp);
+        if (!in_array($mime, $allowed)) continue;
+        $ext = match ($mime) {
+            'application/pdf' => 'pdf',
+            'image/jpeg' => 'jpg',
+            'image/png' => 'png',
+            'image/webp' => 'webp',
+            'image/gif' => 'gif',
+            default => 'bin',
+        };
+        $filename = gerarUuid() . '.' . $ext;
+        $dir = __DIR__ . '/uploads/comprovantes/' . $usuarioId . '/';
+        if (!is_dir($dir)) mkdir($dir, 0755, true);
+        if (move_uploaded_file($tmp, $dir . $filename)) {
+            $pdo->prepare("INSERT INTO Comprovante (IDComprovante, FKRegistro, FKUsuario, NomeArquivo, NomeOriginal, TipoMime, Tamanho) VALUES (:id, :reg, :uid, :nome, :orig, :mime, :tam)")
+                ->execute([
+                    ':id'   => gerarUuid(),
+                    ':reg'  => $registroId,
+                    ':uid'  => $usuarioId,
+                    ':nome' => $filename,
+                    ':orig' => mb_substr(basename($_FILES['comprovantes']['name'][$i]), 0, 255),
+                    ':mime' => $mime,
+                    ':tam'  => (int)$_FILES['comprovantes']['size'][$i],
+                ]);
+        }
+    }
+}
+
 // Processa o Formulário quando o usuário clica em Salvar (Criar ou Atualizar)
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $tipoRegistro   = trim($_POST['tipo_registro'] ?? '');
@@ -110,7 +159,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
     if (!$erro) {
         $valor = $valorRaw; // O valor já está limpo
-        $dataVencimento = !empty($dataVencimento) ? $dataVencimento : null;
+        $dataVencimento = !empty($dataVencimento) ? $dataVencimento : $dataRegistro;
 
         try {
             if (isset($_POST['id_editar']) && !empty($_POST['id_editar'])) {
@@ -167,6 +216,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                         ':data_base' => $dataAtual
                     ]);
                 }
+                processarComprovantes($pdo, $_POST['id_editar'], $usuario_id);
                 header("Location: dashboard.php?sucesso=editado");
             } elseif ($parcelado && $numParcelas >= 2) {
                 // ── CRIAÇÃO PARCELADA ────────────────
@@ -230,6 +280,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                     ";
                     $stmtP = $pdo->prepare($sqlParcela);
 
+                    $primeiroIdParc = null;
                     for ($i = 0; $i < $numParcelas; $i++) {
                         $mesAlvo    = (int)$dataBase->format('m') + $i;
                         $anoAlvo    = (int)$dataBase->format('Y') + (int)floor(($mesAlvo - 1) / 12);
@@ -241,8 +292,11 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                         $valAtual = ($i === 0) ? ($valorParcela + $resto) : $valorParcela;
                         $statusP  = ($i === 0) ? $statusRegistro : 'pendente';
 
+                        $idParcela = gerarUuid();
+                        if ($primeiroIdParc === null) $primeiroIdParc = $idParcela;
+
                         $stmtP->execute([
-                            ':id'        => gerarUuid(),
+                            ':id'        => $idParcela,
                             ':tipo'      => $tipoRegistro,
                             ':valor'     => $valAtual,
                             ':juros'     => $jurosPorParcela,
@@ -259,6 +313,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                         ]);
                     }
 
+                    if ($primeiroIdParc) processarComprovantes($pdo, $primeiroIdParc, $usuario_id);
                     header("Location: dashboard.php?sucesso=parcelado&parcelas={$numParcelas}");
                     exit;
                 }
@@ -281,6 +336,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 ";
                 $stmtR = $pdo->prepare($sqlInsert);
 
+                $primeiroIdRec = null;
                 for ($i = 0; $i < $limiteMeses; $i++) {
                     // Cálculo matemático para forçar o mês e ano corretos sequencialmente
                     $mesAlvo = (int)$dataBase->format('m') + $i;
@@ -292,8 +348,10 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
                     $statusRec = ($i === 0) ? $statusRegistro : 'pendente';
 
+                    $idRec = gerarUuid();
+                    if ($primeiroIdRec === null) $primeiroIdRec = $idRec;
                     $stmtR->execute([
-                        ':id'         => gerarUuid(),
+                        ':id'         => $idRec,
                         ':tipo'      => $tipoRegistro,
                         ':valor'      => $valor,
                         ':descricao' => $descricao,
@@ -307,6 +365,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                         ':grupo'     => $grupoRecorrencia
                     ]);
                 }
+                if ($primeiroIdRec) processarComprovantes($pdo, $primeiroIdRec, $usuario_id);
                 header("Location: dashboard.php?sucesso=recorrente");
             } else {
                 // ── CRIAÇÃO SIMPLES (Transação Única) ────────────────────────
@@ -320,8 +379,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                     )
                 ";
                 $stmt = $pdo->prepare($sql);
+                $novoId = gerarUuid();
                 $stmt->execute([
-                    ':id'         => gerarUuid(),
+                    ':id'         => $novoId,
                     ':tipo'      => $tipoRegistro,
                     ':valor'      => $valor,
                     ':descricao' => $descricao,
@@ -334,6 +394,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                     ':usuario'    => $usuario_id,
                     ':categoria' => $categoriaId,
                 ]);
+                processarComprovantes($pdo, $novoId, $usuario_id);
                 header("Location: dashboard.php?sucesso=registro");
             }
             exit;
@@ -346,7 +407,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 // Valores Iniciais do Formulário
 $val_valor  = $_POST['valor'] ?? ($transacao_edit ? $transacao_edit['Valor'] : '');
 $val_desc   = $_POST['descricao'] ?? ($transacao_edit ? $transacao_edit['Descricao'] : '');
-$val_data   = $_POST['data_registro'] ?? ($transacao_edit ? date('Y-m-d', strtotime($transacao_edit['MomentoRegistro'])) : date('Y-m-d'));
+$val_data   = $_POST['data_registro'] ?? ($transacao_edit ? date('Y-m-d', strtotime($transacao_edit['MomentoRegistro'])) : ($_GET['data'] ?? date('Y-m-d')));
 $val_status = $_POST['status_registro'] ?? ($transacao_edit ? $transacao_edit['StatusRegistro'] : 'efetivado');
 
 $val_cart   = $_POST['carteira_id'] ?? ($transacao_edit ? $transacao_edit['FKCarteira'] : ($_GET['carteira_id'] ?? ''));
@@ -356,7 +417,7 @@ if (empty($val_cart) && count($carteiras) === 1) {
 }
 
 $val_cat    = $_POST['categoria_id'] ?? ($transacao_edit ? $transacao_edit['FKCategoria'] : '');
-$val_venc   = $_POST['data_vencimento'] ?? ($transacao_edit ? $transacao_edit['DataVencimento'] : '');
+$val_venc   = $_POST['data_vencimento'] ?? ($transacao_edit ? $transacao_edit['DataVencimento'] : ($_GET['data'] ?? ''));
 $val_rec    = isset($_POST['recorrente']) ? true : ($transacao_edit ? $transacao_edit['Recorrente'] : false);
 $val_dia        = $_POST['dia_vencimento'] ?? ($transacao_edit ? $transacao_edit['DiaVencimento'] : '');
 $val_parcelado  = isset($_POST['parcelado']) ? true : false;
@@ -394,21 +455,36 @@ require_once 'geral/header.php';
             <?php else: ?>
 
                 <div class="card bg-body-tertiary border-secondary-subtle shadow-sm rounded-4">
-                    <form id="formTransacao" method="POST" action="" novalidate class="auralis-premium-form p-4">
+                    <form id="formTransacao" method="POST" action="" novalidate enctype="multipart/form-data" class="auralis-premium-form p-4">
                         <input type="hidden" name="tipo_registro" value="<?= htmlspecialchars($tipo_sugerido) ?>">
                         <?php if ($id_editar): ?>
                             <input type="hidden" name="id_editar" value="<?= htmlspecialchars($id_editar) ?>">
                         <?php endif; ?>
 
-                        <div class="text-center mb-4">
-                            <span class="badge badge-tipo rounded-pill px-4 py-2 shadow-sm">
-                                <?php if ($tipo_sugerido === 'receita'): ?>
-                                    <span class="fw-bold text-success fs-5">💰 Receita</span>
-                                <?php else: ?>
-                                    <span class="fw-bold text-danger fs-5">💸 Despesa</span>
-                                <?php endif; ?>
-                            </span>
-                        </div>
+                        <?php if (!$is_edicao): ?>
+                            <div class="d-flex gap-2 mb-4 p-1 rounded-3" style="background:rgba(255,255,255,0.03);border:1px solid #333;">
+                                <a href="?tipo=receita<?= !empty($_GET['data']) ? '&data=' . urlencode($_GET['data']) : '' ?><?= !empty($_GET['carteira_id']) ? '&carteira_id=' . urlencode($_GET['carteira_id']) : '' ?>&voltar=<?= urlencode($_GET['voltar'] ?? 'dashboard.php') ?>"
+                                    class="btn flex-grow-1 fw-bold rounded-3 py-2 d-flex align-items-center justify-content-center gap-1"
+                                    style="<?= $tipo_sugerido === 'receita' ? 'background:rgba(6,214,160,0.18);color:#6ee7c7;border:1px solid rgba(6,214,160,0.5);' : 'background:transparent;color:#555;border:1px solid transparent;' ?>">
+                                    <i class="bi bi-arrow-up-short" style="font-size:1.3rem;"></i> Receita
+                                </a>
+                                <a href="?tipo=despesa<?= !empty($_GET['data']) ? '&data=' . urlencode($_GET['data']) : '' ?><?= !empty($_GET['carteira_id']) ? '&carteira_id=' . urlencode($_GET['carteira_id']) : '' ?>&voltar=<?= urlencode($_GET['voltar'] ?? 'dashboard.php') ?>"
+                                    class="btn flex-grow-1 fw-bold rounded-3 py-2 d-flex align-items-center justify-content-center gap-1"
+                                    style="<?= $tipo_sugerido === 'despesa' ? 'background:rgba(230,57,70,0.18);color:#f87171;border:1px solid rgba(230,57,70,0.5);' : 'background:transparent;color:#555;border:1px solid transparent;' ?>">
+                                    <i class="bi bi-arrow-down-short" style="font-size:1.3rem;"></i> Despesa
+                                </a>
+                            </div>
+                        <?php else: ?>
+                            <div class="text-center mb-4">
+                                <span class="badge badge-tipo rounded-pill px-4 py-2 shadow-sm">
+                                    <?php if ($tipo_sugerido === 'receita'): ?>
+                                        <span class="fw-bold text-success fs-5"><i class="bi bi-arrow-up-short"></i> Receita</span>
+                                    <?php else: ?>
+                                        <span class="fw-bold text-danger fs-5"><i class="bi bi-arrow-down-short"></i> Despesa</span>
+                                    <?php endif; ?>
+                                </span>
+                            </div>
+                        <?php endif; ?>
 
                         <div class="mb-5 d-flex align-items-center justify-content-center pb-3 auralis-line-input">
                             <input type="text" inputmode="numeric" name="valor" id="valor"
@@ -626,7 +702,8 @@ require_once 'geral/header.php';
                                         <?php endif; ?>
 
                                         <!-- ── 3. DATA LIMITE PARA PAGAMENTO ─────────────────── -->
-                                        <div class="pt-3 border-top border-border-color">
+                                        <div id="bloco-vencimento" class="pt-3 border-top border-border-color"
+                                            style="<?= $val_rec ? 'display:none;' : '' ?>">
                                             <label class="text-light fw-semibold fs-7 mb-1 d-flex align-items-center gap-2">
                                                 <i class="bi bi-calendar-x text-danger"></i>
                                                 Data limite para pagamento
@@ -643,6 +720,75 @@ require_once 'geral/header.php';
                                     </div>
                                 </div>
                             </div>
+                        </div>
+
+                        <!-- ── COMPROVANTES / ANEXOS ─────────────────────────── -->
+                        <div class="mb-4 pt-3 border-top border-border-color">
+
+                            <?php if (!empty($comprovantes)): ?>
+                                <div class="mb-3">
+                                    <div class="text-secondary-analysis fw-semibold fs-7 mb-2 d-flex align-items-center gap-2">
+                                        <i class="bi bi-paperclip"></i> Comprovantes anexados
+                                    </div>
+                                    <div id="listaComprovantes">
+                                        <?php foreach ($comprovantes as $comp): ?>
+                                            <?php $isImg = str_starts_with($comp['TipoMime'], 'image/'); ?>
+                                            <div class="d-flex align-items-center gap-2 mb-2 p-2 rounded-3"
+                                                style="background:rgba(255,255,255,0.04); border:1px solid #333;"
+                                                id="comp-<?= htmlspecialchars($comp['IDComprovante']) ?>">
+                                                <i class="bi <?= $isImg ? 'bi-image' : 'bi-file-earmark-pdf' ?> flex-shrink-0"
+                                                    style="color:<?= $isImg ? '#6ee7c7' : '#f87171' ?>; font-size:1.05rem;"></i>
+                                                <span class="text-secondary text-truncate flex-grow-1" style="font-size:0.8rem; max-width:180px;"
+                                                    title="<?= htmlspecialchars($comp['NomeOriginal']) ?>">
+                                                    <?= htmlspecialchars($comp['NomeOriginal']) ?>
+                                                </span>
+                                                <span class="text-secondary opacity-50 flex-shrink-0" style="font-size:0.7rem;">
+                                                    <?= round($comp['Tamanho'] / 1024) ?> KB
+                                                </span>
+                                                <a href="/comprovante/ver.php?id=<?= htmlspecialchars($comp['IDComprovante']) ?>"
+                                                    target="_blank"
+                                                    class="btn btn-sm rounded-circle d-flex align-items-center justify-content-center flex-shrink-0"
+                                                    style="width:28px;height:28px;padding:0;background:rgba(170,140,44,0.1);color:#AA8C2C;border:1px solid rgba(170,140,44,0.3);"
+                                                    title="Visualizar">
+                                                    <i class="bi bi-eye" style="font-size:0.7rem;"></i>
+                                                </a>
+                                                <a href="/comprovante/ver.php?id=<?= htmlspecialchars($comp['IDComprovante']) ?>&download=1"
+                                                    class="btn btn-sm rounded-circle d-flex align-items-center justify-content-center flex-shrink-0"
+                                                    style="width:28px;height:28px;padding:0;background:rgba(255,255,255,0.05);color:#888;border:1px solid #333;"
+                                                    title="Baixar">
+                                                    <i class="bi bi-download" style="font-size:0.65rem;"></i>
+                                                </a>
+                                                <button type="button"
+                                                    class="btn btn-sm rounded-circle d-flex align-items-center justify-content-center flex-shrink-0 btn-deletar-comp"
+                                                    data-id="<?= htmlspecialchars($comp['IDComprovante']) ?>"
+                                                    style="width:28px;height:28px;padding:0;background:rgba(230,57,70,0.1);color:#f87171;border:1px solid rgba(230,57,70,0.3);"
+                                                    title="Remover">
+                                                    <i class="bi bi-trash3" style="font-size:0.65rem;"></i>
+                                                </button>
+                                            </div>
+                                        <?php endforeach; ?>
+                                    </div>
+                                </div>
+                            <?php endif; ?>
+
+                            <label class="text-secondary-analysis fw-semibold fs-7 mb-2 d-flex align-items-center gap-2" for="comprovantes">
+                                <i class="bi bi-paperclip"></i>
+                                <?= !empty($comprovantes) ? 'Adicionar mais arquivos' : 'Comprovante / Anexo' ?>
+                                <span class="badge bg-secondary fw-normal" style="font-size:0.6rem;">Opcional</span>
+                            </label>
+
+                            <label for="comprovantes" id="dropzone"
+                                class="d-flex flex-column align-items-center justify-content-center rounded-3 text-center"
+                                style="border:2px dashed #333; padding:1.25rem 1rem; cursor:pointer; transition:border-color .2s, background .2s;">
+                                <i class="bi bi-cloud-upload mb-1 text-secondary-analysis" style="font-size:1.5rem;"></i>
+                                <span class="text-secondary" style="font-size:0.8rem;">Clique ou arraste arquivos aqui</span>
+                                <span style="font-size:0.68rem; color:#444;">Imagens (JPG, PNG, WEBP) ou PDF · máx. 5 MB cada</span>
+                            </label>
+                            <input type="file" name="comprovantes[]" id="comprovantes"
+                                accept="image/jpeg,image/png,image/webp,image/gif,application/pdf"
+                                multiple class="d-none">
+
+                            <div id="previewNovos" class="mt-2"></div>
                         </div>
 
                         <div class="d-grid mt-2">
@@ -839,6 +985,9 @@ require_once 'geral/header.php';
         checkRecorrente.addEventListener('change', function() {
             blocoRecorrencia.style.display = this.checked ? 'block' : 'none';
             inputDia.required = this.checked;
+            // Esconde vencimento (recorrente usa o próprio dia de recorrência)
+            const blocoVenc = document.getElementById('bloco-vencimento');
+            if (blocoVenc) blocoVenc.style.display = this.checked ? 'none' : '';
             // Desativa parcelamento se recorrente for ligado
             if (this.checked && toggleParcelado && toggleParcelado.checked) {
                 toggleParcelado.checked = false;
@@ -1081,10 +1230,106 @@ require_once 'geral/header.php';
     document.addEventListener("DOMContentLoaded", function() {
         let inputValor = document.getElementById('valor');
         if (inputValor.value !== '' && !inputValor.value.includes('R$')) {
-            // Multiplica por 100 para simular a digitação sem a vírgula
             inputValor.value = (parseFloat(inputValor.value) * 100).toFixed(0);
             mascaraMoeda(inputValor);
         }
+
+        // Dropdown de carteira — atualiza hidden input e estado visual
+        document.querySelectorAll('.carteira-nt-option').forEach(function(item) {
+            item.addEventListener('click', function(e) {
+                e.preventDefault();
+                var id = this.dataset.id;
+                var nome = this.dataset.nome;
+
+                document.getElementById('carteira_id').value = id;
+                document.getElementById('dropdownCarteiraNTLabel').innerHTML =
+                    '<i class="bi bi-wallet2 me-2 flex-shrink-0" style="color:var(--primary-gold-analysis);"></i>' + nome;
+
+                document.querySelectorAll('.carteira-nt-option').forEach(function(opt) {
+                    var icon = opt.querySelector('.cart-nt-check');
+                    var span = opt.querySelector('span');
+                    if (opt.dataset.id === id) {
+                        opt.classList.add('active');
+                        icon.className = 'bi bi-check-circle-fill flex-shrink-0 cart-nt-check';
+                        icon.style.color = 'var(--primary-gold-analysis)';
+                        span.className = 'fw-bold text-truncate';
+                        span.style.color = 'var(--primary-gold-analysis)';
+                    } else {
+                        opt.classList.remove('active');
+                        icon.className = 'bi bi-circle flex-shrink-0 text-secondary opacity-50 cart-nt-check';
+                        icon.style.color = '';
+                        span.className = 'text-light text-truncate';
+                        span.style.color = '';
+                    }
+                });
+            });
+        });
+
+        // ── Dropzone de comprovantes ─────────────────────────────────────────
+        const dz = document.getElementById('dropzone');
+        const inp = document.getElementById('comprovantes');
+        if (dz && inp) {
+            dz.addEventListener('dragover', function(e) {
+                e.preventDefault();
+                dz.style.borderColor = 'var(--primary-gold-analysis)';
+                dz.style.background = 'rgba(170,140,44,0.05)';
+            });
+            dz.addEventListener('dragleave', function() {
+                dz.style.borderColor = '#333';
+                dz.style.background = 'transparent';
+            });
+            dz.addEventListener('drop', function(e) {
+                e.preventDefault();
+                dz.style.borderColor = '#333';
+                dz.style.background = 'transparent';
+                const dt = new DataTransfer();
+                [...(inp.files || []), ...e.dataTransfer.files].forEach(f => dt.items.add(f));
+                inp.files = dt.files;
+                atualizarPreviewAnexos();
+            });
+            inp.addEventListener('change', atualizarPreviewAnexos);
+        }
+
+        function atualizarPreviewAnexos() {
+            const container = document.getElementById('previewNovos');
+            if (!container || !inp) return;
+            container.innerHTML = '';
+            [...inp.files].forEach(function(f) {
+                const isImg = f.type.startsWith('image/');
+                const kb = Math.round(f.size / 1024);
+                const div = document.createElement('div');
+                div.className = 'd-flex align-items-center gap-2 p-2 rounded-3 mb-1';
+                div.style.cssText = 'background:rgba(255,255,255,0.04);border:1px solid #333;';
+                div.innerHTML =
+                    '<i class="bi ' + (isImg ? 'bi-image' : 'bi-file-earmark-pdf') + ' flex-shrink-0" style="color:' + (isImg ? '#6ee7c7' : '#f87171') + ';font-size:1rem;"></i>' +
+                    '<span class="text-secondary text-truncate flex-grow-1" style="font-size:0.78rem;max-width:220px;">' + f.name + '</span>' +
+                    '<span class="text-secondary opacity-50 flex-shrink-0" style="font-size:0.7rem;white-space:nowrap;">' + kb + ' KB</span>';
+                container.appendChild(div);
+            });
+        }
+
+        // ── Deletar comprovante (AJAX) ────────────────────────────────────────
+        document.querySelectorAll('.btn-deletar-comp').forEach(function(btn) {
+            btn.addEventListener('click', function() {
+                if (!confirm('Remover este arquivo permanentemente?')) return;
+                const id = this.dataset.id;
+                fetch('/comprovante/deletar.php', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/x-www-form-urlencoded'
+                    },
+                    body: 'id=' + encodeURIComponent(id)
+                }).then(function(r) {
+                    return r.json();
+                }).then(function(data) {
+                    if (data.ok) {
+                        const el = document.getElementById('comp-' + id);
+                        if (el) el.remove();
+                    }
+                });
+            });
+        });
+
     });
 </script>
 <?php require_once 'geral/footer.php'; ?>

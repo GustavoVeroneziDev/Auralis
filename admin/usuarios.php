@@ -183,12 +183,61 @@ require_once '../geral/header.php';
         <?php endforeach; ?>
     </div>
 
-    <!-- Busca -->
+    <!-- Controles: busca + filtros -->
     <div class="mb-3">
-        <input type="text" id="buscaUsuario"
-            class="form-control bg-dark border-secondary-subtle text-light rounded-pill shadow-sm"
-            placeholder="Buscar por nome ou e-mail..."
-            style="max-width: 380px; padding-left: 1.1rem;">
+        <!-- Linha 1: busca + contador + limpar -->
+        <div class="d-flex align-items-center gap-3 mb-2 flex-wrap">
+            <div class="position-relative flex-grow-1" style="max-width:340px;">
+                <i class="bi bi-search position-absolute text-secondary" style="top:50%;left:12px;transform:translateY(-50%);font-size:0.8rem;pointer-events:none;"></i>
+                <input type="text" id="buscaUsuario"
+                    class="form-control bg-dark border-secondary-subtle text-light rounded-pill shadow-sm"
+                    placeholder="Buscar por nome ou e-mail..."
+                    style="padding-left:2.1rem; font-size:0.875rem;">
+            </div>
+            <span id="resultCount" class="text-secondary" style="font-size:0.75rem; white-space:nowrap;"></span>
+            <button id="btnLimparFiltros" class="btn btn-sm rounded-pill px-3"
+                style="display:none; font-size:0.73rem; background:rgba(230,57,70,0.1); color:#f87171; border:1px solid rgba(230,57,70,0.3);">
+                <i class="bi bi-x-circle me-1"></i> Limpar filtros
+            </button>
+        </div>
+
+        <!-- Linha 2: pills de filtro -->
+        <div class="d-flex align-items-center gap-3 flex-wrap">
+
+            <div class="d-flex align-items-center gap-2">
+                <span style="font-size:0.68rem; color:#444; text-transform:uppercase; letter-spacing:0.07em; white-space:nowrap;">Plano</span>
+                <div class="d-flex gap-1" id="filterPlano">
+                    <button class="filter-pill active" data-value="">Todos</button>
+                    <button class="filter-pill" data-value="free">Free</button>
+                    <button class="filter-pill" data-value="pro" style="color:#a78bfa88;">
+                        <i class="fi fi-br-crown" style="font-size:0.65rem; vertical-align:middle;"></i> PRO
+                    </button>
+                    <button class="filter-pill" data-value="vip" style="color:#d4af3788;">
+                        <i class="fi fi-ss-gem" style="font-size:0.65rem; vertical-align:middle;"></i> VIP
+                    </button>
+                </div>
+            </div>
+
+            <div class="d-flex align-items-center gap-2">
+                <span style="font-size:0.68rem; color:#444; text-transform:uppercase; letter-spacing:0.07em; white-space:nowrap;">Status</span>
+                <div class="d-flex gap-1" id="filterStatus">
+                    <button class="filter-pill active" data-value="">Todos</button>
+                    <button class="filter-pill" data-value="ativo">Ativo</button>
+                    <button class="filter-pill" data-value="inativo">Inativo</button>
+                </div>
+            </div>
+
+            <div class="d-flex align-items-center gap-2">
+                <span style="font-size:0.68rem; color:#444; text-transform:uppercase; letter-spacing:0.07em; white-space:nowrap;">Nível</span>
+                <div class="d-flex gap-1" id="filterNivel">
+                    <button class="filter-pill active" data-value="">Todos</button>
+                    <button class="filter-pill" data-value="titular">Titular</button>
+                    <button class="filter-pill" data-value="admin">Admin</button>
+                    <button class="filter-pill" data-value="supremo">Supremo</button>
+                </div>
+            </div>
+
+        </div>
     </div>
 
     <!-- Tabela -->
@@ -197,13 +246,13 @@ require_once '../geral/header.php';
             <table class="table table-dark table-hover align-middle mb-0" id="tabelaUsuarios">
                 <thead>
                     <tr style="background:#15171b; font-size:0.72rem; text-transform:uppercase; letter-spacing:0.06em; color:#555;">
-                        <th class="py-3 ps-4" style="font-weight:700;">Usuário</th>
-                        <th style="font-weight:700;">Plano</th>
-                        <th style="font-weight:700;">Expira em</th>
+                        <th class="py-3 ps-4 sortable" data-col="nome" style="font-weight:700; cursor:pointer; user-select:none; white-space:nowrap;">Usuário <span class="sort-icon" style="color:#333; font-size:0.65rem;">↕</span></th>
+                        <th class="sortable" data-col="plano" style="font-weight:700; cursor:pointer; user-select:none; white-space:nowrap;">Plano <span class="sort-icon" style="color:#333; font-size:0.65rem;">↕</span></th>
+                        <th class="sortable" data-col="expiracao" style="font-weight:700; cursor:pointer; user-select:none; white-space:nowrap;">Expira em <span class="sort-icon" style="color:#333; font-size:0.65rem;">↕</span></th>
                         <th style="font-weight:700;">Fonte</th>
-                        <th style="font-weight:700;">Status</th>
-                        <th style="font-weight:700;">Nível</th>
-                        <th style="font-weight:700;">Cadastro</th>
+                        <th class="sortable" data-col="status" style="font-weight:700; cursor:pointer; user-select:none; white-space:nowrap;">Status <span class="sort-icon" style="color:#333; font-size:0.65rem;">↕</span></th>
+                        <th class="sortable" data-col="nivel" style="font-weight:700; cursor:pointer; user-select:none; white-space:nowrap;">Nível <span class="sort-icon" style="color:#333; font-size:0.65rem;">↕</span></th>
+                        <th class="sortable" data-col="cadastro" style="font-weight:700; cursor:pointer; user-select:none; white-space:nowrap;">Cadastro <span class="sort-icon" style="color:#333; font-size:0.65rem;">↕</span></th>
                         <th class="pe-4 text-end" style="font-weight:700;">Ações</th>
                     </tr>
                 </thead>
@@ -219,7 +268,12 @@ require_once '../geral/header.php';
                     ?>
                         <tr class="usuario-row"
                             data-nome="<?= htmlspecialchars(strtolower($u['Nome'] ?? '')) ?>"
-                            data-email="<?= htmlspecialchars(strtolower($u['Email'] ?? '')) ?>">
+                            data-email="<?= htmlspecialchars(strtolower($u['Email'] ?? '')) ?>"
+                            data-plano="<?= $plano ?>"
+                            data-nivel="<?= $nivel ?>"
+                            data-status="<?= strtolower($u['StatusConta'] ?? 'inativo') ?>"
+                            data-cadastro="<?= $criacao->format('Y-m-d') ?>"
+                            data-expiracao="<?= $exp ? $exp->format('Y-m-d') : '' ?>">
 
                             <!-- Usuário -->
                             <td class="ps-4 py-3">
@@ -476,10 +530,7 @@ require_once '../geral/header.php';
     #tabelaUsuarios tbody tr:hover td {
         background-color: rgba(255, 255, 255, 0.025) !important;
     }
-
-    .opacity-40 {
-        opacity: 0.4;
-    }
+    .opacity-40 { opacity: 0.4; }
 
     /* Botões de seleção de plano */
     #plano_pro:checked + .btn-plano {
@@ -488,52 +539,159 @@ require_once '../geral/header.php';
         box-shadow: 0 0 0 2px rgba(124, 58, 237, 0.35);
         transform: scale(1.04);
     }
-
     #plano_vip:checked + .btn-plano {
         background: rgba(212, 175, 55, 0.28) !important;
         border-color: #d4af37 !important;
         box-shadow: 0 0 0 2px rgba(212, 175, 55, 0.35);
         transform: scale(1.04);
     }
+
+    /* Filter pills */
+    .filter-pill {
+        font-size: 0.7rem;
+        font-weight: 600;
+        padding: 3px 10px;
+        border-radius: 999px;
+        border: 1px solid rgba(255,255,255,0.1);
+        background: transparent;
+        color: #555;
+        cursor: pointer;
+        transition: all .15s ease;
+        white-space: nowrap;
+        line-height: 1.6;
+    }
+    .filter-pill:hover {
+        border-color: rgba(255,255,255,0.2);
+        color: #888;
+        background: rgba(255,255,255,0.04);
+    }
+    .filter-pill.active {
+        background: rgba(170,140,44,0.15);
+        border-color: rgba(170,140,44,0.45);
+        color: #AA8C2C;
+    }
+
+    /* Sortable header hover */
+    .sortable:hover { color: #888 !important; }
+    .sortable:hover .sort-icon { color: #888 !important; }
+    .sortable.sorted .sort-icon { color: #AA8C2C !important; }
 </style>
 
 <script>
-    // ── Modal: Dar acesso ────────────────────────────────────────────────────
+    // ── Modais ───────────────────────────────────────────────────────────────
     document.getElementById('modalDarAcesso').addEventListener('show.bs.modal', function(e) {
         const btn = e.relatedTarget;
         document.getElementById('dar_usuario_id').value = btn.dataset.id;
-        document.getElementById('dar_nome').textContent = btn.dataset.nome;
+        document.getElementById('dar_nome').textContent  = btn.dataset.nome;
         document.getElementById('dar_email').textContent = btn.dataset.email;
-        // Pré-seleciona o plano atual ou PRO como padrão
-        const planoAtual = btn.dataset.plano;
-        if (planoAtual === 'vip') {
-            document.getElementById('plano_vip').checked = true;
-        } else {
-            document.getElementById('plano_pro').checked = true;
-        }
+        document.getElementById(btn.dataset.plano === 'vip' ? 'plano_vip' : 'plano_pro').checked = true;
         document.getElementById('campoDias').value = 30;
     });
 
-    // ── Modal: Revogar ───────────────────────────────────────────────────────
     document.getElementById('modalRevogar').addEventListener('show.bs.modal', function(e) {
         const btn = e.relatedTarget;
         document.getElementById('revogar_usuario_id').value = btn.dataset.id;
-        document.getElementById('revogar_nome').textContent = btn.dataset.nome;
+        document.getElementById('revogar_nome').textContent  = btn.dataset.nome;
     });
 
-    // ── Atalhos de duração ───────────────────────────────────────────────────
-    function setDias(n) {
-        document.getElementById('campoDias').value = n;
+    function setDias(n) { document.getElementById('campoDias').value = n; }
+
+    // ── Estado de filtros + ordenação ────────────────────────────────────────
+    const filtros = { q: '', plano: '', status: '', nivel: '' };
+    let sortCol = '', sortDir = 1;
+
+    function aplicar() {
+        const rows = [...document.querySelectorAll('.usuario-row')];
+
+        // Filtragem
+        rows.forEach(row => {
+            const ok =
+                (!filtros.q      || row.dataset.nome.includes(filtros.q) || row.dataset.email.includes(filtros.q)) &&
+                (!filtros.plano  || row.dataset.plano  === filtros.plano) &&
+                (!filtros.status || row.dataset.status === filtros.status) &&
+                (!filtros.nivel  || row.dataset.nivel  === filtros.nivel);
+            row.style.display = ok ? '' : 'none';
+        });
+
+        // Ordenação (somente sobre linhas visíveis)
+        if (sortCol) {
+            const tbody = document.querySelector('#tabelaUsuarios tbody');
+            const visiveis = rows.filter(r => r.style.display !== 'none');
+            visiveis.sort((a, b) => {
+                let va = a.dataset[sortCol] || '';
+                let vb = b.dataset[sortCol] || '';
+                // datas: vazio vai para o fim
+                if (sortCol === 'expiracao') {
+                    if (!va && !vb) return 0;
+                    if (!va) return 1;
+                    if (!vb) return -1;
+                }
+                return va.localeCompare(vb, 'pt', { sensitivity: 'base' }) * sortDir;
+            });
+            visiveis.forEach(r => tbody.appendChild(r));
+        }
+
+        // Contador
+        const n = rows.filter(r => r.style.display !== 'none').length;
+        document.getElementById('resultCount').textContent = n + ' de ' + rows.length + ' usuários';
+
+        // Botão limpar
+        const temFiltro = filtros.q || filtros.plano || filtros.status || filtros.nivel || sortCol;
+        document.getElementById('btnLimparFiltros').style.display = temFiltro ? '' : 'none';
+
+        // Ícones de ordenação
+        document.querySelectorAll('.sortable').forEach(th => {
+            const ico = th.querySelector('.sort-icon');
+            if (th.dataset.col === sortCol) {
+                ico.textContent = sortDir === 1 ? '↑' : '↓';
+                th.classList.add('sorted');
+            } else {
+                ico.textContent = '↕';
+                th.classList.remove('sorted');
+            }
+        });
     }
 
-    // ── Busca client-side ────────────────────────────────────────────────────
+    // ── Busca ────────────────────────────────────────────────────────────────
     document.getElementById('buscaUsuario').addEventListener('input', function() {
-        const q = this.value.toLowerCase().trim();
-        document.querySelectorAll('.usuario-row').forEach(row => {
-            const match = !q || row.dataset.nome.includes(q) || row.dataset.email.includes(q);
-            row.style.display = match ? '' : 'none';
+        filtros.q = this.value.toLowerCase().trim();
+        aplicar();
+    });
+
+    // ── Pills de filtro ──────────────────────────────────────────────────────
+    [['filterPlano','plano'], ['filterStatus','status'], ['filterNivel','nivel']].forEach(([id, chave]) => {
+        document.getElementById(id).querySelectorAll('.filter-pill').forEach(btn => {
+            btn.addEventListener('click', function() {
+                document.getElementById(id).querySelectorAll('.filter-pill').forEach(b => b.classList.remove('active'));
+                this.classList.add('active');
+                filtros[chave] = this.dataset.value;
+                aplicar();
+            });
         });
     });
+
+    // ── Colunas clicáveis para ordenar ───────────────────────────────────────
+    document.querySelectorAll('.sortable').forEach(th => {
+        th.addEventListener('click', function() {
+            const col = this.dataset.col;
+            sortDir = (sortCol === col) ? sortDir * -1 : 1;
+            sortCol = col;
+            aplicar();
+        });
+    });
+
+    // ── Limpar tudo ──────────────────────────────────────────────────────────
+    document.getElementById('btnLimparFiltros').addEventListener('click', function() {
+        filtros.q = filtros.plano = filtros.status = filtros.nivel = '';
+        sortCol = '';
+        sortDir = 1;
+        document.getElementById('buscaUsuario').value = '';
+        document.querySelectorAll('.filter-pill').forEach(b => b.classList.toggle('active', b.dataset.value === ''));
+        aplicar();
+    });
+
+    // Inicializa contagem ao carregar
+    aplicar();
 </script>
 
 <?php require_once '../geral/footer.php'; ?>
