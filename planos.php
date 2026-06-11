@@ -75,15 +75,15 @@ require_once 'geral/header.php';
                             [
                                 ['ok', '1 carteira'],
                                 ['ok', 'Até 35 registros/mês'],
-                                ['ok', 'Categorias (até 10)'],
+                                ['ok', 'Até 10 categorias'],
                                 ['ok', 'Parcelamento em até 3x'],
-                                ['ok', 'Dashboard básico'],
-                                ['no', 'Histórico comparativo'],
-                                ['no', 'Exportação PDF/Excel'],
+                                ['ok', 'Dashboard com variação mensal'],
+                                ['ok', 'Agenda financeira'],
+                                ['ok', 'App instalável (PWA)'],
+                                ['no', 'Comprovantes e Anexos'],
+                                ['no', 'Registros ilimitados'],
+                                ['no', 'Parcelamento até 48x'],
                                 ['no', 'Carteiras ilimitadas'],
-                                ['no', 'Módulo de Cartão de Crédito'],
-                                ['no', 'Compartilhamento familiar'],
-                                ['no', 'Metas financeiras'],
                                 ['no', 'Suporte prioritário'],
                             ] as [$tipo, $item]
                         ): ?>
@@ -144,15 +144,13 @@ require_once 'geral/header.php';
                                 ['ok', 'Até 3 carteiras'],
                                 ['ok', 'Registros ilimitados'],
                                 ['ok', 'Categorias ilimitadas'],
-                                ['ok', 'Parcelamento em até 48x'],
+                                ['ok', 'Parcelamento em até 48x (com juros)'],
                                 ['ok', 'Dashboard completo'],
-                                ['ok', 'Histórico comparativo (12 meses)'],
-                                ['ok', 'Exportação PDF/Excel'],
+                                ['ok', 'Agenda financeira'],
+                                ['ok', 'Comprovantes e Anexos'],
+                                ['ok', 'App instalável (PWA)'],
                                 ['ok', 'Suporte prioritário'],
                                 ['no', 'Carteiras ilimitadas'],
-                                ['no', 'Módulo de Cartão de Crédito'],
-                                ['no', 'Compartilhamento familiar'],
-                                ['no', 'Metas financeiras'],
                             ] as [$tipo, $item]
                         ): ?>
                             <li class="d-flex align-items-center gap-2 mb-2">
@@ -214,7 +212,7 @@ require_once 'geral/header.php';
                             <span class="text-secondary">/mês</span>
                         </div>
                         <p class="text-secondary mt-1 mb-0 preco-anual-info d-none" style="font-size:0.8rem;">R$ 239,90 cobrado anualmente</p>
-                        <p class="text-secondary mt-2 mb-0" style="font-size:0.85rem;">Tudo do PRO + gestão familiar completa.</p>
+                        <p class="text-secondary mt-2 mb-0" style="font-size:0.85rem;">Para quem não aceita limites.</p>
                     </div>
 
                     <ul class="list-unstyled flex-grow-1 mb-4" style="font-size:0.875rem;">
@@ -223,13 +221,12 @@ require_once 'geral/header.php';
                                 ['ok', 'Carteiras ilimitadas'],
                                 ['ok', 'Registros ilimitados'],
                                 ['ok', 'Categorias ilimitadas'],
-                                ['ok', 'Parcelamento em até 48x'],
+                                ['ok', 'Parcelamento em até 48x (com juros)'],
                                 ['ok', 'Dashboard completo'],
+                                ['ok', 'Agenda financeira'],
                                 ['ok', 'Histórico ilimitado'],
-                                ['ok', 'Exportação PDF/Excel'],
-                                ['ok', 'Módulo de Cartão de Crédito'],
-                                ['ok', 'Compartilhamento familiar (4 membros)'],
-                                ['ok', 'Metas financeiras'],
+                                ['ok', 'Comprovantes e Anexos'],
+                                ['ok', 'App instalável (PWA)'],
                                 ['ok', 'Suporte VIP dedicado'],
                             ] as [$tipo, $item]
                         ): ?>

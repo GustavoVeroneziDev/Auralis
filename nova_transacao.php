@@ -723,72 +723,101 @@ require_once 'geral/header.php';
                         </div>
 
                         <!-- ── COMPROVANTES / ANEXOS ─────────────────────────── -->
+                        <?php
+                        $planoComp   = strtolower($_SESSION['plano'] ?? 'free');
+                        $testeComp   = function_exists('obterHorasRestantesTeste') ? (obterHorasRestantesTeste() > 0) : false;
+                        $podeAnexar  = ($planoComp === 'pro' || $planoComp === 'vip' || $testeComp);
+                        ?>
                         <div class="mb-4 pt-3 border-top border-border-color">
 
-                            <?php if (!empty($comprovantes)): ?>
-                                <div class="mb-3">
-                                    <div class="text-secondary-analysis fw-semibold fs-7 mb-2 d-flex align-items-center gap-2">
-                                        <i class="bi bi-paperclip"></i> Comprovantes anexados
+                            <?php if ($podeAnexar): ?>
+
+                                <?php if (!empty($comprovantes)): ?>
+                                    <div class="mb-3">
+                                        <div class="text-secondary-analysis fw-semibold fs-7 mb-2 d-flex align-items-center gap-2">
+                                            <i class="bi bi-paperclip"></i> Comprovantes anexados
+                                        </div>
+                                        <div id="listaComprovantes">
+                                            <?php foreach ($comprovantes as $comp): ?>
+                                                <?php $isImg = str_starts_with($comp['TipoMime'], 'image/'); ?>
+                                                <div class="d-flex align-items-center gap-2 mb-2 p-2 rounded-3"
+                                                    style="background:rgba(255,255,255,0.04); border:1px solid #333;"
+                                                    id="comp-<?= htmlspecialchars($comp['IDComprovante']) ?>">
+                                                    <i class="bi <?= $isImg ? 'bi-image' : 'bi-file-earmark-pdf' ?> flex-shrink-0"
+                                                        style="color:<?= $isImg ? '#6ee7c7' : '#f87171' ?>; font-size:1.05rem;"></i>
+                                                    <span class="text-secondary text-truncate flex-grow-1" style="font-size:0.8rem; max-width:180px;"
+                                                        title="<?= htmlspecialchars($comp['NomeOriginal']) ?>">
+                                                        <?= htmlspecialchars($comp['NomeOriginal']) ?>
+                                                    </span>
+                                                    <span class="text-secondary opacity-50 flex-shrink-0" style="font-size:0.7rem;">
+                                                        <?= round($comp['Tamanho'] / 1024) ?> KB
+                                                    </span>
+                                                    <a href="/comprovante/ver.php?id=<?= htmlspecialchars($comp['IDComprovante']) ?>"
+                                                        target="_blank"
+                                                        class="btn btn-sm rounded-circle d-flex align-items-center justify-content-center flex-shrink-0"
+                                                        style="width:28px;height:28px;padding:0;background:rgba(170,140,44,0.1);color:#AA8C2C;border:1px solid rgba(170,140,44,0.3);"
+                                                        title="Visualizar">
+                                                        <i class="bi bi-eye" style="font-size:0.7rem;"></i>
+                                                    </a>
+                                                    <a href="/comprovante/ver.php?id=<?= htmlspecialchars($comp['IDComprovante']) ?>&download=1"
+                                                        class="btn btn-sm rounded-circle d-flex align-items-center justify-content-center flex-shrink-0"
+                                                        style="width:28px;height:28px;padding:0;background:rgba(255,255,255,0.05);color:#888;border:1px solid #333;"
+                                                        title="Baixar">
+                                                        <i class="bi bi-download" style="font-size:0.65rem;"></i>
+                                                    </a>
+                                                    <button type="button"
+                                                        class="btn btn-sm rounded-circle d-flex align-items-center justify-content-center flex-shrink-0 btn-deletar-comp"
+                                                        data-id="<?= htmlspecialchars($comp['IDComprovante']) ?>"
+                                                        style="width:28px;height:28px;padding:0;background:rgba(230,57,70,0.1);color:#f87171;border:1px solid rgba(230,57,70,0.3);"
+                                                        title="Remover">
+                                                        <i class="bi bi-trash3" style="font-size:0.65rem;"></i>
+                                                    </button>
+                                                </div>
+                                            <?php endforeach; ?>
+                                        </div>
                                     </div>
-                                    <div id="listaComprovantes">
-                                        <?php foreach ($comprovantes as $comp): ?>
-                                            <?php $isImg = str_starts_with($comp['TipoMime'], 'image/'); ?>
-                                            <div class="d-flex align-items-center gap-2 mb-2 p-2 rounded-3"
-                                                style="background:rgba(255,255,255,0.04); border:1px solid #333;"
-                                                id="comp-<?= htmlspecialchars($comp['IDComprovante']) ?>">
-                                                <i class="bi <?= $isImg ? 'bi-image' : 'bi-file-earmark-pdf' ?> flex-shrink-0"
-                                                    style="color:<?= $isImg ? '#6ee7c7' : '#f87171' ?>; font-size:1.05rem;"></i>
-                                                <span class="text-secondary text-truncate flex-grow-1" style="font-size:0.8rem; max-width:180px;"
-                                                    title="<?= htmlspecialchars($comp['NomeOriginal']) ?>">
-                                                    <?= htmlspecialchars($comp['NomeOriginal']) ?>
-                                                </span>
-                                                <span class="text-secondary opacity-50 flex-shrink-0" style="font-size:0.7rem;">
-                                                    <?= round($comp['Tamanho'] / 1024) ?> KB
-                                                </span>
-                                                <a href="/comprovante/ver.php?id=<?= htmlspecialchars($comp['IDComprovante']) ?>"
-                                                    target="_blank"
-                                                    class="btn btn-sm rounded-circle d-flex align-items-center justify-content-center flex-shrink-0"
-                                                    style="width:28px;height:28px;padding:0;background:rgba(170,140,44,0.1);color:#AA8C2C;border:1px solid rgba(170,140,44,0.3);"
-                                                    title="Visualizar">
-                                                    <i class="bi bi-eye" style="font-size:0.7rem;"></i>
-                                                </a>
-                                                <a href="/comprovante/ver.php?id=<?= htmlspecialchars($comp['IDComprovante']) ?>&download=1"
-                                                    class="btn btn-sm rounded-circle d-flex align-items-center justify-content-center flex-shrink-0"
-                                                    style="width:28px;height:28px;padding:0;background:rgba(255,255,255,0.05);color:#888;border:1px solid #333;"
-                                                    title="Baixar">
-                                                    <i class="bi bi-download" style="font-size:0.65rem;"></i>
-                                                </a>
-                                                <button type="button"
-                                                    class="btn btn-sm rounded-circle d-flex align-items-center justify-content-center flex-shrink-0 btn-deletar-comp"
-                                                    data-id="<?= htmlspecialchars($comp['IDComprovante']) ?>"
-                                                    style="width:28px;height:28px;padding:0;background:rgba(230,57,70,0.1);color:#f87171;border:1px solid rgba(230,57,70,0.3);"
-                                                    title="Remover">
-                                                    <i class="bi bi-trash3" style="font-size:0.65rem;"></i>
-                                                </button>
-                                            </div>
-                                        <?php endforeach; ?>
+                                <?php endif; ?>
+
+                                <label class="text-secondary-analysis fw-semibold fs-7 mb-2 d-flex align-items-center gap-2" for="comprovantes">
+                                    <i class="bi bi-paperclip"></i>
+                                    <?= !empty($comprovantes) ? 'Adicionar mais arquivos' : 'Comprovante / Anexo' ?>
+                                    <span class="badge bg-secondary fw-normal" style="font-size:0.6rem;">Opcional</span>
+                                </label>
+
+                                <label for="comprovantes" id="dropzone"
+                                    class="d-flex flex-column align-items-center justify-content-center rounded-3 text-center"
+                                    style="border:2px dashed #333; padding:1.25rem 1rem; cursor:pointer; transition:border-color .2s, background .2s;">
+                                    <i class="bi bi-cloud-upload mb-1 text-secondary-analysis" style="font-size:1.5rem;"></i>
+                                    <span class="text-secondary" style="font-size:0.8rem;">Clique ou arraste arquivos aqui</span>
+                                    <span style="font-size:0.68rem; color:#444;">Imagens (JPG, PNG, WEBP) ou PDF · máx. 5 MB cada</span>
+                                </label>
+                                <input type="file" name="comprovantes[]" id="comprovantes"
+                                    accept="image/jpeg,image/png,image/webp,image/gif,application/pdf"
+                                    multiple class="d-none">
+
+                                <div id="previewNovos" class="mt-2"></div>
+
+                            <?php else: ?>
+
+                                <a href="/planos.php?upgrade=pro" class="d-flex align-items-center gap-3 rounded-3 text-decoration-none p-3"
+                                    style="border:1px dashed rgba(124,58,237,0.35); background:rgba(124,58,237,0.05);">
+                                    <div class="rounded-circle d-flex align-items-center justify-content-center flex-shrink-0"
+                                        style="width:38px;height:38px;background:rgba(124,58,237,0.12);border:1px solid rgba(124,58,237,0.3);">
+                                        <i class="bi bi-paperclip" style="color:#a78bfa; font-size:1rem;"></i>
                                     </div>
-                                </div>
+                                    <div>
+                                        <div class="d-flex align-items-center gap-2 mb-1">
+                                            <span class="text-light fw-semibold" style="font-size:0.85rem;">Comprovantes e Anexos</span>
+                                            <span class="badge rounded-pill" style="background:rgba(124,58,237,0.2);color:#a78bfa;border:1px solid rgba(124,58,237,0.4);font-size:0.62rem;padding:2px 7px;">
+                                                <i class="fi fi-br-crown" style="font-size:0.6rem;vertical-align:middle;margin-right:2px;"></i> PRO
+                                            </span>
+                                        </div>
+                                        <div class="text-secondary" style="font-size:0.75rem;">Anexe boletos, notas fiscais e comprovantes a qualquer registro. <span style="color:#a78bfa;">Fazer upgrade →</span></div>
+                                    </div>
+                                </a>
+
                             <?php endif; ?>
 
-                            <label class="text-secondary-analysis fw-semibold fs-7 mb-2 d-flex align-items-center gap-2" for="comprovantes">
-                                <i class="bi bi-paperclip"></i>
-                                <?= !empty($comprovantes) ? 'Adicionar mais arquivos' : 'Comprovante / Anexo' ?>
-                                <span class="badge bg-secondary fw-normal" style="font-size:0.6rem;">Opcional</span>
-                            </label>
-
-                            <label for="comprovantes" id="dropzone"
-                                class="d-flex flex-column align-items-center justify-content-center rounded-3 text-center"
-                                style="border:2px dashed #333; padding:1.25rem 1rem; cursor:pointer; transition:border-color .2s, background .2s;">
-                                <i class="bi bi-cloud-upload mb-1 text-secondary-analysis" style="font-size:1.5rem;"></i>
-                                <span class="text-secondary" style="font-size:0.8rem;">Clique ou arraste arquivos aqui</span>
-                                <span style="font-size:0.68rem; color:#444;">Imagens (JPG, PNG, WEBP) ou PDF · máx. 5 MB cada</span>
-                            </label>
-                            <input type="file" name="comprovantes[]" id="comprovantes"
-                                accept="image/jpeg,image/png,image/webp,image/gif,application/pdf"
-                                multiple class="d-none">
-
-                            <div id="previewNovos" class="mt-2"></div>
                         </div>
 
                         <div class="d-grid mt-2">
