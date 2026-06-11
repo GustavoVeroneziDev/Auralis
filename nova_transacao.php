@@ -110,7 +110,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
     if (!$erro) {
         $valor = $valorRaw; // O valor já está limpo
-        $dataVencimento = !empty($dataVencimento) ? $dataVencimento : null;
+        $dataVencimento = !empty($dataVencimento) ? $dataVencimento : $dataRegistro;
 
         try {
             if (isset($_POST['id_editar']) && !empty($_POST['id_editar'])) {
@@ -641,7 +641,8 @@ require_once 'geral/header.php';
                                         <?php endif; ?>
 
                                         <!-- ── 3. DATA LIMITE PARA PAGAMENTO ─────────────────── -->
-                                        <div class="pt-3 border-top border-border-color">
+                                        <div id="bloco-vencimento" class="pt-3 border-top border-border-color"
+                                             style="<?= $val_rec ? 'display:none;' : '' ?>">
                                             <label class="text-light fw-semibold fs-7 mb-1 d-flex align-items-center gap-2">
                                                 <i class="bi bi-calendar-x text-danger"></i>
                                                 Data limite para pagamento
@@ -854,6 +855,9 @@ require_once 'geral/header.php';
         checkRecorrente.addEventListener('change', function() {
             blocoRecorrencia.style.display = this.checked ? 'block' : 'none';
             inputDia.required = this.checked;
+            // Esconde vencimento (recorrente usa o próprio dia de recorrência)
+            const blocoVenc = document.getElementById('bloco-vencimento');
+            if (blocoVenc) blocoVenc.style.display = this.checked ? 'none' : '';
             // Desativa parcelamento se recorrente for ligado
             if (this.checked && toggleParcelado && toggleParcelado.checked) {
                 toggleParcelado.checked = false;

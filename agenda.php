@@ -74,10 +74,11 @@ if (isset($_GET['ajax']) && $_GET['acao'] === 'listar') {
 
         $stmtSb = $pdo->prepare("
             SELECT r.IDRegistro as id, r.TipoRegistro as tipo, r.Descricao as titulo,
-                   r.Valor as valor, r.DataVencimento as data_vencimento
+                   r.Valor as valor,
+                   COALESCE(r.DataVencimento, r.MomentoRegistro) as data_vencimento
             FROM Registro r
-            WHERE r.FKUsuario = :uid AND r.StatusRegistro = 'pendente' AND r.DataVencimento IS NOT NULL
-            $carteiraFilter ORDER BY r.DataVencimento ASC");
+            WHERE r.FKUsuario = :uid AND r.StatusRegistro = 'pendente'
+            $carteiraFilter ORDER BY COALESCE(r.DataVencimento, r.MomentoRegistro) ASC");
         $stmtSb->execute($sidebarParams);
 
         $hoje    = date('Y-m-d');
