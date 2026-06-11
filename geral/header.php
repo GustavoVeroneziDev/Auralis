@@ -221,19 +221,21 @@ $paginaAtual = basename($_SERVER['PHP_SELF']);
 
                         <div class="mb-4 d-inline-flex justify-content-center align-items-center bg-dark border border-secondary-subtle rounded-circle shadow-lg"
                             style="width: 80px; height: 80px;">
-                            <i class="bi bi-phone" style="font-size: 2.2rem; color: var(--accent);"></i>
+                            <i id="installModalIcon" class="bi bi-phone" style="font-size: 2.2rem; color: var(--accent);"></i>
                         </div>
 
-                        <h4 class="text-light fw-bold mb-2">Instale o Auralis</h4>
-                        <p class="text-secondary mb-4" style="font-size: 0.9rem; line-height: 1.6;">
-                            Acesse suas finanças direto da tela inicial do seu celular — sem abrir o navegador, sem digitar endereço. Rápido como um app nativo.
+                        <h4 id="installModalTitle" class="text-light fw-bold mb-2">Instale o Auralis</h4>
+                        <p id="installModalDesc" class="text-secondary mb-4" style="font-size: 0.9rem; line-height: 1.6;">
+                            Acesse suas finanças direto da tela inicial — sem abrir o navegador, sem digitar endereço. Rápido como um app nativo.
                         </p>
 
-                        <button onclick="auralisInstalar(); bootstrap.Modal.getInstance(document.getElementById('modalInstalarApp')).hide();"
-                            class="btn w-100 fw-bold text-dark rounded-pill py-3 mb-3 shadow-lg"
-                            style="background: linear-gradient(135deg, #FFB800 0%, #D4AF37 100%); font-size: 0.95rem;">
-                            <i class="bi bi-download me-2"></i> Instalar Agora
-                        </button>
+                        <div id="installModalAction">
+                            <button onclick="auralisInstalar(); bootstrap.Modal.getInstance(document.getElementById('modalInstalarApp')).hide();"
+                                class="btn w-100 fw-bold text-dark rounded-pill py-3 mb-3 shadow-lg"
+                                style="background: linear-gradient(135deg, #FFB800 0%, #D4AF37 100%); font-size: 0.95rem;">
+                                <i class="bi bi-download me-2"></i> Instalar Agora
+                            </button>
+                        </div>
 
                         <button type="button"
                             class="btn btn-link text-secondary text-decoration-none w-100"

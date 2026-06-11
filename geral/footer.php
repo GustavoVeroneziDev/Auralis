@@ -53,58 +53,136 @@
 
 <script>
     // ─────────────────────────────────────────────────────────────
-    // PWA: Registro do Service Worker + captura do install prompt
+    // PWA: Service Worker + detecção de plataforma + install prompt
     // ─────────────────────────────────────────────────────────────
     (function() {
-        // 1. Registra o service worker
+        var ua = navigator.userAgent;
+        var isIOS        = /iPad|iPhone|iPod/.test(ua) && !window.MSStream;
+        var isAndroid    = /Android/.test(ua);
+        var isMobile     = isIOS || isAndroid || window.innerWidth < 768;
+        var isStandalone = window.matchMedia('(display-mode: standalone)').matches
+                        || window.navigator.standalone === true;
+
+        // ── Atualiza o conteúdo do modal conforme o dispositivo ──────────
+        window.atualizarModalInstalar = function(tipo) {
+            var icon   = document.getElementById('installModalIcon');
+            var title  = document.getElementById('installModalTitle');
+            var desc   = document.getElementById('installModalDesc');
+            var action = document.getElementById('installModalAction');
+            if (!icon || !title || !desc || !action) return;
+
+            if (tipo === 'ios') {
+                icon.className  = 'bi bi-box-arrow-up';
+                title.textContent = 'Instale no iPhone / iPad';
+                desc.innerHTML  = 'Adicione o Auralis à tela inicial para acesso rápido, sem abrir o navegador.';
+                action.innerHTML = `
+                    <div class="text-start p-3 rounded-3 mb-3" style="background:rgba(255,255,255,0.05);font-size:0.87rem;line-height:1.8;">
+                        <div class="d-flex align-items-center gap-2 mb-2 text-light">
+                            <span class="fw-bold d-flex align-items-center justify-content-center rounded-circle text-dark flex-shrink-0"
+                                  style="background:#d4af37;width:22px;height:22px;font-size:0.75rem;">1</span>
+                            Toque em <i class="bi bi-box-arrow-up mx-1" style="color:#d4af37;font-size:1rem;"></i> <strong>Compartilhar</strong>
+                        </div>
+                        <div class="d-flex align-items-center gap-2 text-light">
+                            <span class="fw-bold d-flex align-items-center justify-content-center rounded-circle text-dark flex-shrink-0"
+                                  style="background:#d4af37;width:22px;height:22px;font-size:0.75rem;">2</span>
+                            Toque em <strong class="ms-1">"Adicionar à Tela de Início"</strong>
+                        </div>
+                    </div>`;
+            } else if (tipo === 'desktop') {
+                icon.className  = 'bi bi-display';
+                title.textContent = 'Instale o Auralis no PC';
+                desc.innerHTML  = 'Abra o Auralis como aplicativo na sua área de trabalho — acesso rápido, janela dedicada, sem abas do navegador.';
+                action.innerHTML = `
+                    <button onclick="auralisInstalar(); bootstrap.Modal.getInstance(document.getElementById('modalInstalarApp')).hide();"
+                        class="btn w-100 fw-bold text-dark rounded-pill py-3 mb-3 shadow-lg"
+                        style="background:linear-gradient(135deg,#FFB800 0%,#D4AF37 100%);font-size:0.95rem;">
+                        <i class="bi bi-download me-2"></i> Instalar no PC
+                    </button>`;
+            } else {
+                // Android / padrão
+                icon.className  = 'bi bi-phone';
+                title.textContent = 'Instale o Auralis';
+                desc.innerHTML  = 'Acesse suas finanças direto da tela inicial — sem abrir o navegador, sem digitar endereço. Rápido como um app nativo.';
+                action.innerHTML = `
+                    <button onclick="auralisInstalar(); bootstrap.Modal.getInstance(document.getElementById('modalInstalarApp')).hide();"
+                        class="btn w-100 fw-bold text-dark rounded-pill py-3 mb-3 shadow-lg"
+                        style="background:linear-gradient(135deg,#FFB800 0%,#D4AF37 100%);font-size:0.95rem;">
+                        <i class="bi bi-download me-2"></i> Instalar Agora
+                    </button>`;
+            }
+        };
+
+        // ── Registra o Service Worker ────────────────────────────────────
         if ('serviceWorker' in navigator) {
             navigator.serviceWorker.register('/sw.js').catch(function() {});
         }
 
-        // 2. Captura o evento do browser antes que ele suma
+        // ── Já está instalado como PWA → esconde tudo ────────────────────
+        if (isStandalone) {
+            document.querySelectorAll('.btn-instalar-app').forEach(function(btn) {
+                var li = btn.closest('li');
+                if (li) li.style.display = 'none';
+            });
+            return; // nada mais a fazer
+        }
+
+        // ── iOS: beforeinstallprompt nunca dispara; mostramos instruções manuais ──
+        if (isIOS) {
+            document.querySelectorAll('.btn-instalar-app').forEach(function(btn) {
+                btn.style.display = '';
+            });
+            var jaViu = localStorage.getItem('auralis_install_prompt_visto');
+            var modalEl = document.getElementById('modalInstalarApp');
+            if (!jaViu && modalEl) {
+                setTimeout(function() {
+                    window.atualizarModalInstalar('ios');
+                    new bootstrap.Modal(modalEl).show();
+                    localStorage.setItem('auralis_install_prompt_visto', '1');
+                }, 2500);
+            }
+        }
+
+        // ── Chrome / Android / Edge: captura o evento nativo ────────────
         window.auralisInstallPrompt = null;
         window.addEventListener('beforeinstallprompt', function(e) {
-            e.preventDefault(); // Impede o mini-infobar automático do Chrome
+            e.preventDefault();
             window.auralisInstallPrompt = e;
 
-            // Avisa os botões de instalação que o prompt está disponível
             document.querySelectorAll('.btn-instalar-app').forEach(function(btn) {
                 btn.style.display = '';
             });
 
-            // Mostra o modal de instalação na primeira visita (só 1x por device)
             var jaViu = localStorage.getItem('auralis_install_prompt_visto');
             var modalEl = document.getElementById('modalInstalarApp');
             if (!jaViu && modalEl) {
-                // Pequeno delay para não competir com outros modais de onboarding
                 setTimeout(function() {
-                    var modal = new bootstrap.Modal(modalEl);
-                    modal.show();
+                    window.atualizarModalInstalar(isMobile ? 'mobile' : 'desktop');
+                    new bootstrap.Modal(modalEl).show();
                     localStorage.setItem('auralis_install_prompt_visto', '1');
                 }, 2500);
             }
         });
 
-        // 3. Função global chamada pelos botões "Instalar"
+        // ── Função global chamada pelos botões "Instalar" ────────────────
         window.auralisInstalar = function() {
+            if (isIOS) {
+                // iOS não tem prompt nativo — mostra modal com instruções
+                var modalEl = document.getElementById('modalInstalarApp');
+                if (modalEl) {
+                    window.atualizarModalInstalar('ios');
+                    new bootstrap.Modal(modalEl).show();
+                }
+                return;
+            }
             if (!window.auralisInstallPrompt) return;
             window.auralisInstallPrompt.prompt();
-            window.auralisInstallPrompt.userChoice.then(function(result) {
+            window.auralisInstallPrompt.userChoice.then(function() {
                 window.auralisInstallPrompt = null;
-                // Esconde todos os botões após a escolha (instalou ou recusou)
                 document.querySelectorAll('.btn-instalar-app').forEach(function(btn) {
                     btn.closest('li') ? btn.closest('li').style.display = 'none' : btn.style.display = 'none';
                 });
             });
         };
-
-        // 4. Se já instalou como PWA, esconde tudo permanentemente
-        if (window.matchMedia('(display-mode: standalone)').matches) {
-            document.querySelectorAll('.btn-instalar-app').forEach(function(btn) {
-                var li = btn.closest('li');
-                if (li) li.style.display = 'none';
-            });
-        }
     })();
 </script>
 </body>

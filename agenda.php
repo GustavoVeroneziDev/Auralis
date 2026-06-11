@@ -329,10 +329,12 @@ require_once 'geral/header.php';
     .calendar-day {
         background-color: #1c1f24;
         min-height: 110px;
+        max-height: 200px;
         padding: 6px;
         display: flex;
         flex-direction: column;
         position: relative;
+        overflow: hidden;
         transition: background-color 0.15s ease;
     }
 
@@ -400,6 +402,8 @@ require_once 'geral/header.php';
         transition: filter 0.1s ease, transform 0.1s ease;
         overflow: hidden;
         white-space: nowrap;
+        max-width: 100%;
+        min-width: 0;
     }
 
     .calendar-event:hover {
@@ -501,6 +505,104 @@ require_once 'geral/header.php';
 
     .calendar-day:not(.empty) {
         cursor: pointer;
+    }
+
+    /* ── Responsividade ──────────────────────────────────────────────── */
+
+    /* Tablet (< 900px) */
+    @media (max-width: 899px) {
+        .calendar-day {
+            min-height: 85px;
+            padding: 4px;
+        }
+        .calendar-event {
+            font-size: 0.65rem;
+            padding: 2px 4px;
+        }
+        .day-events {
+            max-height: 72px;
+            gap: 2px;
+        }
+    }
+
+    /* Mobile grande (< 640px) */
+    @media (max-width: 639px) {
+        .calendar-day {
+            min-height: 66px;
+            max-height: 120px;
+            padding: 3px;
+        }
+        .calendar-day-header {
+            padding: 7px 2px;
+            font-size: 0.6rem;
+            letter-spacing: 0;
+        }
+        .day-number {
+            font-size: 0.68rem;
+        }
+        .calendar-day.today .day-number {
+            width: 19px;
+            height: 19px;
+            font-size: 0.62rem;
+        }
+        .calendar-event {
+            font-size: 0.6rem;
+            padding: 2px 3px;
+            border-radius: 4px;
+        }
+        .day-events {
+            max-height: 52px;
+            gap: 2px;
+        }
+        .day-actions {
+            display: none !important;
+        }
+    }
+
+    /* Mobile pequeno (< 480px): eventos viram barras coloridas, sem texto */
+    @media (max-width: 479px) {
+        .calendar-day {
+            min-height: 52px;
+            max-height: 90px;
+            padding: 3px 2px;
+        }
+        .calendar-day-header {
+            padding: 5px 1px;
+            font-size: 0.55rem;
+        }
+        .day-number {
+            font-size: 0.6rem;
+            margin-bottom: 2px;
+        }
+        .calendar-day.today .day-number {
+            width: 17px;
+            height: 17px;
+            font-size: 0.55rem;
+        }
+        .day-events {
+            flex-direction: row;
+            flex-wrap: wrap;
+            max-height: 28px;
+            gap: 2px;
+            overflow: hidden;
+        }
+        .calendar-event {
+            width: 8px;
+            height: 8px;
+            min-width: 8px;
+            min-height: 8px;
+            padding: 0;
+            border-radius: 2px;
+            flex-shrink: 0;
+        }
+        .calendar-event i,
+        .event-desc {
+            display: none !important;
+        }
+        .calendar-event.evento-pago     { background-color: rgba(6,214,160,0.55); }
+        .calendar-event.evento-atrasado { background-color: rgba(230,57,70,0.65); }
+        .calendar-event.evento-hoje     { background-color: rgba(255,184,0,0.65); }
+        .calendar-event.evento-pendente { background-color: rgba(59,130,246,0.55); }
     }
 </style>
 
