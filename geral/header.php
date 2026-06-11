@@ -21,6 +21,7 @@ $paginaAtual = basename($_SERVER['PHP_SELF']);
     <link rel="apple-touch-icon" href="/geral/img/LogoAuralisSemEscudo.png">
 
     <link href="/geral/fonts/inter.css" rel="stylesheet">
+    <link href="/geral/fonts/aquire.css" rel="stylesheet">
     <link href="/geral/css/bootstrap.min.css" rel="stylesheet">
     <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.css" rel="stylesheet">
     <link rel='stylesheet' href='https://cdn-uicons.flaticon.com/uicons-bold-rounded/css/uicons-bold-rounded.css'>
@@ -35,9 +36,10 @@ $paginaAtual = basename($_SERVER['PHP_SELF']);
 
         <div class="container-fluid px-3 px-xl-5" style="max-width: 1500px;">
 
-            <a class="navbar-brand fw-bold fs-3 d-flex align-items-center" href="<?php echo isset($_SESSION['usuario_id']) ? '/dashboard.php' : '/geral/index.php'; ?>" style="letter-spacing: -0.05em;">
-                <img src="/geral/img/LogoAuralisSemEscudo.png" alt="Logo Auralis" class="me-2" style="height: 38px; width: auto; object-fit: contain;">
-                <span style="color: gold !important;">Aura</span><span class="text-light">lis</span>
+            <a class="navbar-brand d-flex align-items-center" href="<?php echo isset($_SESSION['usuario_id']) ? '/dashboard.php' : '/geral/index.php'; ?>"
+               style="font-family: 'Aquire', sans-serif; font-weight: 700; font-size: 1.6rem; letter-spacing: 0.04em; text-decoration: none;">
+                <img src="/geral/img/LogoAuralisSemEscudo.png" alt="Logo Auralis" class="me-2" style="height: 36px; width: auto; object-fit: contain;">
+                <span style="color: gold;">Aura</span><span class="text-light" style="font-weight: 300;">lis</span>
             </a>
 
             <button class="navbar-toggler border-0 shadow-none p-2" type="button" data-bs-toggle="collapse"
