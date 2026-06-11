@@ -143,10 +143,6 @@ require_once 'geral/header.php';
     <div class="mb-4 border-bottom border-secondary-subtle pb-3">
         <div class="d-flex flex-column flex-lg-row justify-content-between align-items-lg-center gap-3">
 
-            <h2 class="fw-bold text-light mb-0 d-flex align-items-center gap-2" style="font-size: clamp(1.2rem, 3vw, 1.5rem);">
-                <i class="bi bi-calendar3" style="color:#AA8C2C;"></i> Agenda Financeira
-            </h2>
-
             <div class="d-flex align-items-center gap-2 gap-md-3 w-100 w-lg-auto flex-wrap">
 
                 <!-- Filtro de carteira -->
@@ -515,10 +511,12 @@ require_once 'geral/header.php';
             min-height: 85px;
             padding: 4px;
         }
+
         .calendar-event {
             font-size: 0.65rem;
             padding: 2px 4px;
         }
+
         .day-events {
             max-height: 72px;
             gap: 2px;
@@ -532,28 +530,34 @@ require_once 'geral/header.php';
             max-height: 120px;
             padding: 3px;
         }
+
         .calendar-day-header {
             padding: 7px 2px;
             font-size: 0.6rem;
             letter-spacing: 0;
         }
+
         .day-number {
             font-size: 0.68rem;
         }
+
         .calendar-day.today .day-number {
             width: 19px;
             height: 19px;
             font-size: 0.62rem;
         }
+
         .calendar-event {
             font-size: 0.6rem;
             padding: 2px 3px;
             border-radius: 4px;
         }
+
         .day-events {
             max-height: 52px;
             gap: 2px;
         }
+
         .day-actions {
             display: none !important;
         }
@@ -566,19 +570,23 @@ require_once 'geral/header.php';
             max-height: 90px;
             padding: 3px 2px;
         }
+
         .calendar-day-header {
             padding: 5px 1px;
             font-size: 0.55rem;
         }
+
         .day-number {
             font-size: 0.6rem;
             margin-bottom: 2px;
         }
+
         .calendar-day.today .day-number {
             width: 17px;
             height: 17px;
             font-size: 0.55rem;
         }
+
         .day-events {
             flex-direction: row;
             flex-wrap: wrap;
@@ -586,6 +594,7 @@ require_once 'geral/header.php';
             gap: 2px;
             overflow: hidden;
         }
+
         .calendar-event {
             width: 8px;
             height: 8px;
@@ -595,14 +604,27 @@ require_once 'geral/header.php';
             border-radius: 2px;
             flex-shrink: 0;
         }
+
         .calendar-event i,
         .event-desc {
             display: none !important;
         }
-        .calendar-event.evento-pago     { background-color: rgba(6,214,160,0.55); }
-        .calendar-event.evento-atrasado { background-color: rgba(230,57,70,0.65); }
-        .calendar-event.evento-hoje     { background-color: rgba(255,184,0,0.65); }
-        .calendar-event.evento-pendente { background-color: rgba(59,130,246,0.55); }
+
+        .calendar-event.evento-pago {
+            background-color: rgba(6, 214, 160, 0.55);
+        }
+
+        .calendar-event.evento-atrasado {
+            background-color: rgba(230, 57, 70, 0.65);
+        }
+
+        .calendar-event.evento-hoje {
+            background-color: rgba(255, 184, 0, 0.65);
+        }
+
+        .calendar-event.evento-pendente {
+            background-color: rgba(59, 130, 246, 0.55);
+        }
     }
 </style>
 
@@ -772,8 +794,8 @@ require_once 'geral/header.php';
     function abrirModalDia(dataStr, transacoesDoDia) {
         const parts = dataStr.split('-');
         const dt = new Date(parseInt(parts[0]), parseInt(parts[1]) - 1, parseInt(parts[2]));
-        const diasLong  = ['Domingo','Segunda-feira','Terça-feira','Quarta-feira','Quinta-feira','Sexta-feira','Sábado'];
-        const mesesLong = ['Janeiro','Fevereiro','Março','Abril','Maio','Junho','Julho','Agosto','Setembro','Outubro','Novembro','Dezembro'];
+        const diasLong = ['Domingo', 'Segunda-feira', 'Terça-feira', 'Quarta-feira', 'Quinta-feira', 'Sexta-feira', 'Sábado'];
+        const mesesLong = ['Janeiro', 'Fevereiro', 'Março', 'Abril', 'Maio', 'Junho', 'Julho', 'Agosto', 'Setembro', 'Outubro', 'Novembro', 'Dezembro'];
 
         document.getElementById('modalDiaTitulo').textContent =
             `${diasLong[dt.getDay()]}, ${dt.getDate()} de ${mesesLong[dt.getMonth()]}`;
@@ -786,12 +808,12 @@ require_once 'geral/header.php';
             body.innerHTML = `<div class="text-center text-secondary py-5" style="font-size:0.88rem;">Nenhuma transação registrada neste dia.</div>`;
         } else {
             body.innerHTML = transacoesDoDia.map(t => {
-                const isRec  = t.tipo === 'receita';
+                const isRec = t.tipo === 'receita';
                 const corVal = isRec ? '#6ee7c7' : '#f87171';
-                const sinal  = isRec ? '+' : '-';
-                const statusBadge = t.status === 'efetivado'
-                    ? `<span class="badge rounded-pill" style="background:rgba(6,214,160,0.15);color:#6ee7c7;border:1px solid rgba(6,214,160,0.3);font-size:0.65rem;white-space:nowrap;">Efetivado</span>`
-                    : `<span class="badge rounded-pill" style="background:rgba(255,184,0,0.15);color:#f5e2a0;border:1px solid rgba(255,184,0,0.3);font-size:0.65rem;white-space:nowrap;">Pendente</span>`;
+                const sinal = isRec ? '+' : '-';
+                const statusBadge = t.status === 'efetivado' ?
+                    `<span class="badge rounded-pill" style="background:rgba(6,214,160,0.15);color:#6ee7c7;border:1px solid rgba(6,214,160,0.3);font-size:0.65rem;white-space:nowrap;">Efetivado</span>` :
+                    `<span class="badge rounded-pill" style="background:rgba(255,184,0,0.15);color:#f5e2a0;border:1px solid rgba(255,184,0,0.3);font-size:0.65rem;white-space:nowrap;">Pendente</span>`;
 
                 return `<div class="d-flex align-items-center gap-3 px-4 py-3 border-bottom border-secondary-subtle"
                              style="cursor:pointer;transition:background .12s ease;"
@@ -866,27 +888,27 @@ require_once 'geral/header.php';
             );
 
             transacoesDoDia.forEach(t => {
-                    const isRec = t.tipo === 'receita';
-                    const cls = classEvento(t, dataStr);
+                const isRec = t.tipo === 'receita';
+                const cls = classEvento(t, dataStr);
 
-                    const pill = document.createElement('div');
-                    pill.className = `calendar-event ${cls}`;
-                    pill.title = `${t.titulo} — ${formatarMoeda(t.valor)}`;
-                    pill.onclick = (e) => {
-                        e.stopPropagation();
-                        window.location.href = `nova_transacao.php?voltar=agenda.php&editar=${encodeURIComponent(t.id)}`;
-                    };
+                const pill = document.createElement('div');
+                pill.className = `calendar-event ${cls}`;
+                pill.title = `${t.titulo} — ${formatarMoeda(t.valor)}`;
+                pill.onclick = (e) => {
+                    e.stopPropagation();
+                    window.location.href = `nova_transacao.php?voltar=agenda.php&editar=${encodeURIComponent(t.id)}`;
+                };
 
-                    const arrow = isRec ?
-                        `<i class="bi bi-arrow-up-short" style="color:#6ee7c7;font-size:0.95rem;flex-shrink:0;line-height:1;"></i>` :
-                        `<i class="bi bi-arrow-down-short" style="color:#f87171;font-size:0.95rem;flex-shrink:0;line-height:1;"></i>`;
-                    const rep = (t.Recorrente == 1) ?
-                        `<i class="bi bi-arrow-repeat ms-1" style="opacity:0.55;font-size:0.6rem;flex-shrink:0;"></i>` :
-                        '';
+                const arrow = isRec ?
+                    `<i class="bi bi-arrow-up-short" style="color:#6ee7c7;font-size:0.95rem;flex-shrink:0;line-height:1;"></i>` :
+                    `<i class="bi bi-arrow-down-short" style="color:#f87171;font-size:0.95rem;flex-shrink:0;line-height:1;"></i>`;
+                const rep = (t.Recorrente == 1) ?
+                    `<i class="bi bi-arrow-repeat ms-1" style="opacity:0.55;font-size:0.6rem;flex-shrink:0;"></i>` :
+                    '';
 
-                    pill.innerHTML = `${arrow}<span class="event-desc">${esc(t.titulo)}</span>${rep}`;
-                    eventsDiv.appendChild(pill);
-                });
+                pill.innerHTML = `${arrow}<span class="event-desc">${esc(t.titulo)}</span>${rep}`;
+                eventsDiv.appendChild(pill);
+            });
 
             cel.appendChild(eventsDiv);
 
@@ -916,15 +938,15 @@ require_once 'geral/header.php';
             <div class="modal-body p-0" id="modalDiaBody"></div>
             <div class="modal-footer border-top border-secondary-subtle px-4 gap-2 justify-content-start flex-wrap">
                 <a id="modalDiaBtnReceita" href="#" class="btn btn-sm rounded-pill fw-semibold"
-                   style="background:rgba(6,214,160,0.15);color:#6ee7c7;border:1px solid rgba(6,214,160,0.4);">
+                    style="background:rgba(6,214,160,0.15);color:#6ee7c7;border:1px solid rgba(6,214,160,0.4);">
                     <i class="bi bi-arrow-up-short me-1"></i> Nova Receita
                 </a>
                 <a id="modalDiaBtnDespesa" href="#" class="btn btn-sm rounded-pill fw-semibold"
-                   style="background:rgba(230,57,70,0.15);color:#f87171;border:1px solid rgba(230,57,70,0.4);">
+                    style="background:rgba(230,57,70,0.15);color:#f87171;border:1px solid rgba(230,57,70,0.4);">
                     <i class="bi bi-arrow-down-short me-1"></i> Nova Despesa
                 </a>
                 <button type="button" class="btn btn-link text-secondary text-decoration-none ms-auto p-0"
-                        data-bs-dismiss="modal" style="font-size:0.82rem;">Fechar</button>
+                    data-bs-dismiss="modal" style="font-size:0.82rem;">Fechar</button>
             </div>
         </div>
     </div>
