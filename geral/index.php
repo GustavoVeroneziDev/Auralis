@@ -96,12 +96,14 @@ if (isset($_SESSION['usuario_id'])) {
                     'color' => '#38bdf8',
                     'title' => 'Agenda financeira',
                     'desc'  => 'Visualize todas as suas transações num calendário mensal. Clique em qualquer dia para ver o detalhe, ou use os botões de + para adicionar receitas e despesas diretamente.',
+                    'badge' => 'PRO',
                 ],
                 [
                     'icon'  => 'bi-pie-chart-fill',
                     'color' => '#f59e0b',
                     'title' => 'Análises por categoria',
                     'desc'  => 'Gráfico de distribuição com % por fatia. Clique numa categoria e veja o histórico detalhado com comparativo do mês anterior — quanto gastou em Lazer em abril vs maio.',
+                    'badge' => 'PRO',
                 ],
                 [
                     'icon'  => 'bi-wallet2',

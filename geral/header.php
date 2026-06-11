@@ -3,6 +3,16 @@ if (session_status() === PHP_SESSION_NONE) {
     session_start();
 }
 $paginaAtual = basename($_SERVER['PHP_SELF']);
+
+// Calcula horas de teste uma única vez — usado tanto no banner quanto nos badges do nav
+$horasRestantes = 0;
+if (isset($_SESSION['usuario_id']) && function_exists('obterHorasRestantesTeste')) {
+    $horasRestantes = obterHorasRestantesTeste();
+}
+// Flag: usuário Free sem trial ativo — exibe badges de plano nos itens de nav bloqueados
+$_ehFreeRestrito = isset($_SESSION['usuario_id'])
+    && strtolower($_SESSION['plano'] ?? 'free') === 'free'
+    && $horasRestantes <= 0;
 ?>
 <!DOCTYPE html>
 <html lang="pt-BR" data-bs-theme="dark">
@@ -63,13 +73,19 @@ $paginaAtual = basename($_SERVER['PHP_SELF']);
                             </a>
                         </li>
                         <li class="nav-item">
-                            <a class="nav-link custom-link py-3 py-lg-2 <?php echo ($paginaAtual == 'analises.php') ? 'text-warning active' : ''; ?>" href="/analises.php">
+                            <a class="nav-link custom-link py-3 py-lg-2 d-flex align-items-center gap-1 <?php echo ($paginaAtual == 'analises.php') ? 'text-warning active' : ''; ?>" href="/analises.php">
                                 <i class="bi bi-graph-up-arrow me-2"></i> Análises
+                                <?php if ($_ehFreeRestrito): ?>
+                                    <span style="background:#7c3aed22;color:#a78bfa;border:1px solid #7c3aed55;border-radius:999px;padding:1px 5px;font-size:0.5rem;font-weight:700;letter-spacing:0.04em;line-height:1.6;flex-shrink:0;"><i class="bi bi-star-fill" style="font-size:0.45rem;vertical-align:middle;margin-right:1px;"></i>PRO</span>
+                                <?php endif; ?>
                             </a>
                         </li>
                         <li class="nav-item">
-                            <a class="nav-link custom-link py-3 py-lg-2 <?php echo ($paginaAtual == 'agenda.php') ? 'text-warning active' : ''; ?>" href="/agenda.php">
+                            <a class="nav-link custom-link py-3 py-lg-2 d-flex align-items-center gap-1 <?php echo ($paginaAtual == 'agenda.php') ? 'text-warning active' : ''; ?>" href="/agenda.php">
                                 <i class="bi bi-calendar3 me-2"></i> Agenda
+                                <?php if ($_ehFreeRestrito): ?>
+                                    <span style="background:#7c3aed22;color:#a78bfa;border:1px solid #7c3aed55;border-radius:999px;padding:1px 5px;font-size:0.5rem;font-weight:700;letter-spacing:0.04em;line-height:1.6;flex-shrink:0;"><i class="bi bi-star-fill" style="font-size:0.45rem;vertical-align:middle;margin-right:1px;"></i>PRO</span>
+                                <?php endif; ?>
                             </a>
                         </li>
                         <li class="nav-item">
@@ -186,14 +202,7 @@ $paginaAtual = basename($_SERVER['PHP_SELF']);
             </div>
         </div>
     </nav>
-    <?php
-    // PROTEÇÃO: Só tenta calcular se a pessoa estiver logada E se a função já tiver carregado
-    $horasRestantes = 0;
-    if (isset($_SESSION['usuario_id']) && function_exists('obterHorasRestantesTeste')) {
-        $horasRestantes = obterHorasRestantesTeste();
-    }
-
-    if ($horasRestantes > 0):
+    <?php if ($horasRestantes > 0):
     ?>
         <div class="container-fluid px-0">
             <div class="alert mb-0 text-center shadow-sm" style="background: linear-gradient(90deg, #ca8a04, #eab308); color: #fff; border: none; border-radius: 0; padding: 0.5rem;">

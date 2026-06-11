@@ -114,6 +114,18 @@ try {
     $erro = "Erro ao buscar as suas carteiras.";
 }
 
+// Determina carteiras bloqueadas (Free sem trial com mais de 1 carteira)
+require_once '../config/funcoes.php';
+$_planoLC  = strtolower($_SESSION['plano'] ?? 'free');
+$_testeLC  = function_exists('obterHorasRestantesTeste') ? (obterHorasRestantesTeste() > 0) : false;
+$_limitesLC = limitesDoPlano();
+$carteiras_bloqueadas_ids = [];
+if ($_planoLC === 'free' && !$_testeLC && $_limitesLC['carteiras'] !== PHP_INT_MAX) {
+    for ($i = $_limitesLC['carteiras']; $i < count($carteiras); $i++) {
+        $carteiras_bloqueadas_ids[] = $carteiras[$i]['IDCarteira'];
+    }
+}
+
 // Volta uma pasta para achar o header
 require_once '../geral/header.php';
 ?>
@@ -126,9 +138,18 @@ require_once '../geral/header.php';
             <a href="../dashboard.php" class="btn btn-outline-secondary btn-sm rounded-pill px-3 transition-hover d-flex align-items-center">
                 <i class="bi bi-arrow-left me-1"></i> Voltar
             </a>
-            <button type="button" onclick="abrirModalCarteira()" class="btn btn-gold btn-sm rounded-pill px-4 fw-bold text-dark transition-hover shadow-sm d-flex align-items-center">
-                <i class="bi bi-plus-circle me-2"></i> Nova Carteira
-            </button>
+            <?php
+            $_podeNovaCat = ($_limitesLC['carteiras'] === PHP_INT_MAX) || count($carteiras) < $_limitesLC['carteiras'] || $_testeLC;
+            ?>
+            <?php if ($_podeNovaCat): ?>
+                <button type="button" onclick="abrirModalCarteira()" class="btn btn-gold btn-sm rounded-pill px-4 fw-bold text-dark transition-hover shadow-sm d-flex align-items-center">
+                    <i class="bi bi-plus-circle me-2"></i> Nova Carteira
+                </button>
+            <?php else: ?>
+                <a href="/planos.php?upgrade=pro" class="btn btn-sm rounded-pill fw-semibold d-flex align-items-center gap-1" style="background:#7c3aed22;color:#a78bfa;border:1px solid #7c3aed55;">
+                    <i class="bi bi-lock-fill"></i> Limite atingido — <strong>PRO</strong>
+                </a>
+            <?php endif; ?>
         </div>
     </div>
 
@@ -139,24 +160,50 @@ require_once '../geral/header.php';
     <?php endif; ?>
 
     <?php if ($erro): ?>
-        <div class="alert alert-danger d-flex align-items-center gap-2 rounded-3 shadow-sm border-0 bg-danger bg-opacity-10 text-danger fw-semibold mb-4">
-            <i class="bi bi-exclamation-triangle-fill"></i> <span><?= htmlspecialchars($erro) ?></span>
+        <div class="alert d-flex align-items-center gap-2 rounded-3 shadow-sm border-0 fw-semibold mb-4" style="background:#ef444418;color:#fca5a5;border:1px solid #ef444444 !important;">
+            <i class="bi bi-exclamation-triangle-fill"></i>
+            <span><?= htmlspecialchars($erro) ?></span>
+            <?php if ($_GET['erro'] === 'limite_plano'): ?>
+                &nbsp;<a href="/planos.php?upgrade=pro" class="fw-bold" style="color:#f87171;">Assinar PRO &rarr;</a>
+            <?php endif; ?>
+        </div>
+    <?php endif; ?>
+
+    <?php if (!empty($carteiras_bloqueadas_ids)): ?>
+        <div class="alert d-flex align-items-start gap-3 rounded-3 border-0 mb-4" style="background:#f59e0b15;border:1px solid #f59e0b44 !important;">
+            <i class="bi bi-lock-fill mt-1 flex-shrink-0" style="color:#f59e0b;"></i>
+            <div>
+                <strong class="text-light">Carteiras bloqueadas</strong>
+                <p class="mb-1 text-secondary" style="font-size:0.85rem;">
+                    Você tem <?= count($carteiras_bloqueadas_ids) ?> carteira(s) além do limite do plano Free (<?= $_limitesLC['carteiras'] ?> no total). Elas estão bloqueadas para novas transações, mas você ainda pode mesclar ou excluir.
+                </p>
+                <a href="/planos.php?upgrade=pro" class="btn btn-sm rounded-pill fw-semibold" style="background:#f59e0b20;color:#fbbf24;border:1px solid #f59e0b55;font-size:0.8rem;">
+                    <i class="bi bi-star-fill me-1"></i> Assinar PRO — até 3 carteiras
+                </a>
+            </div>
         </div>
     <?php endif; ?>
 
     <div class="row g-4">
 
         <?php foreach ($carteiras as $cart): ?>
+            <?php $_cartBloqueada = in_array($cart['IDCarteira'], $carteiras_bloqueadas_ids); ?>
             <div class="col-md-6 col-lg-4">
-                <div class="card bg-body-tertiary border-secondary-subtle shadow-sm h-100 rounded-4 auralis-wallet-card position-relative overflow-hidden">
+                <div class="card bg-body-tertiary border-secondary-subtle shadow-sm h-100 rounded-4 auralis-wallet-card position-relative overflow-hidden"
+                    <?= $_cartBloqueada ? 'style="opacity:0.65;border-color:#f59e0b44 !important;"' : '' ?>>
 
                     <div class="card-body p-4 position-relative z-1 d-flex flex-column">
                         <div class="d-flex justify-content-between align-items-start mb-4">
                             <div class="d-flex align-items-center gap-3">
                                 <div class="icon-circle bg-primary bg-opacity-10 d-flex justify-content-center align-items-center rounded-3 shadow-sm" style="width: 48px; height: 48px;">
-                                    <i class="bi bi-bank text-primary fs-4" style="color: var(--primary-gold-analysis) !important;"></i>
+                                    <i class="bi <?= $_cartBloqueada ? 'bi-lock-fill' : 'bi-bank' ?> fs-4" style="color: <?= $_cartBloqueada ? '#f59e0b' : 'var(--primary-gold-analysis)' ?> !important;"></i>
                                 </div>
-                                <h5 class="fw-bold text-light mb-0"><?= htmlspecialchars($cart['TipoCarteira']) ?></h5>
+                                <div>
+                                    <h5 class="fw-bold text-light mb-0"><?= htmlspecialchars($cart['TipoCarteira']) ?></h5>
+                                    <?php if ($_cartBloqueada): ?>
+                                        <span style="background:#f59e0b18;color:#fbbf24;border:1px solid #f59e0b44;border-radius:999px;padding:1px 6px;font-size:0.6rem;font-weight:700;"><i class="bi bi-lock-fill" style="font-size:0.55rem;"></i> Bloqueada</span>
+                                    <?php endif; ?>
+                                </div>
                             </div>
 
                             <div class="dropdown">
@@ -197,18 +244,34 @@ require_once '../geral/header.php';
             </div>
         <?php endforeach; ?>
 
-        <div class="col-md-6 col-lg-4">
-            <a href="#" onclick="abrirModalCarteira(); return false;" class="text-decoration-none">
-                <div class="card h-100 rounded-4 d-flex align-items-center justify-content-center auralis-add-card transition-hover" style="min-height: 180px;">
-                    <div class="card-body text-center d-flex flex-column align-items-center justify-content-center p-4">
-                        <div class="rounded-circle d-flex align-items-center justify-content-center mb-3" style="width: 50px; height: 50px; background-color: rgba(170, 140, 44, 0.1);">
-                            <i class="bi bi-plus-lg fs-3" style="color: var(--primary-gold-analysis);"></i>
+        <?php if ($_podeNovaCat): ?>
+            <div class="col-md-6 col-lg-4">
+                <a href="#" onclick="abrirModalCarteira(); return false;" class="text-decoration-none">
+                    <div class="card h-100 rounded-4 d-flex align-items-center justify-content-center auralis-add-card transition-hover" style="min-height: 180px;">
+                        <div class="card-body text-center d-flex flex-column align-items-center justify-content-center p-4">
+                            <div class="rounded-circle d-flex align-items-center justify-content-center mb-3" style="width: 50px; height: 50px; background-color: rgba(170, 140, 44, 0.1);">
+                                <i class="bi bi-plus-lg fs-3" style="color: var(--primary-gold-analysis);"></i>
+                            </div>
+                            <h6 class="fw-bold text-secondary mb-0">Adicionar Nova Carteira</h6>
                         </div>
-                        <h6 class="fw-bold text-secondary mb-0">Adicionar Nova Carteira</h6>
                     </div>
-                </div>
-            </a>
-        </div>
+                </a>
+            </div>
+        <?php else: ?>
+            <div class="col-md-6 col-lg-4">
+                <a href="/planos.php?upgrade=pro" class="text-decoration-none">
+                    <div class="card h-100 rounded-4 d-flex align-items-center justify-content-center transition-hover" style="min-height:180px;background:#7c3aed0a;border:1px dashed #7c3aed55;">
+                        <div class="card-body text-center d-flex flex-column align-items-center justify-content-center p-4">
+                            <div class="rounded-circle d-flex align-items-center justify-content-center mb-3" style="width:50px;height:50px;background:#7c3aed18;">
+                                <i class="bi bi-lock-fill fs-3" style="color:#a78bfa;"></i>
+                            </div>
+                            <h6 class="fw-semibold mb-1" style="color:#a78bfa;">Limite do plano Free</h6>
+                            <p class="text-secondary mb-0" style="font-size:0.75rem;">Assine o PRO para até 3 carteiras</p>
+                        </div>
+                    </div>
+                </a>
+            </div>
+        <?php endif; ?>
 
     </div>
 </main>
@@ -444,7 +507,7 @@ require_once '../geral/header.php';
         document.getElementById('text_excluir_carteira_nome').textContent = nome;
         new bootstrap.Modal(document.getElementById('modalExcluirCarteira')).show();
     }
-    
+
     // Trava de Anti-Spam (Blindagem no clique duplo)
     const formCarteira = document.getElementById('formCarteira');
     const btnSalvarCarteira = document.getElementById('btnSalvarCarteira');

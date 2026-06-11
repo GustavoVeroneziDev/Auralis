@@ -78,13 +78,13 @@ require_once 'geral/header.php';
                                 ['ok', 'Até 10 categorias'],
                                 ['ok', 'Parcelamento em até 3x'],
                                 ['ok', 'Dashboard com variação mensal'],
-                                ['ok', 'Agenda financeira'],
                                 ['ok', 'App instalável (PWA)'],
+                                ['no', 'Agenda financeira'],
+                                ['no', 'Análises por categoria'],
                                 ['no', 'Comprovantes e Anexos'],
                                 ['no', 'Registros ilimitados'],
                                 ['no', 'Parcelamento até 48x'],
                                 ['no', 'Carteiras ilimitadas'],
-                                ['no', 'Suporte prioritário'],
                             ] as [$tipo, $item]
                         ): ?>
                             <li class="d-flex align-items-center gap-2 mb-2">

@@ -36,6 +36,13 @@ if ($id_editar) {
 // UX INTELIGENTE: Pega o tipo para filtrar o banco. Se for edição, trava no tipo original.
 $tipo_sugerido = $_POST['tipo_registro'] ?? ($transacao_edit ? $transacao_edit['TipoRegistro'] : ($_GET['tipo'] ?? 'despesa'));
 
+// Limites do plano para filtrar seletores (em edição, exibe tudo para não quebrar registros existentes)
+$_limitesNT  = limitesDoPlano();
+$_planoNT    = strtolower($_SESSION['plano'] ?? 'free');
+$_testeNT    = function_exists('obterHorasRestantesTeste') ? (obterHorasRestantesTeste() > 0) : false;
+$_limCartNT  = ($id_editar || $_planoNT !== 'free' || $_testeNT) ? PHP_INT_MAX : $_limitesNT['carteiras'];
+$_limCatNT   = ($id_editar || $_planoNT !== 'free' || $_testeNT) ? PHP_INT_MAX : $_limitesNT['categorias'];
+
 try {
     // Busca carteiras (Lembrete: Mudei para a sintaxe do MySQL puro)
     $sqlCarteiras = "
@@ -47,18 +54,18 @@ try {
     ";
     $stmtC = $pdo->prepare($sqlCarteiras);
     $stmtC->execute([':uid_dono' => $usuario_id, ':uid_membro' => $usuario_id]);
-    $carteiras = $stmtC->fetchAll();
+    $carteiras = array_slice($stmtC->fetchAll(), 0, $_limCartNT === PHP_INT_MAX ? 9999 : $_limCartNT);
 
     // Busca APENAS as categorias do tipo sugerido
     $sqlCategorias = "
-        SELECT IDCategoria, NomeCategoria 
-        FROM Categoria 
-        WHERE FKUsuario = :uid AND TipoCategoria = :tipo 
+        SELECT IDCategoria, NomeCategoria
+        FROM Categoria
+        WHERE FKUsuario = :uid AND TipoCategoria = :tipo
         ORDER BY NomeCategoria ASC
     ";
     $stmtCat = $pdo->prepare($sqlCategorias);
     $stmtCat->execute([':uid' => $usuario_id, ':tipo' => $tipo_sugerido]);
-    $categorias = $stmtCat->fetchAll();
+    $categorias = array_slice($stmtCat->fetchAll(), 0, $_limCatNT === PHP_INT_MAX ? 9999 : $_limCatNT);
 } catch (PDOException $e) {
     $carteiras = [];
     $categorias = [];
@@ -156,6 +163,31 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     elseif ($recorrente && ($diaVencimento < 1 || $diaVencimento > 31)) $erro = "Dia de vencimento inválido (1 a 31).";
     elseif ($parcelado && intval($_POST['num_parcelas'] ?? 0) === 1) $erro = "O número de parcelas não pode ser 1. Se não quiser parcelar, desative a opção de parcelamento.";
     elseif ($parcelado && $recorrente) $erro = "Uma transação não pode ser parcelada E recorrente ao mesmo tempo.";
+    elseif ($parcelado && !isset($_POST['id_editar'])) {
+        $_limParcNT = limitesDoPlano()['parcelas_max'];
+        if ($numParcelas > $_limParcNT) {
+            $erro = "Seu plano permite parcelar em até {$_limParcNT}x. Assine o PRO para parcelar em até 48x.";
+        }
+    }
+
+    // Verifica limite mensal de registros (apenas para novas transações, não edições)
+    if (!$erro && !isset($_POST['id_editar'])) {
+        $_limMensalNT = limitesDoPlano()['transacoes_mes'];
+        if ($_limMensalNT !== PHP_INT_MAX) {
+            $stmtLimMes = $pdo->prepare(
+                "SELECT COUNT(*) FROM Registro WHERE FKUsuario = :uid
+                 AND YEAR(MomentoRegistro) = :ano AND MONTH(MomentoRegistro) = :mes"
+            );
+            $stmtLimMes->execute([
+                ':uid' => $usuario_id,
+                ':ano' => (int)date('Y'),
+                ':mes' => (int)date('m'),
+            ]);
+            if ((int)$stmtLimMes->fetchColumn() >= $_limMensalNT) {
+                $erro = "Você atingiu o limite de {$_limMensalNT} registros este mês do plano Free. Aguarde o próximo mês ou assine o PRO para registros ilimitados.";
+            }
+        }
+    }
 
     if (!$erro) {
         $valor = $valorRaw; // O valor já está limpo

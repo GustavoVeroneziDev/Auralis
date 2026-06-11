@@ -9,6 +9,14 @@ if (! isset($_SESSION['usuario_id'])) {
 }
 require_once 'config/conexao.php';
 
+// Gate PRO: Análises é exclusiva PRO/VIP
+$_planoAnalises = strtolower($_SESSION['plano'] ?? 'free');
+$_testeAnalises = function_exists('obterHorasRestantesTeste') ? (obterHorasRestantesTeste() > 0) : false;
+if ($_planoAnalises === 'free' && !$_testeAnalises) {
+    header("Location: /planos.php?upgrade=pro");
+    exit;
+}
+
 $usuario_id = $_SESSION['usuario_id'];
 
 // --- LÓGICA DE NAVEGAÇÃO DE TEMPO ---
