@@ -452,46 +452,16 @@ require_once 'geral/header.php';
                             </div>
                         </div>
 
-                        <?php
-                        $nome_carteira_nt = 'Selecione a Carteira';
-                        foreach ($carteiras as $cart) {
-                            if ($cart['IDCarteira'] == $val_cart) { $nome_carteira_nt = $cart['TipoCarteira']; break; }
-                        }
-                        ?>
                         <div class="d-flex align-items-center mb-4 pb-2 auralis-line-input">
-                            <i class="bi bi-wallet2 text-secondary-analysis me-3 w-icon text-center flex-shrink-0"></i>
-                            <input type="hidden" name="carteira_id" id="carteira_id" value="<?= htmlspecialchars($val_cart) ?>">
-                            <div class="dropdown flex-grow-1">
-                                <button class="btn border-secondary-subtle text-light fw-semibold dropdown-toggle d-flex align-items-center rounded-3 transition-hover px-2 px-sm-3 w-100"
-                                    type="button" id="dropdownCarteiraNT" data-bs-toggle="dropdown" aria-expanded="false"
-                                    style="font-size:0.875rem; background-color:var(--bg-charcoal-analysis);">
-                                    <span class="text-truncate d-flex align-items-center flex-grow-1" id="dropdownCarteiraNTLabel">
-                                        <i class="bi bi-wallet2 me-2 flex-shrink-0" style="color:var(--primary-gold-analysis);"></i>
-                                        <?= htmlspecialchars($nome_carteira_nt) ?>
-                                    </span>
-                                </button>
-                                <ul class="dropdown-menu dropdown-menu-dark shadow-lg border-secondary-subtle mt-2 w-100" style="background-color:#1a1d21; min-width:220px;">
-                                    <li class="px-3 pt-2 pb-1 text-secondary small text-uppercase fw-bold">Selecionar Carteira</li>
-                                    <li><hr class="dropdown-divider border-secondary-subtle my-1"></li>
-                                    <?php foreach ($carteiras as $cart): ?>
-                                        <li>
-                                            <a class="dropdown-item d-flex align-items-center gap-2 py-2 transition-hover carteira-nt-option <?= $val_cart == $cart['IDCarteira'] ? 'active' : '' ?>"
-                                                href="#"
-                                                data-id="<?= htmlspecialchars($cart['IDCarteira']) ?>"
-                                                data-nome="<?= htmlspecialchars($cart['TipoCarteira']) ?>"
-                                                style="font-size:0.9rem;">
-                                                <?php if ($val_cart == $cart['IDCarteira']): ?>
-                                                    <i class="bi bi-check-circle-fill flex-shrink-0 cart-nt-check" style="color:var(--primary-gold-analysis);"></i>
-                                                    <span class="fw-bold text-truncate" style="color:var(--primary-gold-analysis); max-width:200px;"><?= htmlspecialchars($cart['TipoCarteira']) ?></span>
-                                                <?php else: ?>
-                                                    <i class="bi bi-circle flex-shrink-0 text-secondary opacity-50 cart-nt-check"></i>
-                                                    <span class="text-light text-truncate" style="max-width:200px;"><?= htmlspecialchars($cart['TipoCarteira']) ?></span>
-                                                <?php endif; ?>
-                                            </a>
-                                        </li>
-                                    <?php endforeach; ?>
-                                </ul>
-                            </div>
+                            <i class="bi bi-credit-card text-secondary-analysis me-3 w-icon text-center"></i>
+                            <select name="carteira_id" id="carteira_id" class="form-select bg-transparent border-0 text-light-analysis px-0 shadow-none fw-semibold fs-6" required>
+                                <option class="bg-card" value="" disabled <?= empty($val_cart) ? 'selected' : '' ?>>Selecione a Carteira</option>
+                                <?php foreach ($carteiras as $cart): ?>
+                                    <option class="bg-card" value="<?= htmlspecialchars($cart['IDCarteira']) ?>" <?= ($val_cart == $cart['IDCarteira']) ? 'selected' : '' ?>>
+                                        <?= htmlspecialchars($cart['TipoCarteira']) ?>
+                                    </option>
+                                <?php endforeach; ?>
+                            </select>
                         </div>
 
                         <div class="row g-3 mb-4 auralis-line-input">
