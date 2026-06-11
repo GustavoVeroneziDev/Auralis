@@ -346,7 +346,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 // Valores Iniciais do Formulário
 $val_valor  = $_POST['valor'] ?? ($transacao_edit ? $transacao_edit['Valor'] : '');
 $val_desc   = $_POST['descricao'] ?? ($transacao_edit ? $transacao_edit['Descricao'] : '');
-$val_data   = $_POST['data_registro'] ?? ($transacao_edit ? date('Y-m-d', strtotime($transacao_edit['MomentoRegistro'])) : date('Y-m-d'));
+$val_data   = $_POST['data_registro'] ?? ($transacao_edit ? date('Y-m-d', strtotime($transacao_edit['MomentoRegistro'])) : ($_GET['data'] ?? date('Y-m-d')));
 $val_status = $_POST['status_registro'] ?? ($transacao_edit ? $transacao_edit['StatusRegistro'] : 'efetivado');
 
 $val_cart   = $_POST['carteira_id'] ?? ($transacao_edit ? $transacao_edit['FKCarteira'] : ($_GET['carteira_id'] ?? ''));
@@ -356,7 +356,7 @@ if (empty($val_cart) && count($carteiras) === 1) {
 }
 
 $val_cat    = $_POST['categoria_id'] ?? ($transacao_edit ? $transacao_edit['FKCategoria'] : '');
-$val_venc   = $_POST['data_vencimento'] ?? ($transacao_edit ? $transacao_edit['DataVencimento'] : '');
+$val_venc   = $_POST['data_vencimento'] ?? ($transacao_edit ? $transacao_edit['DataVencimento'] : ($_GET['data'] ?? ''));
 $val_rec    = isset($_POST['recorrente']) ? true : ($transacao_edit ? $transacao_edit['Recorrente'] : false);
 $val_dia        = $_POST['dia_vencimento'] ?? ($transacao_edit ? $transacao_edit['DiaVencimento'] : '');
 $val_parcelado  = isset($_POST['parcelado']) ? true : false;
@@ -400,15 +400,30 @@ require_once 'geral/header.php';
                             <input type="hidden" name="id_editar" value="<?= htmlspecialchars($id_editar) ?>">
                         <?php endif; ?>
 
+                        <?php if (!$is_edicao): ?>
+                        <div class="d-flex gap-2 mb-4 p-1 rounded-3" style="background:rgba(255,255,255,0.03);border:1px solid #333;">
+                            <a href="?tipo=receita<?= !empty($_GET['data']) ? '&data='.urlencode($_GET['data']) : '' ?><?= !empty($_GET['carteira_id']) ? '&carteira_id='.urlencode($_GET['carteira_id']) : '' ?>&voltar=<?= urlencode($_GET['voltar'] ?? 'dashboard.php') ?>"
+                               class="btn flex-grow-1 fw-bold rounded-3 py-2 d-flex align-items-center justify-content-center gap-1"
+                               style="<?= $tipo_sugerido === 'receita' ? 'background:rgba(6,214,160,0.18);color:#6ee7c7;border:1px solid rgba(6,214,160,0.5);' : 'background:transparent;color:#555;border:1px solid transparent;' ?>">
+                                <i class="bi bi-arrow-up-short" style="font-size:1.3rem;"></i> Receita
+                            </a>
+                            <a href="?tipo=despesa<?= !empty($_GET['data']) ? '&data='.urlencode($_GET['data']) : '' ?><?= !empty($_GET['carteira_id']) ? '&carteira_id='.urlencode($_GET['carteira_id']) : '' ?>&voltar=<?= urlencode($_GET['voltar'] ?? 'dashboard.php') ?>"
+                               class="btn flex-grow-1 fw-bold rounded-3 py-2 d-flex align-items-center justify-content-center gap-1"
+                               style="<?= $tipo_sugerido === 'despesa' ? 'background:rgba(230,57,70,0.18);color:#f87171;border:1px solid rgba(230,57,70,0.5);' : 'background:transparent;color:#555;border:1px solid transparent;' ?>">
+                                <i class="bi bi-arrow-down-short" style="font-size:1.3rem;"></i> Despesa
+                            </a>
+                        </div>
+                        <?php else: ?>
                         <div class="text-center mb-4">
                             <span class="badge badge-tipo rounded-pill px-4 py-2 shadow-sm">
                                 <?php if ($tipo_sugerido === 'receita'): ?>
-                                    <span class="fw-bold text-success fs-5">💰 Receita</span>
+                                    <span class="fw-bold text-success fs-5"><i class="bi bi-arrow-up-short"></i> Receita</span>
                                 <?php else: ?>
-                                    <span class="fw-bold text-danger fs-5">💸 Despesa</span>
+                                    <span class="fw-bold text-danger fs-5"><i class="bi bi-arrow-down-short"></i> Despesa</span>
                                 <?php endif; ?>
                             </span>
                         </div>
+                        <?php endif; ?>
 
                         <div class="mb-5 d-flex align-items-center justify-content-center pb-3 auralis-line-input">
                             <input type="text" inputmode="numeric" name="valor" id="valor"

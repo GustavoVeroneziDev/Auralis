@@ -452,6 +452,55 @@ require_once 'geral/header.php';
     .sidebar-item:hover {
         background-color: rgba(255, 255, 255, 0.04);
     }
+
+    /* ── Botões de ação na célula ── */
+    .day-actions {
+        position: absolute;
+        top: 4px;
+        right: 4px;
+        display: flex;
+        gap: 3px;
+        opacity: 0;
+        transition: opacity 0.15s ease;
+        z-index: 2;
+    }
+
+    .calendar-day:hover:not(.empty) .day-actions {
+        opacity: 1;
+    }
+
+    .day-action-btn {
+        width: 20px;
+        height: 20px;
+        border-radius: 50%;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-size: 0.65rem;
+        text-decoration: none;
+        transition: transform 0.12s ease;
+        line-height: 1;
+    }
+
+    .day-action-btn.receita-btn {
+        background: rgba(6, 214, 160, 0.2);
+        color: #6ee7c7;
+        border: 1px solid rgba(6, 214, 160, 0.45);
+    }
+
+    .day-action-btn.despesa-btn {
+        background: rgba(230, 57, 70, 0.2);
+        color: #f87171;
+        border: 1px solid rgba(230, 57, 70, 0.45);
+    }
+
+    .day-action-btn:hover {
+        transform: scale(1.25);
+    }
+
+    .calendar-day:not(.empty) {
+        cursor: pointer;
+    }
 </style>
 
 <script>
@@ -615,6 +664,53 @@ require_once 'geral/header.php';
     }
 
     // ── Grelha do calendário ──────────────────────────────────────────────
+    let transacoesMes = [];
+
+    function abrirModalDia(dataStr, transacoesDoDia) {
+        const parts = dataStr.split('-');
+        const dt = new Date(parseInt(parts[0]), parseInt(parts[1]) - 1, parseInt(parts[2]));
+        const diasLong  = ['Domingo','Segunda-feira','Terça-feira','Quarta-feira','Quinta-feira','Sexta-feira','Sábado'];
+        const mesesLong = ['Janeiro','Fevereiro','Março','Abril','Maio','Junho','Julho','Agosto','Setembro','Outubro','Novembro','Dezembro'];
+
+        document.getElementById('modalDiaTitulo').textContent =
+            `${diasLong[dt.getDay()]}, ${dt.getDate()} de ${mesesLong[dt.getMonth()]}`;
+        document.getElementById('modalDiaSubtitulo').textContent = dt.getFullYear();
+        document.getElementById('modalDiaBtnReceita').href = `nova_transacao.php?tipo=receita&data=${dataStr}&voltar=agenda.php`;
+        document.getElementById('modalDiaBtnDespesa').href = `nova_transacao.php?tipo=despesa&data=${dataStr}&voltar=agenda.php`;
+
+        const body = document.getElementById('modalDiaBody');
+        if (!transacoesDoDia || transacoesDoDia.length === 0) {
+            body.innerHTML = `<div class="text-center text-secondary py-5" style="font-size:0.88rem;">Nenhuma transação registrada neste dia.</div>`;
+        } else {
+            body.innerHTML = transacoesDoDia.map(t => {
+                const isRec  = t.tipo === 'receita';
+                const corVal = isRec ? '#6ee7c7' : '#f87171';
+                const sinal  = isRec ? '+' : '-';
+                const statusBadge = t.status === 'efetivado'
+                    ? `<span class="badge rounded-pill" style="background:rgba(6,214,160,0.15);color:#6ee7c7;border:1px solid rgba(6,214,160,0.3);font-size:0.65rem;white-space:nowrap;">Efetivado</span>`
+                    : `<span class="badge rounded-pill" style="background:rgba(255,184,0,0.15);color:#f5e2a0;border:1px solid rgba(255,184,0,0.3);font-size:0.65rem;white-space:nowrap;">Pendente</span>`;
+
+                return `<div class="d-flex align-items-center gap-3 px-4 py-3 border-bottom border-secondary-subtle"
+                             style="cursor:pointer;transition:background .12s ease;"
+                             onmouseover="this.style.background='rgba(255,255,255,0.03)'"
+                             onmouseout="this.style.background=''"
+                             onclick="window.location.href='nova_transacao.php?voltar=agenda.php&editar=${encodeURIComponent(t.id)}'">
+                    <i class="bi bi-arrow-${isRec ? 'up' : 'down'}-short" style="color:${corVal};font-size:1.5rem;flex-shrink:0;"></i>
+                    <div style="min-width:0;flex:1;">
+                        <div class="text-light fw-semibold text-truncate" style="font-size:0.88rem;">${esc(t.titulo)}</div>
+                        <div class="text-secondary" style="font-size:0.72rem;">${esc(t.categoria ?? 'Sem categoria')}</div>
+                    </div>
+                    <div class="text-end flex-shrink-0 d-flex flex-column align-items-end gap-1">
+                        <span class="fw-bold" style="color:${corVal};font-size:0.88rem;">${sinal}${formatarMoeda(t.valor)}</span>
+                        ${statusBadge}
+                    </div>
+                </div>`;
+            }).join('');
+        }
+
+        new bootstrap.Modal(document.getElementById('modalDia')).show();
+    }
+
     function renderizarGrelha(ano, mes, transacoes) {
         const grid = document.getElementById('agenda-grid');
         grid.innerHTML = '';
@@ -647,19 +743,36 @@ require_once 'geral/header.php';
             num.innerText = dia;
             cel.appendChild(num);
 
+            // Botões de ação (aparecem no hover)
+            const actionsDiv = document.createElement('div');
+            actionsDiv.className = 'day-actions';
+            actionsDiv.innerHTML = `
+                <a href="nova_transacao.php?tipo=receita&data=${dataStr}&voltar=agenda.php"
+                   class="day-action-btn receita-btn" title="Nova Receita"
+                   onclick="event.stopPropagation()"><i class="bi bi-plus-lg"></i></a>
+                <a href="nova_transacao.php?tipo=despesa&data=${dataStr}&voltar=agenda.php"
+                   class="day-action-btn despesa-btn" title="Nova Despesa"
+                   onclick="event.stopPropagation()"><i class="bi bi-plus-lg"></i></a>`;
+            cel.appendChild(actionsDiv);
+
             const eventsDiv = document.createElement('div');
             eventsDiv.className = 'day-events';
 
-            transacoes
-                .filter(t => (t.data_evento ? t.data_evento.split(' ')[0] : '') === dataStr)
-                .forEach(t => {
+            const transacoesDoDia = transacoes.filter(t =>
+                (t.data_evento ? t.data_evento.split(' ')[0] : '') === dataStr
+            );
+
+            transacoesDoDia.forEach(t => {
                     const isRec = t.tipo === 'receita';
                     const cls = classEvento(t, dataStr);
 
                     const pill = document.createElement('div');
                     pill.className = `calendar-event ${cls}`;
                     pill.title = `${t.titulo} — ${formatarMoeda(t.valor)}`;
-                    pill.onclick = () => window.location.href = `nova_transacao.php?voltar=agenda.php&editar=${encodeURIComponent(t.id)}`;
+                    pill.onclick = (e) => {
+                        e.stopPropagation();
+                        window.location.href = `nova_transacao.php?voltar=agenda.php&editar=${encodeURIComponent(t.id)}`;
+                    };
 
                     const arrow = isRec ?
                         `<i class="bi bi-arrow-up-short" style="color:#6ee7c7;font-size:0.95rem;flex-shrink:0;line-height:1;"></i>` :
@@ -673,11 +786,45 @@ require_once 'geral/header.php';
                 });
 
             cel.appendChild(eventsDiv);
+
+            // Clique no fundo do dia → modal de detalhes
+            cel.addEventListener('click', () => abrirModalDia(dataStr, transacoesDoDia));
+
             grid.appendChild(cel);
         }
     }
 
     document.addEventListener("DOMContentLoaded", () => window.carregarMes(anoAtual, mesAtual));
 </script>
+
+<!-- ═══════════════════════════════════════════════════════════════════════
+     MODAL: DETALHES DO DIA
+     ═══════════════════════════════════════════════════════════════════ -->
+<div class="modal fade" id="modalDia" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered modal-dialog-scrollable" style="max-width: 500px;">
+        <div class="modal-content border-secondary-subtle rounded-4" style="background:#1a1d21;">
+            <div class="modal-header border-bottom border-secondary-subtle px-4 py-3 d-flex align-items-start gap-3">
+                <div>
+                    <h5 class="modal-title text-light fw-bold mb-0" id="modalDiaTitulo">—</h5>
+                    <div class="text-secondary" id="modalDiaSubtitulo" style="font-size:0.8rem;">—</div>
+                </div>
+                <button type="button" class="btn-close btn-close-white ms-auto flex-shrink-0 mt-1" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body p-0" id="modalDiaBody"></div>
+            <div class="modal-footer border-top border-secondary-subtle px-4 gap-2 justify-content-start flex-wrap">
+                <a id="modalDiaBtnReceita" href="#" class="btn btn-sm rounded-pill fw-semibold"
+                   style="background:rgba(6,214,160,0.15);color:#6ee7c7;border:1px solid rgba(6,214,160,0.4);">
+                    <i class="bi bi-arrow-up-short me-1"></i> Nova Receita
+                </a>
+                <a id="modalDiaBtnDespesa" href="#" class="btn btn-sm rounded-pill fw-semibold"
+                   style="background:rgba(230,57,70,0.15);color:#f87171;border:1px solid rgba(230,57,70,0.4);">
+                    <i class="bi bi-arrow-down-short me-1"></i> Nova Despesa
+                </a>
+                <button type="button" class="btn btn-link text-secondary text-decoration-none ms-auto p-0"
+                        data-bs-dismiss="modal" style="font-size:0.82rem;">Fechar</button>
+            </div>
+        </div>
+    </div>
+</div>
 
 <?php require_once 'geral/footer.php'; ?>
