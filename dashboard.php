@@ -305,6 +305,11 @@ foreach ($carteiras as $cart) {
 $link_ant  = "?mes={$mes_ant}&ano={$ano_ant}" . ($carteira_selecionada ? "&carteira={$carteira_selecionada}" : "");
 $link_prox = "?mes={$mes_prox}&ano={$ano_prox}" . ($carteira_selecionada ? "&carteira={$carteira_selecionada}" : "");
 
+// URL de retorno para nova_transacao — preserva contexto atual
+$_uv_dash = 'dashboard.php?mes=' . $mes_atual . '&ano=' . $ano_atual . ($carteira_selecionada ? '&carteira=' . urlencode($carteira_selecionada) : '');
+// Acesso a comprovantes (PRO/VIP)
+$_temAcessoComp = function_exists('recursoDisponivelParaPlano') ? recursoDisponivelParaPlano('comprovantes') : false;
+
 // --- LÓGICA DE DADOS REAIS DO DASHBOARD ---
 $saldoAtual  = 0.00;
 $receitasMes = 0.00;
@@ -362,7 +367,8 @@ if ($carteira_selecionada) {
                     r.IDRegistro, r.MomentoRegistro, r.Valor, r.Descricao, r.TipoRegistro, r.StatusRegistro,
                     r.DataVencimento, r.Recorrente, r.DiaVencimento,
                     r.GrupoParcela, r.ParcelaAtual, r.TotalParcelas,
-                    c.NomeCategoria, c.IconeCategoria
+                    c.NomeCategoria, c.IconeCategoria,
+                    (SELECT COUNT(*) FROM Comprovante WHERE FKRegistro = r.IDRegistro AND FKUsuario = r.FKUsuario) AS qtd_comprovantes
                 FROM Registro r
                 LEFT JOIN Categoria c ON r.FKCategoria = c.IDCategoria
                 WHERE r.FKCarteira = :carteira_id
@@ -590,13 +596,13 @@ require_once 'geral/header.php';
                 </div>
 
                 <div class="d-flex gap-2 w-100 w-lg-auto mt-1 mt-lg-0">
-                    <a href="nova_transacao.php?carteira_id=<?php echo urlencode($carteira_selecionada) ?>&tipo=receita"
+                    <a href="nova_transacao.php?carteira_id=<?php echo urlencode($carteira_selecionada) ?>&tipo=receita&voltar=<?php echo urlencode($_uv_dash) ?>"
                         class="btn btn-outline-success fw-semibold d-flex align-items-center justify-content-center gap-1 rounded-pill transition-hover shadow-sm flex-grow-1"
                         style="font-size: 0.875rem; padding: 0.375rem 0.875rem;">
                         <i class="bi bi-arrow-up-short fs-5"></i> Receita
                     </a>
 
-                    <a href="nova_transacao.php?carteira_id=<?php echo urlencode($carteira_selecionada) ?>&tipo=despesa"
+                    <a href="nova_transacao.php?carteira_id=<?php echo urlencode($carteira_selecionada) ?>&tipo=despesa&voltar=<?php echo urlencode($_uv_dash) ?>"
                         class="btn btn-outline-danger fw-semibold d-flex align-items-center justify-content-center gap-1 rounded-pill transition-hover shadow-sm flex-grow-1"
                         style="font-size: 0.875rem; padding: 0.375rem 0.875rem;">
                         <i class="bi bi-arrow-down-short fs-5"></i> Despesa
@@ -840,9 +846,18 @@ require_once 'geral/header.php';
                                                 <?php endif; ?>
                                             </form>
 
-                                            <a href="nova_transacao.php?editar=<?php echo $t['IDRegistro'] ?>" class="btn btn-sm btn-outline-warning rounded-pill fw-semibold px-3 d-inline-flex align-items-center gap-1 transition-hover">
+                                            <a href="nova_transacao.php?editar=<?php echo $t['IDRegistro'] ?>&voltar=<?php echo urlencode($_uv_dash) ?>" class="btn btn-sm btn-outline-warning rounded-pill fw-semibold px-3 d-inline-flex align-items-center gap-1 transition-hover">
                                                 <i class="bi bi-pencil-square"></i> <span class="d-none d-sm-inline">Editar</span>
                                             </a>
+
+                                            <?php if ($_temAcessoComp && ($t['qtd_comprovantes'] ?? 0) > 0): ?>
+                                                <button type="button"
+                                                    class="btn btn-sm btn-outline-info rounded-pill fw-semibold px-3 d-inline-flex align-items-center gap-1 transition-hover"
+                                                    title="Ver comprovante"
+                                                    onclick="abrirComprovantes('<?php echo $t['IDRegistro'] ?>')">
+                                                    <i class="bi bi-eye"></i>
+                                                </button>
+                                            <?php endif; ?>
 
                                             <?php
                                             // Identifica o tipo de transação
@@ -1098,6 +1113,21 @@ require_once 'geral/header.php';
         </div>
     </div>
 </div>
+<!-- MODAL: VISUALIZAR COMPROVANTES -->
+<div class="modal fade" id="modalComprovantes" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered modal-lg">
+        <div class="modal-content border-secondary-subtle" style="background:var(--bg-card);">
+            <div class="modal-header border-secondary-subtle px-4 py-3">
+                <h6 class="modal-title fw-bold text-light mb-0"><i class="bi bi-paperclip me-2"></i>Comprovantes</h6>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body p-4" id="modalComprovantesBody">
+                <div class="text-center text-secondary py-4"><i class="bi bi-hourglass-split me-2"></i>Carregando...</div>
+            </div>
+        </div>
+    </div>
+</div>
+
 <!-- ======================================================================= -->
 <!-- MODAIS DE ONBOARDING (PRIMEIRO ACESSO) -->
 <!-- ======================================================================= -->
@@ -1312,6 +1342,38 @@ require_once 'geral/header.php';
             document.getElementById('excluir_parcelado_grupo_id').value = button.getAttribute('data-grupo');
             document.getElementById('excluir_parcela_atual').value = button.getAttribute('data-parcela');
         });
+    }
+
+    function abrirComprovantes(registroId) {
+        const modal = new bootstrap.Modal(document.getElementById('modalComprovantes'));
+        const body  = document.getElementById('modalComprovantesBody');
+        body.innerHTML = '<div class="text-center text-secondary py-4"><i class="bi bi-hourglass-split me-2"></i>Carregando...</div>';
+        modal.show();
+        fetch('/comprovante/listar_ajax.php?registro=' + encodeURIComponent(registroId))
+            .then(r => r.json())
+            .then(data => {
+                if (data.erro) { body.innerHTML = '<p class="text-danger text-center py-3">' + data.erro + '</p>'; return; }
+                if (!data.arquivos.length) { body.innerHTML = '<p class="text-secondary text-center py-3">Nenhum comprovante encontrado.</p>'; return; }
+                let html = '<div class="d-flex flex-column gap-3">';
+                data.arquivos.forEach(a => {
+                    const isImg = a.TipoMime.startsWith('image/');
+                    const url   = '/comprovante/ver.php?id=' + encodeURIComponent(a.IDComprovante);
+                    if (isImg) {
+                        html += `<div class="text-center"><img src="${url}" class="img-fluid rounded-3" style="max-height:420px;object-fit:contain;" alt="${a.NomeOriginal}">
+                                 <p class="text-secondary small mt-2">${a.NomeOriginal}</p></div>`;
+                    } else {
+                        html += `<div class="d-flex align-items-center gap-3 p-3 rounded-3" style="background:rgba(255,255,255,0.04);border:1px solid #333;">
+                                     <i class="bi bi-file-earmark-pdf fs-2 text-danger"></i>
+                                     <div class="flex-grow-1"><p class="text-light mb-0 fw-semibold">${a.NomeOriginal}</p></div>
+                                     <a href="${url}" target="_blank" class="btn btn-sm btn-outline-secondary rounded-pill">Abrir</a>
+                                     <a href="${url}?download=1" class="btn btn-sm btn-outline-primary rounded-pill">Baixar</a>
+                                 </div>`;
+                    }
+                });
+                html += '</div>';
+                body.innerHTML = html;
+            })
+            .catch(() => { body.innerHTML = '<p class="text-danger text-center py-3">Erro ao carregar comprovantes.</p>'; });
     }
 </script>
 

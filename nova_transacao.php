@@ -15,6 +15,13 @@ $carteiras = [];
 $categorias = [];
 $erro = null;
 
+// URL de retorno após salvar — whitelist para evitar open redirect
+$_urlVoltar = (function ($raw) {
+    if (empty($raw)) return 'dashboard.php';
+    $base = basename(strtok($raw, '?'));
+    return in_array($base, ['dashboard.php', 'agenda.php']) ? $raw : 'dashboard.php';
+})($_POST['voltar'] ?? $_GET['voltar'] ?? '');
+
 // --- VERIFICA SE É MODO DE EDIÇÃO ---
 $id_editar = $_GET['editar'] ?? null;
 $transacao_edit = null;
@@ -249,7 +256,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                     ]);
                 }
                 processarComprovantes($pdo, $_POST['id_editar'], $usuario_id);
-                header("Location: dashboard.php?sucesso=editado");
+                header("Location: " . $_urlVoltar . (strpos($_urlVoltar, '?') !== false ? '&' : '?') . "sucesso=editado");
             } elseif ($parcelado && $numParcelas >= 2) {
                 // ── CRIAÇÃO PARCELADA ────────────────
                 $grupoParcela = gerarUuid();
@@ -346,7 +353,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                     }
 
                     if ($primeiroIdParc) processarComprovantes($pdo, $primeiroIdParc, $usuario_id);
-                    header("Location: dashboard.php?sucesso=parcelado&parcelas={$numParcelas}");
+                    header("Location: " . $_urlVoltar . (strpos($_urlVoltar, '?') !== false ? '&' : '?') . "sucesso=parcelado&parcelas={$numParcelas}");
                     exit;
                 }
             } elseif ($recorrente) {
@@ -398,7 +405,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                     ]);
                 }
                 if ($primeiroIdRec) processarComprovantes($pdo, $primeiroIdRec, $usuario_id);
-                header("Location: dashboard.php?sucesso=recorrente");
+                header("Location: " . $_urlVoltar . (strpos($_urlVoltar, '?') !== false ? '&' : '?') . "sucesso=recorrente");
             } else {
                 // ── CRIAÇÃO SIMPLES (Transação Única) ────────────────────────
                 $sql = "
@@ -427,7 +434,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                     ':categoria' => $categoriaId,
                 ]);
                 processarComprovantes($pdo, $novoId, $usuario_id);
-                header("Location: dashboard.php?sucesso=registro");
+                header("Location: " . $_urlVoltar . (strpos($_urlVoltar, '?') !== false ? '&' : '?') . "sucesso=registro");
             }
             exit;
         } catch (PDOException $e) {
@@ -489,6 +496,7 @@ require_once 'geral/header.php';
                 <div class="card bg-body-tertiary border-secondary-subtle shadow-sm rounded-4">
                     <form id="formTransacao" method="POST" action="" novalidate enctype="multipart/form-data" class="auralis-premium-form p-4">
                         <input type="hidden" name="tipo_registro" value="<?= htmlspecialchars($tipo_sugerido) ?>">
+                        <input type="hidden" name="voltar" value="<?= htmlspecialchars($_urlVoltar) ?>">
                         <?php if ($id_editar): ?>
                             <input type="hidden" name="id_editar" value="<?= htmlspecialchars($id_editar) ?>">
                         <?php endif; ?>

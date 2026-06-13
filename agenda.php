@@ -34,6 +34,26 @@ $usuario_id = $_SESSION['usuario_id'];
 // ==============================================================================
 // AJAX
 // ==============================================================================
+
+// Exclusão rápida via context menu
+if ($_SERVER['REQUEST_METHOD'] === 'POST' && ($_POST['action'] ?? '') === 'excluir_rapido') {
+    ob_clean();
+    header('Content-Type: application/json; charset=utf-8');
+    $id = trim($_POST['registro_id'] ?? '');
+    if ($id) {
+        try {
+            $pdo->prepare("DELETE FROM Registro WHERE IDRegistro = :id AND FKUsuario = :uid")
+                ->execute([':id' => $id, ':uid' => $usuario_id]);
+            echo json_encode(['ok' => true]);
+        } catch (PDOException $e) {
+            echo json_encode(['ok' => false, 'erro' => $e->getMessage()]);
+        }
+    } else {
+        echo json_encode(['ok' => false, 'erro' => 'ID inválido']);
+    }
+    exit;
+}
+
 if (isset($_GET['ajax']) && $_GET['acao'] === 'listar') {
     ob_clean();
     header('Content-Type: application/json; charset=utf-8');
@@ -59,7 +79,8 @@ if (isset($_GET['ajax']) && $_GET['acao'] === 'listar') {
             SELECT r.IDRegistro as id, r.TipoRegistro as tipo, r.Descricao as titulo,
                    r.Valor as valor, r.StatusRegistro as status, r.Recorrente,
                    COALESCE(r.DataVencimento, r.MomentoRegistro) as data_evento,
-                   c.NomeCategoria as categoria, COALESCE(c.IconeCategoria, 'bi-tag') as icone
+                   c.NomeCategoria as categoria, COALESCE(c.IconeCategoria, 'bi-tag') as icone,
+                   (SELECT COUNT(*) FROM Comprovante WHERE FKRegistro = r.IDRegistro AND FKUsuario = r.FKUsuario) AS tem_comprovante
             FROM Registro r
             LEFT JOIN Categoria c ON r.FKCategoria = c.IDCategoria
             WHERE $whereGrelha ORDER BY data_evento ASC");
@@ -136,6 +157,7 @@ try {
 } catch (PDOException $e) {
 }
 
+$_agendaTemAcessoComp = function_exists('recursoDisponivelParaPlano') ? recursoDisponivelParaPlano('comprovantes') : false;
 $carteira_selecionada = $_GET['carteira'] ?? 'todas';
 $nome_carteira_atual  = 'Todas as Carteiras';
 if ($carteira_selecionada !== 'todas') {
@@ -655,6 +677,7 @@ require_once 'geral/header.php';
 
 <script>
     const carteiraAtual = "<?= htmlspecialchars($carteira_selecionada, ENT_QUOTES, 'UTF-8') ?>";
+    const _temAcessoCompAgenda = <?= $_agendaTemAcessoComp ? 'true' : 'false' ?>;
     let anoAtual = new Date().getFullYear();
     let mesAtual = new Date().getMonth();
     const HOJE_JS = new Date();
@@ -840,6 +863,9 @@ require_once 'geral/header.php';
                     `<span class="badge rounded-pill" style="background:rgba(6,214,160,0.15);color:#6ee7c7;border:1px solid rgba(6,214,160,0.3);font-size:0.65rem;white-space:nowrap;">Efetivado</span>` :
                     `<span class="badge rounded-pill" style="background:rgba(255,184,0,0.15);color:#f5e2a0;border:1px solid rgba(255,184,0,0.3);font-size:0.65rem;white-space:nowrap;">Pendente</span>`;
 
+                const btnComp = (_temAcessoCompAgenda && t.tem_comprovante > 0)
+                    ? `<button onclick="event.stopPropagation();abrirComprovantes('${t.id}')" class="btn btn-sm btn-outline-info rounded-pill px-2 py-0 mt-1" title="Ver comprovante"><i class="bi bi-eye"></i></button>`
+                    : '';
                 return `<div class="d-flex align-items-center gap-3 px-4 py-3 border-bottom border-secondary-subtle"
                              style="cursor:pointer;transition:background .12s ease;"
                              onmouseover="this.style.background='rgba(255,255,255,0.03)'"
@@ -853,6 +879,7 @@ require_once 'geral/header.php';
                     <div class="text-end flex-shrink-0 d-flex flex-column align-items-end gap-1">
                         <span class="fw-bold" style="color:${corVal};font-size:0.88rem;">${sinal}${formatarMoeda(t.valor)}</span>
                         ${statusBadge}
+                        ${btnComp}
                     </div>
                 </div>`;
             }).join('');
@@ -923,6 +950,11 @@ require_once 'geral/header.php';
                     e.stopPropagation();
                     window.location.href = `nova_transacao.php?voltar=agenda.php&editar=${encodeURIComponent(t.id)}`;
                 };
+                pill.addEventListener('contextmenu', (e) => {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    window._mostrarMenuPill(e.clientX, e.clientY, t);
+                });
 
                 const arrow = isRec ?
                     `<i class="bi bi-arrow-up-short" style="color:#6ee7c7;font-size:0.95rem;flex-shrink:0;line-height:1;"></i>` :
@@ -944,7 +976,95 @@ require_once 'geral/header.php';
         }
     }
 
+    // ── Context menu dos pills do calendário ────────────────────────────────
+    (function () {
+        const menu = document.createElement('div');
+        menu.id = 'ctx-pill';
+        menu.style.cssText = 'position:fixed;z-index:9999;display:none;background:#1e2128;border:1px solid rgba(255,255,255,.1);border-radius:10px;box-shadow:0 8px 28px rgba(0,0,0,.55);min-width:168px;overflow:hidden;';
+        menu.innerHTML = `
+            <div id="ctx-editar"  class="ctx-item"><i class="bi bi-pencil-square" style="color:#f5c542;"></i> Editar</div>
+            <div id="ctx-comp"    class="ctx-item" style="display:none;"><i class="bi bi-eye" style="color:#38bdf8;"></i> Ver comprovante</div>
+            <div class="ctx-sep"></div>
+            <div id="ctx-excluir" class="ctx-item ctx-danger"><i class="bi bi-trash3"></i> Excluir</div>`;
+        document.body.appendChild(menu);
+
+        const style = document.createElement('style');
+        style.textContent = `.ctx-item{padding:9px 16px;cursor:pointer;font-size:.855rem;color:#f8fafc;display:flex;align-items:center;gap:9px;transition:background .1s}.ctx-item:hover{background:rgba(255,255,255,.07)}.ctx-danger{color:#f87171!important}.ctx-sep{height:1px;background:rgba(255,255,255,.08);margin:3px 0}`;
+        document.head.appendChild(style);
+
+        let _transacao = null;
+
+        function fechar() { menu.style.display = 'none'; _transacao = null; }
+        document.addEventListener('click', fechar);
+        document.addEventListener('keydown', e => e.key === 'Escape' && fechar());
+        menu.addEventListener('click', e => e.stopPropagation());
+
+        window._mostrarMenuPill = function (x, y, t) {
+            _transacao = t;
+            document.getElementById('ctx-editar').onclick  = () => { fechar(); window.location.href = `nova_transacao.php?voltar=agenda.php&editar=${encodeURIComponent(t.id)}`; };
+            const btnComp = document.getElementById('ctx-comp');
+            if (_temAcessoCompAgenda && t.tem_comprovante > 0) {
+                btnComp.style.display = 'flex';
+                btnComp.onclick = () => { fechar(); abrirComprovantes(t.id); };
+            } else {
+                btnComp.style.display = 'none';
+            }
+            document.getElementById('ctx-excluir').onclick = () => {
+                fechar();
+                const desc = t.titulo.length > 40 ? t.titulo.slice(0, 40) + '…' : t.titulo;
+                if (!confirm(`Excluir "${desc}"?\n\nEsta ação é irreversível.`)) return;
+                fetch('agenda.php', {
+                    method: 'POST',
+                    headers: {'Content-Type': 'application/x-www-form-urlencoded'},
+                    body: `action=excluir_rapido&registro_id=${encodeURIComponent(t.id)}`
+                })
+                .then(r => r.json())
+                .then(d => { if (d.ok) window.carregarMes(anoAtual, mesAtual); else alert('Erro ao excluir.'); })
+                .catch(() => alert('Erro de conexão.'));
+            };
+
+            // Posiciona sem sair da viewport
+            menu.style.display = 'block';
+            const mw = menu.offsetWidth, mh = menu.offsetHeight;
+            const vw = window.innerWidth,   vh = window.innerHeight;
+            menu.style.left = (x + mw > vw ? x - mw : x) + 'px';
+            menu.style.top  = (y + mh > vh ? y - mh : y) + 'px';
+        };
+    })();
+
     document.addEventListener("DOMContentLoaded", () => window.carregarMes(anoAtual, mesAtual));
+
+    function abrirComprovantes(registroId) {
+        const modal = new bootstrap.Modal(document.getElementById('modalComprovantesAgenda'));
+        const body  = document.getElementById('modalComprovantesAgendaBody');
+        body.innerHTML = '<div class="text-center text-secondary py-4"><i class="bi bi-hourglass-split me-2"></i>Carregando...</div>';
+        modal.show();
+        fetch('/comprovante/listar_ajax.php?registro=' + encodeURIComponent(registroId))
+            .then(r => r.json())
+            .then(data => {
+                if (data.erro) { body.innerHTML = '<p class="text-danger text-center py-3">' + data.erro + '</p>'; return; }
+                if (!data.arquivos.length) { body.innerHTML = '<p class="text-secondary text-center py-3">Nenhum comprovante encontrado.</p>'; return; }
+                let html = '<div class="d-flex flex-column gap-3">';
+                data.arquivos.forEach(a => {
+                    const isImg = a.TipoMime.startsWith('image/');
+                    const url   = '/comprovante/ver.php?id=' + encodeURIComponent(a.IDComprovante);
+                    if (isImg) {
+                        html += `<div class="text-center"><img src="${url}" class="img-fluid rounded-3" style="max-height:380px;object-fit:contain;" alt="${a.NomeOriginal}">
+                                 <p class="text-secondary small mt-2">${a.NomeOriginal}</p></div>`;
+                    } else {
+                        html += `<div class="d-flex align-items-center gap-3 p-3 rounded-3" style="background:rgba(255,255,255,0.04);border:1px solid #333;">
+                                     <i class="bi bi-file-earmark-pdf fs-2 text-danger"></i>
+                                     <div class="flex-grow-1"><p class="text-light mb-0 fw-semibold">${a.NomeOriginal}</p></div>
+                                     <a href="${url}" target="_blank" class="btn btn-sm btn-outline-secondary rounded-pill">Abrir</a>
+                                     <a href="${url}?download=1" class="btn btn-sm btn-outline-primary rounded-pill">Baixar</a>
+                                 </div>`;
+                    }
+                });
+                html += '</div>';
+                body.innerHTML = html;
+            })
+            .catch(() => { body.innerHTML = '<p class="text-danger text-center py-3">Erro ao carregar comprovantes.</p>'; });
+    }
 </script>
 
 <!-- ═══════════════════════════════════════════════════════════════════════
@@ -972,6 +1092,21 @@ require_once 'geral/header.php';
                 </a>
                 <button type="button" class="btn btn-link text-secondary text-decoration-none ms-auto p-0"
                     data-bs-dismiss="modal" style="font-size:0.82rem;">Fechar</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- MODAL: VISUALIZAR COMPROVANTES -->
+<div class="modal fade" id="modalComprovantesAgenda" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered modal-lg">
+        <div class="modal-content border-secondary-subtle" style="background:var(--bg-card);">
+            <div class="modal-header border-secondary-subtle px-4 py-3">
+                <h6 class="modal-title fw-bold text-light mb-0"><i class="bi bi-paperclip me-2"></i>Comprovantes</h6>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body p-4" id="modalComprovantesAgendaBody">
+                <div class="text-center text-secondary py-4"><i class="bi bi-hourglass-split me-2"></i>Carregando...</div>
             </div>
         </div>
     </div>
