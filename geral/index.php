@@ -4,6 +4,8 @@ if (isset($_SESSION['usuario_id'])) {
     header("Location: ../dashboard.php");
     exit;
 }
+require_once '../config/conexao.php';
+require_once '../config/funcoes.php';
 ?>
 <?php require_once 'header.php'; ?>
 
