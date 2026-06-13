@@ -15,8 +15,10 @@ if (!isset($_SESSION['usuario_id'])) {
 // 2. Conecta ao banco de dados
 require_once 'config/conexao.php';
 require_once 'config/funcoes.php';
+require_once 'config/funcoes_cartao.php';
 
 $usuario_id = $_SESSION['usuario_id'];
+cartao_verificarFechamentos($pdo, $usuario_id);
 $carteiras  = [];
 
 try {
@@ -136,6 +138,14 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'])) {
                 $sqlToggle  = "UPDATE Registro SET StatusRegistro = :status WHERE IDRegistro = :id AND FKUsuario = :uid";
                 $stmtToggle = $pdo->prepare($sqlToggle);
                 $stmtToggle->execute([':status' => $novo_status, ':id' => $id_registro, ':uid' => $usuario_id]);
+                // Se efetivou, verifica se é pagamento de fatura de cartão
+                if ($novo_status === 'efetivado') {
+                    try {
+                        $pdo->prepare(
+                            "UPDATE FaturaCartao SET Status='paga' WHERE FKRegistroPagamento=:rid AND FKUsuario=:uid AND Status='fechada'"
+                        )->execute([':rid' => $id_registro, ':uid' => $usuario_id]);
+                    } catch (PDOException $e) {}
+                }
                 header("Location: " . $redirectBase);
                 exit;
             } catch (PDOException $e) {

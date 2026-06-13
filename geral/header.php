@@ -111,6 +111,11 @@ $_ehFreeRestrito = !$_emTrial
                             </a>
                         </li>
                         <li class="nav-item">
+                            <a class="nav-link custom-link py-3 py-lg-2 <?php echo (strpos($_SERVER['PHP_SELF'], '/cartao_credito/') !== false) ? 'text-warning active' : ''; ?>" href="/cartao_credito/index.php">
+                                <i class="bi bi-credit-card-2-front me-2"></i> Cartões
+                            </a>
+                        </li>
+                        <li class="nav-item">
                             <a class="nav-link custom-link py-3 py-lg-2 <?php echo ($paginaAtual == 'planos.php') ? 'text-warning active' : ''; ?>" href="/planos.php">
                                 <i class="bi bi-star me-2"></i> Planos
                             </a>

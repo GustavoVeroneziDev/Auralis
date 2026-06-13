@@ -9,10 +9,12 @@ if (!isset($_SESSION['usuario_id'])) {
 }
 require_once 'config/conexao.php';
 require_once 'config/funcoes.php';
+require_once 'config/funcoes_cartao.php';
 
 $usuario_id = $_SESSION['usuario_id'];
 $carteiras = [];
 $categorias = [];
+$cartoes = [];
 $erro = null;
 
 // URL de retorno após salvar — whitelist para evitar open redirect
@@ -70,13 +72,16 @@ try {
         WHERE FKUsuario = :uid AND TipoCategoria = :tipo
         ORDER BY NomeCategoria ASC
     ";
+    $tipoCat = ($tipo_sugerido === 'cartao') ? 'despesa' : $tipo_sugerido;
     $stmtCat = $pdo->prepare($sqlCategorias);
-    $stmtCat->execute([':uid' => $usuario_id, ':tipo' => $tipo_sugerido]);
+    $stmtCat->execute([':uid' => $usuario_id, ':tipo' => $tipoCat]);
     $categorias = array_slice($stmtCat->fetchAll(), 0, $_limCatNT === PHP_INT_MAX ? 9999 : $_limCatNT);
 } catch (PDOException $e) {
     $carteiras = [];
     $categorias = [];
 }
+
+$cartoes = (!$id_editar) ? cartao_listarAtivos($pdo, $usuario_id) : [];
 
 // Busca comprovantes existentes (modo edição)
 $comprovantes = [];
@@ -125,6 +130,74 @@ function processarComprovantes(PDO $pdo, string $registroId, string $usuarioId):
                 ]);
         }
     }
+}
+
+// ── CARTÃO DE CRÉDITO — handler separado ──────────────────────────────────────
+if ($_SERVER['REQUEST_METHOD'] === 'POST' && trim($_POST['tipo_registro'] ?? '') === 'cartao') {
+    $cartaoId    = trim($_POST['cartao_cc_id'] ?? '');
+    $descricao   = trim($_POST['descricao'] ?? '');
+    $dataCompra  = trim($_POST['data_registro'] ?? '');
+    $categoriaId = trim($_POST['categoria_id'] ?? '') ?: null;
+    $parcelado   = isset($_POST['parcelado_cc']) ? 1 : 0;
+    $numParcelas = $parcelado ? max(1, min(48, intval($_POST['num_parcelas_cc'] ?? 1))) : 1;
+
+    $valorPost  = trim($_POST['valor'] ?? '');
+    $valorLimpo = preg_replace('/[^\d.,]/', '', $valorPost);
+    if (strpos($valorLimpo, ',') !== false) {
+        $valorLimpo = str_replace('.', '', $valorLimpo);
+        $valorRaw   = str_replace(',', '.', $valorLimpo);
+    } else {
+        $valorRaw = $valorLimpo;
+    }
+
+    if (empty($cartaoId))                     $erro = 'Selecione um cartão.';
+    elseif (empty($descricao))                $erro = 'A descrição não pode ficar em branco.';
+    elseif (empty($dataCompra))               $erro = 'Selecione a data da compra.';
+    elseif (empty($valorRaw) || !is_numeric($valorRaw)) $erro = 'Informe um valor numérico válido.';
+    elseif (floatval($valorRaw) <= 0)         $erro = 'O valor deve ser maior que zero.';
+
+    if (!$erro) {
+        $stmtCC = $pdo->prepare("SELECT * FROM CartaoCredito WHERE IDCartao = :id AND FKUsuario = :uid AND Ativo = 1");
+        $stmtCC->execute([':id' => $cartaoId, ':uid' => $usuario_id]);
+        $cartao = $stmtCC->fetch(PDO::FETCH_ASSOC);
+        if (!$cartao) $erro = 'Cartão não encontrado.';
+    }
+
+    if (!$erro) {
+        $grupoParcela = ($numParcelas > 1) ? gerarUuid() : null;
+        $mesRefBase   = _cc_mesRefAtual((int)$cartao['DiaFechamento']);
+        $valorTotal   = (float)$valorRaw;
+        $valorParcela = floor(($valorTotal / $numParcelas) * 100) / 100;
+        $resto        = $valorTotal - ($valorParcela * $numParcelas);
+
+        $sqlLanc = "INSERT INTO LancamentoCartao
+            (IDLancamento, FKFatura, FKCartao, FKUsuario, Descricao, Valor, DataCompra, FKCategoria, GrupoParcelamento, ParcelaAtual, TotalParcelas)
+            VALUES (:id, :fid, :cid, :uid, :desc, :val, :data, :cat, :grupo, :parc, :tot)";
+        $stmtL = $pdo->prepare($sqlLanc);
+
+        for ($i = 0; $i < $numParcelas; $i++) {
+            $mesRef = _cc_mesRefAdiante($mesRefBase, $i);
+            $fatura = cartao_obterFaturaParaMesRef($pdo, $cartaoId, $usuario_id, $cartao, $mesRef);
+            $val    = ($i === 0) ? ($valorParcela + $resto) : $valorParcela;
+
+            $stmtL->execute([
+                ':id'    => gerarUuid(),
+                ':fid'   => $fatura['IDFatura'],
+                ':cid'   => $cartaoId,
+                ':uid'   => $usuario_id,
+                ':desc'  => $descricao . ($numParcelas > 1 ? ' (' . ($i + 1) . '/' . $numParcelas . ')' : ''),
+                ':val'   => round($val, 2),
+                ':data'  => $dataCompra,
+                ':cat'   => $categoriaId,
+                ':grupo' => $grupoParcela,
+                ':parc'  => ($numParcelas > 1) ? ($i + 1) : null,
+                ':tot'   => ($numParcelas > 1) ? $numParcelas : null,
+            ]);
+        }
+        header("Location: " . $_urlVoltar . (strpos($_urlVoltar, '?') !== false ? '&' : '?') . "sucesso=registro");
+        exit;
+    }
+    // Se erro, cai no formulário abaixo com $erro definido
 }
 
 // Processa o Formulário quando o usuário clica em Salvar (Criar ou Atualizar)
@@ -513,6 +586,13 @@ require_once 'geral/header.php';
                                     style="<?= $tipo_sugerido === 'despesa' ? 'background:rgba(230,57,70,0.18);color:#f87171;border:1px solid rgba(230,57,70,0.5);' : 'background:transparent;color:#555;border:1px solid transparent;' ?>">
                                     <i class="bi bi-arrow-down-short" style="font-size:1.3rem;"></i> Despesa
                                 </a>
+                                <?php if (!empty($cartoes)): ?>
+                                <a href="?tipo=cartao<?= !empty($_GET['data']) ? '&data=' . urlencode($_GET['data']) : '' ?>&voltar=<?= urlencode($_GET['voltar'] ?? 'dashboard.php') ?><?= !empty($_GET['cartao_id']) ? '&cartao_id=' . urlencode($_GET['cartao_id']) : '' ?>"
+                                    class="btn flex-grow-1 fw-bold rounded-3 py-2 d-flex align-items-center justify-content-center gap-1"
+                                    style="<?= $tipo_sugerido === 'cartao' ? 'background:rgba(124,58,237,0.18);color:#a78bfa;border:1px solid rgba(124,58,237,0.5);' : 'background:transparent;color:#555;border:1px solid transparent;' ?>">
+                                    <i class="bi bi-credit-card-2-front" style="font-size:1rem;"></i> Cartão
+                                </a>
+                                <?php endif; ?>
                             </div>
                         <?php else: ?>
                             <div class="text-center mb-4">
@@ -525,6 +605,107 @@ require_once 'geral/header.php';
                                 </span>
                             </div>
                         <?php endif; ?>
+
+                        <?php if ($tipo_sugerido === 'cartao' && !$is_edicao): ?>
+                        <!-- ── FORMULÁRIO CARTÃO DE CRÉDITO ───────────────── -->
+                        <input type="hidden" name="tipo_registro" value="cartao">
+
+                        <div class="mb-5 d-flex align-items-center justify-content-center pb-3 auralis-line-input">
+                            <input type="text" inputmode="numeric" name="valor" id="valor"
+                                class="form-control form-control-lg bg-transparent border-0 fw-bold text-center fs-1-large valor-input p-0 p-lg-1 no-spinners"
+                                style="color:#a78bfa;"
+                                placeholder="R$ 0,00" required autofocus autocomplete="off"
+                                value="<?= htmlspecialchars($val_valor) ?>"
+                                oninput="mascaraMoeda(this)">
+                        </div>
+
+                        <div class="d-flex align-items-center mb-4 pb-2 auralis-line-input">
+                            <i class="bi bi-paragraph text-secondary-analysis me-3 w-icon text-center"></i>
+                            <input type="text" name="descricao" id="descricao"
+                                class="form-control bg-transparent border-0 text-light-analysis px-0 shadow-none fs-6 fw-bold"
+                                placeholder="Descrição da compra:" maxlength="255" required
+                                value="<?= htmlspecialchars($val_desc) ?>">
+                        </div>
+
+                        <div class="d-flex align-items-center mb-4 pb-2 auralis-line-input">
+                            <i class="bi bi-credit-card-2-front me-3 w-icon text-center" style="color:#a78bfa;"></i>
+                            <select name="cartao_cc_id" id="cartao_cc_id" class="form-select bg-transparent border-0 text-light-analysis px-0 shadow-none fw-semibold fs-6" required>
+                                <option class="bg-card" value="" disabled <?= empty($_GET['cartao_id']) ? 'selected' : '' ?>>Selecione o Cartão</option>
+                                <?php foreach ($cartoes as $cc): ?>
+                                    <option class="bg-card" value="<?= htmlspecialchars($cc['IDCartao']) ?>"
+                                        <?= (($_GET['cartao_id'] ?? '') === $cc['IDCartao']) ? 'selected' : '' ?>>
+                                        <?= htmlspecialchars($cc['Nome']) ?>
+                                    </option>
+                                <?php endforeach; ?>
+                            </select>
+                        </div>
+
+                        <div class="row g-3 mb-4 auralis-line-input">
+                            <div class="col-6 d-flex align-items-center border-end border-border-color pe-3">
+                                <i class="bi bi-tags text-secondary-analysis me-2 fs-7"></i>
+                                <select name="categoria_id" class="form-select bg-transparent border-0 text-muted-analysis px-0 shadow-none fs-7 fw-bold">
+                                    <option class="bg-card" value="">Sem Categoria</option>
+                                    <?php foreach ($categorias as $cat): ?>
+                                        <option class="bg-card" value="<?= htmlspecialchars($cat['IDCategoria']) ?>" <?= ($val_cat == $cat['IDCategoria']) ? 'selected' : '' ?>>
+                                            <?= htmlspecialchars($cat['NomeCategoria']) ?>
+                                        </option>
+                                    <?php endforeach; ?>
+                                </select>
+                            </div>
+                            <div class="col-6 d-flex align-items-center ps-3">
+                                <i class="bi bi-calendar3 text-secondary-analysis me-2 fs-7"></i>
+                                <input type="date" name="data_registro" class="form-control bg-transparent border-0 text-light-analysis px-0 shadow-none fs-7 fw-bold"
+                                    value="<?= htmlspecialchars($val_data) ?>" required>
+                            </div>
+                        </div>
+
+                        <!-- Parcelamento CC -->
+                        <div class="accordion accordion-flush mb-5 border border-border-color rounded-3 overflow-hidden auralis-line-input" id="accordionCC">
+                            <div class="accordion-item bg-transparent">
+                                <h2 class="accordion-header">
+                                    <button class="accordion-button collapsed bg-transparent text-secondary-analysis shadow-none py-2 px-3 small fs-7"
+                                        type="button" data-bs-toggle="collapse" data-bs-target="#collapseCC">
+                                        <i class="bi bi-sliders me-2"></i> Parcelamento
+                                    </button>
+                                </h2>
+                                <div id="collapseCC" class="accordion-collapse collapse" data-bs-parent="#accordionCC">
+                                    <div class="accordion-body border-top border-border-color pt-3 px-3 pb-4 bg-charcoal">
+                                        <div class="d-flex align-items-start justify-content-between gap-3 mb-3">
+                                            <div>
+                                                <div class="text-light fw-semibold fs-7 mb-1 d-flex align-items-center gap-2">
+                                                    <i class="bi bi-credit-card-2-front" style="color:#a78bfa;"></i>
+                                                    Dividir em parcelas
+                                                </div>
+                                                <div class="text-secondary" style="font-size:0.75rem;">Distribuído automaticamente nas próximas faturas.</div>
+                                            </div>
+                                            <div class="form-check form-switch fs-4 mb-0 toggle-analysis flex-shrink-0 mt-1"
+                                                style="--bs-form-check-bg:transparent;">
+                                                <input class="form-check-input bg-dark border-border-color shadow-none"
+                                                    type="checkbox" name="parcelado_cc" id="toggle_parcelado_cc">
+                                            </div>
+                                        </div>
+                                        <div id="bloco_parc_cc" style="display:none;" class="ps-3 border-start border-border-color">
+                                            <label class="form-label text-secondary-analysis fs-7 mb-1">Em quantas vezes?</label>
+                                            <div class="d-flex align-items-center gap-3">
+                                                <input type="number" name="num_parcelas_cc" id="num_parcelas_cc"
+                                                    class="form-control bg-dark border-border-color text-light-analysis form-control-sm no-spinners fs-7"
+                                                    style="max-width:100px;" min="2" max="48" placeholder="Ex: 3" value="2">
+                                                <div id="preview_parc_cc" class="fs-7"></div>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="d-grid mt-2">
+                            <button id="btnSalvar" type="submit" class="btn fw-bold text-light py-3 rounded-pill fs-6 shadow-lg d-flex align-items-center justify-content-center"
+                                style="background:rgba(124,58,237,0.25);border:1px solid rgba(124,58,237,0.5);">
+                                Lançar no Cartão
+                            </button>
+                        </div>
+
+                        <?php else: /* receita / despesa */ ?>
 
                         <div class="mb-5 d-flex align-items-center justify-content-center pb-3 auralis-line-input">
                             <input type="text" inputmode="numeric" name="valor" id="valor"
@@ -865,6 +1046,8 @@ require_once 'geral/header.php';
                                 <?= $id_editar ? 'Salvar Alterações' : 'Salvar Transação' ?>
                             </button>
                         </div>
+
+                        <?php endif; /* end cartao/receita-despesa */ ?>
 
                     </form>
                 </div>
@@ -1400,5 +1583,33 @@ require_once 'geral/header.php';
         });
 
     });
+
+    // ── PARCELAMENTO CC ─────────────────────────────────────────────────────
+    (function () {
+        const togCC  = document.getElementById('toggle_parcelado_cc');
+        const blocoCC = document.getElementById('bloco_parc_cc');
+        const numCC  = document.getElementById('num_parcelas_cc');
+        const prevCC = document.getElementById('preview_parc_cc');
+        const valCC  = document.getElementById('valor');
+        if (!togCC) return;
+        togCC.addEventListener('change', function () {
+            blocoCC.style.display = this.checked ? 'block' : 'none';
+            calcPreviewCC();
+        });
+        if (numCC) numCC.addEventListener('input', calcPreviewCC);
+        if (valCC) valCC.addEventListener('input', calcPreviewCC);
+        function calcPreviewCC() {
+            if (!togCC.checked || !prevCC) return;
+            const n = parseInt(numCC ? numCC.value : 0) || 0;
+            const raw = parseFloat((valCC ? valCC.value : '0').replace(/\D/g, '')) / 100 || 0;
+            if (raw > 0 && n >= 2) {
+                const p = (raw / n).toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+                prevCC.innerHTML = '<span style="color:#a78bfa;font-weight:600;">' + n + 'x de R$ ' + p + '</span>';
+            } else {
+                prevCC.textContent = '';
+            }
+        }
+    })();
+});
 </script>
 <?php require_once 'geral/footer.php'; ?>
