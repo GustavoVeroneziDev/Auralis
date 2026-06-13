@@ -1586,11 +1586,11 @@ require_once 'geral/header.php';
 
     // ── PARCELAMENTO CC ─────────────────────────────────────────────────────
     (function () {
-        const togCC  = document.getElementById('toggle_parcelado_cc');
+        const togCC   = document.getElementById('toggle_parcelado_cc');
         const blocoCC = document.getElementById('bloco_parc_cc');
-        const numCC  = document.getElementById('num_parcelas_cc');
-        const prevCC = document.getElementById('preview_parc_cc');
-        const valCC  = document.getElementById('valor');
+        const numCC   = document.getElementById('num_parcelas_cc');
+        const prevCC  = document.getElementById('preview_parc_cc');
+        const valCC   = document.getElementById('valor');
         if (!togCC) return;
         togCC.addEventListener('change', function () {
             blocoCC.style.display = this.checked ? 'block' : 'none';
@@ -1610,6 +1610,5 @@ require_once 'geral/header.php';
             }
         }
     })();
-});
 </script>
 <?php require_once 'geral/footer.php'; ?>
