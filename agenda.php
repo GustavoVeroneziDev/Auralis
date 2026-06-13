@@ -16,6 +16,19 @@ if (!isset($_SESSION['usuario_id'])) {
 
 require_once 'config/conexao.php';
 
+// Gate: acesso configurável via /admin/configuracoes_planos.php
+$_testeAgenda = function_exists('obterHorasRestantesTeste') && obterHorasRestantesTeste() > 0;
+if (!$_testeAgenda && !recursoDisponivelParaPlano('agenda')) {
+    if (isset($_GET['ajax'])) {
+        ob_clean();
+        header('Content-Type: application/json');
+        echo json_encode(['sucesso' => false, 'erro' => 'Plano insuficiente']);
+        exit;
+    }
+    header("Location: /planos.php?upgrade=" . urlencode(nivelMinimoRecurso('agenda')));
+    exit;
+}
+
 $usuario_id = $_SESSION['usuario_id'];
 
 // ==============================================================================
@@ -157,7 +170,9 @@ require_once 'geral/header.php';
                     </button>
                     <ul class="dropdown-menu dropdown-menu-dark shadow-lg border-secondary-subtle mt-2" style="background-color:#1a1d21; min-width:220px;">
                         <li class="px-3 pt-2 pb-1 text-secondary small text-uppercase fw-bold tracking-wide">Alternar Carteira</li>
-                        <li><hr class="dropdown-divider border-secondary-subtle my-1"></li>
+                        <li>
+                            <hr class="dropdown-divider border-secondary-subtle my-1">
+                        </li>
                         <li>
                             <a class="dropdown-item d-flex align-items-center gap-2 py-2 transition-hover" href="?carteira=todas" style="font-size:0.9rem;">
                                 <?php if ($carteira_selecionada === 'todas'): ?>

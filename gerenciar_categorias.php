@@ -35,6 +35,18 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action']) && $_POST['
     if (empty($nomeCategoria)) {
         $erro = "O nome da categoria não pode estar vazio.";
     } else {
+        // Verifica limite de categorias do plano
+        $_limitesCat = limitesDoPlano();
+        if ($_limitesCat['categorias'] !== PHP_INT_MAX) {
+            $stmtContCat = $pdo->prepare("SELECT COUNT(*) FROM Categoria WHERE FKUsuario = :uid");
+            $stmtContCat->execute([':uid' => $usuario_id]);
+            if ((int)$stmtContCat->fetchColumn() >= $_limitesCat['categorias']) {
+                $erro = "Você atingiu o limite de {$_limitesCat['categorias']} categorias do plano Free. Assine o PRO para categorias ilimitadas.";
+            }
+        }
+    }
+
+    if (!$erro && !empty($nomeCategoria)) {
         try {
             $sqlInsert = "INSERT INTO Categoria (IDCategoria, NomeCategoria, TipoCategoria, IconeCategoria, FKUsuario) VALUES (:id, :nome, :tipo, :icone, :uid)";
             $stmtInsert = $pdo->prepare($sqlInsert);
@@ -106,6 +118,7 @@ if (isset($_GET['sucesso'])) {
 // --- 1.4 BUSCA AS CATEGORIAS SEPARANDO POR TIPO ---
 $categorias_receita = [];
 $categorias_despesa = [];
+$categorias_bloqueadas_ids = []; // IDs de categorias "além do limite" para Free
 
 try {
     $sqlBusca = "
@@ -119,6 +132,17 @@ try {
     $stmtBusca = $pdo->prepare($sqlBusca);
     $stmtBusca->execute([':uid' => $usuario_id]);
     $todas = $stmtBusca->fetchAll();
+
+    // Detecta categorias bloqueadas (Free sem trial acima do limite)
+    $_planoGC  = strtolower($_SESSION['plano'] ?? 'free');
+    $_testeGC  = function_exists('obterHorasRestantesTeste') ? (obterHorasRestantesTeste() > 0) : false;
+    $_limitesGC = limitesDoPlano();
+    if ($_planoGC === 'free' && !$_testeGC && $_limitesGC['categorias'] !== PHP_INT_MAX) {
+        $todasOrdenadas = array_values($todas);
+        for ($i = $_limitesGC['categorias']; $i < count($todasOrdenadas); $i++) {
+            $categorias_bloqueadas_ids[] = $todasOrdenadas[$i]['IDCategoria'];
+        }
+    }
 
     foreach ($todas as $cat) {
         if ($cat['TipoCategoria'] === 'receita') {
@@ -194,79 +218,115 @@ $listaIcones = [
     <?php endif; ?>
 
     <?php if ($erro): ?>
-        <div class="alert alert-danger d-flex align-items-center gap-2 rounded-3 shadow-sm border-0 bg-danger bg-opacity-10 text-danger fw-semibold">
-            <i class="bi bi-exclamation-triangle-fill"></i> <span><?= htmlspecialchars($erro) ?></span>
+        <div class="alert d-flex align-items-center gap-2 rounded-3 shadow-sm border-0 fw-semibold mb-3" style="background:#ef444418;color:#fca5a5;border:1px solid #ef444444 !important;">
+            <i class="bi bi-exclamation-triangle-fill"></i> <span><?= $erro ?></span>
+            <?php if (!empty($_limitesGC) && strpos($erro, 'limite') !== false): ?>
+                &nbsp;<a href="/planos.php?upgrade=pro" class="fw-bold" style="color:#f87171;">Assinar PRO &rarr;</a>
+            <?php endif; ?>
         </div>
     <?php endif; ?>
 
+    <?php if (!empty($categorias_bloqueadas_ids)): ?>
+        <div class="alert d-flex align-items-start gap-3 rounded-3 border-0 mb-3" style="background:#f59e0b15;border:1px solid #f59e0b44 !important;">
+            <i class="bi bi-lock-fill mt-1 flex-shrink-0" style="color:#f59e0b;"></i>
+            <div>
+                <strong class="text-light">Categorias bloqueadas</strong>
+                <p class="mb-1 text-secondary" style="font-size:0.85rem;">
+                    Você tem <?= count($categorias_bloqueadas_ids) ?> categoria(s) além do limite do plano Free (<?= $_limitesGC['categorias'] ?> no total). Elas estão bloqueadas para uso em novas transações, mas você ainda pode editar, mesclar ou excluir.
+                </p>
+                <a href="/planos.php?upgrade=pro" class="btn btn-sm rounded-pill fw-semibold" style="background:#f59e0b20;color:#fbbf24;border:1px solid #f59e0b55;font-size:0.8rem;">
+                    <i class="bi bi-star-fill me-1"></i> Assinar PRO — categorias ilimitadas
+                </a>
+            </div>
+        </div>
+    <?php endif; ?>
+
+    <?php
+    $_totalCats = count($todas ?? []);
+    $_podeCriarCat = ($_limitesGC['categorias'] === PHP_INT_MAX) || ($_totalCats < $_limitesGC['categorias']) || $_testeGC;
+    ?>
     <div class="row g-4">
         <div class="col-md-5 col-lg-4">
             <div class="card bg-body-tertiary border-secondary-subtle shadow-sm rounded-4 h-100">
                 <div class="card-body p-4">
                     <h5 class="text-light fw-bold mb-4 d-flex align-items-center gap-2">
                         <i class="bi bi-plus-circle text-primary" style="color: var(--primary-gold-analysis) !important;"></i> Nova Categoria
+                        <?php if (!$_podeCriarCat): ?>
+                            <span style="background:#7c3aed22;color:#a78bfa;border:1px solid #7c3aed55;border-radius:999px;padding:1px 6px;font-size:0.6rem;font-weight:700;" class="ms-auto"><i class="bi bi-lock-fill" style="font-size:0.55rem;"></i> PRO</span>
+                        <?php endif; ?>
                     </h5>
-                    <?php
-                    $gruposIcones = [
-                        'Essenciais & Casa'   => ['bi-house-door', 'bi-cart3', 'bi-lightning-charge', 'bi-droplet', 'bi-wifi', 'bi-basket', 'bi-tools', 'bi-trash'],
-                        'Transporte'          => ['bi-car-front', 'bi-bus-front', 'bi-bicycle', 'bi-fuel-pump', 'bi-airplane', 'bi-train-front'],
-                        'Saúde & Bem-estar'   => ['bi-heart-pulse', 'bi-capsule', 'bi-bandaid', 'bi-activity', 'bi-clipboard-pulse'],
-                        'Lazer & Estilo'      => ['bi-controller', 'bi-cup-hot', 'bi-ticket-perforated', 'bi-bag', 'bi-scissors', 'bi-palette', 'bi-music-note-beamed', 'bi-tv'],
-                        'Trabalho & Finanças' => ['bi-briefcase', 'bi-cash-stack', 'bi-bank', 'bi-piggy-bank', 'bi-graph-up-arrow', 'bi-laptop', 'bi-credit-card', 'bi-wallet2'],
-                        'Outros'              => ['bi-star', 'bi-box', 'bi-tag', 'bi-three-dots', 'bi-gift', 'bi-book', 'bi-shield-check']
-                    ];
-                    ?>
-                    <form method="POST" action="" class="auralis-premium-form">
-                        <input type="hidden" name="action" value="nova_categoria">
+                    <?php if (!$_podeCriarCat): ?>
+                        <div class="text-center py-4">
+                            <i class="bi bi-lock-fill mb-3 d-block" style="font-size:2rem;color:#7c3aed;"></i>
+                            <p class="text-secondary mb-3" style="font-size:0.875rem;">Você atingiu o limite de <strong><?= $_limitesGC['categorias'] ?> categorias</strong> do plano Free.</p>
+                            <a href="/planos.php?upgrade=pro" class="btn rounded-pill fw-bold w-100" style="background:#7c3aed;color:#fff;border:none;">
+                                <i class="bi bi-star-fill me-1"></i> Assinar PRO
+                            </a>
+                            <p class="text-secondary mt-2 mb-0" style="font-size:0.75rem;">Ou exclua uma categoria existente para liberar espaço.</p>
+                        </div>
+                    <?php else: ?>
+                        <?php
+                        $gruposIcones = [
+                            'Essenciais & Casa'   => ['bi-house-door', 'bi-cart3', 'bi-lightning-charge', 'bi-droplet', 'bi-wifi', 'bi-basket', 'bi-tools', 'bi-trash'],
+                            'Transporte'          => ['bi-car-front', 'bi-bus-front', 'bi-bicycle', 'bi-fuel-pump', 'bi-airplane', 'bi-train-front'],
+                            'Saúde & Bem-estar'   => ['bi-heart-pulse', 'bi-capsule', 'bi-bandaid', 'bi-activity', 'bi-clipboard-pulse'],
+                            'Lazer & Estilo'      => ['bi-controller', 'bi-cup-hot', 'bi-ticket-perforated', 'bi-bag', 'bi-scissors', 'bi-palette', 'bi-music-note-beamed', 'bi-tv'],
+                            'Trabalho & Finanças' => ['bi-briefcase', 'bi-cash-stack', 'bi-bank', 'bi-piggy-bank', 'bi-graph-up-arrow', 'bi-laptop', 'bi-credit-card', 'bi-wallet2'],
+                            'Outros'              => ['bi-star', 'bi-box', 'bi-tag', 'bi-three-dots', 'bi-gift', 'bi-book', 'bi-shield-check']
+                        ];
+                        ?>
+                        <form method="POST" action="" class="auralis-premium-form">
+                            <input type="hidden" name="action" value="nova_categoria">
 
-                        <div class="mb-4">
-                            <label class="form-label text-secondary small mb-2 d-block">Tipo da Categoria</label>
-                            <div class="d-flex gap-2">
-                                <input type="radio" class="btn-check" name="tipo_categoria" id="tipo_despesa" value="despesa" checked>
-                                <label class="btn btn-outline-danger flex-grow-1 rounded-pill fw-semibold fs-7 py-2" for="tipo_despesa">Despesa</label>
+                            <div class="mb-4">
+                                <label class="form-label text-secondary small mb-2 d-block">Tipo da Categoria</label>
+                                <div class="d-flex gap-2">
+                                    <input type="radio" class="btn-check" name="tipo_categoria" id="tipo_despesa" value="despesa" checked>
+                                    <label class="btn btn-outline-danger flex-grow-1 rounded-pill fw-semibold fs-7 py-2" for="tipo_despesa">Despesa</label>
 
-                                <input type="radio" class="btn-check" name="tipo_categoria" id="tipo_receita" value="receita">
-                                <label class="btn btn-outline-success flex-grow-1 rounded-pill fw-semibold fs-7 py-2" for="tipo_receita">Receita</label>
+                                    <input type="radio" class="btn-check" name="tipo_categoria" id="tipo_receita" value="receita">
+                                    <label class="btn btn-outline-success flex-grow-1 rounded-pill fw-semibold fs-7 py-2" for="tipo_receita">Receita</label>
+                                </div>
                             </div>
-                        </div>
 
-                        <div class="mb-4 auralis-line-input pb-2">
-                            <input type="text" name="nome_categoria" class="form-control bg-transparent border-0 text-light-analysis px-0 shadow-none fs-6 fw-bold" placeholder="Nome Ex: Supermercado" required autocomplete="off">
-                        </div>
-
-                        <div class="mb-4">
-                            <label class="form-label text-secondary-analysis fs-7 mb-2">Escolha um ícone</label>
-
-                            <div class="w-100">
-                                <?php foreach ($gruposIcones as $nomeGrupo => $icones): ?>
-
-                                    <div class="d-flex align-items-center mt-3 mb-2">
-                                        <hr class="flex-grow-1" style="border-color: #D4AF37; opacity: 0.35;">
-                                        <span class="mx-3" style="font-size: 0.65rem; font-weight: 800; text-transform: uppercase; letter-spacing: 1.5px; color: #D4AF37;">
-                                            <?= $nomeGrupo ?>
-                                        </span>
-                                        <hr class="flex-grow-1" style="border-color: #D4AF37; opacity: 0.35;">
-                                    </div>
-
-                                    <div class="d-flex flex-wrap gap-2 justify-content-center">
-                                        <?php foreach ($icones as $icone): ?>
-                                            <div>
-                                                <input type="radio" class="btn-check" name="icone_categoria" id="icone_<?= $icone ?>" value="<?= $icone ?>" autocomplete="off" required>
-                                                <label class="btn-icon-select" for="icone_<?= $icone ?>" style="width: 45px; padding: 0;">
-                                                    <i class="bi <?= $icone ?> fs-5"></i>
-                                                </label>
-                                            </div>
-                                        <?php endforeach; ?>
-                                    </div>
-
-                                <?php endforeach; ?>
+                            <div class="mb-4 auralis-line-input pb-2">
+                                <input type="text" name="nome_categoria" class="form-control bg-transparent border-0 text-light-analysis px-0 shadow-none fs-6 fw-bold" placeholder="Nome Ex: Supermercado" required autocomplete="off">
                             </div>
-                        </div>
 
-                        <button type="submit" class="btn btn-gold fw-bold text-dark py-3 w-100 rounded-pill shadow-lg mt-4 transition-hover">
-                            Salvar Categoria
-                        </button>
-                    </form>
+                            <div class="mb-4">
+                                <label class="form-label text-secondary-analysis fs-7 mb-2">Escolha um ícone</label>
+
+                                <div class="w-100">
+                                    <?php foreach ($gruposIcones as $nomeGrupo => $icones): ?>
+
+                                        <div class="d-flex align-items-center mt-3 mb-2">
+                                            <hr class="flex-grow-1" style="border-color: #D4AF37; opacity: 0.35;">
+                                            <span class="mx-3" style="font-size: 0.65rem; font-weight: 800; text-transform: uppercase; letter-spacing: 1.5px; color: #D4AF37;">
+                                                <?= $nomeGrupo ?>
+                                            </span>
+                                            <hr class="flex-grow-1" style="border-color: #D4AF37; opacity: 0.35;">
+                                        </div>
+
+                                        <div class="d-flex flex-wrap gap-2 justify-content-center">
+                                            <?php foreach ($icones as $icone): ?>
+                                                <div>
+                                                    <input type="radio" class="btn-check" name="icone_categoria" id="icone_<?= $icone ?>" value="<?= $icone ?>" autocomplete="off" required>
+                                                    <label class="btn-icon-select" for="icone_<?= $icone ?>" style="width: 45px; padding: 0;">
+                                                        <i class="bi <?= $icone ?> fs-5"></i>
+                                                    </label>
+                                                </div>
+                                            <?php endforeach; ?>
+                                        </div>
+
+                                    <?php endforeach; ?>
+                                </div>
+                            </div>
+
+                            <button type="submit" class="btn btn-gold fw-bold text-dark py-3 w-100 rounded-pill shadow-lg mt-4 transition-hover">
+                                Salvar Categoria
+                            </button>
+                        </form>
+                    <?php endif; ?>
                 </div>
             </div>
         </div>
@@ -289,13 +349,17 @@ $listaIcones = [
                                 </tr>
                             <?php else: ?>
                                 <?php foreach ($categorias_despesa as $cat): ?>
-                                    <tr>
+                                    <?php $_catBloqueada = in_array($cat['IDCategoria'], $categorias_bloqueadas_ids); ?>
+                                    <tr <?= $_catBloqueada ? 'style="opacity:0.65;"' : '' ?>>
                                         <td class="ps-4 py-3 border-secondary-subtle w-50">
                                             <div class="d-flex align-items-center">
                                                 <div class="icon-circle bg-secondary bg-opacity-10 me-3">
                                                     <i class="bi <?= htmlspecialchars($cat['IconeCategoria'] ?? 'bi-tag') ?> text-light fs-5"></i>
                                                 </div>
                                                 <span class="text-light fw-semibold fs-6"><?= htmlspecialchars($cat['NomeCategoria']) ?></span>
+                                                <?php if ($_catBloqueada): ?>
+                                                    <span class="ms-2" style="background:#f59e0b18;color:#fbbf24;border:1px solid #f59e0b44;border-radius:999px;padding:1px 6px;font-size:0.6rem;font-weight:700;"><i class="bi bi-lock-fill" style="font-size:0.55rem;"></i> Bloqueada</span>
+                                                <?php endif; ?>
                                             </div>
                                         </td>
                                         <td class="py-3 border-secondary-subtle text-secondary small text-center fs-7">
@@ -356,13 +420,17 @@ $listaIcones = [
                                 </tr>
                             <?php else: ?>
                                 <?php foreach ($categorias_receita as $cat): ?>
-                                    <tr>
+                                    <?php $_catBloqueada = in_array($cat['IDCategoria'], $categorias_bloqueadas_ids); ?>
+                                    <tr <?= $_catBloqueada ? 'style="opacity:0.65;"' : '' ?>>
                                         <td class="ps-4 py-3 border-secondary-subtle w-50">
                                             <div class="d-flex align-items-center">
                                                 <div class="icon-circle bg-secondary bg-opacity-10 me-3">
                                                     <i class="bi <?= htmlspecialchars($cat['IconeCategoria'] ?? 'bi-tag') ?> text-light fs-5"></i>
                                                 </div>
                                                 <span class="text-light fw-semibold fs-6"><?= htmlspecialchars($cat['NomeCategoria']) ?></span>
+                                                <?php if ($_catBloqueada): ?>
+                                                    <span class="ms-2" style="background:#f59e0b18;color:#fbbf24;border:1px solid #f59e0b44;border-radius:999px;padding:1px 6px;font-size:0.6rem;font-weight:700;"><i class="bi bi-lock-fill" style="font-size:0.55rem;"></i> Bloqueada</span>
+                                                <?php endif; ?>
                                             </div>
                                         </td>
                                         <td class="py-3 border-secondary-subtle text-secondary small text-center fs-7">

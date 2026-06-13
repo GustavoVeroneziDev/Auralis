@@ -3,6 +3,33 @@ if (session_status() === PHP_SESSION_NONE) {
     session_start();
 }
 $paginaAtual = basename($_SERVER['PHP_SELF']);
+
+// Calcula horas de teste uma única vez — usado tanto no banner quanto nos badges do nav
+$horasRestantes = 0;
+if (isset($_SESSION['usuario_id']) && function_exists('obterHorasRestantesTeste')) {
+    $horasRestantes = obterHorasRestantesTeste();
+}
+// Badges de nav: exibe tag de plano quando o usuário não tem acesso E não está em trial
+// Cada recurso é verificado individualmente contra seu nível mínimo configurado no banco
+$_emTrial = $horasRestantes > 0;
+function _navBadgeRecurso($slug, $emTrial)
+{
+    if ($emTrial || !function_exists('recursoDisponivelParaPlano')) return false;
+    if (!isset($_SESSION['usuario_id'])) return false;
+    return !recursoDisponivelParaPlano($slug);
+}
+function _navBadgeTag($slug)
+{
+    $nivel = function_exists('nivelMinimoRecurso') ? strtoupper(nivelMinimoRecurso($slug)) : 'PRO';
+    $cor   = $nivel === 'VIP' ? '#d4af37' : '#a78bfa';
+    $borda = $nivel === 'VIP' ? '#d4af3755' : '#7c3aed55';
+    $bg    = $nivel === 'VIP' ? '#d4af3722' : '#7c3aed22';
+    return "<span style=\"background:{$bg};color:{$cor};border:1px solid {$borda};border-radius:999px;padding:1px 5px;font-size:0.5rem;font-weight:700;letter-spacing:0.04em;line-height:1.6;flex-shrink:0;\"><i class=\"bi bi-star-fill\" style=\"font-size:0.45rem;vertical-align:middle;margin-right:1px;\"></i>{$nivel}</span>";
+}
+// Mantém flag genérica para compatibilidade com código legado
+$_ehFreeRestrito = !$_emTrial
+    && isset($_SESSION['usuario_id'])
+    && strtolower($_SESSION['plano'] ?? 'free') === 'free';
 ?>
 <!DOCTYPE html>
 <html lang="pt-BR" data-bs-theme="dark">
@@ -39,7 +66,7 @@ $paginaAtual = basename($_SERVER['PHP_SELF']);
             <a class="navbar-brand d-flex align-items-center" href="<?php echo isset($_SESSION['usuario_id']) ? '/dashboard.php' : '/geral/index.php'; ?>"
                 style="font-family: 'Aquire', sans-serif; font-weight: 700; font-size: 1.6rem; letter-spacing: 0.04em; text-decoration: none;">
                 <img src="/geral/img/LogoAuralisSemEscudo.png" alt="Logo Auralis" class="me-2" style="height: 36px; width: auto; object-fit: contain;">
-                <span style="color: gold;">Aura</span><span class="text-light" style="font-weight: 700;"></span>lis</span>
+                <span style="color: gold;">Aura</span><span class="text-light" style="font-weight: 300;">lis</span>
             </a>
 
             <button class="navbar-toggler border-0 shadow-none p-2" type="button" data-bs-toggle="collapse"
@@ -63,13 +90,19 @@ $paginaAtual = basename($_SERVER['PHP_SELF']);
                             </a>
                         </li>
                         <li class="nav-item">
-                            <a class="nav-link custom-link py-3 py-lg-2 <?php echo ($paginaAtual == 'analises.php') ? 'text-warning active' : ''; ?>" href="/analises.php">
+                            <a class="nav-link custom-link py-3 py-lg-2 d-flex align-items-center gap-1 <?php echo ($paginaAtual == 'analises.php') ? 'text-warning active' : ''; ?>" href="/analises.php">
                                 <i class="bi bi-graph-up-arrow me-2"></i> Análises
+                                <?php if (_navBadgeRecurso('analises', $_emTrial)): ?>
+                                    <?= _navBadgeTag('analises') ?>
+                                <?php endif; ?>
                             </a>
                         </li>
                         <li class="nav-item">
-                            <a class="nav-link custom-link py-3 py-lg-2 <?php echo ($paginaAtual == 'agenda.php') ? 'text-warning active' : ''; ?>" href="/agenda.php">
+                            <a class="nav-link custom-link py-3 py-lg-2 d-flex align-items-center gap-1 <?php echo ($paginaAtual == 'agenda.php') ? 'text-warning active' : ''; ?>" href="/agenda.php">
                                 <i class="bi bi-calendar3 me-2"></i> Agenda
+                                <?php if (_navBadgeRecurso('agenda', $_emTrial)): ?>
+                                    <?= _navBadgeTag('agenda') ?>
+                                <?php endif; ?>
                             </a>
                         </li>
                         <li class="nav-item">
@@ -186,14 +219,7 @@ $paginaAtual = basename($_SERVER['PHP_SELF']);
             </div>
         </div>
     </nav>
-    <?php
-    // PROTEÇÃO: Só tenta calcular se a pessoa estiver logada E se a função já tiver carregado
-    $horasRestantes = 0;
-    if (isset($_SESSION['usuario_id']) && function_exists('obterHorasRestantesTeste')) {
-        $horasRestantes = obterHorasRestantesTeste();
-    }
-
-    if ($horasRestantes > 0):
+    <?php if ($horasRestantes > 0):
     ?>
         <div class="container-fluid px-0">
             <div class="alert mb-0 text-center shadow-sm" style="background: linear-gradient(90deg, #ca8a04, #eab308); color: #fff; border: none; border-radius: 0; padding: 0.5rem;">

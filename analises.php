@@ -9,6 +9,13 @@ if (! isset($_SESSION['usuario_id'])) {
 }
 require_once 'config/conexao.php';
 
+// Gate: acesso configurável via /admin/configuracoes_planos.php
+$_testeAnalises = function_exists('obterHorasRestantesTeste') && obterHorasRestantesTeste() > 0;
+if (!$_testeAnalises && !recursoDisponivelParaPlano('analises')) {
+    header("Location: /planos.php?upgrade=" . urlencode(nivelMinimoRecurso('analises')));
+    exit;
+}
+
 $usuario_id = $_SESSION['usuario_id'];
 
 // --- LÓGICA DE NAVEGAÇÃO DE TEMPO ---
