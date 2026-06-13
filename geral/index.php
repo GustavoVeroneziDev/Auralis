@@ -7,6 +7,54 @@ if (isset($_SESSION['usuario_id'])) {
 ?>
 <?php require_once 'header.php'; ?>
 
+<?php
+// ── Dados dinâmicos dos planos ────────────────────────────────────────────
+$_lp_raw = [];
+try {
+    $rows = $pdo->query("SELECT * FROM config_limites_plano")->fetchAll(PDO::FETCH_ASSOC);
+    foreach ($rows as $r) $_lp_raw[$r['plano']] = $r;
+} catch (PDOException $e) {}
+
+if (empty($_lp_raw)) {
+    $_lp_raw = [
+        'free' => ['transacoes_mes' => 35, 'carteiras' => 1,  'categorias' => 10, 'parcelas_max' => 3],
+        'pro'  => ['transacoes_mes' => -1, 'carteiras' => 3,  'categorias' => -1, 'parcelas_max' => 48],
+        'vip'  => ['transacoes_mes' => -1, 'carteiras' => -1, 'categorias' => -1, 'parcelas_max' => 48],
+    ];
+}
+
+$_lp_recursos = recursosParaExibicao();
+
+function _lp_itensLimite($row)
+{
+    $itens = [];
+    if ($row['carteiras'] == -1)      $itens[] = ['ok', 'Carteiras ilimitadas'];
+    elseif ($row['carteiras'] == 1)   $itens[] = ['ok', '1 carteira'];
+    else                              $itens[] = ['ok', "Até {$row['carteiras']} carteiras"];
+    if ($row['transacoes_mes'] == -1) $itens[] = ['ok', 'Registros ilimitados'];
+    else                              $itens[] = ['ok', "Até {$row['transacoes_mes']} registros/mês"];
+    if ($row['categorias'] == -1)     $itens[] = ['ok', 'Categorias ilimitadas'];
+    else                              $itens[] = ['ok', "Até {$row['categorias']} categorias"];
+    $pmax = $row['parcelas_max'] ?? 3;
+    if ($pmax == -1)                  $itens[] = ['ok', 'Parcelamento ilimitado'];
+    elseif ($pmax <= 3)               $itens[] = ['ok', "Parcelamento em até {$pmax}x"];
+    else                              $itens[] = ['ok', "Parcelamento em até {$pmax}x (com juros)"];
+    return $itens;
+}
+
+function _lp_itensRecursos($planoCarta, $recursos)
+{
+    $colMap = ['free' => 'disponivel_free', 'pro' => 'disponivel_pro', 'vip' => 'disponivel_vip'];
+    $col    = $colMap[$planoCarta] ?? 'disponivel_pro';
+    $itens  = [];
+    foreach ($recursos as $r) {
+        $disponivel = (bool)($r[$col] ?? false);
+        $itens[]    = [$disponivel ? 'ok' : 'no', $r['label']];
+    }
+    return $itens;
+}
+?>
+
 <!-- ── HERO ─────────────────────────────────────────────────────────────── -->
 <section class="position-relative overflow-hidden" style="padding: clamp(4rem,10vw,7rem) 0;">
     <div style="position:absolute;top:0;left:50%;transform:translateX(-50%);width:600px;height:400px;background:var(--accent);filter:blur(180px);opacity:0.07;border-radius:50%;pointer-events:none;"></div>
@@ -185,102 +233,161 @@ if (isset($_SESSION['usuario_id'])) {
 </section>
 
 <!-- ── PLANOS ────────────────────────────────────────────────────────────── -->
-<section class="py-5 border-top border-secondary-subtle">
+<section class="py-5 border-top border-secondary-subtle" id="planos">
     <div class="container">
         <div class="text-center mb-5">
             <h2 class="fw-bold text-light mb-3" style="font-size:clamp(1.5rem,3vw,2.2rem);">Preços simples e honestos</h2>
             <p class="text-secondary">Comece grátis. Evolua quando fizer sentido.</p>
+
+            <!-- Toggle mensal / anual -->
+            <div class="d-flex align-items-center justify-content-center gap-3 mt-4">
+                <span class="text-secondary" style="font-size:0.9rem;">Mensal</span>
+                <div class="form-check form-switch fs-4 mb-0">
+                    <input class="form-check-input" type="checkbox" id="toggleAnualLp" role="switch">
+                </div>
+                <span class="text-light fw-semibold" style="font-size:0.9rem;">
+                    Anual
+                    <span style="background:#16a34a22;color:#22c55e;border:1px solid #22c55e44;border-radius:999px;padding:1px 8px;font-size:0.7rem;font-weight:700;margin-left:4px;">-33%</span>
+                </span>
+            </div>
         </div>
 
-        <div class="row g-4 justify-content-center">
-            <!-- Free -->
-            <div class="col-12 col-md-4 card-animado surgir-baixo">
-                <div class="feature-card h-100 text-center">
-                    <p class="text-secondary fw-semibold small text-uppercase mb-1" style="letter-spacing:.08em;">Gratuito</p>
-                    <div class="fw-bold text-light mb-1" style="font-size:2rem;">R$ 0</div>
-                    <p class="text-secondary mb-4" style="font-size:0.8rem;">Para começar a organizar</p>
-                    <ul class="list-unstyled text-start mb-4" style="font-size:0.85rem;">
-                        <?php foreach (
-                            [
-                                '1 carteira',
-                                'Até 35 registros/mês',
-                                'Até 10 categorias',
-                                'Parcelamento em até 3x',
-                                'Dashboard com variação mensal',
-                                'Agenda financeira',
-                                'App instalável (PWA)',
-                            ] as $item
-                        ): ?>
-                            <li class="mb-2 d-flex gap-2"><i class="bi bi-check-circle-fill text-success mt-1 flex-shrink-0"></i><span class="text-light"><?php echo $item ?></span></li>
-                        <?php endforeach; ?>
-                    </ul>
-                    <a href="/usuario/cadastro.php" class="btn w-100 rounded-pill fw-semibold"
-                        style="background:rgba(255,255,255,.06);color:#f8fafc;border:1px solid rgba(255,255,255,.1);">
-                        Começar grátis
-                    </a>
-                </div>
-            </div>
-            <!-- PRO -->
-            <div class="col-12 col-md-4 card-animado surgir-baixo" style="transition-delay:.15s;">
-                <div class="h-100 rounded-4 overflow-hidden" style="border:1.5px solid #7c3aed88;background:var(--bg-card);">
-                    <div class="text-center py-1" style="background:#7c3aed;font-size:0.7rem;font-weight:700;letter-spacing:.08em;color:#fff;">MAIS POPULAR</div>
-                    <div class="p-4 text-center d-flex flex-column" style="height:calc(100% - 30px);">
-                        <p class="fw-semibold small text-uppercase mb-1" style="color:#a78bfa;letter-spacing:.08em;"><i class="fi fi-br-crown" style="font-size:0.75rem;vertical-align:middle;"></i> PRO</p>
-                        <div class="fw-bold text-light mb-0" style="font-size:2rem;">R$ 19,90</div>
-                        <p class="text-secondary mb-4" style="font-size:0.8rem;">/mês · Para quem leva a sério</p>
-                        <ul class="list-unstyled text-start mb-4" style="font-size:0.85rem;">
-                            <?php foreach (
-                                [
-                                    'Até 3 carteiras',
-                                    'Registros ilimitados',
-                                    'Categorias ilimitadas',
-                                    'Parcelamento em até 48x (com juros)',
-                                    'Histórico comparativo (12 meses)',
-                                    'Comprovantes e Anexos',
-                                    'Suporte prioritário',
-                                ] as $item
-                            ): ?>
-                                <li class="mb-2 d-flex gap-2"><i class="bi bi-check-circle-fill mt-1 flex-shrink-0" style="color:#a78bfa;"></i><span class="text-light"><?php echo $item ?></span></li>
-                            <?php endforeach; ?>
-                        </ul>
-                        <a href="/usuario/cadastro.php" class="btn w-100 rounded-pill fw-bold mt-auto"
-                            style="background:#7c3aed;color:#fff;border:none;">
-                            Assinar PRO
-                        </a>
+        <div class="row g-4 justify-content-center align-items-stretch">
+
+            <?php
+            $lpCards = [
+                'free' => [
+                    'topo_bg'      => '#4b5563',
+                    'topo_label'   => 'PARA CONHECER O SISTEMA',
+                    'border'       => '#4b556366',
+                    'label_plano'  => 'Gratuito',
+                    'nome'         => 'Free',
+                    'preco_m'      => 'R$ 0',
+                    'preco_a'      => null,
+                    'sub'          => 'O essencial para começar a organizar.',
+                    'label_cor'    => null,
+                    'icone_cor_ok' => '',
+                    'btn_m_text'   => 'Começar grátis',
+                    'btn_a_text'   => 'Começar grátis',
+                    'btn_m_style'  => 'background:rgba(255,255,255,.06);color:#f8fafc;border:1px solid rgba(255,255,255,.1);',
+                    'btn_a_style'  => 'background:rgba(255,255,255,.06);color:#f8fafc;border:1px solid rgba(255,255,255,.1);',
+                    'btn_m_href'   => '/usuario/cadastro.php',
+                    'btn_a_href'   => '/usuario/cadastro.php',
+                    'delay'        => '0s',
+                ],
+                'pro' => [
+                    'topo_bg'      => '#7c3aed',
+                    'topo_label'   => 'MAIS POPULAR',
+                    'border'       => '#7c3aed88',
+                    'label_plano'  => 'PRO',
+                    'nome'         => 'Auralis PRO',
+                    'preco_m'      => 'R$ 19,90',
+                    'preco_a'      => 'R$ 14,99',
+                    'preco_a_info' => 'R$ 179,90 cobrado anualmente',
+                    'sub'          => 'Para quem leva as finanças a sério.',
+                    'label_cor'    => '#a78bfa',
+                    'icone_cor_ok' => 'style="color:#a78bfa;"',
+                    'btn_m_text'   => 'Assinar PRO — R$ 19,90/mês',
+                    'btn_a_text'   => 'Assinar PRO — R$ 179,90/ano',
+                    'btn_m_style'  => 'background:#7c3aed;color:#fff;border:none;',
+                    'btn_a_style'  => 'background:#7c3aed;color:#fff;border:none;',
+                    'btn_m_href'   => '/planos.php',
+                    'btn_a_href'   => '/planos.php?periodo=anual',
+                    'delay'        => '.15s',
+                ],
+                'vip' => [
+                    'topo_bg'      => 'linear-gradient(90deg,#AA8C2C,#d4af37)',
+                    'topo_label'   => '⭐ PARA FAMÍLIAS &amp; EMPREENDEDORES',
+                    'border'       => '#d4af3766',
+                    'label_plano'  => 'VIP',
+                    'nome'         => 'Auralis VIP',
+                    'preco_m'      => 'R$ 29,90',
+                    'preco_a'      => 'R$ 19,99',
+                    'preco_a_info' => 'R$ 239,90 cobrado anualmente',
+                    'sub'          => 'Para quem não aceita limites.',
+                    'label_cor'    => '#d4af37',
+                    'icone_cor_ok' => 'style="color:#d4af37;"',
+                    'btn_m_text'   => 'Assinar VIP — R$ 29,90/mês',
+                    'btn_a_text'   => 'Assinar VIP — R$ 239,90/ano',
+                    'btn_m_style'  => 'background:linear-gradient(90deg,#AA8C2C,#d4af37);color:#fff;border:none;font-weight:800;',
+                    'btn_a_style'  => 'background:linear-gradient(90deg,#AA8C2C,#d4af37);color:#fff;border:none;font-weight:800;',
+                    'btn_m_href'   => '/planos.php',
+                    'btn_a_href'   => '/planos.php?periodo=anual',
+                    'delay'        => '.3s',
+                ],
+            ];
+
+            foreach ($lpCards as $slug => $c):
+                $row   = $_lp_raw[$slug] ?? $_lp_raw['free'];
+                $itens = array_merge(_lp_itensLimite($row), _lp_itensRecursos($slug, $_lp_recursos));
+            ?>
+                <div class="col-12 col-md-4 card-animado surgir-baixo" style="transition-delay:<?= $c['delay'] ?>;">
+                    <div class="card rounded-4 shadow-sm h-100 position-relative overflow-hidden"
+                        style="background:var(--bg-card);border:1.5px solid <?= $c['border'] ?>;">
+
+                        <div class="text-center py-1"
+                            style="background:<?= $c['topo_bg'] ?>;font-size:0.7rem;font-weight:700;letter-spacing:0.08em;color:#fff;">
+                            <?= $c['topo_label'] ?>
+                        </div>
+
+                        <div class="card-body p-4 d-flex flex-column">
+                            <div class="mb-4">
+                                <p class="fw-semibold mb-1 small text-uppercase"
+                                    <?= $c['label_cor'] ? "style=\"color:{$c['label_cor']};letter-spacing:.08em;\"" : 'class="text-secondary" style="letter-spacing:.08em;"' ?>>
+                                    <?= htmlspecialchars($c['label_plano']) ?>
+                                </p>
+                                <h3 class="fw-bold text-light mb-0" style="font-size:1.4rem;"><?= htmlspecialchars($c['nome']) ?></h3>
+                                <div class="mt-3">
+                                    <span class="fw-bold text-light preco-mensal-lp" style="font-size:2rem;"><?= $c['preco_m'] ?></span>
+                                    <?php if ($c['preco_a'] ?? null): ?>
+                                        <span class="fw-bold text-light preco-anual-lp d-none" style="font-size:2rem;"><?= $c['preco_a'] ?></span>
+                                    <?php endif; ?>
+                                    <?php if ($slug !== 'free'): ?><span class="text-secondary">/mês</span><?php endif; ?>
+                                </div>
+                                <?php if ($c['preco_a'] ?? null): ?>
+                                    <p class="text-secondary mt-1 mb-0 preco-anual-info-lp d-none" style="font-size:0.78rem;"><?= $c['preco_a_info'] ?></p>
+                                <?php endif; ?>
+                                <p class="text-secondary mt-2 mb-0" style="font-size:0.82rem;"><?= htmlspecialchars($c['sub']) ?></p>
+                            </div>
+
+                            <ul class="list-unstyled flex-grow-1 mb-4" style="font-size:0.85rem;">
+                                <?php foreach ($itens as [$tipo, $item]): ?>
+                                    <li class="d-flex align-items-center gap-2 mb-2">
+                                        <i class="bi <?= $tipo === 'ok'
+                                                            ? 'bi-check-circle-fill ' . ($c['icone_cor_ok'] ? '' : 'text-success')
+                                                            : 'bi-x-circle text-secondary opacity-40' ?>"
+                                            <?= ($tipo === 'ok' && $c['icone_cor_ok']) ? $c['icone_cor_ok'] : '' ?>></i>
+                                        <span class="<?= $tipo === 'no' ? 'text-secondary opacity-40 text-decoration-line-through' : 'text-light' ?>">
+                                            <?= htmlspecialchars($item) ?>
+                                        </span>
+                                    </li>
+                                <?php endforeach; ?>
+                            </ul>
+
+                            <div class="mt-auto">
+                                <a href="<?= $c['btn_m_href'] ?>"
+                                    class="btn w-100 rounded-pill fw-bold preco-mensal-lp"
+                                    style="<?= $c['btn_m_style'] ?>">
+                                    <?= htmlspecialchars($c['btn_m_text']) ?>
+                                </a>
+                                <a href="<?= $c['btn_a_href'] ?>"
+                                    class="btn w-100 rounded-pill fw-bold preco-anual-lp d-none"
+                                    style="<?= $c['btn_a_style'] ?>">
+                                    <?= htmlspecialchars($c['btn_a_text']) ?>
+                                </a>
+                            </div>
+                        </div>
                     </div>
                 </div>
-            </div>
-            <!-- VIP -->
-            <div class="col-12 col-md-4 card-animado surgir-baixo" style="transition-delay:.3s;">
-                <div class="h-100 rounded-4 overflow-hidden" style="border:1.5px solid #d4af3766;background:var(--bg-card);">
-                    <div class="text-center py-1" style="background:linear-gradient(90deg,#AA8C2C,#d4af37);font-size:0.7rem;font-weight:700;letter-spacing:.08em;color:#121418;"><i class="fi fi-ss-gem" style="font-size:0.7rem;vertical-align:middle;"></i> VIP</div>
-                    <div class="p-4 text-center d-flex flex-column" style="height:calc(100% - 30px);">
-                        <p class="fw-semibold small text-uppercase mb-1" style="color:#d4af37;letter-spacing:.08em;"><i class="fi fi-ss-gem" style="font-size:0.75rem;vertical-align:middle;"></i> VIP</p>
-                        <div class="fw-bold text-light mb-0" style="font-size:2rem;">R$ 29,90</div>
-                        <p class="text-secondary mb-4" style="font-size:0.8rem;">/mês · Para famílias e empreendedores</p>
-                        <ul class="list-unstyled text-start mb-4" style="font-size:0.85rem;">
-                            <?php foreach (
-                                [
-                                    'Carteiras ilimitadas',
-                                    'Registros ilimitados',
-                                    'Categorias ilimitadas',
-                                    'Parcelamento em até 48x (com juros)',
-                                    'Histórico ilimitado',
-                                    'Comprovantes e Anexos',
-                                    'Suporte VIP dedicado',
-                                ] as $item
-                            ): ?>
-                                <li class="mb-2 d-flex gap-2"><i class="bi bi-check-circle-fill mt-1 flex-shrink-0" style="color:#d4af37;"></i><span class="text-light"><?php echo $item ?></span></li>
-                            <?php endforeach; ?>
-                        </ul>
-                        <a href="/usuario/cadastro.php" class="btn w-100 rounded-pill fw-bold mt-auto"
-                            style="background:linear-gradient(90deg,#AA8C2C,#d4af37);color:#121418;border:none;font-weight:800;">
-                            Assinar VIP
-                        </a>
-                    </div>
-                </div>
-            </div>
+            <?php endforeach; ?>
+
         </div>
+
+        <p class="text-center text-secondary mt-4 mb-0" style="font-size:0.82rem;">
+            <i class="bi bi-shield-check me-1"></i>
+            Pagamento seguro. Cancele quando quiser. Sem fidelidade.
+            <a href="/planos.php" class="text-secondary ms-2" style="text-decoration:underline dotted;">Ver página completa de planos →</a>
+        </p>
     </div>
 </section>
 
@@ -302,5 +409,21 @@ if (isset($_SESSION['usuario_id'])) {
         </p>
     </div>
 </section>
+
+<script>
+(function () {
+    const toggle    = document.getElementById('toggleAnualLp');
+    if (!toggle) return;
+    const mensal    = document.querySelectorAll('.preco-mensal-lp');
+    const anual     = document.querySelectorAll('.preco-anual-lp');
+    const anualInfo = document.querySelectorAll('.preco-anual-info-lp');
+    toggle.addEventListener('change', function () {
+        const isAnual = this.checked;
+        mensal   .forEach(el => el.classList.toggle('d-none',  isAnual));
+        anual    .forEach(el => el.classList.toggle('d-none', !isAnual));
+        anualInfo.forEach(el => el.classList.toggle('d-none', !isAnual));
+    });
+})();
+</script>
 
 <?php require_once 'footer.php'; ?>
