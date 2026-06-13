@@ -16,17 +16,17 @@ if (!isset($_SESSION['usuario_id'])) {
 
 require_once 'config/conexao.php';
 
-// Gate PRO: Agenda é exclusiva PRO/VIP (Free sem trial → redireciona)
-$_planoAgenda = strtolower($_SESSION['plano'] ?? 'free');
-$_testeAgenda = function_exists('obterHorasRestantesTeste') ? (obterHorasRestantesTeste() > 0) : false;
-if ($_planoAgenda === 'free' && !$_testeAgenda) {
+// Gate: nível mínimo lido do banco (configurável via /admin/configuracoes_planos.php)
+$_nivelAgenda = function_exists('nivelMinimoRecurso') ? nivelMinimoRecurso('agenda') : 'pro';
+$_testeAgenda = function_exists('obterHorasRestantesTeste') && obterHorasRestantesTeste() > 0;
+if (!$_testeAgenda && function_exists('temPlano') && !temPlano($_nivelAgenda)) {
     if (isset($_GET['ajax'])) {
         ob_clean();
         header('Content-Type: application/json');
         echo json_encode(['sucesso' => false, 'erro' => 'Plano insuficiente']);
         exit;
     }
-    header("Location: /planos.php?upgrade=pro");
+    header("Location: /planos.php?upgrade=" . urlencode($_nivelAgenda));
     exit;
 }
 

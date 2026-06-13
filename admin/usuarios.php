@@ -150,6 +150,22 @@ require_once '../geral/header.php';
         </a>
     </div>
 
+    <!-- Tabs de navegação admin -->
+    <ul class="nav nav-pills gap-2 mb-4">
+        <li class="nav-item">
+            <a href="/admin/usuarios.php" class="nav-link rounded-pill active"
+                style="background:#7c3aed;color:#fff;font-size:0.85rem;">
+                <i class="bi bi-people me-1"></i> Usuários
+            </a>
+        </li>
+        <li class="nav-item">
+            <a href="/admin/configuracoes_planos.php" class="nav-link rounded-pill"
+                style="background:rgba(255,255,255,.05);color:#9ca3af;font-size:0.85rem;">
+                <i class="bi bi-sliders me-1"></i> Configurações de Planos
+            </a>
+        </li>
+    </ul>
+
     <!-- Alertas -->
     <?php if ($sucesso): ?>
         <div class="alert alert-success d-flex align-items-center gap-2 rounded-3 border-0 bg-success bg-opacity-10 text-success fw-semibold mb-4">
@@ -530,16 +546,20 @@ require_once '../geral/header.php';
     #tabelaUsuarios tbody tr:hover td {
         background-color: rgba(255, 255, 255, 0.025) !important;
     }
-    .opacity-40 { opacity: 0.4; }
+
+    .opacity-40 {
+        opacity: 0.4;
+    }
 
     /* Botões de seleção de plano */
-    #plano_pro:checked + .btn-plano {
+    #plano_pro:checked+.btn-plano {
         background: rgba(124, 58, 237, 0.28) !important;
         border-color: #a78bfa !important;
         box-shadow: 0 0 0 2px rgba(124, 58, 237, 0.35);
         transform: scale(1.04);
     }
-    #plano_vip:checked + .btn-plano {
+
+    #plano_vip:checked+.btn-plano {
         background: rgba(212, 175, 55, 0.28) !important;
         border-color: #d4af37 !important;
         box-shadow: 0 0 0 2px rgba(212, 175, 55, 0.35);
@@ -552,7 +572,7 @@ require_once '../geral/header.php';
         font-weight: 600;
         padding: 3px 10px;
         border-radius: 999px;
-        border: 1px solid rgba(255,255,255,0.1);
+        border: 1px solid rgba(255, 255, 255, 0.1);
         background: transparent;
         color: #555;
         cursor: pointer;
@@ -560,21 +580,31 @@ require_once '../geral/header.php';
         white-space: nowrap;
         line-height: 1.6;
     }
+
     .filter-pill:hover {
-        border-color: rgba(255,255,255,0.2);
+        border-color: rgba(255, 255, 255, 0.2);
         color: #888;
-        background: rgba(255,255,255,0.04);
+        background: rgba(255, 255, 255, 0.04);
     }
+
     .filter-pill.active {
-        background: rgba(170,140,44,0.15);
-        border-color: rgba(170,140,44,0.45);
+        background: rgba(170, 140, 44, 0.15);
+        border-color: rgba(170, 140, 44, 0.45);
         color: #AA8C2C;
     }
 
     /* Sortable header hover */
-    .sortable:hover { color: #888 !important; }
-    .sortable:hover .sort-icon { color: #888 !important; }
-    .sortable.sorted .sort-icon { color: #AA8C2C !important; }
+    .sortable:hover {
+        color: #888 !important;
+    }
+
+    .sortable:hover .sort-icon {
+        color: #888 !important;
+    }
+
+    .sortable.sorted .sort-icon {
+        color: #AA8C2C !important;
+    }
 </style>
 
 <script>
@@ -582,7 +612,7 @@ require_once '../geral/header.php';
     document.getElementById('modalDarAcesso').addEventListener('show.bs.modal', function(e) {
         const btn = e.relatedTarget;
         document.getElementById('dar_usuario_id').value = btn.dataset.id;
-        document.getElementById('dar_nome').textContent  = btn.dataset.nome;
+        document.getElementById('dar_nome').textContent = btn.dataset.nome;
         document.getElementById('dar_email').textContent = btn.dataset.email;
         document.getElementById(btn.dataset.plano === 'vip' ? 'plano_vip' : 'plano_pro').checked = true;
         document.getElementById('campoDias').value = 30;
@@ -591,14 +621,22 @@ require_once '../geral/header.php';
     document.getElementById('modalRevogar').addEventListener('show.bs.modal', function(e) {
         const btn = e.relatedTarget;
         document.getElementById('revogar_usuario_id').value = btn.dataset.id;
-        document.getElementById('revogar_nome').textContent  = btn.dataset.nome;
+        document.getElementById('revogar_nome').textContent = btn.dataset.nome;
     });
 
-    function setDias(n) { document.getElementById('campoDias').value = n; }
+    function setDias(n) {
+        document.getElementById('campoDias').value = n;
+    }
 
     // ── Estado de filtros + ordenação ────────────────────────────────────────
-    const filtros = { q: '', plano: '', status: '', nivel: '' };
-    let sortCol = '', sortDir = 1;
+    const filtros = {
+        q: '',
+        plano: '',
+        status: '',
+        nivel: ''
+    };
+    let sortCol = '',
+        sortDir = 1;
 
     function aplicar() {
         const rows = [...document.querySelectorAll('.usuario-row')];
@@ -606,10 +644,10 @@ require_once '../geral/header.php';
         // Filtragem
         rows.forEach(row => {
             const ok =
-                (!filtros.q      || row.dataset.nome.includes(filtros.q) || row.dataset.email.includes(filtros.q)) &&
-                (!filtros.plano  || row.dataset.plano  === filtros.plano) &&
+                (!filtros.q || row.dataset.nome.includes(filtros.q) || row.dataset.email.includes(filtros.q)) &&
+                (!filtros.plano || row.dataset.plano === filtros.plano) &&
                 (!filtros.status || row.dataset.status === filtros.status) &&
-                (!filtros.nivel  || row.dataset.nivel  === filtros.nivel);
+                (!filtros.nivel || row.dataset.nivel === filtros.nivel);
             row.style.display = ok ? '' : 'none';
         });
 
@@ -626,7 +664,9 @@ require_once '../geral/header.php';
                     if (!va) return 1;
                     if (!vb) return -1;
                 }
-                return va.localeCompare(vb, 'pt', { sensitivity: 'base' }) * sortDir;
+                return va.localeCompare(vb, 'pt', {
+                    sensitivity: 'base'
+                }) * sortDir;
             });
             visiveis.forEach(r => tbody.appendChild(r));
         }
@@ -659,7 +699,11 @@ require_once '../geral/header.php';
     });
 
     // ── Pills de filtro ──────────────────────────────────────────────────────
-    [['filterPlano','plano'], ['filterStatus','status'], ['filterNivel','nivel']].forEach(([id, chave]) => {
+    [
+        ['filterPlano', 'plano'],
+        ['filterStatus', 'status'],
+        ['filterNivel', 'nivel']
+    ].forEach(([id, chave]) => {
         document.getElementById(id).querySelectorAll('.filter-pill').forEach(btn => {
             btn.addEventListener('click', function() {
                 document.getElementById(id).querySelectorAll('.filter-pill').forEach(b => b.classList.remove('active'));

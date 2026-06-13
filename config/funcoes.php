@@ -85,39 +85,41 @@ if (!function_exists('badgePlano')) {
 }
 
 if (!function_exists('limitesDoPlano')) {
-    function limitesDoPlano()
+    function limitesDoPlano($planoExplicito = null)
     {
-        $plano = obterPlanoAtual();
-        if ($plano === 'pro') {
-            return [
-                'transacoes_mes'  => PHP_INT_MAX,
-                'carteiras'       => 3,
-                'categorias'      => PHP_INT_MAX,
-                'parcelas_max'    => 48,
-                'historico_meses' => 12,
-                'exportacao'      => true,
-            ];
+        global $pdo;
+        static $cache = [];
+
+        $plano = $planoExplicito ?? obterPlanoAtual();
+
+        if (isset($cache[$plano])) return $cache[$plano];
+
+        if ($pdo) {
+            try {
+                $stmt = $pdo->prepare("SELECT * FROM config_limites_plano WHERE plano = ? LIMIT 1");
+                $stmt->execute([$plano]);
+                $row = $stmt->fetch(PDO::FETCH_ASSOC);
+                if ($row) {
+                    $cache[$plano] = [
+                        'transacoes_mes' => $row['transacoes_mes'] == -1 ? PHP_INT_MAX : (int)$row['transacoes_mes'],
+                        'carteiras'      => $row['carteiras']      == -1 ? PHP_INT_MAX : (int)$row['carteiras'],
+                        'categorias'     => $row['categorias']     == -1 ? PHP_INT_MAX : (int)$row['categorias'],
+                        'parcelas_max'   => (int)$row['parcelas_max'],
+                        'horas_teste'    => (int)$row['horas_teste'],
+                    ];
+                    return $cache[$plano];
+                }
+            } catch (PDOException $e) {}
         }
-        if ($plano === 'vip') {
-            return [
-                'transacoes_mes'   => PHP_INT_MAX,
-                'carteiras'        => PHP_INT_MAX,
-                'categorias'       => PHP_INT_MAX,
-                'parcelas_max'     => 48,
-                'historico_meses'  => PHP_INT_MAX,
-                'exportacao'       => true,
-                'compartilhamento' => true,
-                'cartao_credito'   => true,
-            ];
-        }
-        return [
-            'transacoes_mes'  => 35,
-            'carteiras'       => 1,
-            'categorias'      => 10,
-            'parcelas_max'    => 3,
-            'historico_meses' => 1,
-            'exportacao'      => false,
+
+        // Fallback hardcoded se a tabela ainda não existir
+        $defaults = [
+            'pro'  => ['transacoes_mes' => PHP_INT_MAX, 'carteiras' => 3,           'categorias' => PHP_INT_MAX, 'parcelas_max' => 48, 'horas_teste' => 0],
+            'vip'  => ['transacoes_mes' => PHP_INT_MAX, 'carteiras' => PHP_INT_MAX, 'categorias' => PHP_INT_MAX, 'parcelas_max' => 48, 'horas_teste' => 0],
+            'free' => ['transacoes_mes' => 35,          'carteiras' => 1,           'categorias' => 10,          'parcelas_max' => 3,  'horas_teste' => 50],
         ];
+        $cache[$plano] = $defaults[$plano] ?? $defaults['free'];
+        return $cache[$plano];
     }
 }
 
@@ -182,6 +184,9 @@ if (!function_exists('obterPlanoEfetivo')) {
         $plano = obterPlanoAtual();
         if ($plano !== 'free') return $plano;
 
+        $horasTrial = limitesDoPlano('free')['horas_teste'] ?? 50;
+        if ($horasTrial <= 0) return 'free';
+
         try {
             $stmt = $pdo->prepare("SELECT MomentoCriacao FROM Usuario WHERE IDUsuario = ?");
             $stmt->execute([$uid]);
@@ -192,7 +197,7 @@ if (!function_exists('obterPlanoEfetivo')) {
                 $diff    = (new DateTime())->diff($criacao);
                 $horas   = ($diff->days * 24) + $diff->h;
 
-                if ($horas < 50) return 'vip_trial';
+                if ($horas < $horasTrial) return 'vip_trial';
             }
         } catch (PDOException $e) {
         }
@@ -208,6 +213,9 @@ if (!function_exists('obterHorasRestantesTeste')) {
         $uid = $_SESSION['usuario_id'] ?? '';
         if (!$uid || !$pdo || obterPlanoAtual() !== 'free') return 0;
 
+        $horasTrial = limitesDoPlano('free')['horas_teste'] ?? 50;
+        if ($horasTrial <= 0) return 0;
+
         try {
             $stmt = $pdo->prepare("SELECT MomentoCriacao FROM Usuario WHERE IDUsuario = ?");
             $stmt->execute([$uid]);
@@ -217,12 +225,57 @@ if (!function_exists('obterHorasRestantesTeste')) {
                 $criacao = new DateTime($user['MomentoCriacao']);
                 $diff    = (new DateTime())->diff($criacao);
                 $horas   = ($diff->days * 24) + $diff->h;
-                if ($horas < 50) return 50 - $horas;
+                if ($horas < $horasTrial) return $horasTrial - $horas;
             }
         } catch (PDOException $e) {
         }
 
         return 0;
+    }
+}
+
+// ── Configuração dinâmica de recursos por plano ──────────────────────────
+
+if (!function_exists('nivelMinimoRecurso')) {
+    function nivelMinimoRecurso($slug)
+    {
+        global $pdo;
+        static $cache = [];
+
+        if (isset($cache[$slug])) return $cache[$slug];
+
+        if ($pdo) {
+            try {
+                $stmt = $pdo->prepare("SELECT nivel_minimo FROM config_recursos WHERE slug = ? LIMIT 1");
+                $stmt->execute([$slug]);
+                $row = $stmt->fetch(PDO::FETCH_ASSOC);
+                if ($row) {
+                    $cache[$slug] = $row['nivel_minimo'];
+                    return $row['nivel_minimo'];
+                }
+            } catch (PDOException $e) {}
+        }
+
+        // Fallback se a tabela ainda não existir
+        $defaults = ['agenda' => 'pro', 'analises' => 'pro', 'comprovantes' => 'pro'];
+        $cache[$slug] = $defaults[$slug] ?? 'pro';
+        return $cache[$slug];
+    }
+}
+
+if (!function_exists('recursosParaExibicao')) {
+    function recursosParaExibicao()
+    {
+        global $pdo;
+        if (!$pdo) return [];
+        try {
+            return $pdo->query(
+                "SELECT slug, label, nivel_minimo FROM config_recursos
+                 WHERE mostrar_nos_planos = 1 ORDER BY ordem ASC"
+            )->fetchAll(PDO::FETCH_ASSOC);
+        } catch (PDOException $e) {
+            return [];
+        }
     }
 }
 

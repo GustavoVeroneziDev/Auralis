@@ -9,10 +9,27 @@ $horasRestantes = 0;
 if (isset($_SESSION['usuario_id']) && function_exists('obterHorasRestantesTeste')) {
     $horasRestantes = obterHorasRestantesTeste();
 }
-// Flag: usuário Free sem trial ativo — exibe badges de plano nos itens de nav bloqueados
-$_ehFreeRestrito = isset($_SESSION['usuario_id'])
-    && strtolower($_SESSION['plano'] ?? 'free') === 'free'
-    && $horasRestantes <= 0;
+// Badges de nav: exibe tag de plano quando o usuário não tem acesso E não está em trial
+// Cada recurso é verificado individualmente contra seu nível mínimo configurado no banco
+$_emTrial = $horasRestantes > 0;
+function _navBadgeRecurso($slug, $emTrial)
+{
+    if ($emTrial || !function_exists('temPlano') || !function_exists('nivelMinimoRecurso')) return false;
+    if (!isset($_SESSION['usuario_id'])) return false;
+    return !temPlano(nivelMinimoRecurso($slug));
+}
+function _navBadgeTag($slug)
+{
+    $nivel = function_exists('nivelMinimoRecurso') ? strtoupper(nivelMinimoRecurso($slug)) : 'PRO';
+    $cor   = $nivel === 'VIP' ? '#d4af37' : '#a78bfa';
+    $borda = $nivel === 'VIP' ? '#d4af3755' : '#7c3aed55';
+    $bg    = $nivel === 'VIP' ? '#d4af3722' : '#7c3aed22';
+    return "<span style=\"background:{$bg};color:{$cor};border:1px solid {$borda};border-radius:999px;padding:1px 5px;font-size:0.5rem;font-weight:700;letter-spacing:0.04em;line-height:1.6;flex-shrink:0;\"><i class=\"bi bi-star-fill\" style=\"font-size:0.45rem;vertical-align:middle;margin-right:1px;\"></i>{$nivel}</span>";
+}
+// Mantém flag genérica para compatibilidade com código legado
+$_ehFreeRestrito = !$_emTrial
+    && isset($_SESSION['usuario_id'])
+    && strtolower($_SESSION['plano'] ?? 'free') === 'free';
 ?>
 <!DOCTYPE html>
 <html lang="pt-BR" data-bs-theme="dark">
@@ -75,16 +92,16 @@ $_ehFreeRestrito = isset($_SESSION['usuario_id'])
                         <li class="nav-item">
                             <a class="nav-link custom-link py-3 py-lg-2 d-flex align-items-center gap-1 <?php echo ($paginaAtual == 'analises.php') ? 'text-warning active' : ''; ?>" href="/analises.php">
                                 <i class="bi bi-graph-up-arrow me-2"></i> Análises
-                                <?php if ($_ehFreeRestrito): ?>
-                                    <span style="background:#7c3aed22;color:#a78bfa;border:1px solid #7c3aed55;border-radius:999px;padding:1px 5px;font-size:0.5rem;font-weight:700;letter-spacing:0.04em;line-height:1.6;flex-shrink:0;"><i class="bi bi-star-fill" style="font-size:0.45rem;vertical-align:middle;margin-right:1px;"></i>PRO</span>
+                                <?php if (_navBadgeRecurso('analises', $_emTrial)): ?>
+                                    <?= _navBadgeTag('analises') ?>
                                 <?php endif; ?>
                             </a>
                         </li>
                         <li class="nav-item">
                             <a class="nav-link custom-link py-3 py-lg-2 d-flex align-items-center gap-1 <?php echo ($paginaAtual == 'agenda.php') ? 'text-warning active' : ''; ?>" href="/agenda.php">
                                 <i class="bi bi-calendar3 me-2"></i> Agenda
-                                <?php if ($_ehFreeRestrito): ?>
-                                    <span style="background:#7c3aed22;color:#a78bfa;border:1px solid #7c3aed55;border-radius:999px;padding:1px 5px;font-size:0.5rem;font-weight:700;letter-spacing:0.04em;line-height:1.6;flex-shrink:0;"><i class="bi bi-star-fill" style="font-size:0.45rem;vertical-align:middle;margin-right:1px;"></i>PRO</span>
+                                <?php if (_navBadgeRecurso('agenda', $_emTrial)): ?>
+                                    <?= _navBadgeTag('agenda') ?>
                                 <?php endif; ?>
                             </a>
                         </li>

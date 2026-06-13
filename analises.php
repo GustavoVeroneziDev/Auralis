@@ -9,11 +9,11 @@ if (! isset($_SESSION['usuario_id'])) {
 }
 require_once 'config/conexao.php';
 
-// Gate PRO: Análises é exclusiva PRO/VIP
-$_planoAnalises = strtolower($_SESSION['plano'] ?? 'free');
-$_testeAnalises = function_exists('obterHorasRestantesTeste') ? (obterHorasRestantesTeste() > 0) : false;
-if ($_planoAnalises === 'free' && !$_testeAnalises) {
-    header("Location: /planos.php?upgrade=pro");
+// Gate: nível mínimo lido do banco (configurável via /admin/configuracoes_planos.php)
+$_nivelAnalises = function_exists('nivelMinimoRecurso') ? nivelMinimoRecurso('analises') : 'pro';
+$_testeAnalises = function_exists('obterHorasRestantesTeste') && obterHorasRestantesTeste() > 0;
+if (!$_testeAnalises && function_exists('temPlano') && !temPlano($_nivelAnalises)) {
+    header("Location: /planos.php?upgrade=" . urlencode($_nivelAnalises));
     exit;
 }
 

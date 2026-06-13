@@ -15,6 +15,59 @@ if ($upgrade === 'pro') {
     $msg_upgrade = '';
 }
 
+// ── Carrega limites e recursos do banco ──────────────────────────────────
+$limitesRaw = [];   // valores brutos do banco (com -1 para ilimitado)
+try {
+    $rows = $pdo->query("SELECT * FROM config_limites_plano")->fetchAll(PDO::FETCH_ASSOC);
+    foreach ($rows as $r) $limitesRaw[$r['plano']] = $r;
+} catch (PDOException $e) {
+}
+
+// Fallback se a tabela ainda não existir
+if (empty($limitesRaw)) {
+    $limitesRaw = [
+        'free' => ['transacoes_mes' => 35, 'carteiras' => 1,  'categorias' => 10, 'parcelas_max' => 3],
+        'pro'  => ['transacoes_mes' => -1, 'carteiras' => 3,  'categorias' => -1, 'parcelas_max' => 48],
+        'vip'  => ['transacoes_mes' => -1, 'carteiras' => -1, 'categorias' => -1, 'parcelas_max' => 48],
+    ];
+}
+
+$recursos = recursosParaExibicao();   // ['slug', 'label', 'nivel_minimo']
+
+// ── Helper: gera itens de limite para um card ─────────────────────────────
+function _itensLimite($row)
+{
+    $itens = [];
+    // Carteiras
+    if ($row['carteiras'] == -1)     $itens[] = ['ok', 'Carteiras ilimitadas'];
+    elseif ($row['carteiras'] == 1)  $itens[] = ['ok', '1 carteira'];
+    else                             $itens[] = ['ok', "Até {$row['carteiras']} carteiras"];
+    // Registros / mês
+    if ($row['transacoes_mes'] == -1) $itens[] = ['ok', 'Registros ilimitados'];
+    else                              $itens[] = ['ok', "Até {$row['transacoes_mes']} registros/mês"];
+    // Categorias
+    if ($row['categorias'] == -1)  $itens[] = ['ok', 'Categorias ilimitadas'];
+    else                           $itens[] = ['ok', "Até {$row['categorias']} categorias"];
+    // Parcelas
+    if (($row['parcelas_max'] ?? 3) <= 3) $itens[] = ['ok', "Parcelamento em até {$row['parcelas_max']}x"];
+    else                                  $itens[] = ['ok', "Parcelamento em até {$row['parcelas_max']}x (com juros)"];
+    return $itens;
+}
+
+// ── Helper: adiciona itens de recurso (✅/❌) para um card ───────────────
+function _itensRecursos($planoCarta, $recursos)
+{
+    $hierarquia = ['free' => 0, 'pro' => 1, 'vip' => 2];
+    $nivel      = $hierarquia[$planoCarta] ?? 0;
+    $itens      = [];
+    foreach ($recursos as $r) {
+        $minimo      = $hierarquia[$r['nivel_minimo']] ?? 0;
+        $disponivel  = $nivel >= $minimo;
+        $itens[]     = [$disponivel ? 'ok' : 'no', $r['label']];
+    }
+    return $itens;
+}
+
 require_once 'geral/header.php';
 ?>
 
@@ -29,7 +82,7 @@ require_once 'geral/header.php';
 
         <?php if ($msg_upgrade): ?>
             <div class="alert mt-4 mx-auto" style="max-width:520px;background:#d4af3715;border:1px solid #d4af3740;color:#d4af37;border-radius:0.75rem;">
-                <i class="bi bi-lock-fill me-2"></i> <?php echo $msg_upgrade ?>
+                <i class="bi bi-lock-fill me-2"></i> <?= $msg_upgrade ?>
             </div>
         <?php endif; ?>
 
@@ -49,218 +102,148 @@ require_once 'geral/header.php';
     <!-- Cards -->
     <div class="row g-4 justify-content-center align-items-stretch">
 
-        <!-- ── FREE ─────────────────────────────────────────────────────── -->
-        <div class="col-12 col-md-4">
-            <div class="card rounded-4 shadow-sm h-100 position-relative overflow-hidden"
-                style="background:var(--bg-card);border:1.5px solid #4b556366;">
+        <?php
+        // ── Configuração estática de cada card ─────────────────────────────
+        $cards = [
+            'free' => [
+                'topo_bg'     => '#4b5563',
+                'topo_label'  => 'PARA CONHECER O SISTEMA',
+                'border'      => '#4b556366',
+                'label_plano' => 'Gratuito',
+                'nome'        => 'Free',
+                'preco_m'     => 'R$ 0',
+                'preco_a'     => null,
+                'subtitulo'   => 'O essencial para começar a organizar.',
+                'icone_cor'   => 'text-success',
+                'icone_cor_ok' => '',
+                'btn_atual'   => 'background:rgba(255,255,255,.06);color:#6b7280;',
+                'btn_basico'  => 'Plano básico',
+                'btn_m_href'  => null,
+                'btn_a_href'  => null,
+            ],
+            'pro' => [
+                'topo_bg'     => '#7c3aed',
+                'topo_label'  => 'MAIS POPULAR',
+                'border'      => '#7c3aed88',
+                'label_plano' => 'PRO',
+                'nome'        => 'Auralis PRO',
+                'preco_m'     => 'R$ 19,90',
+                'preco_a'     => 'R$ 14,99',
+                'preco_a_info' => 'R$ 179,90 cobrado anualmente',
+                'subtitulo'   => 'Para quem leva as finanças a sério.',
+                'label_cor'   => '#a78bfa',
+                'icone_cor'   => '',
+                'icone_cor_ok' => 'style="color:#a78bfa;"',
+                'btn_atual'   => 'background:rgba(124,58,237,.2);color:#a78bfa;border:1px solid #7c3aed66;',
+                'btn_basico'  => null,
+                'btn_m_text'  => 'Assinar PRO — R$ 19,90/mês',
+                'btn_a_text'  => 'Assinar PRO — R$ 179,90/ano',
+                'btn_m_style' => 'background:#7c3aed;color:#fff;border:none;',
+                'btn_a_style' => 'background:#7c3aed;color:#fff;border:none;',
+                'btn_m_href'  => 'https://www.mercadopago.com.br/subscriptions/checkout?preapproval_plan_id=9c7869b02a884962a185a44dee6c16f8',
+                'btn_a_href'  => 'https://www.mercadopago.com.br/subscriptions/checkout?preapproval_plan_id=98c6343b478e4efcad77ab56fe6f5948',
+            ],
+            'vip' => [
+                'topo_bg'     => 'linear-gradient(90deg,#AA8C2C,#d4af37)',
+                'topo_label'  => '⭐ PARA FAMÍLIAS &amp; EMPREENDEDORES',
+                'border'      => '#d4af3766',
+                'label_plano' => 'VIP',
+                'nome'        => 'Auralis VIP',
+                'preco_m'     => 'R$ 29,90',
+                'preco_a'     => 'R$ 19,99',
+                'preco_a_info' => 'R$ 239,90 cobrado anualmente',
+                'subtitulo'   => 'Para quem não aceita limites.',
+                'label_cor'   => '#d4af37',
+                'icone_cor'   => '',
+                'icone_cor_ok' => 'style="color:#d4af37;"',
+                'btn_atual'   => 'background:#d4af3720;color:#d4af37;border:1px solid #d4af3766;',
+                'btn_basico'  => null,
+                'btn_m_text'  => 'Assinar VIP — R$ 29,90/mês',
+                'btn_a_text'  => 'Assinar VIP — R$ 239,90/ano',
+                'btn_m_style' => 'background:linear-gradient(90deg,#AA8C2C,#d4af37);color:#fff;border:none;font-weight:800;',
+                'btn_a_style' => 'background:linear-gradient(90deg,#AA8C2C,#d4af37);color:#fff;border:none;font-weight:800;',
+                'btn_m_href'  => 'https://www.mercadopago.com.br/subscriptions/checkout?preapproval_plan_id=55856961da8d49d09b4ccded59a56810',
+                'btn_a_href'  => 'https://www.mercadopago.com.br/subscriptions/checkout?preapproval_plan_id=3ed445df740c439884e8ebc71ddbdb69',
+            ],
+        ];
 
-                <div class="text-center py-1"
-                    style="background:#4b5563;font-size:0.7rem;font-weight:700;letter-spacing:0.08em;color:#fff;">
-                    PARA CONHECER O SISTEMA
-                </div>
+        foreach ($cards as $slug => $c):
+            $row   = $limitesRaw[$slug] ?? $limitesRaw['free'];
+            $itens = array_merge(_itensLimite($row), _itensRecursos($slug, $recursos));
+        ?>
+            <div class="col-12 col-md-4">
+                <div class="card rounded-4 shadow-sm h-100 position-relative overflow-hidden"
+                    style="background:var(--bg-card);border:1.5px solid <?= $c['border'] ?>;">
 
-                <div class="card-body p-4 d-flex flex-column">
-                    <div class="mb-4">
-                        <p class="text-secondary fw-semibold mb-1 small text-uppercase tracking-wide">Gratuito</p>
-                        <h3 class="fw-bold text-light mb-0">Free</h3>
-                        <div class="mt-3">
-                            <span class="fw-bold text-light" style="font-size:2rem;">R$ 0</span>
-                            <span class="text-secondary">/mês</span>
-                        </div>
-                        <p class="text-secondary mt-2 mb-0" style="font-size:0.85rem;">O essencial para começar a organizar.</p>
+                    <div class="text-center py-1"
+                        style="background:<?= $c['topo_bg'] ?>;font-size:0.7rem;font-weight:700;letter-spacing:0.08em;color:#fff;">
+                        <?= $c['topo_label'] ?>
                     </div>
 
-                    <ul class="list-unstyled flex-grow-1 mb-4" style="font-size:0.875rem;">
-                        <?php foreach (
-                            [
-                                ['ok', '1 carteira'],
-                                ['ok', 'Até 35 registros/mês'],
-                                ['ok', 'Até 10 categorias'],
-                                ['ok', 'Parcelamento em até 3x'],
-                                ['ok', 'Dashboard com variação mensal'],
-                                ['ok', 'App instalável (PWA)'],
-                                ['no', 'Agenda financeira'],
-                                ['no', 'Análises por categoria'],
-                                ['no', 'Comprovantes e Anexos'],
-                                ['no', 'Registros ilimitados'],
-                                ['no', 'Parcelamento até 48x'],
-                                ['no', 'Carteiras ilimitadas'],
-                            ] as [$tipo, $item]
-                        ): ?>
-                            <li class="d-flex align-items-center gap-2 mb-2">
-                                <i class="bi <?php echo $tipo === 'ok'
-                                                    ? 'bi-check-circle-fill text-success'
-                                                    : 'bi-x-circle text-secondary opacity-40' ?>"></i>
-                                <span class="<?php echo $tipo === 'no'
-                                                    ? 'text-secondary opacity-40 text-decoration-line-through'
-                                                    : 'text-light' ?>">
-                                    <?php echo $item ?>
-                                </span>
-                            </li>
-                        <?php endforeach; ?>
-                    </ul>
-
-                    <?php if ($planoAtual === 'free'): ?>
-                        <button class="btn w-100 rounded-pill fw-semibold"
-                            style="background:rgba(255,255,255,.06);color:#6b7280;cursor:default;" disabled>
-                            ✓ Plano atual
-                        </button>
-                    <?php else: ?>
-                        <div class="btn w-100 rounded-pill fw-semibold text-secondary"
-                            style="background:transparent;border:1px solid rgba(255,255,255,.1);cursor:default;">
-                            Plano básico
+                    <div class="card-body p-4 d-flex flex-column">
+                        <div class="mb-4">
+                            <p class="fw-semibold mb-1 small text-uppercase tracking-wide"
+                                <?= isset($c['label_cor']) ? "style=\"color:{$c['label_cor']};\"" : 'class="text-secondary"' ?>>
+                                <?= htmlspecialchars($c['label_plano']) ?>
+                            </p>
+                            <h3 class="fw-bold text-light mb-0"><?= htmlspecialchars($c['nome']) ?></h3>
+                            <div class="mt-3">
+                                <span class="fw-bold text-light preco-mensal" style="font-size:2rem;"><?= $c['preco_m'] ?></span>
+                                <?php if ($c['preco_a'] ?? null): ?>
+                                    <span class="fw-bold text-light preco-anual d-none" style="font-size:2rem;"><?= $c['preco_a'] ?></span>
+                                <?php endif; ?>
+                                <span class="text-secondary">/mês</span>
+                            </div>
+                            <?php if ($c['preco_a'] ?? null): ?>
+                                <p class="text-secondary mt-1 mb-0 preco-anual-info d-none" style="font-size:0.8rem;"><?= $c['preco_a_info'] ?></p>
+                            <?php endif; ?>
+                            <p class="text-secondary mt-2 mb-0" style="font-size:0.85rem;"><?= htmlspecialchars($c['subtitulo']) ?></p>
                         </div>
-                    <?php endif; ?>
-                </div>
-            </div>
-        </div>
 
-        <!-- ── PRO ──────────────────────────────────────────────────────── -->
-        <div class="col-12 col-md-4">
-            <div class="card rounded-4 shadow h-100 position-relative overflow-hidden"
-                style="background:var(--bg-card);border:1.5px solid #7c3aed88;">
+                        <ul class="list-unstyled flex-grow-1 mb-4" style="font-size:0.875rem;">
+                            <?php foreach ($itens as [$tipo, $item]): ?>
+                                <li class="d-flex align-items-center gap-2 mb-2">
+                                    <i class="bi <?= $tipo === 'ok'
+                                                        ? 'bi-check-circle-fill ' . $c['icone_cor']
+                                                        : 'bi-x-circle text-secondary opacity-40' ?>"
+                                        <?= ($tipo === 'ok' && $c['icone_cor_ok']) ? $c['icone_cor_ok'] : '' ?>></i>
+                                    <span class="<?= $tipo === 'no'
+                                                        ? 'text-secondary opacity-40 text-decoration-line-through'
+                                                        : 'text-light' ?>">
+                                        <?= htmlspecialchars($item) ?>
+                                    </span>
+                                </li>
+                            <?php endforeach; ?>
+                        </ul>
 
-                <div class="text-center py-1"
-                    style="background:#7c3aed;font-size:0.7rem;font-weight:700;letter-spacing:0.08em;color:#fff;">
-                    MAIS POPULAR
-                </div>
-
-                <div class="card-body p-4 d-flex flex-column">
-                    <div class="mb-4">
-                        <p class="fw-semibold mb-1 small text-uppercase tracking-wide" style="color:#a78bfa;">PRO</p>
-                        <h3 class="fw-bold text-light mb-0">Auralis PRO</h3>
-                        <div class="mt-3">
-                            <span class="fw-bold text-light preco-mensal" style="font-size:2rem;">R$ 19,90</span>
-                            <span class="fw-bold text-light preco-anual d-none" style="font-size:2rem;">R$ 14,99</span>
-                            <span class="text-secondary">/mês</span>
-                        </div>
-                        <p class="text-secondary mt-1 mb-0 preco-anual-info d-none" style="font-size:0.8rem;">R$ 179,90 cobrado anualmente</p>
-                        <p class="text-secondary mt-2 mb-0" style="font-size:0.85rem;">Para quem leva as finanças a sério.</p>
+                        <?php if ($planoAtual === $slug): ?>
+                            <button class="btn w-100 rounded-pill fw-semibold"
+                                style="<?= $c['btn_atual'] ?>cursor:default;" disabled>
+                                <?= $slug === 'vip' ? '⭐' : '✓' ?> Plano atual
+                            </button>
+                        <?php elseif ($c['btn_basico'] ?? null): ?>
+                            <div class="btn w-100 rounded-pill fw-semibold text-secondary"
+                                style="background:transparent;border:1px solid rgba(255,255,255,.1);cursor:default;">
+                                <?= htmlspecialchars($c['btn_basico']) ?>
+                            </div>
+                        <?php else: ?>
+                            <div class="d-flex flex-column gap-2">
+                                <a href="<?= $c['btn_m_href'] ?>" target="_blank"
+                                    class="btn w-100 rounded-pill fw-bold preco-mensal"
+                                    style="<?= $c['btn_m_style'] ?>">
+                                    <?= htmlspecialchars($c['btn_m_text']) ?>
+                                </a>
+                                <a href="<?= $c['btn_a_href'] ?>" target="_blank"
+                                    class="btn w-100 rounded-pill fw-bold preco-anual d-none"
+                                    style="<?= $c['btn_a_style'] ?>">
+                                    <?= htmlspecialchars($c['btn_a_text']) ?>
+                                </a>
+                            </div>
+                        <?php endif; ?>
                     </div>
-
-                    <ul class="list-unstyled flex-grow-1 mb-4" style="font-size:0.875rem;">
-                        <?php foreach (
-                            [
-                                ['ok', 'Até 3 carteiras'],
-                                ['ok', 'Registros ilimitados'],
-                                ['ok', 'Categorias ilimitadas'],
-                                ['ok', 'Parcelamento em até 48x (com juros)'],
-                                ['ok', 'Dashboard completo'],
-                                ['ok', 'Agenda financeira'],
-                                ['ok', 'Comprovantes e Anexos'],
-                                ['ok', 'App instalável (PWA)'],
-                                ['ok', 'Suporte prioritário'],
-                                ['no', 'Carteiras ilimitadas'],
-                            ] as [$tipo, $item]
-                        ): ?>
-                            <li class="d-flex align-items-center gap-2 mb-2">
-                                <i class="bi <?php echo $tipo === 'ok'
-                                                    ? 'bi-check-circle-fill'
-                                                    : 'bi-x-circle text-secondary opacity-40' ?>"
-                                    <?php echo $tipo === 'ok' ? 'style="color:#a78bfa;"' : '' ?>></i>
-                                <span class="<?php echo $tipo === 'no'
-                                                    ? 'text-secondary opacity-40 text-decoration-line-through'
-                                                    : 'text-light' ?>">
-                                    <?php echo $item ?>
-                                </span>
-                            </li>
-                        <?php endforeach; ?>
-                    </ul>
-
-                    <?php if ($planoAtual === 'pro'): ?>
-                        <button class="btn w-100 rounded-pill fw-semibold"
-                            style="background:rgba(124,58,237,.2);color:#a78bfa;border:1px solid #7c3aed66;cursor:default;" disabled>
-                            ✓ Plano atual
-                        </button>
-                    <?php else: ?>
-                        <div class="d-flex flex-column gap-2">
-                            <a href="https://www.mercadopago.com.br/subscriptions/checkout?preapproval_plan_id=9c7869b02a884962a185a44dee6c16f8"
-                                target="_blank"
-                                class="btn w-100 rounded-pill fw-bold preco-mensal"
-                                style="background:#7c3aed;color:#fff;border:none;">
-                                Assinar PRO — R$ 19,90/mês
-                            </a>
-                            <a href="https://www.mercadopago.com.br/subscriptions/checkout?preapproval_plan_id=98c6343b478e4efcad77ab56fe6f5948"
-                                target="_blank"
-                                class="btn w-100 rounded-pill fw-bold preco-anual d-none"
-                                style="background:#7c3aed;color:#fff;border:none;">
-                                Assinar PRO — R$ 179,90/ano
-                            </a>
-                        </div>
-                    <?php endif; ?>
                 </div>
             </div>
-        </div>
-
-        <!-- ── VIP ──────────────────────────────────────────────────────── -->
-        <div class="col-12 col-md-4">
-            <div class="card rounded-4 shadow h-100 position-relative overflow-hidden"
-                style="background:var(--bg-card);border:1.5px solid #d4af3766;">
-
-                <div class="text-center py-1"
-                    style="background:linear-gradient(90deg,#AA8C2C,#d4af37);font-size:0.7rem;font-weight:700;letter-spacing:0.08em;color:#fff;">
-                    ⭐ PARA FAMÍLIAS &amp; EMPREENDEDORES
-                </div>
-
-                <div class="card-body p-4 d-flex flex-column">
-                    <div class="mb-4">
-                        <p class="fw-semibold mb-1 small text-uppercase tracking-wide" style="color:#d4af37;">VIP</p>
-                        <h3 class="fw-bold text-light mb-0">Auralis VIP</h3>
-                        <div class="mt-3">
-                            <span class="fw-bold text-light preco-mensal" style="font-size:2rem;">R$ 29,90</span>
-                            <span class="fw-bold text-light preco-anual d-none" style="font-size:2rem;">R$ 19,99</span>
-                            <span class="text-secondary">/mês</span>
-                        </div>
-                        <p class="text-secondary mt-1 mb-0 preco-anual-info d-none" style="font-size:0.8rem;">R$ 239,90 cobrado anualmente</p>
-                        <p class="text-secondary mt-2 mb-0" style="font-size:0.85rem;">Para quem não aceita limites.</p>
-                    </div>
-
-                    <ul class="list-unstyled flex-grow-1 mb-4" style="font-size:0.875rem;">
-                        <?php foreach (
-                            [
-                                ['ok', 'Carteiras ilimitadas'],
-                                ['ok', 'Registros ilimitados'],
-                                ['ok', 'Categorias ilimitadas'],
-                                ['ok', 'Parcelamento em até 48x (com juros)'],
-                                ['ok', 'Dashboard completo'],
-                                ['ok', 'Agenda financeira'],
-                                ['ok', 'Histórico ilimitado'],
-                                ['ok', 'Comprovantes e Anexos'],
-                                ['ok', 'App instalável (PWA)'],
-                                ['ok', 'Suporte VIP dedicado'],
-                            ] as [$tipo, $item]
-                        ): ?>
-                            <li class="d-flex align-items-center gap-2 mb-2">
-                                <i class="bi bi-check-circle-fill" style="color:#d4af37;"></i>
-                                <span class="text-light"><?php echo $item ?></span>
-                            </li>
-                        <?php endforeach; ?>
-                    </ul>
-
-                    <?php if ($planoAtual === 'vip'): ?>
-                        <button class="btn w-100 rounded-pill fw-semibold"
-                            style="background:#d4af3720;color:#d4af37;border:1px solid #d4af3766;cursor:default;" disabled>
-                            ⭐ Plano atual
-                        </button>
-                    <?php else: ?>
-                        <div class="d-flex flex-column gap-2">
-                            <a href="https://www.mercadopago.com.br/subscriptions/checkout?preapproval_plan_id=55856961da8d49d09b4ccded59a56810"
-                                target="_blank"
-                                class="btn w-100 rounded-pill fw-bold preco-mensal"
-                                style="background:linear-gradient(90deg,#AA8C2C,#d4af37);color:#fff;border:none;font-weight:800;">
-                                Assinar VIP — R$ 29,90/mês
-                            </a>
-                            <a href="https://www.mercadopago.com.br/subscriptions/checkout?preapproval_plan_id=3ed445df740c439884e8ebc71ddbdb69"
-                                target="_blank"
-                                class="btn w-100 rounded-pill fw-bold preco-anual d-none"
-                                style="background:linear-gradient(90deg,#AA8C2C,#d4af37);color:#fff;border:none;font-weight:800;">
-                                Assinar VIP — R$ 239,90/ano
-                            </a>
-                        </div>
-                    <?php endif; ?>
-                </div>
-            </div>
-        </div>
+        <?php endforeach; ?>
 
     </div>
 
