@@ -34,6 +34,26 @@ $usuario_id = $_SESSION['usuario_id'];
 // ==============================================================================
 // AJAX
 // ==============================================================================
+
+// Exclusão rápida via context menu
+if ($_SERVER['REQUEST_METHOD'] === 'POST' && ($_POST['action'] ?? '') === 'excluir_rapido') {
+    ob_clean();
+    header('Content-Type: application/json; charset=utf-8');
+    $id = trim($_POST['registro_id'] ?? '');
+    if ($id) {
+        try {
+            $pdo->prepare("DELETE FROM Registro WHERE IDRegistro = :id AND FKUsuario = :uid")
+                ->execute([':id' => $id, ':uid' => $usuario_id]);
+            echo json_encode(['ok' => true]);
+        } catch (PDOException $e) {
+            echo json_encode(['ok' => false, 'erro' => $e->getMessage()]);
+        }
+    } else {
+        echo json_encode(['ok' => false, 'erro' => 'ID inválido']);
+    }
+    exit;
+}
+
 if (isset($_GET['ajax']) && $_GET['acao'] === 'listar') {
     ob_clean();
     header('Content-Type: application/json; charset=utf-8');
@@ -930,6 +950,11 @@ require_once 'geral/header.php';
                     e.stopPropagation();
                     window.location.href = `nova_transacao.php?voltar=agenda.php&editar=${encodeURIComponent(t.id)}`;
                 };
+                pill.addEventListener('contextmenu', (e) => {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    window._mostrarMenuPill(e.clientX, e.clientY, t);
+                });
 
                 const arrow = isRec ?
                     `<i class="bi bi-arrow-up-short" style="color:#6ee7c7;font-size:0.95rem;flex-shrink:0;line-height:1;"></i>` :
@@ -950,6 +975,62 @@ require_once 'geral/header.php';
             grid.appendChild(cel);
         }
     }
+
+    // ── Context menu dos pills do calendário ────────────────────────────────
+    (function () {
+        const menu = document.createElement('div');
+        menu.id = 'ctx-pill';
+        menu.style.cssText = 'position:fixed;z-index:9999;display:none;background:#1e2128;border:1px solid rgba(255,255,255,.1);border-radius:10px;box-shadow:0 8px 28px rgba(0,0,0,.55);min-width:168px;overflow:hidden;';
+        menu.innerHTML = `
+            <div id="ctx-editar"  class="ctx-item"><i class="bi bi-pencil-square" style="color:#f5c542;"></i> Editar</div>
+            <div id="ctx-comp"    class="ctx-item" style="display:none;"><i class="bi bi-eye" style="color:#38bdf8;"></i> Ver comprovante</div>
+            <div class="ctx-sep"></div>
+            <div id="ctx-excluir" class="ctx-item ctx-danger"><i class="bi bi-trash3"></i> Excluir</div>`;
+        document.body.appendChild(menu);
+
+        const style = document.createElement('style');
+        style.textContent = `.ctx-item{padding:9px 16px;cursor:pointer;font-size:.855rem;color:#f8fafc;display:flex;align-items:center;gap:9px;transition:background .1s}.ctx-item:hover{background:rgba(255,255,255,.07)}.ctx-danger{color:#f87171!important}.ctx-sep{height:1px;background:rgba(255,255,255,.08);margin:3px 0}`;
+        document.head.appendChild(style);
+
+        let _transacao = null;
+
+        function fechar() { menu.style.display = 'none'; _transacao = null; }
+        document.addEventListener('click', fechar);
+        document.addEventListener('keydown', e => e.key === 'Escape' && fechar());
+        menu.addEventListener('click', e => e.stopPropagation());
+
+        window._mostrarMenuPill = function (x, y, t) {
+            _transacao = t;
+            document.getElementById('ctx-editar').onclick  = () => { fechar(); window.location.href = `nova_transacao.php?voltar=agenda.php&editar=${encodeURIComponent(t.id)}`; };
+            const btnComp = document.getElementById('ctx-comp');
+            if (_temAcessoCompAgenda && t.tem_comprovante > 0) {
+                btnComp.style.display = 'flex';
+                btnComp.onclick = () => { fechar(); abrirComprovantes(t.id); };
+            } else {
+                btnComp.style.display = 'none';
+            }
+            document.getElementById('ctx-excluir').onclick = () => {
+                fechar();
+                const desc = t.titulo.length > 40 ? t.titulo.slice(0, 40) + '…' : t.titulo;
+                if (!confirm(`Excluir "${desc}"?\n\nEsta ação é irreversível.`)) return;
+                fetch('agenda.php', {
+                    method: 'POST',
+                    headers: {'Content-Type': 'application/x-www-form-urlencoded'},
+                    body: `action=excluir_rapido&registro_id=${encodeURIComponent(t.id)}`
+                })
+                .then(r => r.json())
+                .then(d => { if (d.ok) window.carregarMes(anoAtual, mesAtual); else alert('Erro ao excluir.'); })
+                .catch(() => alert('Erro de conexão.'));
+            };
+
+            // Posiciona sem sair da viewport
+            menu.style.display = 'block';
+            const mw = menu.offsetWidth, mh = menu.offsetHeight;
+            const vw = window.innerWidth,   vh = window.innerHeight;
+            menu.style.left = (x + mw > vw ? x - mw : x) + 'px';
+            menu.style.top  = (y + mh > vh ? y - mh : y) + 'px';
+        };
+    })();
 
     document.addEventListener("DOMContentLoaded", () => window.carregarMes(anoAtual, mesAtual));
 
