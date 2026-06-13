@@ -14,9 +14,9 @@ if (isset($_SESSION['usuario_id']) && function_exists('obterHorasRestantesTeste'
 $_emTrial = $horasRestantes > 0;
 function _navBadgeRecurso($slug, $emTrial)
 {
-    if ($emTrial || !function_exists('temPlano') || !function_exists('nivelMinimoRecurso')) return false;
+    if ($emTrial || !function_exists('recursoDisponivelParaPlano')) return false;
     if (!isset($_SESSION['usuario_id'])) return false;
-    return !temPlano(nivelMinimoRecurso($slug));
+    return !recursoDisponivelParaPlano($slug);
 }
 function _navBadgeTag($slug)
 {

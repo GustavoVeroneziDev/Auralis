@@ -16,17 +16,16 @@ if (!isset($_SESSION['usuario_id'])) {
 
 require_once 'config/conexao.php';
 
-// Gate: nível mínimo lido do banco (configurável via /admin/configuracoes_planos.php)
-$_nivelAgenda = function_exists('nivelMinimoRecurso') ? nivelMinimoRecurso('agenda') : 'pro';
+// Gate: acesso configurável via /admin/configuracoes_planos.php
 $_testeAgenda = function_exists('obterHorasRestantesTeste') && obterHorasRestantesTeste() > 0;
-if (!$_testeAgenda && function_exists('temPlano') && !temPlano($_nivelAgenda)) {
+if (!$_testeAgenda && !recursoDisponivelParaPlano('agenda')) {
     if (isset($_GET['ajax'])) {
         ob_clean();
         header('Content-Type: application/json');
         echo json_encode(['sucesso' => false, 'erro' => 'Plano insuficiente']);
         exit;
     }
-    header("Location: /planos.php?upgrade=" . urlencode($_nivelAgenda));
+    header("Location: /planos.php?upgrade=" . urlencode(nivelMinimoRecurso('agenda')));
     exit;
 }
 

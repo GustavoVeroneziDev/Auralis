@@ -49,21 +49,22 @@ function _itensLimite($row)
     if ($row['categorias'] == -1)  $itens[] = ['ok', 'Categorias ilimitadas'];
     else                           $itens[] = ['ok', "Até {$row['categorias']} categorias"];
     // Parcelas
-    if (($row['parcelas_max'] ?? 3) <= 3) $itens[] = ['ok', "Parcelamento em até {$row['parcelas_max']}x"];
-    else                                  $itens[] = ['ok', "Parcelamento em até {$row['parcelas_max']}x (com juros)"];
+    $pmax = $row['parcelas_max'] ?? 3;
+    if ($pmax == -1)     $itens[] = ['ok', 'Parcelamento ilimitado'];
+    elseif ($pmax <= 3)  $itens[] = ['ok', "Parcelamento em até {$pmax}x"];
+    else                 $itens[] = ['ok', "Parcelamento em até {$pmax}x (com juros)"];
     return $itens;
 }
 
 // ── Helper: adiciona itens de recurso (✅/❌) para um card ───────────────
 function _itensRecursos($planoCarta, $recursos)
 {
-    $hierarquia = ['free' => 0, 'pro' => 1, 'vip' => 2];
-    $nivel      = $hierarquia[$planoCarta] ?? 0;
-    $itens      = [];
+    $colMap = ['free' => 'disponivel_free', 'pro' => 'disponivel_pro', 'vip' => 'disponivel_vip'];
+    $col    = $colMap[$planoCarta] ?? 'disponivel_pro';
+    $itens  = [];
     foreach ($recursos as $r) {
-        $minimo      = $hierarquia[$r['nivel_minimo']] ?? 0;
-        $disponivel  = $nivel >= $minimo;
-        $itens[]     = [$disponivel ? 'ok' : 'no', $r['label']];
+        $disponivel = (bool)($r[$col] ?? false);
+        $itens[]    = [$disponivel ? 'ok' : 'no', $r['label']];
     }
     return $itens;
 }

@@ -9,11 +9,10 @@ if (! isset($_SESSION['usuario_id'])) {
 }
 require_once 'config/conexao.php';
 
-// Gate: nível mínimo lido do banco (configurável via /admin/configuracoes_planos.php)
-$_nivelAnalises = function_exists('nivelMinimoRecurso') ? nivelMinimoRecurso('analises') : 'pro';
+// Gate: acesso configurável via /admin/configuracoes_planos.php
 $_testeAnalises = function_exists('obterHorasRestantesTeste') && obterHorasRestantesTeste() > 0;
-if (!$_testeAnalises && function_exists('temPlano') && !temPlano($_nivelAnalises)) {
-    header("Location: /planos.php?upgrade=" . urlencode($_nivelAnalises));
+if (!$_testeAnalises && !recursoDisponivelParaPlano('analises')) {
+    header("Location: /planos.php?upgrade=" . urlencode(nivelMinimoRecurso('analises')));
     exit;
 }
 

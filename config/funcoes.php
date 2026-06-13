@@ -236,7 +236,41 @@ if (!function_exists('obterHorasRestantesTeste')) {
 
 // ── Configuração dinâmica de recursos por plano ──────────────────────────
 
+if (!function_exists('recursoDisponivelParaPlano')) {
+    function recursoDisponivelParaPlano($slug, $plano = null)
+    {
+        global $pdo;
+        static $cache = [];
+
+        $plano = $plano ?? obterPlanoAtual();
+        $key   = "{$slug}:{$plano}";
+
+        if (isset($cache[$key])) return $cache[$key];
+
+        $colMap = ['free' => 'disponivel_free', 'pro' => 'disponivel_pro', 'vip' => 'disponivel_vip'];
+        $col    = $colMap[$plano] ?? null;
+
+        if ($col && $pdo) {
+            try {
+                $stmt = $pdo->prepare("SELECT `{$col}` FROM config_recursos WHERE slug = ? LIMIT 1");
+                $stmt->execute([$slug]);
+                $row = $stmt->fetch(PDO::FETCH_ASSOC);
+                if ($row !== false) {
+                    $cache[$key] = (bool)$row[$col];
+                    return $cache[$key];
+                }
+            } catch (PDOException $e) {}
+        }
+
+        // Fallback se tabela não existir
+        $restrito = ['agenda', 'analises', 'comprovantes'];
+        $cache[$key] = in_array($slug, $restrito) ? ($plano !== 'free') : true;
+        return $cache[$key];
+    }
+}
+
 if (!function_exists('nivelMinimoRecurso')) {
+    // Retorna o menor plano com acesso — usado para exibição de badges no nav
     function nivelMinimoRecurso($slug)
     {
         global $pdo;
@@ -246,17 +280,23 @@ if (!function_exists('nivelMinimoRecurso')) {
 
         if ($pdo) {
             try {
-                $stmt = $pdo->prepare("SELECT nivel_minimo FROM config_recursos WHERE slug = ? LIMIT 1");
+                $stmt = $pdo->prepare(
+                    "SELECT disponivel_free, disponivel_pro, disponivel_vip
+                     FROM config_recursos WHERE slug = ? LIMIT 1"
+                );
                 $stmt->execute([$slug]);
                 $row = $stmt->fetch(PDO::FETCH_ASSOC);
                 if ($row) {
-                    $cache[$slug] = $row['nivel_minimo'];
-                    return $row['nivel_minimo'];
+                    if ($row['disponivel_free'])     $nivel = 'free';
+                    elseif ($row['disponivel_pro'])  $nivel = 'pro';
+                    elseif ($row['disponivel_vip'])  $nivel = 'vip';
+                    else                             $nivel = 'vip';
+                    $cache[$slug] = $nivel;
+                    return $nivel;
                 }
             } catch (PDOException $e) {}
         }
 
-        // Fallback se a tabela ainda não existir
         $defaults = ['agenda' => 'pro', 'analises' => 'pro', 'comprovantes' => 'pro'];
         $cache[$slug] = $defaults[$slug] ?? 'pro';
         return $cache[$slug];
@@ -270,8 +310,8 @@ if (!function_exists('recursosParaExibicao')) {
         if (!$pdo) return [];
         try {
             return $pdo->query(
-                "SELECT slug, label, nivel_minimo FROM config_recursos
-                 WHERE mostrar_nos_planos = 1 ORDER BY ordem ASC"
+                "SELECT slug, label, disponivel_free, disponivel_pro, disponivel_vip
+                 FROM config_recursos WHERE mostrar_nos_planos = 1 ORDER BY ordem ASC"
             )->fetchAll(PDO::FETCH_ASSOC);
         } catch (PDOException $e) {
             return [];

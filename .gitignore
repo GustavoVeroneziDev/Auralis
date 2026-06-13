@@ -4,4 +4,3 @@ upgrade_manual_vip.sql
 upgrade_manual_pro.sql
 downgrade_manual_free.sql
 deletar_usuario.sql
-config_planos.sql
