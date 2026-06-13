@@ -255,7 +255,7 @@ require_once '../geral/header.php';
                     <div class="row g-2">
                         <div class="col-6">
                             <label class="form-label text-secondary small">Bandeira</label>
-                            <select name="bandeira" id="mc_bandeira" class="form-select bg-transparent text-light border-secondary">
+                            <select name="bandeira" id="mc_bandeira" class="form-select text-light border-secondary" style="background-color:#1e1e2e;">
                                 <?php foreach ($bandeiras as $k => $v): ?>
                                     <option value="<?= $k ?>"><?= $v ?></option>
                                 <?php endforeach; ?>
@@ -263,7 +263,7 @@ require_once '../geral/header.php';
                         </div>
                         <div class="col-6">
                             <label class="form-label text-secondary small">Cor</label>
-                            <select name="cor" id="mc_cor" class="form-select bg-transparent text-light border-secondary">
+                            <select name="cor" id="mc_cor" class="form-select text-light border-secondary" style="background-color:#1e1e2e;">
                                 <?php foreach ($cores as $hex => $nome): ?>
                                     <option value="<?= $hex ?>"><?= $nome ?></option>
                                 <?php endforeach; ?>
@@ -289,7 +289,7 @@ require_once '../geral/header.php';
 
                     <div>
                         <label class="form-label text-secondary small">Carteira para pagamento da fatura</label>
-                        <select name="carteira_debito" id="mc_carteira" class="form-select bg-transparent text-light border-secondary">
+                        <select name="carteira_debito" id="mc_carteira" class="form-select text-light border-secondary" style="background-color:#1e1e2e;">
                             <option value="">— Não definido —</option>
                             <?php foreach ($carteiras as $cart): ?>
                                 <option value="<?= $cart['IDCarteira'] ?>"><?= htmlspecialchars($cart['TipoCarteira']) ?></option>
@@ -336,4 +336,15 @@ function abrirModalEditar(c) {
 }
 </script>
 
+<style>
+#modalCartao .form-select option {
+    background-color: #1e1e2e;
+    color: #e0e0e0;
+}
+#modalCartao .form-select option:hover,
+#modalCartao .form-select option:checked {
+    background-color: #2d2b55;
+    color: #fff;
+}
+</style>
 <?php require_once '../geral/footer.php'; ?>
