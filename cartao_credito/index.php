@@ -73,12 +73,41 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         }
     }
 
-    if ($action === 'desativar_cartao') {
+    if ($action === 'excluir_cartao') {
         $id = trim($_POST['id_cartao'] ?? '');
         if ($id) {
-            $pdo->prepare("UPDATE CartaoCredito SET Ativo=0 WHERE IDCartao=:id AND FKUsuario=:uid")
-                ->execute([':id'=>$id,':uid'=>$uid]);
-            $sucesso = 'Cartão removido.';
+            try {
+                $pdo->beginTransaction();
+                // Remove Registro de preview (sintético, pode apagar sempre)
+                $pdo->prepare(
+                    "DELETE r FROM Registro r
+                     JOIN FaturaCartao f ON f.FKRegistroPreview = r.IDRegistro
+                     WHERE f.FKCartao = :id AND f.FKUsuario = :uid"
+                )->execute([':id' => $id, ':uid' => $uid]);
+                // Remove Registros de pagamento ainda pendentes (não efetivados)
+                $pdo->prepare(
+                    "DELETE r FROM Registro r
+                     JOIN FaturaCartao f ON f.FKRegistroPagamento = r.IDRegistro
+                     WHERE f.FKCartao = :id AND f.FKUsuario = :uid AND r.StatusRegistro = 'pendente'"
+                )->execute([':id' => $id, ':uid' => $uid]);
+                // Remove lançamentos
+                $pdo->prepare(
+                    "DELETE l FROM LancamentoCartao l
+                     JOIN FaturaCartao f ON l.FKFatura = f.IDFatura
+                     WHERE f.FKCartao = :id AND f.FKUsuario = :uid"
+                )->execute([':id' => $id, ':uid' => $uid]);
+                // Remove faturas
+                $pdo->prepare("DELETE FROM FaturaCartao WHERE FKCartao=:id AND FKUsuario=:uid")
+                    ->execute([':id' => $id, ':uid' => $uid]);
+                // Remove o cartão
+                $pdo->prepare("DELETE FROM CartaoCredito WHERE IDCartao=:id AND FKUsuario=:uid")
+                    ->execute([':id' => $id, ':uid' => $uid]);
+                $pdo->commit();
+                $sucesso = 'Cartão excluído com sucesso.';
+            } catch (PDOException $e) {
+                $pdo->rollBack();
+                $erro = 'Erro ao excluir o cartão.';
+            }
         }
     }
 }
@@ -219,13 +248,11 @@ require_once '../geral/header.php';
                                 data-bs-toggle="modal" data-bs-target="#modalCartao" title="Editar">
                                 <i class="bi bi-pencil-square"></i>
                             </button>
-                            <form method="POST" class="m-0" onsubmit="return confirm('Remover este cartão?')">
-                                <input type="hidden" name="action" value="desativar_cartao">
-                                <input type="hidden" name="id_cartao" value="<?= $c['IDCartao'] ?>">
-                                <button class="btn btn-sm btn-outline-danger rounded-pill px-3" title="Remover">
-                                    <i class="bi bi-trash3"></i>
-                                </button>
-                            </form>
+                            <button class="btn btn-sm btn-outline-danger rounded-pill px-3" title="Excluir"
+                                data-bs-toggle="modal" data-bs-target="#modalExcluirCartao"
+                                onclick="abrirModalExcluir('<?= $c['IDCartao'] ?>', '<?= htmlspecialchars($c['Nome'], ENT_QUOTES) ?>')">
+                                <i class="bi bi-trash3"></i>
+                            </button>
                         </div>
                     </div>
                 </div>
@@ -319,7 +346,46 @@ require_once '../geral/header.php';
     </div>
 </div>
 
+<!-- MODAL: Excluir Cartão -->
+<div class="modal fade" id="modalExcluirCartao" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered" style="max-width:420px;">
+        <div class="modal-content border-secondary-subtle shadow-lg rounded-4" style="background:#1a1d21;">
+            <div class="modal-header border-secondary-subtle p-3">
+                <h6 class="modal-title fw-bold text-light mb-0">
+                    <i class="bi bi-trash3 me-2 text-danger"></i> Excluir Cartão
+                </h6>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+            </div>
+            <form method="POST">
+                <input type="hidden" name="action" value="excluir_cartao">
+                <input type="hidden" name="id_cartao" id="excluir_cartao_id">
+                <div class="modal-body p-4 text-center">
+                    <p class="text-secondary mb-1">Você está prestes a excluir o cartão</p>
+                    <p class="text-light fw-bold fs-5 mb-3" id="excluir_cartao_nome">—</p>
+                    <div class="rounded-3 p-3 text-start" style="background:rgba(220,38,38,.08);border:1px solid rgba(220,38,38,.25);">
+                        <p class="text-secondary small mb-0">
+                            <i class="bi bi-exclamation-triangle text-warning me-1"></i>
+                            Todos os <strong class="text-light">lançamentos</strong> e <strong class="text-light">faturas</strong> deste cartão serão removidos permanentemente. Esta ação não pode ser desfeita.
+                        </p>
+                    </div>
+                </div>
+                <div class="modal-footer border-secondary-subtle d-flex justify-content-between p-3">
+                    <button type="button" class="btn btn-sm btn-link text-secondary text-decoration-none" data-bs-dismiss="modal">Cancelar</button>
+                    <button type="submit" class="btn btn-sm btn-danger fw-bold px-4 rounded-pill">
+                        <i class="bi bi-trash3 me-1"></i> Confirmar Exclusão
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
 <script>
+function abrirModalExcluir(id, nome) {
+    document.getElementById('excluir_cartao_id').value  = id;
+    document.getElementById('excluir_cartao_nome').textContent = nome;
+}
+
 function validarDiasCartao() {
     const fech  = parseInt(document.getElementById('mc_fech').value, 10);
     const venc  = parseInt(document.getElementById('mc_venc').value, 10);
