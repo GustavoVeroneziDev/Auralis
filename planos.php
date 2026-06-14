@@ -26,9 +26,9 @@ try {
 // Fallback se a tabela ainda não existir
 if (empty($limitesRaw)) {
     $limitesRaw = [
-        'free' => ['transacoes_mes' => 35, 'carteiras' => 1,  'categorias' => 10, 'parcelas_max' => 3],
-        'pro'  => ['transacoes_mes' => -1, 'carteiras' => 3,  'categorias' => -1, 'parcelas_max' => 48],
-        'vip'  => ['transacoes_mes' => -1, 'carteiras' => -1, 'categorias' => -1, 'parcelas_max' => 48],
+        'free' => ['transacoes_mes' => 35, 'carteiras' => 1,  'cartoes' => 1,  'categorias' => 10, 'parcelas_max' => 3],
+        'pro'  => ['transacoes_mes' => -1, 'carteiras' => 3,  'cartoes' => 3,  'categorias' => -1, 'parcelas_max' => 48],
+        'vip'  => ['transacoes_mes' => -1, 'carteiras' => -1, 'cartoes' => -1, 'categorias' => -1, 'parcelas_max' => 48],
     ];
 }
 
@@ -42,6 +42,11 @@ function _itensLimite($row)
     if ($row['carteiras'] == -1)     $itens[] = ['ok', 'Carteiras ilimitadas'];
     elseif ($row['carteiras'] == 1)  $itens[] = ['ok', '1 carteira'];
     else                             $itens[] = ['ok', "Até {$row['carteiras']} carteiras"];
+    // Cartões de crédito
+    $nc = $row['cartoes'] ?? 1;
+    if ($nc == -1)    $itens[] = ['ok', 'Cartões de crédito ilimitados'];
+    elseif ($nc == 1) $itens[] = ['ok', '1 cartão de crédito'];
+    else              $itens[] = ['ok', "Até {$nc} cartões de crédito"];
     // Registros / mês
     if ($row['transacoes_mes'] == -1) $itens[] = ['ok', 'Registros ilimitados'];
     else                              $itens[] = ['ok', "Até {$row['transacoes_mes']} registros/mês"];
