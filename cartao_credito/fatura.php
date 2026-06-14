@@ -371,21 +371,21 @@ require_once '../geral/header.php';
 <!-- ── Modal: Excluir lançamento ───────────────────────────────────────── -->
 <div class="modal fade" id="modalExcluirLanc" tabindex="-1">
     <div class="modal-dialog modal-dialog-centered">
-        <div class="modal-content rounded-4 border-0" style="background:#1a1a2e;border:1px solid rgba(255,255,255,.1)!important;">
-            <div class="modal-header border-0 pb-0">
-                <h6 class="modal-title fw-bold text-light">Remover lançamento</h6>
+        <div class="modal-content border-secondary-subtle shadow-lg" style="background:#1a1d21;">
+            <div class="modal-header border-secondary-subtle px-4 py-3">
+                <h6 class="modal-title fw-bold text-light mb-0">Remover lançamento</h6>
                 <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
             </div>
-            <div class="modal-body">
+            <div class="modal-body px-4 py-3">
                 <p class="text-secondary mb-0">Deseja remover <strong class="text-light" id="excluirLancNome"></strong>?</p>
                 <p class="text-secondary small mt-1 mb-0">Esta ação não pode ser desfeita.</p>
             </div>
-            <div class="modal-footer border-0 pt-0">
-                <button type="button" class="btn btn-outline-secondary rounded-pill px-4" data-bs-dismiss="modal">Cancelar</button>
-                <form method="POST" id="formExcluirLanc">
+            <div class="modal-footer border-secondary-subtle d-flex justify-content-between p-3">
+                <button type="button" class="btn btn-sm btn-link text-secondary text-decoration-none" data-bs-dismiss="modal">Cancelar</button>
+                <form method="POST">
                     <input type="hidden" name="action" value="excluir_lancamento">
                     <input type="hidden" name="lancamento_id" id="excluirLancId">
-                    <button type="submit" class="btn rounded-pill px-4 fw-semibold"
+                    <button type="submit" class="btn btn-sm fw-bold rounded-pill px-4"
                         style="background:rgba(239,68,68,.2);color:#f87171;border:1px solid rgba(239,68,68,.4);">
                         <i class="bi bi-trash3 me-1"></i> Remover
                     </button>
@@ -398,38 +398,37 @@ require_once '../geral/header.php';
 <!-- ── Modal: Editar lançamento ────────────────────────────────────────── -->
 <div class="modal fade" id="modalEditarLanc" tabindex="-1">
     <div class="modal-dialog modal-dialog-centered">
-        <div class="modal-content rounded-4 border-0" style="background:#1a1a2e;border:1px solid rgba(255,255,255,.1)!important;">
-            <div class="modal-header border-0 pb-0">
-                <h6 class="modal-title fw-bold text-light">Editar lançamento</h6>
-                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
-            </div>
-            <form method="POST" id="formEditarLanc">
-                <div class="modal-body">
-                    <input type="hidden" name="action" value="editar_lancamento">
-                    <input type="hidden" name="lancamento_id" id="editarLancId">
-
-                    <div class="mb-3">
+        <div class="modal-content border-secondary-subtle shadow-lg" style="background:#1a1d21;">
+            <form method="POST">
+                <input type="hidden" name="action" value="editar_lancamento">
+                <input type="hidden" name="lancamento_id" id="editarLancId">
+                <div class="modal-header border-secondary-subtle px-4 py-3">
+                    <h6 class="modal-title fw-bold text-light mb-0">Editar lançamento</h6>
+                    <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+                </div>
+                <div class="modal-body px-4 py-3 d-flex flex-column gap-3">
+                    <div>
                         <label class="form-label text-secondary small">Descrição</label>
-                        <input type="text" name="descricao" id="editarLancDesc" class="form-control rounded-3"
-                            style="background:rgba(255,255,255,.06);border:1px solid rgba(255,255,255,.12);color:#fff;"
+                        <input type="text" name="descricao" id="editarLancDesc"
+                            class="form-control bg-transparent text-light border-secondary"
                             required maxlength="120">
                     </div>
-                    <div class="mb-3">
+                    <div>
                         <label class="form-label text-secondary small">Valor (R$)</label>
-                        <input type="text" name="valor" id="editarLancValor" class="form-control rounded-3"
-                            style="background:rgba(255,255,255,.06);border:1px solid rgba(255,255,255,.12);color:#fff;"
+                        <input type="text" name="valor" id="editarLancValor"
+                            class="form-control bg-transparent text-light border-secondary"
                             required inputmode="decimal">
                     </div>
-                    <div class="mb-3">
+                    <div>
                         <label class="form-label text-secondary small">Data da compra</label>
-                        <input type="date" name="data_compra" id="editarLancData" class="form-control rounded-3"
-                            style="background:rgba(255,255,255,.06);border:1px solid rgba(255,255,255,.12);color:#fff;"
+                        <input type="date" name="data_compra" id="editarLancData"
+                            class="form-control bg-transparent text-light border-secondary"
                             required>
                     </div>
-                    <div class="mb-1">
+                    <div>
                         <label class="form-label text-secondary small">Categoria</label>
-                        <select name="categoria_id" id="editarLancCat" class="form-select rounded-3"
-                            style="background:rgba(255,255,255,.06);border:1px solid rgba(255,255,255,.12);color:#fff;">
+                        <select name="categoria_id" id="editarLancCat"
+                            class="form-select text-light border-secondary" style="background-color:#1e1e2e;">
                             <option value="">— Sem categoria —</option>
                             <?php foreach ($categorias as $cat): ?>
                             <option value="<?= $cat['IDCategoria'] ?>"><?= htmlspecialchars($cat['NomeCategoria']) ?></option>
@@ -437,10 +436,10 @@ require_once '../geral/header.php';
                         </select>
                     </div>
                 </div>
-                <div class="modal-footer border-0 pt-0">
-                    <button type="button" class="btn btn-outline-secondary rounded-pill px-4" data-bs-dismiss="modal">Cancelar</button>
-                    <button type="submit" class="btn rounded-pill px-4 fw-semibold"
-                        style="background:rgba(124,58,237,.25);color:#a78bfa;border:1px solid rgba(124,58,237,.4);">
+                <div class="modal-footer border-secondary-subtle d-flex justify-content-between p-3">
+                    <button type="button" class="btn btn-sm btn-link text-secondary text-decoration-none" data-bs-dismiss="modal">Cancelar</button>
+                    <button type="submit" class="btn btn-sm fw-bold rounded-pill px-4"
+                        style="background:linear-gradient(135deg,#7c3aed,#a78bfa);color:#fff;border:none;">
                         <i class="bi bi-check-lg me-1"></i> Salvar
                     </button>
                 </div>
@@ -452,21 +451,21 @@ require_once '../geral/header.php';
 <!-- ── Modal: Fechar fatura ────────────────────────────────────────────── -->
 <div class="modal fade" id="modalFecharFatura" tabindex="-1">
     <div class="modal-dialog modal-dialog-centered">
-        <div class="modal-content rounded-4 border-0" style="background:#1a1a2e;border:1px solid rgba(255,255,255,.1)!important;">
-            <div class="modal-header border-0 pb-0">
-                <h6 class="modal-title fw-bold text-light">Fechar fatura</h6>
+        <div class="modal-content border-secondary-subtle shadow-lg" style="background:#1a1d21;">
+            <div class="modal-header border-secondary-subtle px-4 py-3">
+                <h6 class="modal-title fw-bold text-light mb-0">Fechar fatura</h6>
                 <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
             </div>
-            <div class="modal-body">
+            <div class="modal-body px-4 py-3">
                 <p class="text-secondary mb-1">Deseja fechar a fatura de <strong class="text-light" id="fecharFaturaTotal"></strong>?</p>
                 <p class="text-secondary small mb-0">O valor será congelado e um lembrete de pagamento será criado na agenda.</p>
             </div>
-            <div class="modal-footer border-0 pt-0">
-                <button type="button" class="btn btn-outline-secondary rounded-pill px-4" data-bs-dismiss="modal">Cancelar</button>
-                <form method="POST" id="formFecharFatura">
+            <div class="modal-footer border-secondary-subtle d-flex justify-content-between p-3">
+                <button type="button" class="btn btn-sm btn-link text-secondary text-decoration-none" data-bs-dismiss="modal">Cancelar</button>
+                <form method="POST">
                     <input type="hidden" name="action" value="fechar_fatura">
                     <input type="hidden" name="fatura_id" id="fecharFaturaId">
-                    <button type="submit" class="btn rounded-pill px-4 fw-semibold"
+                    <button type="submit" class="btn btn-sm fw-bold rounded-pill px-4"
                         style="background:rgba(239,68,68,.15);color:#f87171;border:1px solid rgba(239,68,68,.4);">
                         <i class="bi bi-lock-fill me-1"></i> Fechar fatura
                     </button>
