@@ -115,25 +115,15 @@ if (isset($_GET['ajax']) && $_GET['acao'] === 'listar') {
                    COALESCE(r.DataVencimento, r.MomentoRegistro) as data_evento,
                    c.NomeCategoria as categoria, COALESCE(c.IconeCategoria, 'bi-tag') as icone,
                    (SELECT COUNT(*) FROM Comprovante WHERE FKRegistro = r.IDRegistro AND FKUsuario = r.FKUsuario) AS tem_comprovante,
-                   fp.IDFatura as fatura_id,
-                   fp.FKCartao as cartao_id
+                   COALESCE(fp.IDFatura, fp2.IDFatura) as fatura_id,
+                   COALESCE(fp.FKCartao, fp2.FKCartao) as cartao_id
             FROM Registro r
             LEFT JOIN Categoria c ON r.FKCategoria = c.IDCategoria
-            LEFT JOIN FaturaCartao fp ON fp.FKRegistroPagamento = r.IDRegistro AND fp.FKUsuario = r.FKUsuario
+            LEFT JOIN FaturaCartao fp  ON fp.FKRegistroPagamento = r.IDRegistro AND fp.FKUsuario  = r.FKUsuario
+            LEFT JOIN FaturaCartao fp2 ON fp2.FKRegistroPreview  = r.IDRegistro AND fp2.FKUsuario = r.FKUsuario
             WHERE $whereGrelha ORDER BY data_evento ASC");
         $stmtG->execute($params);
         $transacoesGrelha = $stmtG->fetchAll(PDO::FETCH_ASSOC);
-
-        // Remove Registros de preview de CC (são sintéticos, não transações reais)
-        $previewIds = [];
-        try {
-            $stmtPv = $pdo->prepare("SELECT FKRegistroPreview FROM FaturaCartao WHERE FKUsuario = :uid AND FKRegistroPreview IS NOT NULL");
-            $stmtPv->execute([':uid' => $usuario_id]);
-            $previewIds = array_column($stmtPv->fetchAll(PDO::FETCH_ASSOC), 'FKRegistroPreview');
-        } catch (PDOException $e) {}
-        if (!empty($previewIds)) {
-            $transacoesGrelha = array_values(array_filter($transacoesGrelha, fn($t) => !in_array($t['id'], $previewIds)));
-        }
 
         // ─── Saldos ───────────────────────────────────────────────────────────
         $whereSaldos = "FKUsuario = :uid AND MONTH(MomentoRegistro) = :mes AND YEAR(MomentoRegistro) = :ano" . ($carteira !== 'todas' ? " AND FKCarteira = :cid" : "");
@@ -158,10 +148,11 @@ if (isset($_GET['ajax']) && $_GET['acao'] === 'listar') {
             SELECT r.IDRegistro as id, r.TipoRegistro as tipo, r.Descricao as titulo,
                    r.Valor as valor,
                    COALESCE(r.DataVencimento, r.MomentoRegistro) as data_vencimento,
-                   fp.IDFatura as fatura_id,
-                   fp.FKCartao as cartao_id
+                   COALESCE(fp.IDFatura, fp2.IDFatura) as fatura_id,
+                   COALESCE(fp.FKCartao, fp2.FKCartao) as cartao_id
             FROM Registro r
-            LEFT JOIN FaturaCartao fp ON fp.FKRegistroPagamento = r.IDRegistro AND fp.FKUsuario = r.FKUsuario
+            LEFT JOIN FaturaCartao fp  ON fp.FKRegistroPagamento = r.IDRegistro AND fp.FKUsuario  = r.FKUsuario
+            LEFT JOIN FaturaCartao fp2 ON fp2.FKRegistroPreview  = r.IDRegistro AND fp2.FKUsuario = r.FKUsuario
             WHERE r.FKUsuario = :uid AND r.StatusRegistro = 'pendente'
             $carteiraFilter ORDER BY COALESCE(r.DataVencimento, r.MomentoRegistro) ASC");
         $stmtSb->execute($sidebarParams);
