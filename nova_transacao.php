@@ -630,11 +630,12 @@ require_once 'geral/header.php';
 
                         <div class="d-flex align-items-center mb-4 pb-2 auralis-line-input">
                             <i class="bi bi-credit-card-2-front me-3 w-icon text-center" style="color:#a78bfa;"></i>
+                            <?php $cartaoPreSel = $_GET['cartao_id'] ?? (count($cartoes) === 1 ? $cartoes[0]['IDCartao'] : ''); ?>
                             <select name="cartao_cc_id" id="cartao_cc_id" class="form-select bg-transparent border-0 text-light-analysis px-0 shadow-none fw-semibold fs-6" required>
-                                <option class="bg-card" value="" disabled <?= empty($_GET['cartao_id']) ? 'selected' : '' ?>>Selecione o Cartão</option>
+                                <option class="bg-card" value="" disabled <?= empty($cartaoPreSel) ? 'selected' : '' ?>>Selecione o Cartão</option>
                                 <?php foreach ($cartoes as $cc): ?>
                                     <option class="bg-card" value="<?= htmlspecialchars($cc['IDCartao']) ?>"
-                                        <?= (($_GET['cartao_id'] ?? '') === $cc['IDCartao']) ? 'selected' : '' ?>>
+                                        <?= ($cartaoPreSel === $cc['IDCartao']) ? 'selected' : '' ?>>
                                         <?= htmlspecialchars($cc['Nome']) ?>
                                     </option>
                                 <?php endforeach; ?>
