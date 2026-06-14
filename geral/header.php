@@ -66,7 +66,7 @@ $_ehFreeRestrito = !$_emTrial
             <a class="navbar-brand d-flex align-items-center" href="<?php echo isset($_SESSION['usuario_id']) ? '/dashboard.php' : '/geral/index.php'; ?>"
                 style="font-family: 'Aquire', sans-serif; font-weight: 700; font-size: 1.6rem; letter-spacing: 0.04em; text-decoration: none;">
                 <img src="/geral/img/LogoAuralisSemEscudo.png" alt="Logo Auralis" class="me-2" style="height: 36px; width: auto; object-fit: contain;">
-                <span style="color: gold;">Aura</span><span class="text-light" style="font-weight: 300;">lis</span>
+                <span style="color: gold;">Aura</span><span class="text-light" style="font-weight: 700;">lis</span>
             </a>
 
             <button class="navbar-toggler border-0 shadow-none p-2" type="button" data-bs-toggle="collapse"
@@ -111,10 +111,17 @@ $_ehFreeRestrito = !$_emTrial
                             </a>
                         </li>
                         <li class="nav-item">
+                            <a class="nav-link custom-link py-3 py-lg-2 <?php echo (strpos($_SERVER['PHP_SELF'], '/cartao_credito/') !== false) ? 'text-warning active' : ''; ?>" href="/cartao_credito/index.php">
+                                <i class="bi bi-credit-card-2-front me-2"></i> Cartões
+                            </a>
+                        </li>
+                        <?php if ($_ehFreeRestrito): ?>
+                        <li class="nav-item">
                             <a class="nav-link custom-link py-3 py-lg-2 <?php echo ($paginaAtual == 'planos.php') ? 'text-warning active' : ''; ?>" href="/planos.php">
                                 <i class="bi bi-star me-2"></i> Planos
                             </a>
                         </li>
+                        <?php endif; ?>
                         <?php if (in_array(strtolower($_SESSION['nivel_acesso'] ?? ''), ['admin', 'supremo'])): ?>
                             <li class="nav-item">
                                 <a class="nav-link custom-link py-3 py-lg-2 <?php echo ($paginaAtual == 'usuarios.php') ? 'text-warning active' : ''; ?>" href="/admin/usuarios.php">

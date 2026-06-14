@@ -54,6 +54,40 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && ($_POST['action'] ?? '') === 'exclu
     exit;
 }
 
+// Detalhe de fatura de cartão para o modal da agenda
+if (isset($_GET['ajax']) && $_GET['acao'] === 'fatura_detalhe') {
+    ob_clean();
+    header('Content-Type: application/json; charset=utf-8');
+    $faturaId = trim($_GET['fatura_id'] ?? '');
+    if (!$faturaId) { echo json_encode(['ok' => false]); exit; }
+    try {
+        $stmtF = $pdo->prepare("
+            SELECT f.IDFatura, f.DataFechamento, f.DataVencimento, f.Status, f.FKCartao,
+                   c.Nome AS NomeCartao, c.Bandeira, c.Cor
+            FROM FaturaCartao f
+            JOIN CartaoCredito c ON f.FKCartao = c.IDCartao
+            WHERE f.IDFatura = :fid AND f.FKUsuario = :uid
+        ");
+        $stmtF->execute([':fid' => $faturaId, ':uid' => $usuario_id]);
+        $fatura = $stmtF->fetch(PDO::FETCH_ASSOC);
+        if (!$fatura) { echo json_encode(['ok' => false]); exit; }
+
+        $stmtL = $pdo->prepare("
+            SELECT l.Descricao, l.Valor, l.DataCompra, l.ParcelaAtual, l.TotalParcelas,
+                   cat.NomeCategoria, cat.IconeCategoria
+            FROM LancamentoCartao l
+            LEFT JOIN Categoria cat ON l.FKCategoria = cat.IDCategoria
+            WHERE l.FKFatura = :fid AND l.FKUsuario = :uid
+            ORDER BY l.DataCompra ASC, l.IDLancamento ASC
+        ");
+        $stmtL->execute([':fid' => $faturaId, ':uid' => $usuario_id]);
+        echo json_encode(['ok' => true, 'fatura' => $fatura, 'lancamentos' => $stmtL->fetchAll(PDO::FETCH_ASSOC)]);
+    } catch (PDOException $e) {
+        echo json_encode(['ok' => false]);
+    }
+    exit;
+}
+
 if (isset($_GET['ajax']) && $_GET['acao'] === 'listar') {
     ob_clean();
     header('Content-Type: application/json; charset=utf-8');
@@ -80,9 +114,13 @@ if (isset($_GET['ajax']) && $_GET['acao'] === 'listar') {
                    r.Valor as valor, r.StatusRegistro as status, r.Recorrente,
                    COALESCE(r.DataVencimento, r.MomentoRegistro) as data_evento,
                    c.NomeCategoria as categoria, COALESCE(c.IconeCategoria, 'bi-tag') as icone,
-                   (SELECT COUNT(*) FROM Comprovante WHERE FKRegistro = r.IDRegistro AND FKUsuario = r.FKUsuario) AS tem_comprovante
+                   (SELECT COUNT(*) FROM Comprovante WHERE FKRegistro = r.IDRegistro AND FKUsuario = r.FKUsuario) AS tem_comprovante,
+                   COALESCE(fp.IDFatura, fp2.IDFatura) as fatura_id,
+                   COALESCE(fp.FKCartao, fp2.FKCartao) as cartao_id
             FROM Registro r
             LEFT JOIN Categoria c ON r.FKCategoria = c.IDCategoria
+            LEFT JOIN FaturaCartao fp  ON fp.FKRegistroPagamento = r.IDRegistro AND fp.FKUsuario  = r.FKUsuario
+            LEFT JOIN FaturaCartao fp2 ON fp2.FKRegistroPreview  = r.IDRegistro AND fp2.FKUsuario = r.FKUsuario
             WHERE $whereGrelha ORDER BY data_evento ASC");
         $stmtG->execute($params);
         $transacoesGrelha = $stmtG->fetchAll(PDO::FETCH_ASSOC);
@@ -109,8 +147,12 @@ if (isset($_GET['ajax']) && $_GET['acao'] === 'listar') {
         $stmtSb = $pdo->prepare("
             SELECT r.IDRegistro as id, r.TipoRegistro as tipo, r.Descricao as titulo,
                    r.Valor as valor,
-                   COALESCE(r.DataVencimento, r.MomentoRegistro) as data_vencimento
+                   COALESCE(r.DataVencimento, r.MomentoRegistro) as data_vencimento,
+                   COALESCE(fp.IDFatura, fp2.IDFatura) as fatura_id,
+                   COALESCE(fp.FKCartao, fp2.FKCartao) as cartao_id
             FROM Registro r
+            LEFT JOIN FaturaCartao fp  ON fp.FKRegistroPagamento = r.IDRegistro AND fp.FKUsuario  = r.FKUsuario
+            LEFT JOIN FaturaCartao fp2 ON fp2.FKRegistroPreview  = r.IDRegistro AND fp2.FKUsuario = r.FKUsuario
             WHERE r.FKUsuario = :uid AND r.StatusRegistro = 'pendente'
             $carteiraFilter ORDER BY COALESCE(r.DataVencimento, r.MomentoRegistro) ASC");
         $stmtSb->execute($sidebarParams);
@@ -784,8 +826,10 @@ require_once 'geral/header.php';
             `<i class="bi bi-arrow-up-short" style="color:#6ee7c7;font-size:1.15rem;flex-shrink:0;"></i>` :
             `<i class="bi bi-arrow-down-short" style="color:#f87171;font-size:1.15rem;flex-shrink:0;"></i>`;
 
-        return `<div class="sidebar-item"
-                     onclick="window.location.href='nova_transacao.php?voltar=agenda.php&editar=${encodeURIComponent(item.id)}'">
+        const clickSb = item.fatura_id
+            ? `abrirModalFaturaCC('${item.fatura_id}','${item.cartao_id}')`
+            : `window.location.href='nova_transacao.php?voltar=agenda.php&editar=${encodeURIComponent(item.id)}'`;
+        return `<div class="sidebar-item" onclick="${clickSb}">
             <div class="d-flex align-items-center gap-2" style="min-width:0;">
                 ${arrow}
                 <div style="min-width:0;">
@@ -866,15 +910,22 @@ require_once 'geral/header.php';
                 const btnComp = (_temAcessoCompAgenda && t.tem_comprovante > 0)
                     ? `<button onclick="event.stopPropagation();abrirComprovantes('${t.id}')" class="btn btn-sm btn-outline-info rounded-pill px-2 py-0 mt-1" title="Ver comprovante"><i class="bi bi-eye"></i></button>`
                     : '';
+                const isCC = !!t.fatura_id;
+                const clickDia = isCC
+                    ? `abrirModalDiaCC('${t.fatura_id}','${t.cartao_id}')`
+                    : `window.location.href='nova_transacao.php?voltar=agenda.php&editar=${encodeURIComponent(t.id)}'`;
+                const iconeEsq = isCC
+                    ? `<i class="bi bi-credit-card-2-front" style="color:#a78bfa;font-size:1.3rem;flex-shrink:0;"></i>`
+                    : `<i class="bi bi-arrow-${isRec ? 'up' : 'down'}-short" style="color:${corVal};font-size:1.5rem;flex-shrink:0;"></i>`;
                 return `<div class="d-flex align-items-center gap-3 px-4 py-3 border-bottom border-secondary-subtle"
                              style="cursor:pointer;transition:background .12s ease;"
                              onmouseover="this.style.background='rgba(255,255,255,0.03)'"
                              onmouseout="this.style.background=''"
-                             onclick="window.location.href='nova_transacao.php?voltar=agenda.php&editar=${encodeURIComponent(t.id)}'">
-                    <i class="bi bi-arrow-${isRec ? 'up' : 'down'}-short" style="color:${corVal};font-size:1.5rem;flex-shrink:0;"></i>
+                             onclick="${clickDia}">
+                    ${iconeEsq}
                     <div style="min-width:0;flex:1;">
                         <div class="text-light fw-semibold text-truncate" style="font-size:0.88rem;">${esc(t.titulo)}</div>
-                        <div class="text-secondary" style="font-size:0.72rem;">${esc(t.categoria ?? 'Sem categoria')}</div>
+                        <div class="text-secondary" style="font-size:0.72rem;">${isCC ? 'Fatura do cartão' : esc(t.categoria ?? 'Sem categoria')}</div>
                     </div>
                     <div class="text-end flex-shrink-0 d-flex flex-column align-items-end gap-1">
                         <span class="fw-bold" style="color:${corVal};font-size:0.88rem;">${sinal}${formatarMoeda(t.valor)}</span>
@@ -946,24 +997,19 @@ require_once 'geral/header.php';
                 const pill = document.createElement('div');
                 pill.className = `calendar-event ${cls}`;
                 pill.title = `${t.titulo} — ${formatarMoeda(t.valor)}`;
-                pill.onclick = (e) => {
-                    e.stopPropagation();
-                    window.location.href = `nova_transacao.php?voltar=agenda.php&editar=${encodeURIComponent(t.id)}`;
-                };
-                pill.addEventListener('contextmenu', (e) => {
-                    e.preventDefault();
-                    e.stopPropagation();
-                    window._mostrarMenuPill(e.clientX, e.clientY, t);
-                });
-
-                const arrow = isRec ?
-                    `<i class="bi bi-arrow-up-short" style="color:#6ee7c7;font-size:0.95rem;flex-shrink:0;line-height:1;"></i>` :
-                    `<i class="bi bi-arrow-down-short" style="color:#f87171;font-size:0.95rem;flex-shrink:0;line-height:1;"></i>`;
-                const rep = (t.Recorrente == 1) ?
-                    `<i class="bi bi-arrow-repeat ms-1" style="opacity:0.55;font-size:0.6rem;flex-shrink:0;"></i>` :
-                    '';
-
-                pill.innerHTML = `${arrow}<span class="event-desc">${esc(t.titulo)}</span>${rep}`;
+                if (t.fatura_id) {
+                    pill.onclick = (e) => { e.stopPropagation(); abrirModalFaturaCC(t.fatura_id, t.cartao_id); };
+                    pill.innerHTML = `<i class="bi bi-credit-card-2-front" style="color:#a78bfa;font-size:0.8rem;flex-shrink:0;line-height:1;"></i><span class="event-desc">${esc(t.titulo)}</span>`;
+                } else {
+                    pill.onclick = (e) => { e.stopPropagation(); window.location.href = `nova_transacao.php?voltar=agenda.php&editar=${encodeURIComponent(t.id)}`; };
+                    pill.addEventListener('contextmenu', (e) => { e.preventDefault(); e.stopPropagation(); window._mostrarMenuPill(e.clientX, e.clientY, t); });
+                    const arrow = isRec
+                        ? `<i class="bi bi-arrow-up-short" style="color:#6ee7c7;font-size:0.95rem;flex-shrink:0;line-height:1;"></i>`
+                        : `<i class="bi bi-arrow-down-short" style="color:#f87171;font-size:0.95rem;flex-shrink:0;line-height:1;"></i>`;
+                    const rep = (t.Recorrente == 1)
+                        ? `<i class="bi bi-arrow-repeat ms-1" style="opacity:0.55;font-size:0.6rem;flex-shrink:0;"></i>` : '';
+                    pill.innerHTML = `${arrow}<span class="event-desc">${esc(t.titulo)}</span>${rep}`;
+                }
                 eventsDiv.appendChild(pill);
             });
 
@@ -1032,6 +1078,85 @@ require_once 'geral/header.php';
         };
     })();
 
+    // ── Modal de Fatura de Cartão ─────────────────────────────────────────
+    async function abrirModalFaturaCC(faturaId, cartaoId) {
+        const modalEl = document.getElementById('modalFaturaCC');
+        const modal   = new bootstrap.Modal(modalEl);
+        document.getElementById('modalFaturaCCBody').innerHTML =
+            '<div class="text-center py-5 text-secondary"><i class="bi bi-hourglass-split me-2"></i>Carregando...</div>';
+        document.getElementById('modalFaturaCCLink').href =
+            '/cartao_credito/fatura.php?cartao=' + encodeURIComponent(cartaoId);
+        modal.show();
+        try {
+            const r    = await fetch(`agenda.php?ajax=1&acao=fatura_detalhe&fatura_id=${encodeURIComponent(faturaId)}`);
+            const data = await r.json();
+            if (!data.ok) { document.getElementById('modalFaturaCCBody').innerHTML = '<p class="text-danger text-center py-4 px-4">Erro ao carregar fatura.</p>'; return; }
+
+            const f = data.fatura;
+            const cor = f.Cor || '#7c3aed';
+            const stMap = { aberta: ['#22c55e','ABERTA'], fechada: ['#FFB800','FECHADA'], paga: ['#6ee7c7','PAGA'] };
+            const [stCor, stLabel] = stMap[f.Status] || ['#888','—'];
+            const total = data.lancamentos.reduce((s, l) => s + parseFloat(l.Valor), 0);
+            const fmtD  = d => d ? d.slice(8,10)+'/'+d.slice(5,7)+'/'+d.slice(0,4) : '—';
+            const fmtV  = v => parseFloat(v).toLocaleString('pt-BR', {minimumFractionDigits:2, maximumFractionDigits:2});
+
+            let html = `<div class="px-4 pt-3 pb-3" style="border-bottom:1px solid #2a2d38;">
+                <div class="d-flex align-items-center gap-3">
+                    <div class="rounded-3 d-flex align-items-center justify-content-center flex-shrink-0"
+                         style="width:42px;height:42px;background:${cor}22;">
+                        <i class="bi bi-credit-card-2-front" style="color:${cor};font-size:1.15rem;"></i>
+                    </div>
+                    <div>
+                        <div class="fw-bold text-light" style="font-size:1rem;">${esc(f.NomeCartao)}</div>
+                        <span style="display:inline-flex;align-items:center;background:${stCor}18;color:${stCor};border:1px solid ${stCor}33;border-radius:999px;padding:1px 8px;font-size:0.62rem;font-weight:700;margin-top:3px;">● ${stLabel}</span>
+                    </div>
+                    <div class="ms-auto text-end">
+                        <div class="text-secondary" style="font-size:0.68rem;">Fecha ${fmtD(f.DataFechamento)}</div>
+                        <div class="text-secondary" style="font-size:0.68rem;">Vence ${fmtD(f.DataVencimento)}</div>
+                        <div class="fw-bold text-danger mt-1" style="font-size:1.1rem;">R$ ${fmtV(total)}</div>
+                    </div>
+                </div>
+            </div>`;
+
+            if (!data.lancamentos.length) {
+                html += '<div class="text-center text-secondary py-5" style="font-size:0.85rem;">Nenhum lançamento nesta fatura.</div>';
+            } else {
+                data.lancamentos.forEach(l => {
+                    const dt = l.DataCompra ? l.DataCompra.slice(8,10)+'/'+l.DataCompra.slice(5,7) : '—';
+                    const parc = parseInt(l.TotalParcelas) > 1
+                        ? `<span style="display:inline-flex;align-items:center;background:rgba(124,58,237,.18);color:#a78bfa;border:1px solid rgba(124,58,237,.3);border-radius:999px;padding:0 5px;font-size:0.58rem;font-weight:700;margin-left:4px;">${l.ParcelaAtual}/${l.TotalParcelas}x</span>` : '';
+                    html += `<div class="d-flex align-items-center gap-3 px-4 py-2" style="border-bottom:1px solid rgba(255,255,255,.04);">
+                        <div style="min-width:0;flex:1;">
+                            <div class="text-light d-flex align-items-center flex-wrap" style="font-size:0.83rem;">${esc(l.Descricao)}${parc}</div>
+                            <div class="text-secondary" style="font-size:0.7rem;">${l.NomeCategoria ? esc(l.NomeCategoria) : '—'} · ${dt}</div>
+                        </div>
+                        <span class="fw-bold text-danger flex-shrink-0" style="font-size:0.85rem;">R$ ${fmtV(l.Valor)}</span>
+                    </div>`;
+                });
+                html += `<div class="d-flex justify-content-between px-4 py-3" style="border-top:1px solid #2a2d38;">
+                    <span class="text-secondary fw-semibold" style="font-size:0.83rem;">Total</span>
+                    <span class="fw-bold text-danger" style="font-size:0.9rem;">R$ ${fmtV(total)}</span>
+                </div>`;
+            }
+            document.getElementById('modalFaturaCCBody').innerHTML = html;
+        } catch(e) {
+            document.getElementById('modalFaturaCCBody').innerHTML = '<p class="text-danger text-center py-4 px-4">Erro ao carregar fatura.</p>';
+        }
+    }
+
+    function abrirModalDiaCC(faturaId, cartaoId) {
+        const diaModal = bootstrap.Modal.getInstance(document.getElementById('modalDia'));
+        if (diaModal) {
+            document.getElementById('modalDia').addEventListener('hidden.bs.modal', function once() {
+                this.removeEventListener('hidden.bs.modal', once);
+                abrirModalFaturaCC(faturaId, cartaoId);
+            });
+            diaModal.hide();
+        } else {
+            abrirModalFaturaCC(faturaId, cartaoId);
+        }
+    }
+
     document.addEventListener("DOMContentLoaded", () => window.carregarMes(anoAtual, mesAtual));
 
     function abrirComprovantes(registroId) {
@@ -1092,6 +1217,29 @@ require_once 'geral/header.php';
                 </a>
                 <button type="button" class="btn btn-link text-secondary text-decoration-none ms-auto p-0"
                     data-bs-dismiss="modal" style="font-size:0.82rem;">Fechar</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- MODAL: FATURA DE CARTÃO DE CRÉDITO -->
+<div class="modal fade" id="modalFaturaCC" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered modal-dialog-scrollable" style="max-width:480px;">
+        <div class="modal-content border-secondary-subtle rounded-4" style="background:#1a1d21;">
+            <div class="modal-header border-secondary-subtle px-4 py-3">
+                <h6 class="modal-title fw-bold text-light mb-0">
+                    <i class="bi bi-credit-card-2-front me-2" style="color:#a78bfa;"></i>Fatura do Cartão
+                </h6>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body p-0" id="modalFaturaCCBody"></div>
+            <div class="modal-footer border-secondary-subtle px-4 py-3 d-flex justify-content-between">
+                <a id="modalFaturaCCLink" href="#" class="btn btn-sm fw-semibold rounded-pill px-3"
+                   style="background:rgba(124,58,237,.18);color:#a78bfa;border:1px solid rgba(124,58,237,.3);">
+                    <i class="bi bi-arrow-right-circle me-1"></i> Ver fatura completa
+                </a>
+                <button type="button" class="btn btn-sm btn-link text-secondary text-decoration-none"
+                    data-bs-dismiss="modal">Fechar</button>
             </div>
         </div>
     </div>
