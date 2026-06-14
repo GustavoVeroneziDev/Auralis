@@ -43,7 +43,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
     if ($action === 'excluir_lancamento') {
         $lancId = trim($_POST['lancamento_id'] ?? '');
-        // Captura a fatura antes de deletar
         $stmtFid = $pdo->prepare("SELECT FKFatura FROM LancamentoCartao WHERE IDLancamento = :lid AND FKUsuario = :uid");
         $stmtFid->execute([':lid' => $lancId, ':uid' => $uid]);
         $faturaIdDel = $stmtFid->fetchColumn();
@@ -58,6 +57,33 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             cartao_sincronizarPreview($pdo, $faturaIdDel, $uid, $cartao);
         }
         $sucesso = 'Lançamento removido.';
+    }
+
+    if ($action === 'editar_lancamento') {
+        $lancId  = trim($_POST['lancamento_id'] ?? '');
+        $desc    = trim($_POST['descricao'] ?? '');
+        $valorRaw = str_replace(['.', ','], ['', '.'], trim($_POST['valor'] ?? '0'));
+        $valor   = (float)$valorRaw;
+        $data    = trim($_POST['data_compra'] ?? '');
+        $catId   = trim($_POST['categoria_id'] ?? '') ?: null;
+
+        if ($lancId && $desc && $valor > 0 && $data) {
+            $stmtFid = $pdo->prepare("SELECT FKFatura FROM LancamentoCartao WHERE IDLancamento = :lid AND FKUsuario = :uid");
+            $stmtFid->execute([':lid' => $lancId, ':uid' => $uid]);
+            $faturaIdEdit = $stmtFid->fetchColumn();
+
+            $pdo->prepare(
+                "UPDATE LancamentoCartao l
+                 JOIN FaturaCartao f ON l.FKFatura = f.IDFatura
+                 SET l.Descricao = :desc, l.Valor = :val, l.DataCompra = :data, l.FKCategoria = :cat
+                 WHERE l.IDLancamento = :lid AND l.FKUsuario = :uid AND f.Status = 'aberta'"
+            )->execute([':desc' => $desc, ':val' => $valor, ':data' => $data, ':cat' => $catId, ':lid' => $lancId, ':uid' => $uid]);
+
+            if ($faturaIdEdit) {
+                cartao_sincronizarPreview($pdo, $faturaIdEdit, $uid, $cartao);
+            }
+            $sucesso = 'Lançamento atualizado.';
+        }
     }
 
     if ($action === 'marcar_paga') {
@@ -118,6 +144,10 @@ foreach ($historico as $fh) {
 }
 
 $totalAberta = array_sum(array_column($lancamentosAberta, 'Valor'));
+
+$stmtCat = $pdo->prepare("SELECT IDCategoria, NomeCategoria, IconeCategoria FROM Categoria WHERE FKUsuario = :uid ORDER BY NomeCategoria ASC");
+$stmtCat->execute([':uid' => $uid]);
+$categorias = $stmtCat->fetchAll(PDO::FETCH_ASSOC);
 
 $bandeiras = ['visa'=>'Visa','mastercard'=>'Mastercard','elo'=>'Elo','amex'=>'Amex','hipercard'=>'Hipercard','outro'=>'Outro'];
 $cor = $cartao['Cor'];
@@ -212,14 +242,15 @@ require_once '../geral/header.php';
                                 <td class="text-end fw-semibold py-2 border-0" style="color:#f87171;">
                                     R$ <?= number_format($l['Valor'], 2, ',', '.') ?>
                                 </td>
-                                <td class="py-2 border-0 text-end">
-                                    <form method="POST" class="d-inline" onsubmit="return confirm('Remover este lançamento?')">
-                                        <input type="hidden" name="action" value="excluir_lancamento">
-                                        <input type="hidden" name="lancamento_id" value="<?= $l['IDLancamento'] ?>">
-                                        <button class="btn btn-sm btn-link text-danger p-0" title="Remover">
-                                            <i class="bi bi-trash3" style="font-size:0.8rem;"></i>
-                                        </button>
-                                    </form>
+                                <td class="py-2 border-0 text-end" style="white-space:nowrap;">
+                                    <button class="btn btn-sm btn-link p-0 me-2" style="color:#a78bfa;" title="Editar"
+                                        onclick="abrirModalEditarLanc('<?= $l['IDLancamento'] ?>','<?= htmlspecialchars(addslashes($l['Descricao']), ENT_QUOTES) ?>','<?= number_format($l['Valor'], 2, ',', '.') ?>','<?= $l['DataCompra'] ?>','<?= $l['FKCategoria'] ?? '' ?>')">
+                                        <i class="bi bi-pencil" style="font-size:0.8rem;"></i>
+                                    </button>
+                                    <button class="btn btn-sm btn-link text-danger p-0" title="Remover"
+                                        onclick="abrirModalExcluirLanc('<?= $l['IDLancamento'] ?>','<?= htmlspecialchars(addslashes($l['Descricao']), ENT_QUOTES) ?>')">
+                                        <i class="bi bi-trash3" style="font-size:0.8rem;"></i>
+                                    </button>
                                 </td>
                             </tr>
                             <?php endforeach; ?>
@@ -239,14 +270,11 @@ require_once '../geral/header.php';
 
             <!-- Botão de fechar fatura -->
             <?php if ($totalAberta > 0): ?>
-            <form method="POST" onsubmit="return confirm('Fechar a fatura de R$ <?= number_format($totalAberta, 2, ',', '.') ?>?\n\nO valor será congelado e um lembrete de pagamento será criado na agenda.')">
-                <input type="hidden" name="action" value="fechar_fatura">
-                <input type="hidden" name="fatura_id" value="<?= $faturaAberta['IDFatura'] ?>">
-                <button class="btn btn-sm rounded-pill fw-semibold px-4"
-                    style="background:rgba(239,68,68,.15);color:#f87171;border:1px solid rgba(239,68,68,.4);">
-                    <i class="bi bi-lock-fill me-1"></i> Fechar fatura manualmente
-                </button>
-            </form>
+            <button class="btn btn-sm rounded-pill fw-semibold px-4"
+                style="background:rgba(239,68,68,.15);color:#f87171;border:1px solid rgba(239,68,68,.4);"
+                onclick="abrirModalFecharFatura('<?= $faturaAberta['IDFatura'] ?>','<?= number_format($totalAberta, 2, ',', '.') ?>')">
+                <i class="bi bi-lock-fill me-1"></i> Fechar fatura manualmente
+            </button>
             <?php endif; ?>
         </div>
     </div>
@@ -335,6 +363,114 @@ require_once '../geral/header.php';
     <?php endif; ?>
 </main>
 
+<!-- ── Modal: Excluir lançamento ───────────────────────────────────────── -->
+<div class="modal fade" id="modalExcluirLanc" tabindex="-1">
+    <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content rounded-4 border-0" style="background:#1a1a2e;border:1px solid rgba(255,255,255,.1)!important;">
+            <div class="modal-header border-0 pb-0">
+                <h6 class="modal-title fw-bold text-light">Remover lançamento</h6>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <p class="text-secondary mb-0">Deseja remover <strong class="text-light" id="excluirLancNome"></strong>?</p>
+                <p class="text-secondary small mt-1 mb-0">Esta ação não pode ser desfeita.</p>
+            </div>
+            <div class="modal-footer border-0 pt-0">
+                <button type="button" class="btn btn-outline-secondary rounded-pill px-4" data-bs-dismiss="modal">Cancelar</button>
+                <form method="POST" id="formExcluirLanc">
+                    <input type="hidden" name="action" value="excluir_lancamento">
+                    <input type="hidden" name="lancamento_id" id="excluirLancId">
+                    <button type="submit" class="btn rounded-pill px-4 fw-semibold"
+                        style="background:rgba(239,68,68,.2);color:#f87171;border:1px solid rgba(239,68,68,.4);">
+                        <i class="bi bi-trash3 me-1"></i> Remover
+                    </button>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- ── Modal: Editar lançamento ────────────────────────────────────────── -->
+<div class="modal fade" id="modalEditarLanc" tabindex="-1">
+    <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content rounded-4 border-0" style="background:#1a1a2e;border:1px solid rgba(255,255,255,.1)!important;">
+            <div class="modal-header border-0 pb-0">
+                <h6 class="modal-title fw-bold text-light">Editar lançamento</h6>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+            </div>
+            <form method="POST" id="formEditarLanc">
+                <div class="modal-body">
+                    <input type="hidden" name="action" value="editar_lancamento">
+                    <input type="hidden" name="lancamento_id" id="editarLancId">
+
+                    <div class="mb-3">
+                        <label class="form-label text-secondary small">Descrição</label>
+                        <input type="text" name="descricao" id="editarLancDesc" class="form-control rounded-3"
+                            style="background:rgba(255,255,255,.06);border:1px solid rgba(255,255,255,.12);color:#fff;"
+                            required maxlength="120">
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label text-secondary small">Valor (R$)</label>
+                        <input type="text" name="valor" id="editarLancValor" class="form-control rounded-3"
+                            style="background:rgba(255,255,255,.06);border:1px solid rgba(255,255,255,.12);color:#fff;"
+                            required inputmode="decimal">
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label text-secondary small">Data da compra</label>
+                        <input type="date" name="data_compra" id="editarLancData" class="form-control rounded-3"
+                            style="background:rgba(255,255,255,.06);border:1px solid rgba(255,255,255,.12);color:#fff;"
+                            required>
+                    </div>
+                    <div class="mb-1">
+                        <label class="form-label text-secondary small">Categoria</label>
+                        <select name="categoria_id" id="editarLancCat" class="form-select rounded-3"
+                            style="background:rgba(255,255,255,.06);border:1px solid rgba(255,255,255,.12);color:#fff;">
+                            <option value="">— Sem categoria —</option>
+                            <?php foreach ($categorias as $cat): ?>
+                            <option value="<?= $cat['IDCategoria'] ?>"><?= htmlspecialchars($cat['NomeCategoria']) ?></option>
+                            <?php endforeach; ?>
+                        </select>
+                    </div>
+                </div>
+                <div class="modal-footer border-0 pt-0">
+                    <button type="button" class="btn btn-outline-secondary rounded-pill px-4" data-bs-dismiss="modal">Cancelar</button>
+                    <button type="submit" class="btn rounded-pill px-4 fw-semibold"
+                        style="background:rgba(124,58,237,.25);color:#a78bfa;border:1px solid rgba(124,58,237,.4);">
+                        <i class="bi bi-check-lg me-1"></i> Salvar
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+<!-- ── Modal: Fechar fatura ────────────────────────────────────────────── -->
+<div class="modal fade" id="modalFecharFatura" tabindex="-1">
+    <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content rounded-4 border-0" style="background:#1a1a2e;border:1px solid rgba(255,255,255,.1)!important;">
+            <div class="modal-header border-0 pb-0">
+                <h6 class="modal-title fw-bold text-light">Fechar fatura</h6>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <p class="text-secondary mb-1">Deseja fechar a fatura de <strong class="text-light" id="fecharFaturaTotal"></strong>?</p>
+                <p class="text-secondary small mb-0">O valor será congelado e um lembrete de pagamento será criado na agenda.</p>
+            </div>
+            <div class="modal-footer border-0 pt-0">
+                <button type="button" class="btn btn-outline-secondary rounded-pill px-4" data-bs-dismiss="modal">Cancelar</button>
+                <form method="POST" id="formFecharFatura">
+                    <input type="hidden" name="action" value="fechar_fatura">
+                    <input type="hidden" name="fatura_id" id="fecharFaturaId">
+                    <button type="submit" class="btn rounded-pill px-4 fw-semibold"
+                        style="background:rgba(239,68,68,.15);color:#f87171;border:1px solid rgba(239,68,68,.4);">
+                        <i class="bi bi-lock-fill me-1"></i> Fechar fatura
+                    </button>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
+
 <script>
 function toggleFatura(id) {
     const el  = document.getElementById(id);
@@ -342,6 +478,28 @@ function toggleFatura(id) {
     const vis = el.style.display !== 'none';
     el.style.display  = vis ? 'none' : 'block';
     ico.className     = vis ? 'bi bi-chevron-down text-secondary' : 'bi bi-chevron-up text-secondary';
+}
+
+function abrirModalExcluirLanc(id, nome) {
+    document.getElementById('excluirLancId').value = id;
+    document.getElementById('excluirLancNome').textContent = nome;
+    bootstrap.Modal.getOrCreate(document.getElementById('modalExcluirLanc')).show();
+}
+
+function abrirModalEditarLanc(id, desc, valor, data, catId) {
+    document.getElementById('editarLancId').value    = id;
+    document.getElementById('editarLancDesc').value  = desc;
+    document.getElementById('editarLancValor').value = valor;
+    document.getElementById('editarLancData').value  = data.substring(0, 10);
+    const sel = document.getElementById('editarLancCat');
+    sel.value = catId || '';
+    bootstrap.Modal.getOrCreate(document.getElementById('modalEditarLanc')).show();
+}
+
+function abrirModalFecharFatura(faturaId, total) {
+    document.getElementById('fecharFaturaId').value     = faturaId;
+    document.getElementById('fecharFaturaTotal').textContent = 'R$ ' + total;
+    bootstrap.Modal.getOrCreate(document.getElementById('modalFecharFatura')).show();
 }
 </script>
 
