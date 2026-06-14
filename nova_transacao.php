@@ -185,7 +185,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && trim($_POST['tipo_registro'] ?? '')
                 ':fid'   => $fatura['IDFatura'],
                 ':cid'   => $cartaoId,
                 ':uid'   => $usuario_id,
-                ':desc'  => $descricao . ($numParcelas > 1 ? ' (' . ($i + 1) . '/' . $numParcelas . ')' : ''),
+                ':desc'  => $descricao,
                 ':val'   => round($val, 2),
                 ':data'  => $dataCompra,
                 ':cat'   => $categoriaId,
