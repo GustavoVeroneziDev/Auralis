@@ -291,7 +291,7 @@ require_once 'geral/header.php';
             <div class="card border-secondary-subtle shadow-sm rounded-4" style="background-color:#1c1f24;">
                 <div class="card-body p-3">
                     <div class="d-flex align-items-center gap-2 mb-2" style="font-size:0.8rem; color:#888;">
-                        <i class="bi bi-check-circle text-success"></i>Saldo atual
+                        <i class="bi bi-check-circle text-success"></i>Balanço efetivado no mês
                     </div>
                     <h4 id="saldoEfetivado" class="fw-bold mb-0 text-secondary">—</h4>
                 </div>
