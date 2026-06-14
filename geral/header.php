@@ -115,11 +115,13 @@ $_ehFreeRestrito = !$_emTrial
                                 <i class="bi bi-credit-card-2-front me-2"></i> Cartões
                             </a>
                         </li>
+                        <?php if ($_ehFreeRestrito): ?>
                         <li class="nav-item">
                             <a class="nav-link custom-link py-3 py-lg-2 <?php echo ($paginaAtual == 'planos.php') ? 'text-warning active' : ''; ?>" href="/planos.php">
                                 <i class="bi bi-star me-2"></i> Planos
                             </a>
                         </li>
+                        <?php endif; ?>
                         <?php if (in_array(strtolower($_SESSION['nivel_acesso'] ?? ''), ['admin', 'supremo'])): ?>
                             <li class="nav-item">
                                 <a class="nav-link custom-link py-3 py-lg-2 <?php echo ($paginaAtual == 'usuarios.php') ? 'text-warning active' : ''; ?>" href="/admin/usuarios.php">
