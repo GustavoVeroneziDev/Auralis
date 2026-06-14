@@ -42,47 +42,85 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     }
 
     if ($action === 'excluir_lancamento') {
-        $lancId = trim($_POST['lancamento_id'] ?? '');
+        $lancId       = trim($_POST['lancamento_id'] ?? '');
+        $scope        = trim($_POST['scope'] ?? 'so_esta');
+        $grupo        = trim($_POST['grupo'] ?? '');
+        $parcelaAtual = (int)($_POST['parcela_atual'] ?? 0);
+
         $stmtFid = $pdo->prepare("SELECT FKFatura FROM LancamentoCartao WHERE IDLancamento = :lid AND FKUsuario = :uid");
         $stmtFid->execute([':lid' => $lancId, ':uid' => $uid]);
         $faturaIdDel = $stmtFid->fetchColumn();
 
-        $pdo->prepare(
-            "DELETE l FROM LancamentoCartao l
-             JOIN FaturaCartao f ON l.FKFatura = f.IDFatura
-             WHERE l.IDLancamento = :lid AND l.FKUsuario = :uid AND f.Status = 'aberta'"
-        )->execute([':lid' => $lancId, ':uid' => $uid]);
-
-        if ($faturaIdDel) {
-            cartao_sincronizarPreview($pdo, $faturaIdDel, $uid, $cartao);
+        if ($scope === 'futuras' && $grupo && $parcelaAtual > 0) {
+            $pdo->prepare(
+                "DELETE l FROM LancamentoCartao l
+                 JOIN FaturaCartao f ON l.FKFatura = f.IDFatura
+                 WHERE l.GrupoParcelamento = :grupo AND l.FKUsuario = :uid AND l.FKCartao = :cid
+                   AND l.ParcelaAtual >= :parc AND f.Status = 'aberta'"
+            )->execute([':grupo' => $grupo, ':uid' => $uid, ':cid' => $cartaoId, ':parc' => $parcelaAtual]);
+            $stmtFats = $pdo->prepare("SELECT IDFatura FROM FaturaCartao WHERE FKCartao = :cid AND FKUsuario = :uid AND Status = 'aberta'");
+            $stmtFats->execute([':cid' => $cartaoId, ':uid' => $uid]);
+            foreach ($stmtFats->fetchAll(PDO::FETCH_COLUMN) as $fid) {
+                cartao_sincronizarPreview($pdo, $fid, $uid, $cartao);
+            }
+            $sucesso = 'Parcelas removidas com sucesso.';
+        } else {
+            $pdo->prepare(
+                "DELETE l FROM LancamentoCartao l
+                 JOIN FaturaCartao f ON l.FKFatura = f.IDFatura
+                 WHERE l.IDLancamento = :lid AND l.FKUsuario = :uid AND f.Status = 'aberta'"
+            )->execute([':lid' => $lancId, ':uid' => $uid]);
+            if ($faturaIdDel) {
+                cartao_sincronizarPreview($pdo, $faturaIdDel, $uid, $cartao);
+            }
+            $sucesso = 'Lançamento removido.';
         }
-        $sucesso = 'Lançamento removido.';
     }
 
     if ($action === 'editar_lancamento') {
-        $lancId  = trim($_POST['lancamento_id'] ?? '');
-        $desc    = trim($_POST['descricao'] ?? '');
-        $valorRaw = str_replace(['.', ','], ['', '.'], trim($_POST['valor'] ?? '0'));
-        $valor   = (float)$valorRaw;
-        $data    = trim($_POST['data_compra'] ?? '');
-        $catId   = trim($_POST['categoria_id'] ?? '') ?: null;
+        $lancId       = trim($_POST['lancamento_id'] ?? '');
+        $scope        = trim($_POST['scope'] ?? 'so_esta');
+        $grupo        = trim($_POST['grupo'] ?? '');
+        $parcelaAtual = (int)($_POST['parcela_atual'] ?? 0);
+        $desc         = trim($_POST['descricao'] ?? '');
+        $valorRaw     = str_replace(['.', ','], ['', '.'], trim($_POST['valor'] ?? '0'));
+        $valor        = (float)$valorRaw;
+        $data         = trim($_POST['data_compra'] ?? '');
+        $catId        = trim($_POST['categoria_id'] ?? '') ?: null;
 
         if ($lancId && $desc && $valor > 0 && $data) {
             $stmtFid = $pdo->prepare("SELECT FKFatura FROM LancamentoCartao WHERE IDLancamento = :lid AND FKUsuario = :uid");
             $stmtFid->execute([':lid' => $lancId, ':uid' => $uid]);
             $faturaIdEdit = $stmtFid->fetchColumn();
 
-            $pdo->prepare(
-                "UPDATE LancamentoCartao l
-                 JOIN FaturaCartao f ON l.FKFatura = f.IDFatura
-                 SET l.Descricao = :desc, l.Valor = :val, l.DataCompra = :data, l.FKCategoria = :cat
-                 WHERE l.IDLancamento = :lid AND l.FKUsuario = :uid AND f.Status = 'aberta'"
-            )->execute([':desc' => $desc, ':val' => $valor, ':data' => $data, ':cat' => $catId, ':lid' => $lancId, ':uid' => $uid]);
-
-            if ($faturaIdEdit) {
-                cartao_sincronizarPreview($pdo, $faturaIdEdit, $uid, $cartao);
+            if ($scope === 'futuras' && $grupo && $parcelaAtual > 0) {
+                $pdo->prepare(
+                    "UPDATE LancamentoCartao l
+                     JOIN FaturaCartao f ON l.FKFatura = f.IDFatura
+                     SET l.Descricao = :desc, l.Valor = :val, l.FKCategoria = :cat
+                     WHERE l.GrupoParcelamento = :grupo AND l.FKUsuario = :uid AND l.FKCartao = :cid
+                       AND l.ParcelaAtual >= :parc AND f.Status = 'aberta'"
+                )->execute([':desc' => $desc, ':val' => $valor, ':cat' => $catId,
+                            ':grupo' => $grupo, ':uid' => $uid, ':cid' => $cartaoId, ':parc' => $parcelaAtual]);
+                $stmtFats = $pdo->prepare("SELECT IDFatura FROM FaturaCartao WHERE FKCartao = :cid AND FKUsuario = :uid AND Status = 'aberta'");
+                $stmtFats->execute([':cid' => $cartaoId, ':uid' => $uid]);
+                foreach ($stmtFats->fetchAll(PDO::FETCH_COLUMN) as $fid) {
+                    cartao_sincronizarPreview($pdo, $fid, $uid, $cartao);
+                }
+                $sucesso = 'Parcelas futuras atualizadas.';
+            } else {
+                $pdo->prepare(
+                    "UPDATE LancamentoCartao l
+                     JOIN FaturaCartao f ON l.FKFatura = f.IDFatura
+                     SET l.Descricao = :desc, l.Valor = :val, l.DataCompra = :data, l.FKCategoria = :cat
+                     WHERE l.IDLancamento = :lid AND l.FKUsuario = :uid AND f.Status = 'aberta'"
+                )->execute([':desc' => $desc, ':val' => $valor, ':data' => $data, ':cat' => $catId,
+                            ':lid' => $lancId, ':uid' => $uid]);
+                if ($faturaIdEdit) {
+                    cartao_sincronizarPreview($pdo, $faturaIdEdit, $uid, $cartao);
+                }
+                $sucesso = 'Lançamento atualizado.';
             }
-            $sucesso = 'Lançamento atualizado.';
         }
     }
 
@@ -248,12 +286,20 @@ require_once '../geral/header.php';
                                         data-desc="<?= htmlspecialchars($l['Descricao']) ?>"
                                         data-valor="<?= number_format($l['Valor'], 2, ',', '.') ?>"
                                         data-data="<?= substr($l['DataCompra'], 0, 10) ?>"
-                                        data-cat="<?= htmlspecialchars($l['FKCategoria'] ?? '') ?>">
+                                        data-cat="<?= htmlspecialchars($l['FKCategoria'] ?? '') ?>"
+                                        data-grupo="<?= htmlspecialchars($l['GrupoParcelamento'] ?? '') ?>"
+                                        data-parcela-atual="<?= (int)($l['ParcelaAtual'] ?? 0) ?>"
+                                        data-total-parcelas="<?= (int)($l['TotalParcelas'] ?? 0) ?>"
+                                        data-is-parcelado="<?= ($l['TotalParcelas'] > 1) ? '1' : '0' ?>">
                                         <i class="bi bi-pencil" style="font-size:0.8rem;"></i>
                                     </button>
                                     <button class="btn btn-sm btn-link text-danger p-0 btn-excluir-lanc" title="Remover"
                                         data-id="<?= $l['IDLancamento'] ?>"
-                                        data-desc="<?= htmlspecialchars($l['Descricao']) ?>">
+                                        data-desc="<?= htmlspecialchars($l['Descricao']) ?>"
+                                        data-grupo="<?= htmlspecialchars($l['GrupoParcelamento'] ?? '') ?>"
+                                        data-parcela-atual="<?= (int)($l['ParcelaAtual'] ?? 0) ?>"
+                                        data-total-parcelas="<?= (int)($l['TotalParcelas'] ?? 0) ?>"
+                                        data-is-parcelado="<?= ($l['TotalParcelas'] > 1) ? '1' : '0' ?>">
                                         <i class="bi bi-trash3" style="font-size:0.8rem;"></i>
                                     </button>
                                 </td>
@@ -378,13 +424,31 @@ require_once '../geral/header.php';
             </div>
             <div class="modal-body px-4 py-3">
                 <p class="text-secondary mb-0">Deseja remover <strong class="text-light" id="excluirLancNome"></strong>?</p>
-                <p class="text-secondary small mt-1 mb-0">Esta ação não pode ser desfeita.</p>
+                <div id="excluirEscopoWrap" class="d-none mt-3 p-3 rounded-3" style="background:rgba(129,140,248,.06);border:1px solid rgba(129,140,248,.2);">
+                    <p class="text-secondary mb-2" style="font-size:0.82rem;">Esta é uma compra parcelada. O que deseja remover?</p>
+                    <div class="d-flex flex-column gap-2">
+                        <label class="d-flex align-items-center gap-2 text-light" style="cursor:pointer;font-size:0.875rem;">
+                            <input type="radio" name="scope_excluir" value="so_esta" checked style="accent-color:#818cf8;"
+                                onchange="document.getElementById('excluirLancScope').value=this.value">
+                            Somente esta parcela (<span id="excluirParcelaLabel">—</span>)
+                        </label>
+                        <label class="d-flex align-items-center gap-2 text-light" style="cursor:pointer;font-size:0.875rem;">
+                            <input type="radio" name="scope_excluir" value="futuras" style="accent-color:#818cf8;"
+                                onchange="document.getElementById('excluirLancScope').value=this.value">
+                            Esta e as parcelas futuras em aberto
+                        </label>
+                    </div>
+                </div>
+                <p class="text-secondary small mt-2 mb-0">Esta ação não pode ser desfeita.</p>
             </div>
             <div class="modal-footer border-secondary-subtle d-flex justify-content-between p-3">
                 <button type="button" class="btn btn-sm btn-link text-secondary text-decoration-none" data-bs-dismiss="modal">Cancelar</button>
                 <form method="POST">
                     <input type="hidden" name="action" value="excluir_lancamento">
                     <input type="hidden" name="lancamento_id" id="excluirLancId">
+                    <input type="hidden" name="scope" id="excluirLancScope" value="so_esta">
+                    <input type="hidden" name="grupo" id="excluirLancGrupo">
+                    <input type="hidden" name="parcela_atual" id="excluirLancParcelaAtual">
                     <button type="submit" class="btn btn-sm fw-bold rounded-pill px-4"
                         style="background:rgba(239,68,68,.2);color:#f87171;border:1px solid rgba(239,68,68,.4);">
                         <i class="bi bi-trash3 me-1"></i> Remover
@@ -402,6 +466,9 @@ require_once '../geral/header.php';
             <form method="POST">
                 <input type="hidden" name="action" value="editar_lancamento">
                 <input type="hidden" name="lancamento_id" id="editarLancId">
+                <input type="hidden" name="scope" id="editarLancScope" value="so_esta">
+                <input type="hidden" name="grupo" id="editarLancGrupo">
+                <input type="hidden" name="parcela_atual" id="editarLancParcelaAtual">
                 <div class="modal-header border-secondary-subtle px-4 py-3">
                     <h6 class="modal-title fw-bold text-light mb-0">Editar lançamento</h6>
                     <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
@@ -419,11 +486,14 @@ require_once '../geral/header.php';
                             class="form-control bg-transparent text-light border-secondary"
                             required inputmode="decimal">
                     </div>
-                    <div>
+                    <div id="editarDataWrap">
                         <label class="form-label text-secondary small">Data da compra</label>
                         <input type="date" name="data_compra" id="editarLancData"
                             class="form-control bg-transparent text-light border-secondary"
                             required>
+                        <p id="editarDataNote" class="d-none text-secondary mb-0 mt-1" style="font-size:0.75rem;">
+                            <i class="bi bi-info-circle me-1"></i>A data de cada parcela não será alterada.
+                        </p>
                     </div>
                     <div>
                         <label class="form-label text-secondary small">Categoria</label>
@@ -434,6 +504,21 @@ require_once '../geral/header.php';
                             <option value="<?= $cat['IDCategoria'] ?>"><?= htmlspecialchars($cat['NomeCategoria']) ?></option>
                             <?php endforeach; ?>
                         </select>
+                    </div>
+                    <div id="editarEscopoWrap" class="d-none p-3 rounded-3" style="background:rgba(129,140,248,.06);border:1px solid rgba(129,140,248,.2);">
+                        <p class="text-secondary mb-2" style="font-size:0.82rem;">Esta é uma compra parcelada. O que deseja editar?</p>
+                        <div class="d-flex flex-column gap-2">
+                            <label class="d-flex align-items-center gap-2 text-light" style="cursor:pointer;font-size:0.875rem;">
+                                <input type="radio" name="scope_editar" value="so_esta" checked style="accent-color:#818cf8;"
+                                    onchange="onScopeEditarChange(this.value)">
+                                Somente esta parcela (<span id="editarParcelaLabel">—</span>)
+                            </label>
+                            <label class="d-flex align-items-center gap-2 text-light" style="cursor:pointer;font-size:0.875rem;">
+                                <input type="radio" name="scope_editar" value="futuras" style="accent-color:#818cf8;"
+                                    onchange="onScopeEditarChange(this.value)">
+                                Esta e as parcelas futuras em aberto
+                            </label>
+                        </div>
                     </div>
                 </div>
                 <div class="modal-footer border-secondary-subtle d-flex justify-content-between p-3">
@@ -489,22 +574,61 @@ function toggleFatura(id) {
     ico.className    = vis ? 'bi bi-chevron-down text-secondary' : 'bi bi-chevron-up text-secondary';
 }
 
+function onScopeEditarChange(val) {
+    document.getElementById('editarLancScope').value = val;
+    const dataWrap = document.getElementById('editarDataWrap');
+    const dataNote = document.getElementById('editarDataNote');
+    if (val === 'futuras') {
+        dataWrap.style.opacity = '0.45';
+        dataNote.classList.remove('d-none');
+    } else {
+        dataWrap.style.opacity = '';
+        dataNote.classList.add('d-none');
+    }
+}
+
 document.addEventListener('click', function(e) {
     const btnEdit = e.target.closest('.btn-editar-lanc');
     if (btnEdit) {
         const d = btnEdit.dataset;
-        document.getElementById('editarLancId').value    = d.id;
-        document.getElementById('editarLancDesc').value  = d.desc;
-        document.getElementById('editarLancValor').value = d.valor;
-        document.getElementById('editarLancData').value  = d.data;
-        document.getElementById('editarLancCat').value   = d.cat || '';
+        document.getElementById('editarLancId').value          = d.id;
+        document.getElementById('editarLancDesc').value        = d.desc;
+        document.getElementById('editarLancValor').value       = d.valor;
+        document.getElementById('editarLancData').value        = d.data;
+        document.getElementById('editarLancCat').value         = d.cat || '';
+        document.getElementById('editarLancGrupo').value       = d.grupo || '';
+        document.getElementById('editarLancParcelaAtual').value = d.parcelaAtual || '';
+        document.getElementById('editarLancScope').value       = 'so_esta';
+        const temParcela = d.isParcelado === '1';
+        const escopoWrap = document.getElementById('editarEscopoWrap');
+        if (temParcela) {
+            escopoWrap.classList.remove('d-none');
+            document.getElementById('editarParcelaLabel').textContent = (d.parcelaAtual || '?') + '/' + (d.totalParcelas || '?');
+            document.querySelector('input[name="scope_editar"][value="so_esta"]').checked = true;
+        } else {
+            escopoWrap.classList.add('d-none');
+        }
+        onScopeEditarChange('so_esta');
         bsModal('modalEditarLanc').show();
         return;
     }
     const btnDel = e.target.closest('.btn-excluir-lanc');
     if (btnDel) {
-        document.getElementById('excluirLancId').value         = btnDel.dataset.id;
-        document.getElementById('excluirLancNome').textContent = btnDel.dataset.desc;
+        const d = btnDel.dataset;
+        document.getElementById('excluirLancId').value           = d.id;
+        document.getElementById('excluirLancNome').textContent   = d.desc;
+        document.getElementById('excluirLancGrupo').value        = d.grupo || '';
+        document.getElementById('excluirLancParcelaAtual').value = d.parcelaAtual || '';
+        document.getElementById('excluirLancScope').value        = 'so_esta';
+        const temParcelaExcluir = d.isParcelado === '1';
+        const excluirWrap = document.getElementById('excluirEscopoWrap');
+        if (temParcelaExcluir) {
+            excluirWrap.classList.remove('d-none');
+            document.getElementById('excluirParcelaLabel').textContent = (d.parcelaAtual || '?') + '/' + (d.totalParcelas || '?');
+            document.querySelector('input[name="scope_excluir"][value="so_esta"]').checked = true;
+        } else {
+            excluirWrap.classList.add('d-none');
+        }
         bsModal('modalExcluirLanc').show();
         return;
     }
