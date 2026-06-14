@@ -401,6 +401,37 @@ if ($carteira_selecionada) {
 }
 
 
+// ── Cartões de crédito: faturas abertas para exibir no painel ────────────
+$faturasAbertasDash = [];
+try {
+    $stmtFC = $pdo->prepare("
+        SELECT f.IDFatura, f.FKCartao, f.MesReferencia, f.DataFechamento, f.DataVencimento,
+               c.Nome AS NomeCartao, c.Bandeira, c.Cor, c.IDCartao,
+               COALESCE(SUM(l.Valor), 0) AS TotalAcumulado
+        FROM FaturaCartao f
+        JOIN CartaoCredito c ON f.FKCartao = c.IDCartao
+        LEFT JOIN LancamentoCartao l ON l.FKFatura = f.IDFatura
+        WHERE f.FKUsuario = :uid AND f.Status = 'aberta'
+        GROUP BY f.IDFatura, f.FKCartao, f.MesReferencia, f.DataFechamento, f.DataVencimento,
+                 c.Nome, c.Bandeira, c.Cor, c.IDCartao
+        ORDER BY f.DataFechamento ASC
+    ");
+    $stmtFC->execute([':uid' => $usuario_id]);
+    $faturasAbertasDash = $stmtFC->fetchAll(PDO::FETCH_ASSOC);
+} catch (PDOException $e) {}
+
+// Remove Registros de preview de CC da lista de transações (não são transações reais)
+try {
+    $stmtPv = $pdo->prepare(
+        "SELECT FKRegistroPreview FROM FaturaCartao WHERE FKUsuario = :uid AND FKRegistroPreview IS NOT NULL"
+    );
+    $stmtPv->execute([':uid' => $usuario_id]);
+    $idsPreview = array_column($stmtPv->fetchAll(PDO::FETCH_ASSOC), 'FKRegistroPreview');
+    if (!empty($idsPreview)) {
+        $transacoes = array_values(array_filter($transacoes, fn($t) => !in_array($t['IDRegistro'], $idsPreview)));
+    }
+} catch (PDOException $e) {}
+
 // ── Verifica se assinatura ainda está válida (1x por sessão) ────────────
 verificarExpiracao($pdo);
 
@@ -725,6 +756,82 @@ require_once 'geral/header.php';
                     </div>
                 </div>
             </div>
+        <?php endif; ?>
+
+        <?php if (!empty($faturasAbertasDash)): ?>
+        <!-- ── Seção de Cartões de Crédito ───────────────────────────────── -->
+        <div class="d-flex align-items-center justify-content-between mb-3 mt-4">
+            <h4 class="fw-bold text-light mb-0">
+                <i class="bi bi-credit-card-2-front me-2" style="color: var(--primary-gold-analysis);"></i>
+                Cartões de Crédito
+            </h4>
+            <a href="cartao_credito/index.php" class="btn btn-sm btn-outline-secondary rounded-pill px-3 d-flex align-items-center gap-1" style="font-size:0.8rem;">
+                <i class="bi bi-gear"></i> <span class="d-none d-sm-inline">Gerenciar</span>
+            </a>
+        </div>
+
+        <div class="row g-3 mb-4">
+            <?php foreach ($faturasAbertasDash as $fat):
+                $corCartao  = htmlspecialchars($fat['Cor'] ?? '#7c3aed');
+                $dataFech   = (!empty($fat['DataFechamento']) && $fat['DataFechamento'] !== '0000-00-00')
+                               ? date('d/m/Y', strtotime($fat['DataFechamento'])) : '—';
+                $dataVenc   = (!empty($fat['DataVencimento']) && $fat['DataVencimento'] !== '0000-00-00')
+                               ? date('d/m/Y', strtotime($fat['DataVencimento'])) : '—';
+                $totalFat   = (float)$fat['TotalAcumulado'];
+                $bandeira   = ucfirst($fat['Bandeira'] ?? 'Cartão');
+            ?>
+            <div class="col-12 col-sm-6 col-xl-4">
+                <a href="cartao_credito/fatura.php?cartao=<?php echo urlencode($fat['IDCartao']) ?>"
+                   class="text-decoration-none d-block h-100">
+                    <div class="h-100 rounded-4 shadow-sm cc-dash-card"
+                         style="background:#161820; border:1px solid #2a2d38; border-left:3px solid <?php echo $corCartao ?> !important; transition:all .18s;">
+                        <div class="p-3">
+                            <!-- Cabeçalho do cartão -->
+                            <div class="d-flex align-items-start justify-content-between mb-3">
+                                <div class="d-flex align-items-center gap-2">
+                                    <div class="d-flex align-items-center justify-content-center rounded-3 flex-shrink-0"
+                                         style="width:36px;height:36px;background:<?php echo $corCartao ?>22;">
+                                        <i class="bi bi-credit-card-2-front" style="color:<?php echo $corCartao ?>;font-size:1rem;"></i>
+                                    </div>
+                                    <div>
+                                        <div class="fw-bold text-light lh-1" style="font-size:0.9rem;"><?php echo htmlspecialchars($fat['NomeCartao']) ?></div>
+                                        <div class="text-secondary mt-1" style="font-size:0.7rem;"><?php echo $bandeira ?></div>
+                                    </div>
+                                </div>
+                                <span class="flex-shrink-0" style="display:inline-flex;align-items:center;background:#22c55e18;color:#22c55e;border:1px solid #22c55e33;border-radius:999px;padding:2px 8px;font-size:0.62rem;font-weight:700;letter-spacing:.03em;">
+                                    ● ABERTA
+                                </span>
+                            </div>
+
+                            <!-- Datas + total -->
+                            <div class="d-flex align-items-end justify-content-between">
+                                <div>
+                                    <div class="text-secondary mb-1" style="font-size:0.68rem;">
+                                        <i class="bi bi-lock me-1" style="font-size:0.6rem;"></i>Fecha <?php echo $dataFech ?>
+                                    </div>
+                                    <div class="text-secondary" style="font-size:0.68rem;">
+                                        <i class="bi bi-calendar-check me-1" style="font-size:0.6rem;"></i>Vence <?php echo $dataVenc ?>
+                                    </div>
+                                </div>
+                                <div class="text-end">
+                                    <div class="text-secondary mb-1" style="font-size:0.62rem;">Total acumulado</div>
+                                    <div class="fw-bold <?php echo $totalFat > 0 ? 'text-danger' : 'text-secondary' ?>" style="font-size:1.05rem;">
+                                        R$ <?php echo number_format($totalFat, 2, ',', '.') ?>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <!-- Rodapé -->
+                            <div class="mt-2 pt-2 d-flex align-items-center gap-1" style="border-top:1px solid #2a2d38;color:#6c757d;font-size:0.72rem;">
+                                <i class="bi bi-arrow-right-circle" style="font-size:0.75rem;"></i>
+                                Ver fatura completa
+                            </div>
+                        </div>
+                    </div>
+                </a>
+            </div>
+            <?php endforeach; ?>
+        </div>
         <?php endif; ?>
 
         <h4 class="fw-bold text-light mb-3 mt-4">Transações de <?php echo $nome_mes ?></h4>
@@ -1231,6 +1338,13 @@ require_once 'geral/header.php';
 
     .auralis-table>tbody>tr.cursor-pointer:hover>td {
         background-color: rgba(255, 255, 255, 0.03) !important;
+    }
+
+    .cc-dash-card:hover {
+        background: #1c1f2b !important;
+        border-color: #3a3d4e !important;
+        transform: translateY(-2px);
+        box-shadow: 0 6px 20px rgba(0,0,0,0.4) !important;
     }
 
     .table-active {
