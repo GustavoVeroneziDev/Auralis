@@ -150,7 +150,7 @@ require_once '../geral/header.php';
                     <div class="col-12 col-md-3">
                         <label class="form-label text-secondary small">Código *</label>
                         <input type="text" name="codigo" required maxlength="50"
-                               placeholder="COMEÇANDOBEM"
+                               placeholder="EX: COMEÇANDOBEM"
                                class="form-control rounded-3 fw-bold"
                                style="background:#111318;border:1px solid #374151;color:#d4af37;letter-spacing:.06em;text-transform:uppercase;"
                                oninput="this.value=this.value.toUpperCase()">
