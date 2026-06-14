@@ -208,6 +208,7 @@ require_once '../geral/header.php';
             </h5>
             <div class="table-responsive">
                 <table class="table table-dark table-borderless align-middle mb-0" style="font-size:0.84rem;">
+                    <?php $baseUrl = (isset($_SERVER['HTTPS']) && $_SERVER['HTTPS'] === 'on' ? 'https' : 'http') . '://' . $_SERVER['HTTP_HOST']; ?>
                     <thead>
                         <tr style="border-bottom:1px solid #374151;">
                             <th class="text-secondary fw-semibold">Código</th>
@@ -217,11 +218,14 @@ require_once '../geral/header.php';
                             <th class="text-secondary fw-semibold text-center">Usos</th>
                             <th class="text-secondary fw-semibold text-center">Expira</th>
                             <th class="text-secondary fw-semibold text-center">Status</th>
-                            <th style="width:80px;"></th>
+                            <th class="text-secondary fw-semibold text-center">Link</th>
+                            <th style="width:44px;"></th>
                         </tr>
                     </thead>
                     <tbody>
-                    <?php foreach ($codigos as $c): ?>
+                    <?php foreach ($codigos as $c):
+                        $linkCodigo = $baseUrl . '/resgatar.php?codigo=' . urlencode($c['Codigo']);
+                    ?>
                     <tr style="border-bottom:1px solid #1f2937;">
                         <td>
                             <span class="fw-bold" style="color:#d4af37;letter-spacing:.06em;"><?= htmlspecialchars($c['Codigo']) ?></span>
@@ -259,6 +263,15 @@ require_once '../geral/header.php';
                             </form>
                         </td>
                         <td class="text-center">
+                            <button type="button"
+                                    onclick="copiarLink('<?= htmlspecialchars($linkCodigo, ENT_QUOTES) ?>', this)"
+                                    class="btn btn-sm rounded-pill px-2"
+                                    style="background:rgba(99,102,241,.12);color:#818cf8;border:1px solid rgba(99,102,241,.3);font-size:.72rem;white-space:nowrap;"
+                                    title="<?= htmlspecialchars($linkCodigo) ?>">
+                                <i class="bi bi-link-45deg me-1"></i>Copiar
+                            </button>
+                        </td>
+                        <td class="text-center">
                             <form method="POST" class="d-inline"
                                   onsubmit="return confirm('Excluir o código <?= htmlspecialchars($c['Codigo'], ENT_QUOTES) ?>?')">
                                 <input type="hidden" name="action" value="excluir">
@@ -281,4 +294,21 @@ require_once '../geral/header.php';
 
 </main>
 
+<script>
+function copiarLink(url, btn) {
+    navigator.clipboard.writeText(url).then(function() {
+        const orig = btn.innerHTML;
+        btn.innerHTML = '<i class="bi bi-check-lg me-1"></i>Copiado!';
+        btn.style.color = '#4ade80';
+        btn.style.borderColor = 'rgba(22,163,74,.4)';
+        btn.style.background  = 'rgba(22,163,74,.12)';
+        setTimeout(function() {
+            btn.innerHTML = orig;
+            btn.style.color = '#818cf8';
+            btn.style.borderColor = 'rgba(99,102,241,.3)';
+            btn.style.background  = 'rgba(99,102,241,.12)';
+        }, 2000);
+    });
+}
+</script>
 <?php require_once '../geral/footer.php'; ?>

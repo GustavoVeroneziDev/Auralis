@@ -13,6 +13,8 @@ $erro      = null;
 $sucesso   = null;
 $pageTitle = 'Resgatar Código — Auralis';
 
+$codigoGet = strtoupper(trim($_GET['codigo'] ?? ''));
+
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $codigo = strtoupper(trim($_POST['codigo'] ?? ''));
 
@@ -160,7 +162,7 @@ require_once 'geral/header.php';
                            class="form-control form-control-lg text-center fw-bold bg-transparent text-light border-secondary rounded-3"
                            style="letter-spacing:.12em;font-size:1.1rem;"
                            placeholder="EX: COMEÇANDOBEM"
-                           value="<?= htmlspecialchars(strtoupper($_POST['codigo'] ?? '')) ?>"
+                           value="<?= htmlspecialchars($_POST['codigo'] ?? $codigoGet) ?>"
                            autocomplete="off" autofocus maxlength="50">
                 </div>
                 <button type="submit" class="btn w-100 rounded-pill fw-bold py-2"
