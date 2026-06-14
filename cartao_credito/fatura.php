@@ -43,12 +43,20 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
     if ($action === 'excluir_lancamento') {
         $lancId = trim($_POST['lancamento_id'] ?? '');
-        // Só permite excluir de faturas abertas
+        // Captura a fatura antes de deletar
+        $stmtFid = $pdo->prepare("SELECT FKFatura FROM LancamentoCartao WHERE IDLancamento = :lid AND FKUsuario = :uid");
+        $stmtFid->execute([':lid' => $lancId, ':uid' => $uid]);
+        $faturaIdDel = $stmtFid->fetchColumn();
+
         $pdo->prepare(
             "DELETE l FROM LancamentoCartao l
              JOIN FaturaCartao f ON l.FKFatura = f.IDFatura
              WHERE l.IDLancamento = :lid AND l.FKUsuario = :uid AND f.Status = 'aberta'"
         )->execute([':lid' => $lancId, ':uid' => $uid]);
+
+        if ($faturaIdDel) {
+            cartao_sincronizarPreview($pdo, $faturaIdDel, $uid, $cartao);
+        }
         $sucesso = 'Lançamento removido.';
     }
 

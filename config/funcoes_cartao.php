@@ -115,7 +115,79 @@ function cartao_obterFaturaParaMesRef(PDO $pdo, string $cartaoId, string $uid, a
 }
 
 /**
- * Fecha uma fatura: congela valor, cria lembrete de pagamento e abre próxima.
+ * Mantém um Registro pendente de "preview" para a fatura aberta.
+ * Criado/atualizado após cada lançamento; deletado quando a fatura fecha.
+ * Requer coluna FKRegistroPreview em FaturaCartao (alter_cartoes_v2.sql).
+ */
+function cartao_sincronizarPreview(PDO $pdo, string $faturaId, string $uid, array $cartao): void
+{
+    if (empty($cartao['FKCarteiraDebito'])) return;
+
+    try {
+        $stmtF = $pdo->prepare("SELECT * FROM FaturaCartao WHERE IDFatura = :id AND FKUsuario = :uid AND Status = 'aberta'");
+        $stmtF->execute([':id' => $faturaId, ':uid' => $uid]);
+        $fatura = $stmtF->fetch(PDO::FETCH_ASSOC);
+        if (!$fatura) return;
+
+        $stmtT = $pdo->prepare("SELECT COALESCE(SUM(Valor), 0) FROM LancamentoCartao WHERE FKFatura = :fid");
+        $stmtT->execute([':fid' => $faturaId]);
+        $total = (float)$stmtT->fetchColumn();
+
+        $desc = 'Fatura ' . $cartao['Nome'];
+        $dataRef = $fatura['DataFechamento'];
+        $dataVenc = $fatura['DataVencimento'];
+
+        if ($total <= 0) {
+            // Sem lançamentos: remove o preview se existia
+            if (!empty($fatura['FKRegistroPreview'])) {
+                $pdo->prepare("DELETE FROM Registro WHERE IDRegistro = :rid AND FKUsuario = :uid")
+                    ->execute([':rid' => $fatura['FKRegistroPreview'], ':uid' => $uid]);
+                $pdo->prepare("UPDATE FaturaCartao SET FKRegistroPreview = NULL WHERE IDFatura = :fid")
+                    ->execute([':fid' => $faturaId]);
+            }
+            return;
+        }
+
+        if (!empty($fatura['FKRegistroPreview'])) {
+            // Atualiza preview existente
+            $pdo->prepare(
+                "UPDATE Registro SET Valor = :v, Descricao = :d, MomentoRegistro = :m, DataVencimento = :dv
+                 WHERE IDRegistro = :id AND FKUsuario = :uid"
+            )->execute([
+                ':v'   => $total,
+                ':d'   => $desc,
+                ':m'   => $dataRef,
+                ':dv'  => $dataVenc,
+                ':id'  => $fatura['FKRegistroPreview'],
+                ':uid' => $uid,
+            ]);
+        } else {
+            // Cria preview novo
+            $rid = gerarUuid();
+            $pdo->prepare(
+                "INSERT INTO Registro
+                     (IDRegistro, TipoRegistro, Valor, Descricao, MomentoRegistro, DataVencimento,
+                      StatusRegistro, Recorrente, FKCarteira, FKUsuario)
+                 VALUES (:id, 'despesa', :v, :d, :m, :dv, 'pendente', 0, :cart, :uid)"
+            )->execute([
+                ':id'   => $rid,
+                ':v'    => $total,
+                ':d'    => $desc,
+                ':m'    => $dataRef,
+                ':dv'   => $dataVenc,
+                ':cart' => $cartao['FKCarteiraDebito'],
+                ':uid'  => $uid,
+            ]);
+            $pdo->prepare("UPDATE FaturaCartao SET FKRegistroPreview = :rid WHERE IDFatura = :fid")
+                ->execute([':rid' => $rid, ':fid' => $faturaId]);
+        }
+    } catch (PDOException $e) {
+        // Silencia caso a coluna ainda não exista (antes do alter_cartoes_v2.sql)
+    }
+}
+
+/**
+ * Fecha uma fatura: congela valor, remove preview, cria lembrete de pagamento e abre próxima.
  */
 function cartao_fecharFatura(PDO $pdo, array $fatura, string $uid): void
 {
@@ -123,6 +195,14 @@ function cartao_fecharFatura(PDO $pdo, array $fatura, string $uid): void
     $stmt = $pdo->prepare("SELECT COALESCE(SUM(Valor), 0) FROM LancamentoCartao WHERE FKFatura = :id");
     $stmt->execute([':id' => $fatura['IDFatura']]);
     $total = (float)$stmt->fetchColumn();
+
+    // Remove o Registro de preview (será substituído pelo de pagamento real)
+    if (!empty($fatura['FKRegistroPreview'])) {
+        $pdo->prepare("DELETE FROM Registro WHERE IDRegistro = :rid AND FKUsuario = :uid")
+            ->execute([':rid' => $fatura['FKRegistroPreview'], ':uid' => $uid]);
+        $pdo->prepare("UPDATE FaturaCartao SET FKRegistroPreview = NULL WHERE IDFatura = :fid")
+            ->execute([':fid' => $fatura['IDFatura']]);
+    }
 
     // Fecha a fatura
     $pdo->prepare("UPDATE FaturaCartao SET Status = 'fechada', ValorTotal = :t WHERE IDFatura = :id")
@@ -137,13 +217,13 @@ function cartao_fecharFatura(PDO $pdo, array $fatura, string $uid): void
                   StatusRegistro, Recorrente, FKCarteira, FKUsuario)
              VALUES (:id, 'despesa', :val, :desc, :momento, :venc, 'pendente', 0, :cart, :uid)"
         )->execute([
-            ':id'     => $rid,
-            ':val'    => $total,
-            ':desc'   => 'Fatura ' . ($fatura['NomeCartao'] ?? 'Cartão'),
+            ':id'      => $rid,
+            ':val'     => $total,
+            ':desc'    => 'Fatura ' . ($fatura['NomeCartao'] ?? 'Cartão'),
             ':momento' => $fatura['DataVencimento'],
-            ':venc'   => $fatura['DataVencimento'],
-            ':cart'   => $fatura['FKCarteiraDebito'],
-            ':uid'    => $uid,
+            ':venc'    => $fatura['DataVencimento'],
+            ':cart'    => $fatura['FKCarteiraDebito'],
+            ':uid'     => $uid,
         ]);
         $pdo->prepare("UPDATE FaturaCartao SET FKRegistroPagamento = :rid WHERE IDFatura = :id")
             ->execute([':rid' => $rid, ':id' => $fatura['IDFatura']]);

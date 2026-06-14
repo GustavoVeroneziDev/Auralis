@@ -193,6 +193,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && trim($_POST['tipo_registro'] ?? '')
                 ':parc'  => ($numParcelas > 1) ? ($i + 1) : null,
                 ':tot'   => ($numParcelas > 1) ? $numParcelas : null,
             ]);
+            cartao_sincronizarPreview($pdo, $fatura['IDFatura'], $usuario_id, $cartao);
         }
         header("Location: " . $_urlVoltar . (strpos($_urlVoltar, '?') !== false ? '&' : '?') . "sucesso=registro");
         exit;
