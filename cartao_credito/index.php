@@ -120,14 +120,17 @@ $dadosCartoes = [];
 foreach ($cartoes as $c) {
     try {
         $fatura  = cartao_obterFaturaAberta($pdo, $c['IDCartao'], $uid, $c);
-        $total   = cartao_totalFaturaAberta($pdo, $c['IDCartao'], $uid);
+        // Total apenas da fatura atual (não de parcelas futuras)
+        $stmtTot = $pdo->prepare("SELECT COALESCE(SUM(Valor), 0) FROM LancamentoCartao WHERE FKFatura = :fid");
+        $stmtTot->execute([':fid' => $fatura['IDFatura']]);
+        $total   = (float)$stmtTot->fetchColumn();
         $diasAte = (new DateTime())->diff(new DateTime($fatura['DataFechamento']))->days;
         $jaFechou = (new DateTime('today')) > (new DateTime($fatura['DataFechamento']));
         $dadosCartoes[$c['IDCartao']] = [
             'fatura'   => $fatura,
             'total'    => $total,
             'diasAte'  => $jaFechou ? 0 : $diasAte,
-            'pct'      => $c['Limite'] ? min(100, round(($total / $c['Limite']) * 100)) : null,
+            'pct'      => $c['Limite'] ? round(($total / $c['Limite']) * 100) : null,
         ];
     } catch (Exception $e) {
         $dadosCartoes[$c['IDCartao']] = ['fatura'=>null,'total'=>0,'diasAte'=>null,'pct'=>null];
@@ -202,14 +205,23 @@ require_once '../geral/header.php';
                                 R$ <?= number_format($d['total'], 2, ',', '.') ?>
                             </p>
                             <?php if ($c['Limite']): ?>
+                                <?php $excedido = $d['pct'] !== null && $d['pct'] > 100; ?>
                                 <div class="mt-2">
-                                    <div class="d-flex justify-content-between small text-secondary mb-1">
-                                        <span>Usado</span>
-                                        <span><?= $d['pct'] ?>% de R$ <?= number_format($c['Limite'], 2, ',', '.') ?></span>
+                                    <div class="d-flex justify-content-between small mb-1" style="color:<?= $excedido ? '#fca5a5' : '' ?>">
+                                        <span class="text-secondary">Usado</span>
+                                        <span>
+                                            <?= $d['pct'] ?>% de R$ <?= number_format($c['Limite'], 2, ',', '.') ?>
+                                            <?php if ($excedido): ?>
+                                                <i class="bi bi-exclamation-triangle-fill ms-1" style="color:#ef4444;" title="Limite excedido"></i>
+                                            <?php endif; ?>
+                                        </span>
                                     </div>
                                     <div class="progress rounded-pill" style="height:5px;background:rgba(255,255,255,.08);">
-                                        <div class="progress-bar rounded-pill" style="width:<?= $d['pct'] ?>%;background:<?= $cor ?>;"></div>
+                                        <div class="progress-bar rounded-pill" style="width:<?= min(100, $d['pct']) ?>%;background:<?= $excedido ? '#ef4444' : $cor ?>;"></div>
                                     </div>
+                                    <?php if ($excedido): ?>
+                                        <p class="mb-0 mt-1" style="font-size:.7rem;color:#fca5a5;">Limite excedido</p>
+                                    <?php endif; ?>
                                 </div>
                             <?php endif; ?>
                         </div>
