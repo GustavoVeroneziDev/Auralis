@@ -66,12 +66,17 @@ function _cc_datasParaMesRef(int $diaFech, int $diaVenc, string $mesRef): array
  */
 function _cc_mesRefAtual(int $diaFech, int $diaVenc): string
 {
-    $hoje    = new DateTime('today');
-    $diaHoje = (int)$hoje->format('j');
+    $hoje      = new DateTime('today');
+    $diaHoje   = (int)$hoje->format('j');
+    $mesAtual  = (int)$hoje->format('n');
+    $anoAtual  = (int)$hoje->format('Y');
+
+    // Dia de fechamento efetivo no mês atual (29/30/31 vira último dia do mês)
+    $diaFechEfetivo = min($diaFech, _cc_diasNoMes($mesAtual, $anoAtual));
 
     // Mês onde o PRÓXIMO fechamento vai ocorrer
     $mesFech = clone $hoje;
-    if ($diaHoje > $diaFech) {
+    if ($diaHoje > $diaFechEfetivo) {
         $mesFech->modify('+1 month');
     }
 

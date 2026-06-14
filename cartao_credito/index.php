@@ -38,8 +38,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                        ? $_POST['bandeira'] : 'outro';
         $cor         = preg_match('/^#[0-9a-fA-F]{6}$/', $_POST['cor'] ?? '') ? $_POST['cor'] : '#7c3aed';
         $limite      = is_numeric($_POST['limite'] ?? '') ? (float)$_POST['limite'] : null;
-        $diaFech     = max(1, min(28, (int)($_POST['dia_fechamento'] ?? 1)));
-        $diaVenc     = max(1, min(28, (int)($_POST['dia_vencimento'] ?? 10)));
+        $diaFech     = max(1, min(31, (int)($_POST['dia_fechamento'] ?? 1)));
+        $diaVenc     = max(1, min(31, (int)($_POST['dia_vencimento'] ?? 10)));
         $carteiraDb  = trim($_POST['carteira_debito'] ?? '') ?: null;
 
         if (empty($nome)) {
@@ -125,7 +125,7 @@ foreach ($cartoes as $c) {
         $stmtTot->execute([':fid' => $fatura['IDFatura']]);
         $total   = (float)$stmtTot->fetchColumn();
         $diasAte = (new DateTime())->diff(new DateTime($fatura['DataFechamento']))->days;
-        $jaFechou = (new DateTime('today')) > (new DateTime($fatura['DataFechamento']));
+        $jaFechou = new DateTime('today') > new DateTime($fatura['DataFechamento']);
         $dadosCartoes[$c['IDCartao']] = [
             'fatura'   => $fatura,
             'total'    => $total,
@@ -315,13 +315,13 @@ require_once '../geral/header.php';
                     <div class="row g-2">
                         <div class="col-6">
                             <label class="form-label text-secondary small">Dia de fechamento</label>
-                            <input type="number" name="dia_fechamento" id="mc_fech" class="form-control bg-transparent text-light border-secondary" min="1" max="28" value="1" required>
-                            <div class="form-text text-secondary" style="font-size:0.7rem;">Entre 1 e 28</div>
+                            <input type="number" name="dia_fechamento" id="mc_fech" class="form-control bg-transparent text-light border-secondary" min="1" max="31" value="1" required>
+                            <div class="form-text text-secondary" style="font-size:0.7rem;">Entre 1 e 31</div>
                         </div>
                         <div class="col-6">
                             <label class="form-label text-secondary small">Dia de vencimento</label>
-                            <input type="number" name="dia_vencimento" id="mc_venc" class="form-control bg-transparent text-light border-secondary" min="1" max="28" value="10" required>
-                            <div class="form-text text-secondary" style="font-size:0.7rem;">Entre 1 e 28</div>
+                            <input type="number" name="dia_vencimento" id="mc_venc" class="form-control bg-transparent text-light border-secondary" min="1" max="31" value="10" required>
+                            <div class="form-text text-secondary" style="font-size:0.7rem;">Entre 1 e 31</div>
                         </div>
                     </div>
                     <div id="mc_aviso_datas" class="alert alert-warning py-1 px-2 d-none" style="font-size:0.75rem;">
