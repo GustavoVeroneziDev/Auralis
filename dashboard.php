@@ -415,10 +415,18 @@ try {
         FROM FaturaCartao f
         JOIN CartaoCredito c ON f.FKCartao = c.IDCartao
         LEFT JOIN LancamentoCartao l ON l.FKFatura = f.IDFatura
-        WHERE f.FKUsuario = :uid AND f.Status = 'aberta'
+        WHERE f.FKUsuario = :uid
+          AND f.Status = 'aberta'
+          AND f.DataFechamento = (
+              SELECT MIN(f2.DataFechamento)
+              FROM FaturaCartao f2
+              WHERE f2.FKCartao = f.FKCartao
+                AND f2.FKUsuario = f.FKUsuario
+                AND f2.Status = 'aberta'
+          )
         GROUP BY f.IDFatura, f.FKCartao, f.MesReferencia, f.DataFechamento, f.DataVencimento,
                  c.Nome, c.Bandeira, c.Cor, c.IDCartao
-        ORDER BY f.DataFechamento ASC
+        ORDER BY c.Nome ASC
     ");
     $stmtFC->execute([':uid' => $usuario_id]);
     $faturasAbertasDash = $stmtFC->fetchAll(PDO::FETCH_ASSOC);
@@ -785,7 +793,7 @@ require_once 'geral/header.php';
                 $bandeira   = ucfirst($fat['Bandeira'] ?? 'Cartão');
             ?>
             <div class="col-12 col-sm-6 col-xl-4">
-                <a href="cartao_credito/fatura.php?cartao=<?php echo urlencode($fat['IDCartao']) ?>"
+                <a href="/cartao_credito/fatura.php?cartao=<?php echo urlencode($fat['IDCartao']) ?>"
                    class="text-decoration-none d-block h-100">
                     <div class="h-100 rounded-4 shadow-sm cc-dash-card"
                          style="background:#161820; border:1px solid #2a2d38; border-left:3px solid <?php echo $corCartao ?> !important; transition:all .18s;">
