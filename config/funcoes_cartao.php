@@ -14,41 +14,74 @@ function _cc_diasNoMes(int $mes, int $ano): int
 }
 
 /**
- * Dado um MesReferencia (YYYY-MM = mês do vencimento), calcula as datas da fatura.
- * DataFechamento = mês anterior ao MesReferencia, dia DiaFechamento
- * DataVencimento = MesReferencia, dia DiaVencimento
+ * Calcula DataFechamento e DataVencimento para um MesReferencia dado.
+ *
+ * Dois casos possíveis:
+ *  a) diaVenc >= diaFech → fechamento e vencimento ficam no MESMO mês (ex: fecha dia 5, vence dia 10)
+ *     DataFechamento = MesRef, diaFech
+ *     DataVencimento = MesRef, diaVenc
+ *
+ *  b) diaVenc < diaFech → fechamento no mês ANTERIOR ao vencimento (ex: fecha dia 25, vence dia 3)
+ *     DataFechamento = MesRef - 1 mês, diaFech
+ *     DataVencimento = MesRef, diaVenc
  */
 function _cc_datasParaMesRef(int $diaFech, int $diaVenc, string $mesRef): array
 {
     [$ano, $mes] = array_map('intval', explode('-', $mesRef));
 
-    // Vencimento: dentro do MesReferencia
     $diaVencCapped = min($diaVenc, _cc_diasNoMes($mes, $ano));
     $vencimento    = sprintf('%04d-%02d-%02d', $ano, $mes, $diaVencCapped);
 
-    // Fechamento: mês anterior
-    $dtPrev = new DateTime("$ano-" . str_pad($mes, 2, '0', STR_PAD_LEFT) . "-01");
-    $dtPrev->modify('-1 month');
-    $anoPrev = (int)$dtPrev->format('Y');
-    $mesPrev = (int)$dtPrev->format('n');
-    $diaFechCapped = min($diaFech, _cc_diasNoMes($mesPrev, $anoPrev));
-    $fechamento    = sprintf('%04d-%02d-%02d', $anoPrev, $mesPrev, $diaFechCapped);
+    if ($diaVenc >= $diaFech) {
+        // Fechamento no MESMO mês do vencimento
+        $diaFechCapped = min($diaFech, _cc_diasNoMes($mes, $ano));
+        $fechamento    = sprintf('%04d-%02d-%02d', $ano, $mes, $diaFechCapped);
+    } else {
+        // Fechamento no mês ANTERIOR ao vencimento
+        $dtPrev    = new DateTime("$ano-" . str_pad($mes, 2, '0', STR_PAD_LEFT) . "-01");
+        $dtPrev->modify('-1 month');
+        $anoPrev   = (int)$dtPrev->format('Y');
+        $mesPrev   = (int)$dtPrev->format('n');
+        $diaFechCapped = min($diaFech, _cc_diasNoMes($mesPrev, $anoPrev));
+        $fechamento    = sprintf('%04d-%02d-%02d', $anoPrev, $mesPrev, $diaFechCapped);
+    }
 
     return ['fechamento' => $fechamento, 'vencimento' => $vencimento];
 }
 
 /**
- * Retorna o MesReferencia (YYYY-MM) da fatura aberta atual para um dado DiaFechamento.
- * Se hoje <= DiaFechamento → fatura fecha este mês → vence mês que vem → MesRef = próx. mês
- * Se hoje >  DiaFechamento → fatura fecha mês que vem → vence daqui 2 meses → MesRef = +2 meses
+ * Retorna o MesReferencia (YYYY-MM) da fatura aberta atual.
+ *
+ * Regra: encontra o PRÓXIMO DataFechamento a partir de hoje, depois determina
+ * o MesRef conforme a relação entre DiaFech e DiaVenc:
+ *
+ *  diaVenc >= diaFech → vencimento no MESMO mês do fechamento → MesRef = mês do fechamento
+ *  diaVenc <  diaFech → vencimento no MÊS SEGUINTE ao fechamento → MesRef = mês do fechamento + 1
+ *
+ * Exemplos (diaFech=5, diaVenc=10, hoje=14/06):
+ *   → próximo fechamento = 05/07 → diaVenc(10) >= diaFech(5) → MesRef = 2026-07
+ *
+ * Exemplos (diaFech=25, diaVenc=3, hoje=14/06):
+ *   → próximo fechamento = 25/06 → diaVenc(3) < diaFech(25) → MesRef = 2026-07
  */
-function _cc_mesRefAtual(int $diaFech): string
+function _cc_mesRefAtual(int $diaFech, int $diaVenc): string
 {
     $hoje    = new DateTime('today');
     $diaHoje = (int)$hoje->format('j');
-    $offset  = ($diaHoje <= $diaFech) ? '+1 month' : '+2 months';
-    $hoje->modify($offset);
-    return $hoje->format('Y-m');
+
+    // Mês onde o PRÓXIMO fechamento vai ocorrer
+    $mesFech = clone $hoje;
+    if ($diaHoje > $diaFech) {
+        $mesFech->modify('+1 month');
+    }
+
+    // MesRef = mês do vencimento
+    if ($diaVenc < $diaFech) {
+        // Vencimento no mês seguinte ao fechamento
+        $mesFech->modify('+1 month');
+    }
+
+    return $mesFech->format('Y-m');
 }
 
 function _cc_mesRefAdiante(string $mesRefBase, int $n): string
@@ -79,7 +112,6 @@ function cartao_criarFatura(PDO $pdo, string $cartaoId, string $uid, array $cart
         ':venc' => $datas['vencimento'],
     ]);
 
-    // Se INSERT IGNORE silenciou um duplicado, busca a existente
     $stmt = $pdo->prepare("SELECT * FROM FaturaCartao WHERE FKCartao = :cid AND FKUsuario = :uid AND MesReferencia = :mr LIMIT 1");
     $stmt->execute([':cid' => $cartaoId, ':uid' => $uid, ':mr' => $mesRef]);
     return $stmt->fetch(PDO::FETCH_ASSOC);
@@ -98,7 +130,8 @@ function cartao_obterFaturaAberta(PDO $pdo, string $cartaoId, string $uid, array
     $f = $stmt->fetch(PDO::FETCH_ASSOC);
     if ($f) return $f;
 
-    return cartao_criarFatura($pdo, $cartaoId, $uid, $cartao, _cc_mesRefAtual((int)$cartao['DiaFechamento']));
+    $mesRef = _cc_mesRefAtual((int)$cartao['DiaFechamento'], (int)$cartao['DiaVencimento']);
+    return cartao_criarFatura($pdo, $cartaoId, $uid, $cartao, $mesRef);
 }
 
 /**
@@ -115,55 +148,65 @@ function cartao_obterFaturaParaMesRef(PDO $pdo, string $cartaoId, string $uid, a
 }
 
 /**
- * Mantém um Registro pendente de "preview" para a fatura aberta.
- * Criado/atualizado após cada lançamento; deletado quando a fatura fecha.
- * Requer coluna FKRegistroPreview em FaturaCartao (alter_cartoes_v2.sql).
+ * Mantém um Registro pendente de "preview" para cada fatura aberta.
+ * - Cria o Registro na primeira vez que há lançamentos
+ * - Atualiza o valor total a cada lançamento adicionado ou removido
+ * - Remove o Registro se todos os lançamentos forem excluídos
+ * - Requer coluna FKRegistroPreview em FaturaCartao (alter_cartoes_v2.sql)
  */
 function cartao_sincronizarPreview(PDO $pdo, string $faturaId, string $uid, array $cartao): void
 {
     if (empty($cartao['FKCarteiraDebito'])) return;
 
+    // Tenta ler FKRegistroPreview; retorna cedo se a coluna não existir (ALTER TABLE pendente)
     try {
-        $stmtF = $pdo->prepare("SELECT * FROM FaturaCartao WHERE IDFatura = :id AND FKUsuario = :uid AND Status = 'aberta'");
+        $stmtF = $pdo->prepare(
+            "SELECT IDFatura, FKRegistroPreview, DataFechamento, DataVencimento
+             FROM FaturaCartao WHERE IDFatura = :id AND FKUsuario = :uid AND Status = 'aberta'"
+        );
         $stmtF->execute([':id' => $faturaId, ':uid' => $uid]);
         $fatura = $stmtF->fetch(PDO::FETCH_ASSOC);
         if (!$fatura) return;
+    } catch (PDOException $e) {
+        return; // Coluna FKRegistroPreview não existe ainda
+    }
 
-        $stmtT = $pdo->prepare("SELECT COALESCE(SUM(Valor), 0) FROM LancamentoCartao WHERE FKFatura = :fid");
-        $stmtT->execute([':fid' => $faturaId]);
-        $total = (float)$stmtT->fetchColumn();
+    // Calcula total atual
+    $stmtT = $pdo->prepare("SELECT COALESCE(SUM(Valor), 0) FROM LancamentoCartao WHERE FKFatura = :fid");
+    $stmtT->execute([':fid' => $faturaId]);
+    $total = (float)$stmtT->fetchColumn();
 
-        $desc = 'Fatura ' . $cartao['Nome'];
-        $dataRef = $fatura['DataFechamento'];
-        $dataVenc = $fatura['DataVencimento'];
+    $desc     = 'Fatura ' . $cartao['Nome'];
+    $dataRef  = $fatura['DataFechamento'];
+    $dataVenc = $fatura['DataVencimento'];
 
-        if ($total <= 0) {
-            // Sem lançamentos: remove o preview se existia
-            if (!empty($fatura['FKRegistroPreview'])) {
-                $pdo->prepare("DELETE FROM Registro WHERE IDRegistro = :rid AND FKUsuario = :uid")
-                    ->execute([':rid' => $fatura['FKRegistroPreview'], ':uid' => $uid]);
-                $pdo->prepare("UPDATE FaturaCartao SET FKRegistroPreview = NULL WHERE IDFatura = :fid")
-                    ->execute([':fid' => $faturaId]);
-            }
-            return;
-        }
-
+    if ($total <= 0) {
         if (!empty($fatura['FKRegistroPreview'])) {
-            // Atualiza preview existente
-            $pdo->prepare(
-                "UPDATE Registro SET Valor = :v, Descricao = :d, MomentoRegistro = :m, DataVencimento = :dv
-                 WHERE IDRegistro = :id AND FKUsuario = :uid"
-            )->execute([
-                ':v'   => $total,
-                ':d'   => $desc,
-                ':m'   => $dataRef,
-                ':dv'  => $dataVenc,
-                ':id'  => $fatura['FKRegistroPreview'],
-                ':uid' => $uid,
-            ]);
-        } else {
-            // Cria preview novo
-            $rid = gerarUuid();
+            $pdo->prepare("DELETE FROM Registro WHERE IDRegistro = :rid AND FKUsuario = :uid")
+                ->execute([':rid' => $fatura['FKRegistroPreview'], ':uid' => $uid]);
+            $pdo->prepare("UPDATE FaturaCartao SET FKRegistroPreview = NULL WHERE IDFatura = :fid")
+                ->execute([':fid' => $faturaId]);
+        }
+        return;
+    }
+
+    if (!empty($fatura['FKRegistroPreview'])) {
+        $pdo->prepare(
+            "UPDATE Registro SET Valor = :v, Descricao = :d, MomentoRegistro = :m, DataVencimento = :dv
+             WHERE IDRegistro = :id AND FKUsuario = :uid"
+        )->execute([
+            ':v'   => $total,
+            ':d'   => $desc,
+            ':m'   => $dataRef,
+            ':dv'  => $dataVenc,
+            ':id'  => $fatura['FKRegistroPreview'],
+            ':uid' => $uid,
+        ]);
+    } else {
+        // INSERT e UPDATE devem ser atômicos para evitar Registros órfãos
+        $rid = gerarUuid();
+        $pdo->beginTransaction();
+        try {
             $pdo->prepare(
                 "INSERT INTO Registro
                      (IDRegistro, TipoRegistro, Valor, Descricao, MomentoRegistro, DataVencimento,
@@ -180,35 +223,35 @@ function cartao_sincronizarPreview(PDO $pdo, string $faturaId, string $uid, arra
             ]);
             $pdo->prepare("UPDATE FaturaCartao SET FKRegistroPreview = :rid WHERE IDFatura = :fid")
                 ->execute([':rid' => $rid, ':fid' => $faturaId]);
+            $pdo->commit();
+        } catch (PDOException $e) {
+            $pdo->rollBack();
         }
-    } catch (PDOException $e) {
-        // Silencia caso a coluna ainda não exista (antes do alter_cartoes_v2.sql)
     }
 }
 
 /**
- * Fecha uma fatura: congela valor, remove preview, cria lembrete de pagamento e abre próxima.
+ * Fecha uma fatura: remove preview, congela valor, cria lembrete de pagamento e abre próxima.
  */
 function cartao_fecharFatura(PDO $pdo, array $fatura, string $uid): void
 {
-    // Total dos lançamentos
     $stmt = $pdo->prepare("SELECT COALESCE(SUM(Valor), 0) FROM LancamentoCartao WHERE FKFatura = :id");
     $stmt->execute([':id' => $fatura['IDFatura']]);
     $total = (float)$stmt->fetchColumn();
 
-    // Remove o Registro de preview (será substituído pelo de pagamento real)
+    // Remove o Registro de preview (será substituído pelo definitivo de pagamento)
     if (!empty($fatura['FKRegistroPreview'])) {
-        $pdo->prepare("DELETE FROM Registro WHERE IDRegistro = :rid AND FKUsuario = :uid")
-            ->execute([':rid' => $fatura['FKRegistroPreview'], ':uid' => $uid]);
-        $pdo->prepare("UPDATE FaturaCartao SET FKRegistroPreview = NULL WHERE IDFatura = :fid")
-            ->execute([':fid' => $fatura['IDFatura']]);
+        try {
+            $pdo->prepare("DELETE FROM Registro WHERE IDRegistro = :rid AND FKUsuario = :uid")
+                ->execute([':rid' => $fatura['FKRegistroPreview'], ':uid' => $uid]);
+            $pdo->prepare("UPDATE FaturaCartao SET FKRegistroPreview = NULL WHERE IDFatura = :fid")
+                ->execute([':fid' => $fatura['IDFatura']]);
+        } catch (PDOException $e) {}
     }
 
-    // Fecha a fatura
     $pdo->prepare("UPDATE FaturaCartao SET Status = 'fechada', ValorTotal = :t WHERE IDFatura = :id")
         ->execute([':t' => $total, ':id' => $fatura['IDFatura']]);
 
-    // Cria lembrete de pagamento no Registro se há carteira de débito configurada e total > 0
     if ($total > 0 && !empty($fatura['FKCarteiraDebito'])) {
         $rid = gerarUuid();
         $pdo->prepare(
@@ -230,9 +273,9 @@ function cartao_fecharFatura(PDO $pdo, array $fatura, string $uid): void
     }
 
     // Abre próxima fatura automaticamente
-    $cartao = $pdo->prepare("SELECT * FROM CartaoCredito WHERE IDCartao = :id");
-    $cartao->execute([':id' => $fatura['FKCartao']]);
-    $cartao = $cartao->fetch(PDO::FETCH_ASSOC);
+    $stmtC = $pdo->prepare("SELECT * FROM CartaoCredito WHERE IDCartao = :id");
+    $stmtC->execute([':id' => $fatura['FKCartao']]);
+    $cartao = $stmtC->fetch(PDO::FETCH_ASSOC);
     if ($cartao) {
         $proximoMes = _cc_mesRefAdiante($fatura['MesReferencia'], 1);
         cartao_criarFatura($pdo, $cartao['IDCartao'], $uid, $cartao, $proximoMes);
@@ -241,7 +284,6 @@ function cartao_fecharFatura(PDO $pdo, array $fatura, string $uid): void
 
 /**
  * Verificação automática: fecha faturas cujo DataFechamento já passou.
- * Chamada uma vez por request (static guard).
  */
 function cartao_verificarFechamentos(PDO $pdo, string $uid): void
 {
@@ -261,14 +303,9 @@ function cartao_verificarFechamentos(PDO $pdo, string $uid): void
         foreach ($stmt->fetchAll(PDO::FETCH_ASSOC) as $fatura) {
             cartao_fecharFatura($pdo, $fatura, $uid);
         }
-    } catch (PDOException $e) {
-        // Silencia caso as tabelas ainda não existam
-    }
+    } catch (PDOException $e) {}
 }
 
-/**
- * Total acumulado da fatura aberta de um cartão.
- */
 function cartao_totalFaturaAberta(PDO $pdo, string $cartaoId, string $uid): float
 {
     try {
@@ -285,9 +322,6 @@ function cartao_totalFaturaAberta(PDO $pdo, string $cartaoId, string $uid): floa
     }
 }
 
-/**
- * Lista os cartões ativos do usuário. Retorna [] se a tabela não existir.
- */
 function cartao_listarAtivos(PDO $pdo, string $uid): array
 {
     try {

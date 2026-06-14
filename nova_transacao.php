@@ -165,7 +165,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && trim($_POST['tipo_registro'] ?? '')
 
     if (!$erro) {
         $grupoParcela = ($numParcelas > 1) ? gerarUuid() : null;
-        $mesRefBase   = _cc_mesRefAtual((int)$cartao['DiaFechamento']);
+        $mesRefBase   = _cc_mesRefAtual((int)$cartao['DiaFechamento'], (int)$cartao['DiaVencimento']);
         $valorTotal   = (float)$valorRaw;
         $valorParcela = floor(($valorTotal / $numParcelas) * 100) / 100;
         $resto        = $valorTotal - ($valorParcela * $numParcelas);

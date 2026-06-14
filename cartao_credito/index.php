@@ -44,6 +44,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
         if (empty($nome)) {
             $erro = 'O nome do cartão é obrigatório.';
+        } elseif ($diaFech === $diaVenc) {
+            $erro = 'O dia de fechamento e o dia de vencimento não podem ser iguais.';
         } else {
             try {
                 if ($id) {
@@ -274,12 +276,18 @@ require_once '../geral/header.php';
                     <div class="row g-2">
                         <div class="col-6">
                             <label class="form-label text-secondary small">Dia de fechamento</label>
-                            <input type="number" name="dia_fechamento" id="mc_fech" class="form-control bg-transparent text-light border-secondary" min="1" max="28" value="1">
+                            <input type="number" name="dia_fechamento" id="mc_fech" class="form-control bg-transparent text-light border-secondary" min="1" max="28" value="1" required>
+                            <div class="form-text text-secondary" style="font-size:0.7rem;">Entre 1 e 28</div>
                         </div>
                         <div class="col-6">
                             <label class="form-label text-secondary small">Dia de vencimento</label>
-                            <input type="number" name="dia_vencimento" id="mc_venc" class="form-control bg-transparent text-light border-secondary" min="1" max="28" value="10">
+                            <input type="number" name="dia_vencimento" id="mc_venc" class="form-control bg-transparent text-light border-secondary" min="1" max="28" value="10" required>
+                            <div class="form-text text-secondary" style="font-size:0.7rem;">Entre 1 e 28</div>
                         </div>
+                    </div>
+                    <div id="mc_aviso_datas" class="alert alert-warning py-1 px-2 d-none" style="font-size:0.75rem;">
+                        <i class="bi bi-exclamation-triangle me-1"></i>
+                        Dia de fechamento e vencimento não podem ser iguais.
                     </div>
 
                     <div>
@@ -312,6 +320,24 @@ require_once '../geral/header.php';
 </div>
 
 <script>
+function validarDiasCartao() {
+    const fech  = parseInt(document.getElementById('mc_fech').value, 10);
+    const venc  = parseInt(document.getElementById('mc_venc').value, 10);
+    const aviso = document.getElementById('mc_aviso_datas');
+    const btn   = document.querySelector('#modalCartao .btn-primary');
+    if (fech === venc) {
+        aviso.classList.remove('d-none');
+        btn.disabled = true;
+    } else {
+        aviso.classList.add('d-none');
+        btn.disabled = false;
+    }
+}
+document.addEventListener('DOMContentLoaded', function() {
+    document.getElementById('mc_fech').addEventListener('input', validarDiasCartao);
+    document.getElementById('mc_venc').addEventListener('input', validarDiasCartao);
+});
+
 function abrirModalNovo() {
     document.getElementById('mc_id').value      = '';
     document.getElementById('mc_nome').value    = '';
@@ -322,6 +348,7 @@ function abrirModalNovo() {
     document.getElementById('mc_limite').value  = '';
     document.getElementById('mc_carteira').value = '';
     document.getElementById('mc_titulo').textContent = 'Novo Cartão';
+    document.getElementById('mc_aviso_datas').classList.add('d-none');
 }
 function abrirModalEditar(c) {
     document.getElementById('mc_id').value       = c.IDCartao;
