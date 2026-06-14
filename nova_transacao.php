@@ -518,9 +518,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 }
 
 // Valores Iniciais do Formulário
-$val_valor  = $_POST['valor'] ?? ($transacao_edit ? $transacao_edit['Valor'] : '');
-$val_desc   = $_POST['descricao'] ?? ($transacao_edit ? $transacao_edit['Descricao'] : '');
-$val_data   = $_POST['data_registro'] ?? ($transacao_edit ? date('Y-m-d', strtotime($transacao_edit['MomentoRegistro'])) : ($_GET['data'] ?? date('Y-m-d')));
+$val_valor  = $_POST['valor'] ?? ($transacao_edit ? $transacao_edit['Valor'] : ($_GET['_val'] ?? ''));
+$val_desc   = $_POST['descricao'] ?? ($transacao_edit ? $transacao_edit['Descricao'] : ($_GET['_desc'] ?? ''));
+$val_data   = $_POST['data_registro'] ?? ($transacao_edit ? date('Y-m-d', strtotime($transacao_edit['MomentoRegistro'])) : ($_GET['_data'] ?? ($_GET['data'] ?? date('Y-m-d'))));
 $val_status = $_POST['status_registro'] ?? ($transacao_edit ? $transacao_edit['StatusRegistro'] : 'efetivado');
 
 $val_cart   = $_POST['carteira_id'] ?? ($transacao_edit ? $transacao_edit['FKCarteira'] : ($_GET['carteira_id'] ?? ''));
@@ -1611,5 +1611,23 @@ require_once 'geral/header.php';
             }
         }
     })();
+
+    // Preserva descrição, valor e data ao trocar o tipo de transação
+    document.querySelectorAll('a[href*="tipo="]').forEach(function(link) {
+        link.addEventListener('click', function(e) {
+            const desc  = document.getElementById('descricao');
+            const valor = document.getElementById('valor');
+            const data  = document.querySelector('[name="data_registro"]');
+            if (!desc && !valor) return;
+            const params = new URLSearchParams();
+            if (desc  && desc.value.trim())  params.set('_desc', desc.value.trim());
+            if (valor && valor.value.trim()) params.set('_val',  valor.value.trim());
+            if (data  && data.value)         params.set('_data', data.value);
+            if (params.toString()) {
+                e.preventDefault();
+                location.href = link.href + '&' + params.toString();
+            }
+        });
+    });
 </script>
 <?php require_once 'geral/footer.php'; ?>
