@@ -218,6 +218,12 @@ require_once '../geral/header.php';
                 <i class="bi bi-sliders me-1"></i> Configurações de Planos
             </a>
         </li>
+        <li class="nav-item">
+            <a href="/admin/codigos.php" class="nav-link rounded-pill"
+               style="background:rgba(255,255,255,.05);color:#9ca3af;font-size:0.85rem;">
+                <i class="bi bi-gift-fill me-1"></i> Códigos de Ativação
+            </a>
+        </li>
     </ul>
 
     <!-- Alertas -->
