@@ -243,12 +243,17 @@ require_once '../geral/header.php';
                                     R$ <?= number_format($l['Valor'], 2, ',', '.') ?>
                                 </td>
                                 <td class="py-2 border-0 text-end" style="white-space:nowrap;">
-                                    <button class="btn btn-sm btn-link p-0 me-2" style="color:#a78bfa;" title="Editar"
-                                        onclick="abrirModalEditarLanc('<?= $l['IDLancamento'] ?>','<?= htmlspecialchars(addslashes($l['Descricao']), ENT_QUOTES) ?>','<?= number_format($l['Valor'], 2, ',', '.') ?>','<?= $l['DataCompra'] ?>','<?= $l['FKCategoria'] ?? '' ?>')">
+                                    <button class="btn btn-sm btn-link p-0 me-2 btn-editar-lanc" style="color:#a78bfa;" title="Editar"
+                                        data-id="<?= $l['IDLancamento'] ?>"
+                                        data-desc="<?= htmlspecialchars($l['Descricao']) ?>"
+                                        data-valor="<?= number_format($l['Valor'], 2, ',', '.') ?>"
+                                        data-data="<?= substr($l['DataCompra'], 0, 10) ?>"
+                                        data-cat="<?= htmlspecialchars($l['FKCategoria'] ?? '') ?>">
                                         <i class="bi bi-pencil" style="font-size:0.8rem;"></i>
                                     </button>
-                                    <button class="btn btn-sm btn-link text-danger p-0" title="Remover"
-                                        onclick="abrirModalExcluirLanc('<?= $l['IDLancamento'] ?>','<?= htmlspecialchars(addslashes($l['Descricao']), ENT_QUOTES) ?>')">
+                                    <button class="btn btn-sm btn-link text-danger p-0 btn-excluir-lanc" title="Remover"
+                                        data-id="<?= $l['IDLancamento'] ?>"
+                                        data-desc="<?= htmlspecialchars($l['Descricao']) ?>">
                                         <i class="bi bi-trash3" style="font-size:0.8rem;"></i>
                                     </button>
                                 </td>
@@ -472,34 +477,44 @@ require_once '../geral/header.php';
 </div>
 
 <script>
+function bsModal(id) {
+    const el = document.getElementById(id);
+    return bootstrap.Modal.getInstance(el) || new bootstrap.Modal(el);
+}
+
 function toggleFatura(id) {
     const el  = document.getElementById(id);
     const ico = document.getElementById('ico-' + id);
     const vis = el.style.display !== 'none';
-    el.style.display  = vis ? 'none' : 'block';
-    ico.className     = vis ? 'bi bi-chevron-down text-secondary' : 'bi bi-chevron-up text-secondary';
+    el.style.display = vis ? 'none' : 'block';
+    ico.className    = vis ? 'bi bi-chevron-down text-secondary' : 'bi bi-chevron-up text-secondary';
 }
 
-function abrirModalExcluirLanc(id, nome) {
-    document.getElementById('excluirLancId').value = id;
-    document.getElementById('excluirLancNome').textContent = nome;
-    bootstrap.Modal.getOrCreate(document.getElementById('modalExcluirLanc')).show();
-}
-
-function abrirModalEditarLanc(id, desc, valor, data, catId) {
-    document.getElementById('editarLancId').value    = id;
-    document.getElementById('editarLancDesc').value  = desc;
-    document.getElementById('editarLancValor').value = valor;
-    document.getElementById('editarLancData').value  = data.substring(0, 10);
-    const sel = document.getElementById('editarLancCat');
-    sel.value = catId || '';
-    bootstrap.Modal.getOrCreate(document.getElementById('modalEditarLanc')).show();
-}
+document.addEventListener('click', function(e) {
+    const btnEdit = e.target.closest('.btn-editar-lanc');
+    if (btnEdit) {
+        const d = btnEdit.dataset;
+        document.getElementById('editarLancId').value    = d.id;
+        document.getElementById('editarLancDesc').value  = d.desc;
+        document.getElementById('editarLancValor').value = d.valor;
+        document.getElementById('editarLancData').value  = d.data;
+        document.getElementById('editarLancCat').value   = d.cat || '';
+        bsModal('modalEditarLanc').show();
+        return;
+    }
+    const btnDel = e.target.closest('.btn-excluir-lanc');
+    if (btnDel) {
+        document.getElementById('excluirLancId').value         = btnDel.dataset.id;
+        document.getElementById('excluirLancNome').textContent = btnDel.dataset.desc;
+        bsModal('modalExcluirLanc').show();
+        return;
+    }
+});
 
 function abrirModalFecharFatura(faturaId, total) {
-    document.getElementById('fecharFaturaId').value     = faturaId;
+    document.getElementById('fecharFaturaId').value          = faturaId;
     document.getElementById('fecharFaturaTotal').textContent = 'R$ ' + total;
-    bootstrap.Modal.getOrCreate(document.getElementById('modalFecharFatura')).show();
+    bsModal('modalFecharFatura').show();
 }
 </script>
 
