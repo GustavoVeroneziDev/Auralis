@@ -138,14 +138,18 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'])) {
                 $sqlToggle  = "UPDATE Registro SET StatusRegistro = :status WHERE IDRegistro = :id AND FKUsuario = :uid";
                 $stmtToggle = $pdo->prepare($sqlToggle);
                 $stmtToggle->execute([':status' => $novo_status, ':id' => $id_registro, ':uid' => $usuario_id]);
-                // Se efetivou, verifica se é pagamento de fatura de cartão
-                if ($novo_status === 'efetivado') {
-                    try {
+                // Sincroniza status da fatura de cartão vinculada
+                try {
+                    if ($novo_status === 'efetivado') {
                         $pdo->prepare(
                             "UPDATE FaturaCartao SET Status='paga' WHERE FKRegistroPagamento=:rid AND FKUsuario=:uid AND Status='fechada'"
                         )->execute([':rid' => $id_registro, ':uid' => $usuario_id]);
-                    } catch (PDOException $e) {}
-                }
+                    } elseif ($novo_status === 'pendente') {
+                        $pdo->prepare(
+                            "UPDATE FaturaCartao SET Status='fechada' WHERE FKRegistroPagamento=:rid AND FKUsuario=:uid AND Status='paga'"
+                        )->execute([':rid' => $id_registro, ':uid' => $usuario_id]);
+                    }
+                } catch (PDOException $e) {}
                 header("Location: " . $redirectBase);
                 exit;
             } catch (PDOException $e) {

@@ -64,6 +64,15 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $faturaId = trim($_POST['fatura_id'] ?? '');
         $pdo->prepare("UPDATE FaturaCartao SET Status='paga' WHERE IDFatura=:id AND FKUsuario=:uid AND Status='fechada'")
             ->execute([':id' => $faturaId, ':uid' => $uid]);
+        // Efetiva o Registro de pagamento vinculado
+        try {
+            $pdo->prepare(
+                "UPDATE Registro r
+                 JOIN FaturaCartao f ON f.FKRegistroPagamento = r.IDRegistro
+                 SET r.StatusRegistro = 'efetivado'
+                 WHERE f.IDFatura = :fid AND f.FKUsuario = :uid"
+            )->execute([':fid' => $faturaId, ':uid' => $uid]);
+        } catch (PDOException $e) {}
         $sucesso = 'Fatura marcada como paga.';
     }
 }
