@@ -103,6 +103,7 @@ if (!function_exists('limitesDoPlano')) {
                     $cache[$plano] = [
                         'transacoes_mes' => $row['transacoes_mes'] == -1 ? PHP_INT_MAX : (int)$row['transacoes_mes'],
                         'carteiras'      => $row['carteiras']      == -1 ? PHP_INT_MAX : (int)$row['carteiras'],
+                        'cartoes'        => isset($row['cartoes']) ? ($row['cartoes'] == -1 ? PHP_INT_MAX : (int)$row['cartoes']) : PHP_INT_MAX,
                         'categorias'     => $row['categorias']     == -1 ? PHP_INT_MAX : (int)$row['categorias'],
                         'parcelas_max'   => (int)$row['parcelas_max'],
                         'horas_teste'    => (int)$row['horas_teste'],
@@ -114,9 +115,9 @@ if (!function_exists('limitesDoPlano')) {
 
         // Fallback hardcoded se a tabela ainda não existir
         $defaults = [
-            'pro'  => ['transacoes_mes' => PHP_INT_MAX, 'carteiras' => 3,           'categorias' => PHP_INT_MAX, 'parcelas_max' => 48, 'horas_teste' => 0],
-            'vip'  => ['transacoes_mes' => PHP_INT_MAX, 'carteiras' => PHP_INT_MAX, 'categorias' => PHP_INT_MAX, 'parcelas_max' => 48, 'horas_teste' => 0],
-            'free' => ['transacoes_mes' => 35,          'carteiras' => 1,           'categorias' => 10,          'parcelas_max' => 3,  'horas_teste' => 50],
+            'pro'  => ['transacoes_mes' => PHP_INT_MAX, 'carteiras' => 3,           'cartoes' => 3,           'categorias' => PHP_INT_MAX, 'parcelas_max' => 48, 'horas_teste' => 0],
+            'vip'  => ['transacoes_mes' => PHP_INT_MAX, 'carteiras' => PHP_INT_MAX, 'cartoes' => PHP_INT_MAX, 'categorias' => PHP_INT_MAX, 'parcelas_max' => 48, 'horas_teste' => 0],
+            'free' => ['transacoes_mes' => 35,          'carteiras' => 1,           'cartoes' => 1,           'categorias' => 10,          'parcelas_max' => 3,  'horas_teste' => 50],
         ];
         $cache[$plano] = $defaults[$plano] ?? $defaults['free'];
         return $cache[$plano];

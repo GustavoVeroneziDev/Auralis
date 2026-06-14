@@ -58,14 +58,24 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                                 ':df'=>$diaFech,':dv'=>$diaVenc,':cd'=>$carteiraDb,':id'=>$id,':uid'=>$uid]);
                     $sucesso = 'Cartão atualizado com sucesso.';
                 } else {
-                    // Criação
-                    $newId = gerarUuid();
-                    $pdo->prepare(
-                        "INSERT INTO CartaoCredito (IDCartao,FKUsuario,Nome,Bandeira,Cor,Limite,DiaFechamento,DiaVencimento,FKCarteiraDebito)
-                         VALUES (:id,:uid,:n,:b,:c,:l,:df,:dv,:cd)"
-                    )->execute([':id'=>$newId,':uid'=>$uid,':n'=>$nome,':b'=>$bandeira,':c'=>$cor,
-                                ':l'=>$limite,':df'=>$diaFech,':dv'=>$diaVenc,':cd'=>$carteiraDb]);
-                    $sucesso = 'Cartão adicionado com sucesso.';
+                    // Criação — verifica limite do plano
+                    $limites = limitesDoPlano();
+                    if ($limites['cartoes'] !== PHP_INT_MAX) {
+                        $stmtQtd = $pdo->prepare("SELECT COUNT(*) FROM CartaoCredito WHERE FKUsuario = :uid AND Ativo = 1");
+                        $stmtQtd->execute([':uid' => $uid]);
+                        if ((int)$stmtQtd->fetchColumn() >= $limites['cartoes']) {
+                            $erro = 'Seu plano permite no máximo ' . $limites['cartoes'] . ' cartão(ões) de crédito. Faça upgrade para adicionar mais.';
+                        }
+                    }
+                    if (!$erro) {
+                        $newId = gerarUuid();
+                        $pdo->prepare(
+                            "INSERT INTO CartaoCredito (IDCartao,FKUsuario,Nome,Bandeira,Cor,Limite,DiaFechamento,DiaVencimento,FKCarteiraDebito)
+                             VALUES (:id,:uid,:n,:b,:c,:l,:df,:dv,:cd)"
+                        )->execute([':id'=>$newId,':uid'=>$uid,':n'=>$nome,':b'=>$bandeira,':c'=>$cor,
+                                    ':l'=>$limite,':df'=>$diaFech,':dv'=>$diaVenc,':cd'=>$carteiraDb]);
+                        $sucesso = 'Cartão adicionado com sucesso.';
+                    }
                 }
             } catch (PDOException $e) {
                 $erro = 'Erro ao salvar cartão: ' . $e->getMessage();

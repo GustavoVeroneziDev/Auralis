@@ -41,12 +41,13 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     if ($action === 'salvar_limites') {
         try {
             $planos = ['free', 'pro', 'vip'];
-            $campos = ['transacoes_mes', 'carteiras', 'categorias', 'parcelas_max', 'horas_teste'];
+            $campos = ['transacoes_mes', 'carteiras', 'cartoes', 'categorias', 'parcelas_max', 'horas_teste'];
 
             $stmt = $pdo->prepare("
                 UPDATE config_limites_plano
                 SET transacoes_mes = :transacoes_mes,
                     carteiras      = :carteiras,
+                    cartoes        = :cartoes,
                     categorias     = :categorias,
                     parcelas_max   = :parcelas_max,
                     horas_teste    = :horas_teste
@@ -260,6 +261,7 @@ require_once '../geral/header.php';
                 $colunas = [
                     'transacoes_mes' => 'Registros / mês',
                     'carteiras'      => 'Carteiras',
+                    'cartoes'        => 'Cartões de crédito',
                     'categorias'     => 'Categorias',
                     'parcelas_max'   => 'Parcelas máx.',
                     'horas_teste'    => 'Horas de teste',
