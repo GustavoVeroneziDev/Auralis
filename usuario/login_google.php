@@ -159,7 +159,7 @@ if (isset($_GET['code'])) {
 
                 $cabecalhos  = "MIME-Version: 1.0\r\n";
                 $cabecalhos .= "Content-type: text/html; charset=UTF-8\r\n";
-                $cabecalhos .= "From: Auralis <nao-responda@meuauralis.com>\r\n";
+                $cabecalhos .= "From: Auralis <suporte@meuauralis.com>\r\n";
                 $cabecalhos .= "Reply-To: suporte@meuauralis.com\r\n";
 
                 mail($email, "Bem-vindo ao Auralis - Crie sua senha de acesso", $mensagemHTML, $cabecalhos);
