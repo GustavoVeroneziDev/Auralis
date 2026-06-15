@@ -42,7 +42,7 @@ if (!empty($token)) {
 
 <div class="card-reset">
     <div class="text-center mb-4">
-        <img src="https://meuauralis.com/geral/img/logoAuralis-SemFundo.png" alt="Auralis" style="max-height: 45px;" class="mb-3">
+        <img src="/geral/img/LogoAuralisSemEscudo.png" alt="Auralis" style="max-height: 45px;" class="mb-3">
         <h4 class="fw-bold text-white">Nova Senha</h4>
         <p class="small">Crie uma senha forte e de fácil memorização.</p>
     </div>
