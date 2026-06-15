@@ -57,7 +57,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         <body>
             <div class='container'>
                 <div class='header'>
-                    <img src='https://meuauralis.com/geral/img/logoAuralis-SemFundo.png' alt='Auralis'>
+                    <img src='https://meuauralis.com/geral/img/LogoAuralisSemEscudo.png' alt='Auralis'>
                 </div>
                 <div class='content'>
                     <h2>Olá, " . htmlspecialchars($primeiro_nome) . "!</h2>

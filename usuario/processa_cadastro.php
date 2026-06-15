@@ -92,7 +92,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         
         // Monta os links com base em onde o usuário está acessando no momento
         $link_ativacao = $protocolo . $dominioAtual . "/usuario/ativar_conta.php?token=" . $token_ativacao;
-        $link_logo     = $protocolo . $dominioAtual . "/geral/img/logoAuralis-SemFundo.png";
+        $link_logo     = $protocolo . $dominioAtual . "/geral/img/LogoAuralisSemEscudo.png";
         
         $primeiro_nome = explode(' ', $nome)[0];
         
