@@ -1,0 +1,38 @@
+/* ============================================================
+   AURALIS — Tema: Dark (padrão)
+   data-bs-theme="dark"
+   ============================================================ */
+:root {
+  /* Fundos */
+  --bg-dark:  #121418;
+  --bg-card:  #1e2126;
+  --bg-hover: #252a31;
+
+  /* Acento / destaque */
+  --accent:       #d4af37;
+  --accent-light: #f9e596;
+  --gold-primary:           #ffb800;
+  --primary-gold-analysis:  #ffb800;
+
+  /* Texto */
+  --text-main:  #f8fafc;
+  --text-muted: #a1a1aa;
+
+  /* Bootstrap overrides */
+  --bs-primary:          #d4af37;
+  --bs-primary-rgb:      212, 175, 55;
+  --bs-link-color:       #d4af37;
+  --bs-link-hover-color: #f9e596;
+  --bs-body-bg:          #121418;
+  --bs-body-color:       #f8fafc;
+  --bs-border-color:     #2d3139;
+  --bs-secondary-bg:     #1e2126;
+
+  /* Componentes */
+  --navbar-bg:          rgba(18, 20, 24, 0.85);
+  --navbar-collapse-bg: rgba(18, 20, 24, 0.97);
+  --card-border-color:  rgba(212, 175, 55, 0.08);
+  --card-border-feature: rgba(212, 175, 55, 0.1);
+  --card-glow:          rgba(212, 175, 55, 0.1);
+  --scrollbar-thumb:    rgba(212, 175, 55, 0.3);
+}

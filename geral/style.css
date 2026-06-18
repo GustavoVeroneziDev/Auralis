@@ -38,26 +38,9 @@ body {
 
 /* --------------------------------------------------------------------------
    2. VARIÁVEIS DO SISTEMA
+   Cores/temas: carregadas pelo arquivo em /geral/temas/{tema}.css
    -------------------------------------------------------------------------- */
-:root,
-[data-bs-theme="dark"] {
-  --bg-dark: #121418;
-  --bg-card: #1e2126;
-  --bg-hover: #252a31;
-
-  --accent: #d4af37;
-  --accent-light: #f9e596;
-  --gold-primary: #ffb800;
-  --primary-gold-analysis: #ffb800;
-
-  --text-main: #f8fafc;
-  --text-muted: #a1a1aa;
-
-  --bs-primary: var(--accent);
-  --bs-primary-rgb: 212, 175, 55;
-  --bs-link-color: var(--accent);
-  --bs-link-hover-color: var(--accent-light);
-
+:root {
   /* Espaçamentos que escalam com viewport */
   --space-page-x: clamp(0.875rem, 4vw, 3rem);
   --space-card: clamp(0.875rem, 2vw, 1.5rem);
@@ -96,7 +79,7 @@ body {
    4. NAVBAR
    -------------------------------------------------------------------------- */
 .navbar {
-  background-color: rgba(18, 20, 24, 0.85) !important;
+  background-color: var(--navbar-bg) !important;
   backdrop-filter: blur(12px);
   -webkit-backdrop-filter: blur(12px);
 }
@@ -190,7 +173,7 @@ h1 span {
    -------------------------------------------------------------------------- */
 .card {
   background-color: var(--bg-card);
-  border-color: rgba(212, 175, 55, 0.08) !important;
+  border-color: var(--card-border-color) !important;
 }
 
 .card-body {
@@ -204,7 +187,7 @@ h1 span {
 
 .feature-card {
   background-color: var(--bg-card);
-  border: 1px solid rgba(212, 175, 55, 0.1);
+  border: 1px solid var(--card-border-feature);
   border-radius: 1.25rem;
   padding: clamp(1.25rem, 3vw, 2rem);
   transition:
@@ -217,7 +200,7 @@ h1 span {
   transform: translateY(-8px);
   box-shadow:
     0 20px 25px -5px rgba(0, 0, 0, 0.5),
-    0 10px 10px -5px rgba(212, 175, 55, 0.1);
+    0 10px 10px -5px var(--card-glow);
   border-color: var(--accent);
 }
 
@@ -288,7 +271,7 @@ h1 span {
   background: var(--bg-dark);
 }
 ::-webkit-scrollbar-thumb {
-  background: rgba(212, 175, 55, 0.3);
+  background: var(--scrollbar-thumb);
   border-radius: 3px;
 }
 ::-webkit-scrollbar-thumb:hover {
@@ -319,7 +302,7 @@ input[type="number"] {
 @media (max-width: 991.98px) {
   /* Navbar colapsada */
   .navbar-collapse {
-    background-color: rgba(18, 20, 24, 0.97);
+    background-color: var(--navbar-collapse-bg);
     border-radius: 0.75rem;
     padding: 0.875rem;
     margin-top: 0.75rem;

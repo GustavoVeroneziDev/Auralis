@@ -16,7 +16,7 @@ $tipo_mensagem = '';
 // 1. LÓGICA DE ATUALIZAÇÃO (POST)
 // ==============================================================================
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
-    
+
     // AÇÃO 1: ATUALIZAR DADOS PESSOAIS
     if (isset($_POST['action']) && $_POST['action'] === 'update_profile') {
         $nome = trim($_POST['nome']);
@@ -29,7 +29,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                     ':nome' => $nome,
                     ':uid' => $usuario_id
                 ]);
-                
+
                 $_SESSION['usuario_nome'] = $nome;
                 $mensagem = "Seus dados foram atualizados com sucesso!";
                 $tipo_mensagem = "success";
@@ -61,7 +61,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 // Se for Google e mandou o código oculto, autoriza a criação da senha
                 if ($hashBanco === 'GOOGLE_SSO' && $senha_atual === 'GOOGLE_SSO') {
                     $autorizado_senha = true;
-                } 
+                }
                 // Se for usuário comum, verifica a senha digitada
                 elseif (password_verify($senha_atual, $hashBanco)) {
                     $autorizado_senha = true;
@@ -86,7 +86,32 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         }
     }
 
-    // AÇÃO 3: EXCLUIR CONTA (A ZONA DE PERIGO)
+    // AÇÃO 3: TROCAR TEMA
+    if (isset($_POST['action']) && $_POST['action'] === 'trocar_tema') {
+        $novoTema = strtolower(trim($_POST['tema'] ?? ''));
+        $temas    = function_exists('temasDisponiveis') ? temasDisponiveis() : ['dark' => [], 'white' => []];
+        if (isset($temas[$novoTema])) {
+            $conquista = $temas[$novoTema]['conquista'] ?? null;
+            $temAcesso = !$conquista || (function_exists('usuarioPossuiConquista') && usuarioPossuiConquista($conquista));
+            if ($temAcesso) {
+                try {
+                    $pdo->prepare("UPDATE Usuario SET Tema = :tema WHERE IDUsuario = :uid")
+                        ->execute([':tema' => $novoTema, ':uid' => $usuario_id]);
+                    $_SESSION['tema'] = $novoTema;
+                    $mensagem = 'Tema alterado para ' . ucfirst($novoTema) . '!';
+                    $tipo_mensagem = 'success';
+                } catch (PDOException $e) {
+                    $mensagem = 'Erro ao alterar o tema.';
+                    $tipo_mensagem = 'danger';
+                }
+            } else {
+                $mensagem = 'Você ainda não desbloqueou este tema.';
+                $tipo_mensagem = 'warning';
+            }
+        }
+    }
+
+    // AÇÃO 4: EXCLUIR CONTA (A ZONA DE PERIGO)
     if (isset($_POST['action']) && $_POST['action'] === 'delete_account') {
         $senha_confirmacao = $_POST['senha_confirmacao'] ?? '';
 
@@ -116,7 +141,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             }
 
             if ($autorizado_exclusao) {
-                
+
                 $pdo->beginTransaction();
 
                 $pdo->prepare("DELETE FROM RateioRegistro WHERE FKRegistro IN (SELECT IDRegistro FROM Registro WHERE FKUsuario = :uid)")->execute([':uid' => $usuario_id]);
@@ -127,10 +152,10 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 $pdo->prepare("DELETE FROM Categoria WHERE FKUsuario = :uid")->execute([':uid' => $usuario_id]);
                 $pdo->prepare("DELETE FROM ConfiguracaoSistema WHERE FKUsuario = :uid")->execute([':uid' => $usuario_id]);
                 $pdo->prepare("DELETE FROM Carteira WHERE FKUsuarioDono = :uid")->execute([':uid' => $usuario_id]);
-                
+
                 $pdo->prepare("DELETE FROM Usuario WHERE IDUsuario = :uid")->execute([':uid' => $usuario_id]);
 
-                $pdo->commit(); 
+                $pdo->commit();
 
                 session_destroy();
                 setcookie('auralis_remember', '', time() - 3600, '/');
@@ -151,14 +176,13 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 // 2. BUSCA OS DADOS ATUAIS (Incluindo Senha para a lógica do Front-end)
 // ==============================================================================
 try {
-    $sqlBusca = "SELECT Nome, Email, Senha FROM Usuario WHERE IDUsuario = :uid LIMIT 1";
+    $sqlBusca = "SELECT Nome, Email, Senha, Tema FROM Usuario WHERE IDUsuario = :uid LIMIT 1";
     $stmtBusca = $pdo->prepare($sqlBusca);
     $stmtBusca->execute([':uid' => $usuario_id]);
     $dadosUsuario = $stmtBusca->fetch(PDO::FETCH_ASSOC);
-    
+
     // Descobre se é usuário Google para o HTML
     $isGoogleUser = ($dadosUsuario['Senha'] === 'GOOGLE_SSO');
-    
 } catch (PDOException $e) {
     die("Erro ao carregar dados do usuário.");
 }
@@ -167,7 +191,7 @@ require_once 'geral/header.php';
 ?>
 
 <main class="container py-4 mt-2 flex-grow-1" style="min-height: 100vh; padding-inline: var(--space-page-x);">
-    
+
     <div class="d-flex justify-content-between align-items-center mb-4 border-bottom border-secondary-subtle pb-3">
         <h2 class="fw-bold text-light mb-0"><i class="bi bi-gear text-secondary me-2"></i> Configurações da Conta</h2>
     </div>
@@ -176,12 +200,12 @@ require_once 'geral/header.php';
         <div class="alert alert-<?= $tipo_mensagem ?> alert-dismissible fade show d-flex align-items-center rounded-3 shadow-sm border-0" role="alert">
             <i class="bi <?= $tipo_mensagem === 'success' ? 'bi-check-circle-fill' : 'bi-exclamation-triangle-fill' ?> me-2"></i>
             <strong><?= $mensagem ?></strong>
-            <button type="button" class="btn-close <?php if($tipo_mensagem !== 'warning') echo 'btn-close-white'; ?> opacity-50" data-bs-dismiss="alert" aria-label="Close"></button>
+            <button type="button" class="btn-close <?php if ($tipo_mensagem !== 'warning') echo 'btn-close-white'; ?> opacity-50" data-bs-dismiss="alert" aria-label="Close"></button>
         </div>
     <?php endif; ?>
 
     <div class="row g-4 mb-5">
-        
+
         <div class="col-lg-6">
             <div class="card bg-dark border-secondary-subtle shadow-sm rounded-4 h-100">
                 <div class="card-header border-bottom border-secondary-subtle bg-transparent p-4">
@@ -190,7 +214,7 @@ require_once 'geral/header.php';
                 <div class="card-body p-4">
                     <form method="POST" action="">
                         <input type="hidden" name="action" value="update_profile">
-                        
+
                         <div class="mb-3">
                             <label class="form-label text-secondary small mb-1">E-mail de Acesso</label>
                             <input type="email" class="form-control bg-body-tertiary border-secondary-subtle text-secondary shadow-none" value="<?= htmlspecialchars($dadosUsuario['Email']) ?>" disabled>
@@ -256,6 +280,84 @@ require_once 'geral/header.php';
             </div>
         </div>
 
+        <!-- APARÊNCIA / TEMA -->
+        <div class="col-12 mt-2">
+            <?php
+            $temasCfg  = function_exists('temasDisponiveis') ? temasDisponiveis() : ['dark' => ['nome' => 'Dark', 'conquista' => null], 'white' => ['nome' => 'White', 'conquista' => null]];
+            $temaAtivo = $dadosUsuario['Tema'] ?? ($_SESSION['tema'] ?? 'dark');
+            ?>
+            <div class="card border-secondary-subtle shadow-sm rounded-4" style="background:var(--bg-card);">
+                <div class="card-header border-bottom border-secondary-subtle bg-transparent p-4">
+                    <h5 class="fw-bold mb-0"><i class="bi bi-palette2 me-2" style="color:var(--accent);"></i> Aparência</h5>
+                </div>
+                <div class="card-body p-4">
+                    <p class="text-secondary small mb-3">Escolha como o Auralis aparece para você. Mais temas podem ser desbloqueados através de conquistas.</p>
+                    <div class="row g-3">
+                        <?php foreach ($temasCfg as $slug => $info):
+                            $ativo     = ($temaAtivo === $slug);
+                            $conquista = $info['conquista'] ?? null;
+                            $bloqueado = $conquista && !(function_exists('usuarioPossuiConquista') && usuarioPossuiConquista($conquista));
+                        ?>
+                            <div class="col-6 col-md-3">
+                                <form method="POST" action="">
+                                    <input type="hidden" name="action" value="trocar_tema">
+                                    <input type="hidden" name="tema" value="<?= htmlspecialchars($slug) ?>">
+                                    <button type="submit" <?= $bloqueado ? 'disabled' : '' ?>
+                                        class="btn w-100 p-0 border-0 rounded-4 overflow-hidden position-relative"
+                                        style="outline: 2.5px solid <?= $ativo ? 'var(--accent)' : 'transparent' ?>; transition: outline-color .2s;">
+                                        <!-- Preview visual do tema -->
+                                        <?php if ($slug === 'dark'): ?>
+                                            <div class="rounded-4 overflow-hidden" style="background:#121418;padding:14px 10px;">
+                                                <div style="background:#1e2126;border-radius:8px;padding:8px;margin-bottom:6px;">
+                                                    <div style="height:6px;width:55%;background:#d4af37;border-radius:4px;margin-bottom:5px;"></div>
+                                                    <div style="height:5px;width:75%;background:#2d3139;border-radius:4px;"></div>
+                                                </div>
+                                                <div class="d-flex gap-1">
+                                                    <div style="flex:1;background:#1e2126;border-radius:6px;height:24px;"></div>
+                                                    <div style="flex:1;background:#1e2126;border-radius:6px;height:24px;"></div>
+                                                </div>
+                                            </div>
+                                        <?php elseif ($slug === 'white'): ?>
+                                            <div class="rounded-4 overflow-hidden" style="background:#f0f2f5;padding:14px 10px;">
+                                                <div style="background:#fff;border-radius:8px;padding:8px;margin-bottom:6px;border:1px solid #e5e7eb;">
+                                                    <div style="height:6px;width:55%;background:#b8962e;border-radius:4px;margin-bottom:5px;"></div>
+                                                    <div style="height:5px;width:75%;background:#d1d5db;border-radius:4px;"></div>
+                                                </div>
+                                                <div class="d-flex gap-1">
+                                                    <div style="flex:1;background:#fff;border-radius:6px;height:24px;border:1px solid #e5e7eb;"></div>
+                                                    <div style="flex:1;background:#fff;border-radius:6px;height:24px;border:1px solid #e5e7eb;"></div>
+                                                </div>
+                                            </div>
+                                        <?php endif; ?>
+
+                                        <?php if ($ativo): ?>
+                                            <span class="position-absolute top-0 end-0 m-1 badge rounded-pill"
+                                                style="background:var(--accent);color:#000;font-size:0.6rem;padding:3px 6px;">
+                                                <i class="bi bi-check-lg"></i>
+                                            </span>
+                                        <?php endif; ?>
+                                        <?php if ($bloqueado): ?>
+                                            <span class="position-absolute top-0 start-0 m-1 badge rounded-pill bg-secondary"
+                                                style="font-size:0.6rem;padding:3px 6px;">
+                                                <i class="bi bi-lock-fill"></i>
+                                            </span>
+                                        <?php endif; ?>
+                                    </button>
+                                    <p class="text-center mt-1 mb-0 small fw-semibold <?= $ativo ? '' : 'text-secondary' ?>">
+                                        <?= htmlspecialchars($info['nome']) ?>
+                                        <?php if ($bloqueado): ?>
+                                            <span class="text-secondary" style="font-size:0.7rem;"> (bloqueado)</span>
+                                        <?php endif; ?>
+                                    </p>
+                                </form>
+                            </div>
+                        <?php endforeach; ?>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- ZONA DE RISCO -->
         <div class="col-12 mt-2">
             <div class="card border-danger border-opacity-25 bg-transparent shadow-sm rounded-4">
                 <div class="card-body p-4 d-flex justify-content-between align-items-center flex-wrap gap-3">
@@ -284,7 +386,7 @@ require_once 'geral/header.php';
             <form method="POST" action="">
                 <div class="modal-body p-4">
                     <input type="hidden" name="action" value="delete_account">
-                    
+
                     <?php if ($isGoogleUser): ?>
                         <p class="text-light mb-4">Como você acessa o sistema via Google, digite a palavra <strong class="text-danger">EXCLUIR</strong> abaixo para confirmar a exclusão definitiva da conta:</p>
                         <div class="mb-3">
@@ -298,7 +400,7 @@ require_once 'geral/header.php';
                             <input type="password" name="senha_confirmacao" id="senha_confirmacao" class="form-control form-control-lg bg-transparent border-secondary-subtle text-light shadow-none" required placeholder="Digite sua senha">
                         </div>
                     <?php endif; ?>
-                    
+
                 </div>
                 <div class="modal-footer border-top border-secondary-subtle">
                     <button type="button" class="btn btn-secondary rounded-pill px-4 fw-semibold" data-bs-dismiss="modal">Cancelar</button>
@@ -316,17 +418,17 @@ require_once 'geral/header.php';
     const inputConfirmaSenha = document.getElementById('confirma_senha');
 
     if (formSenha) {
-        formSenha.addEventListener('submit', function (e) {
+        formSenha.addEventListener('submit', function(e) {
             if (inputNovaSenha.value !== inputConfirmaSenha.value) {
-                e.preventDefault(); 
-                inputConfirmaSenha.classList.add('is-invalid'); 
-                inputConfirmaSenha.focus(); 
+                e.preventDefault();
+                inputConfirmaSenha.classList.add('is-invalid');
+                inputConfirmaSenha.focus();
             } else {
-                inputConfirmaSenha.classList.remove('is-invalid'); 
+                inputConfirmaSenha.classList.remove('is-invalid');
             }
         });
 
-        inputConfirmaSenha.addEventListener('input', function () {
+        inputConfirmaSenha.addEventListener('input', function() {
             inputConfirmaSenha.classList.remove('is-invalid');
         });
     }

@@ -43,6 +43,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             $_SESSION['usuario_nome'] = $usuario['Nome'];
             $_SESSION['nivel_acesso'] = strtolower($usuario['NivelAcesso']);
             $_SESSION['plano'] = strtolower($usuario['Plano'] ?? 'free');
+            $_SESSION['tema']  = strtolower($usuario['Tema'] ?? 'dark');
 
             if ($lembrar_me) {
                 $assinatura = hash_hmac('sha256', $usuario['IDUsuario'], AURALIS_COOKIE_SECRET);

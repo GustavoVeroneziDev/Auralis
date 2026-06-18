@@ -30,14 +30,25 @@ function _navBadgeTag($slug)
 $_ehFreeRestrito = !$_emTrial
     && isset($_SESSION['usuario_id'])
     && strtolower($_SESSION['plano'] ?? 'free') === 'free';
+
+// ── Tema ─────────────────────────────────────────────────────────────────
+$_temasDisponiveis = function_exists('temasDisponiveis') ? temasDisponiveis() : [
+    'dark'  => ['bs_mode' => 'dark'],
+    'white' => ['bs_mode' => 'light'],
+];
+$_temaAtual = isset($_SESSION['tema']) && isset($_temasDisponiveis[$_SESSION['tema']])
+    ? $_SESSION['tema']
+    : 'dark';
+$_bsMode    = $_temasDisponiveis[$_temaAtual]['bs_mode'] ?? 'dark';
+$_themeColor = $_bsMode === 'light' ? '#f0f2f5' : '#121418';
 ?>
 <!DOCTYPE html>
-<html lang="pt-BR" data-bs-theme="dark">
+<html lang="pt-BR" data-bs-theme="<?= htmlspecialchars($_bsMode) ?>">
 
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <meta name="theme-color" content="#121418">
+    <meta name="theme-color" content="<?= htmlspecialchars($_themeColor) ?>">
     <title>Auralis</title>
     <link rel="shortcut icon" href="/geral/img/icone.ico" type="image/x-icon">
     <link rel="manifest" href="/manifest.json">
@@ -53,13 +64,13 @@ $_ehFreeRestrito = !$_emTrial
     <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.css" rel="stylesheet">
     <link rel='stylesheet' href='https://cdn-uicons.flaticon.com/uicons-bold-rounded/css/uicons-bold-rounded.css'>
     <link rel='stylesheet' href='https://cdn-uicons.flaticon.com/uicons-solid-straight/css/uicons-solid-straight.css'>
+    <link rel="stylesheet" href="/geral/temas/<?= htmlspecialchars($_temaAtual) ?>.css">
     <link rel="stylesheet" href="/geral/style.css">
 </head>
 
 <body class="d-flex flex-column min-vh-100">
 
-    <nav class="navbar navbar-expand-lg border-bottom border-secondary-subtle sticky-top shadow-sm py-2"
-        style="background-color: rgba(18, 20, 24, 0.85); backdrop-filter: blur(12px);">
+    <nav class="navbar navbar-expand-lg border-bottom border-secondary-subtle sticky-top shadow-sm py-2">
 
         <div class="container-fluid px-3 px-xl-5" style="max-width: 1500px;">
 
@@ -116,11 +127,11 @@ $_ehFreeRestrito = !$_emTrial
                             </a>
                         </li>
                         <?php if ($_ehFreeRestrito): ?>
-                        <li class="nav-item">
-                            <a class="nav-link custom-link py-3 py-lg-2 <?php echo ($paginaAtual == 'planos.php') ? 'text-warning active' : ''; ?>" href="/planos.php">
-                                <i class="bi bi-star me-2"></i> Planos
-                            </a>
-                        </li>
+                            <li class="nav-item">
+                                <a class="nav-link custom-link py-3 py-lg-2 <?php echo ($paginaAtual == 'planos.php') ? 'text-warning active' : ''; ?>" href="/planos.php">
+                                    <i class="bi bi-star me-2"></i> Planos
+                                </a>
+                            </li>
                         <?php endif; ?>
                         <?php if (in_array(strtolower($_SESSION['nivel_acesso'] ?? ''), ['admin', 'supremo'])): ?>
                             <li class="nav-item">
