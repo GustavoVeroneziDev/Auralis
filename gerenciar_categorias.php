@@ -516,7 +516,7 @@ $listaIcones = [
     }
 
     .auralis-table>tbody>tr:hover>td {
-        background-color: rgba(212, 175, 55, 0.1) !important;
+        background-color: var(--table-row-hover) !important;
         color: var(--text-light-analysis) !important;
     }
 

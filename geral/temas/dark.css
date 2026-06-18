@@ -4,45 +4,61 @@
    ============================================================ */
 :root {
   /* Fundos */
-  --bg-dark:  #121418;
-  --bg-card:  #1e2126;
+  --bg-dark: #121418;
+  --bg-card: #1e2126;
   --bg-hover: #252a31;
 
   /* Acento / destaque */
-  --accent:       #d4af37;
+  --accent: #d4af37;
   --accent-light: #f9e596;
-  --gold-primary:           #ffb800;
-  --primary-gold-analysis:  #ffb800;
+  --gold-primary: #ffb800;
+  --primary-gold-analysis: #ffb800;
 
   /* Texto */
-  --text-main:  #f8fafc;
+  --text-main: #f8fafc;
   --text-muted: #a1a1aa;
 
   /* Bootstrap overrides */
-  --bs-primary:          #d4af37;
-  --bs-primary-rgb:      212, 175, 55;
-  --bs-link-color:       #d4af37;
+  --bs-primary: #d4af37;
+  --bs-primary-rgb: 212, 175, 55;
+  --bs-link-color: #d4af37;
   --bs-link-hover-color: #f9e596;
-  --bs-body-bg:          #121418;
-  --bs-body-color:       #f8fafc;
-  --bs-border-color:     #2d3139;
-  --bs-secondary-bg:     #1e2126;
+  --bs-body-bg: #121418;
+  --bs-body-color: #f8fafc;
+  --bs-border-color: #2d3139;
+  --bs-secondary-bg: #1e2126;
 
   /* Componentes */
-  --navbar-bg:          rgba(18, 20, 24, 0.85);
+  --navbar-bg: rgba(18, 20, 24, 0.85);
   --navbar-collapse-bg: rgba(18, 20, 24, 0.97);
-  --card-border-color:  rgba(212, 175, 55, 0.08);
+  --card-border-color: rgba(212, 175, 55, 0.08);
   --card-border-feature: rgba(212, 175, 55, 0.1);
-  --card-glow:          rgba(212, 175, 55, 0.1);
-  --scrollbar-thumb:    rgba(212, 175, 55, 0.3);
+  --card-glow: rgba(212, 175, 55, 0.1);
+  --scrollbar-thumb: rgba(212, 175, 55, 0.3);
 
   /* Vars de análise (páginas de formulário/análise) */
-  --bg-main-analysis:      #121418;
-  --bg-card-analysis:      #252a31;
-  --bg-charcoal-analysis:  #1e2126;
+  --bg-main-analysis: #121418;
+  --bg-card-analysis: #252a31;
+  --bg-charcoal-analysis: #1e2126;
   --border-color-analysis: #2d3139;
-  --text-light-analysis:   #f8fafc;
-  --text-muted-analysis:   #a1a1aa;
-  --gold-glow-analysis:    rgba(212, 175, 55, 0.3);
-  --text-gold-analysis:    #d4af37;
+  --text-light-analysis: #f8fafc;
+  --text-muted-analysis: #a1a1aa;
+  --gold-glow-analysis: rgba(212, 175, 55, 0.3);
+  --text-gold-analysis: #d4af37;
+
+  /* Cores semânticas de status */
+  --color-income-bg: rgba(6, 214, 160, 0.18);
+  --color-income-text: #6ee7c7;
+  --color-income-border: rgba(6, 214, 160, 0.5);
+  --color-expense-bg: rgba(230, 57, 70, 0.18);
+  --color-expense-text: #f87171;
+  --color-expense-border: rgba(230, 57, 70, 0.5);
+  --color-card-bg: rgba(124, 58, 237, 0.18);
+  --color-card-text: #a78bfa;
+  --color-card-border: rgba(124, 58, 237, 0.5);
+  --color-pending-bg: rgba(59, 130, 246, 0.22);
+  --color-pending-text: #a0c4f8;
+  --color-today-bg: rgba(255, 184, 0, 0.22);
+  --color-today-text: #f5e2a0;
+  --table-row-hover: rgba(212, 175, 55, 0.1);
 }

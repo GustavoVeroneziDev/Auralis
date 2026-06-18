@@ -579,18 +579,18 @@ require_once 'geral/header.php';
                             <div class="d-flex gap-2 mb-4 p-1 rounded-3" style="background:var(--bg-hover);border:1px solid var(--border-color-analysis);">
                                 <a href="?tipo=receita<?= !empty($_GET['data']) ? '&data=' . urlencode($_GET['data']) : '' ?><?= !empty($_GET['carteira_id']) ? '&carteira_id=' . urlencode($_GET['carteira_id']) : '' ?>&voltar=<?= urlencode($_GET['voltar'] ?? 'dashboard.php') ?>"
                                     class="btn flex-grow-1 fw-bold rounded-3 py-2 d-flex align-items-center justify-content-center gap-1"
-                                    style="<?= $tipo_sugerido === 'receita' ? 'background:rgba(6,214,160,0.18);color:#6ee7c7;border:1px solid rgba(6,214,160,0.5);' : 'background:transparent;color:#555;border:1px solid transparent;' ?>">
+                                    style="<?= $tipo_sugerido === 'receita' ? 'background:var(--color-income-bg);color:var(--color-income-text);border:1px solid var(--color-income-border);' : 'background:transparent;color:var(--text-muted);border:1px solid transparent;' ?>">
                                     <i class="bi bi-arrow-up-short" style="font-size:1.3rem;"></i> Receita
                                 </a>
                                 <a href="?tipo=despesa<?= !empty($_GET['data']) ? '&data=' . urlencode($_GET['data']) : '' ?><?= !empty($_GET['carteira_id']) ? '&carteira_id=' . urlencode($_GET['carteira_id']) : '' ?>&voltar=<?= urlencode($_GET['voltar'] ?? 'dashboard.php') ?>"
                                     class="btn flex-grow-1 fw-bold rounded-3 py-2 d-flex align-items-center justify-content-center gap-1"
-                                    style="<?= $tipo_sugerido === 'despesa' ? 'background:rgba(230,57,70,0.18);color:#f87171;border:1px solid rgba(230,57,70,0.5);' : 'background:transparent;color:#555;border:1px solid transparent;' ?>">
+                                    style="<?= $tipo_sugerido === 'despesa' ? 'background:var(--color-expense-bg);color:var(--color-expense-text);border:1px solid var(--color-expense-border);' : 'background:transparent;color:var(--text-muted);border:1px solid transparent;' ?>">
                                     <i class="bi bi-arrow-down-short" style="font-size:1.3rem;"></i> Despesa
                                 </a>
                                 <?php if (!empty($cartoes)): ?>
                                 <a href="?tipo=cartao<?= !empty($_GET['data']) ? '&data=' . urlencode($_GET['data']) : '' ?>&voltar=<?= urlencode($_GET['voltar'] ?? 'dashboard.php') ?><?= !empty($_GET['cartao_id']) ? '&cartao_id=' . urlencode($_GET['cartao_id']) : '' ?>"
                                     class="btn flex-grow-1 fw-bold rounded-3 py-2 d-flex align-items-center justify-content-center gap-1"
-                                    style="<?= $tipo_sugerido === 'cartao' ? 'background:rgba(124,58,237,0.18);color:#a78bfa;border:1px solid rgba(124,58,237,0.5);' : 'background:transparent;color:#555;border:1px solid transparent;' ?>">
+                                    style="<?= $tipo_sugerido === 'cartao' ? 'background:var(--color-card-bg);color:var(--color-card-text);border:1px solid var(--color-card-border);' : 'background:transparent;color:var(--text-muted);border:1px solid transparent;' ?>">
                                     <i class="bi bi-credit-card-2-front" style="font-size:1rem;"></i> Cartão
                                 </a>
                                 <?php endif; ?>

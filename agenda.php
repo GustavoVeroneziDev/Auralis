@@ -497,23 +497,23 @@ require_once 'geral/header.php';
     }
 
     .calendar-event.evento-pago {
-        background-color: rgba(6, 214, 160, 0.18);
-        color: #b8f5e8;
+        background-color: var(--color-income-bg);
+        color: var(--color-income-text);
     }
 
     .calendar-event.evento-atrasado {
-        background-color: rgba(230, 57, 70, 0.22);
-        color: #f8b4b9;
+        background-color: var(--color-expense-bg);
+        color: var(--color-expense-text);
     }
 
     .calendar-event.evento-hoje {
-        background-color: rgba(255, 184, 0, 0.22);
-        color: #f5e2a0;
+        background-color: var(--color-today-bg);
+        color: var(--color-today-text);
     }
 
     .calendar-event.evento-pendente {
-        background-color: rgba(59, 130, 246, 0.22);
-        color: #a0c4f8;
+        background-color: var(--color-pending-bg);
+        color: var(--color-pending-text);
     }
 
     .event-desc {
