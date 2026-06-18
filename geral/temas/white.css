@@ -125,6 +125,8 @@
   --bs-table-striped-bg: var(--bg-hover);
   color: var(--text-main) !important;
   background-color: var(--bg-hover) !important;
+  /* Bootstrap 5.3 usa inset box-shadow para colorir células — anula aqui */
+  box-shadow: none !important;
   border-color: var(--bs-border-color) !important;
 }
 /* table-hover sobre table-dark → hover dourado */
@@ -132,6 +134,7 @@
 .table-dark tbody tr:hover td,
 .table-dark tbody tr:hover th {
   background-color: var(--table-row-hover) !important;
+  box-shadow: none !important;
   color: var(--text-main) !important;
 }
 
