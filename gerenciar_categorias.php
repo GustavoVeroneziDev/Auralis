@@ -247,7 +247,7 @@ $listaIcones = [
     ?>
     <div class="row g-4">
         <div class="col-md-5 col-lg-4">
-            <div class="card bg-body-tertiary border-secondary-subtle shadow-sm rounded-4 h-100">
+            <div class="card border-secondary-subtle shadow-sm rounded-4 h-100">
                 <div class="card-body p-4">
                     <h5 class="text-light fw-bold mb-4 d-flex align-items-center gap-2">
                         <i class="bi bi-plus-circle text-primary" style="color: var(--primary-gold-analysis) !important;"></i> Nova Categoria
@@ -290,7 +290,7 @@ $listaIcones = [
                             </div>
 
                             <div class="mb-4 auralis-line-input pb-2">
-                                <input type="text" name="nome_categoria" class="form-control bg-transparent border-0 text-light-analysis px-0 shadow-none fs-6 fw-bold" placeholder="Nome Ex: Supermercado" required autocomplete="off">
+                                <input type="text" name="nome_categoria" class="form-control bg-transparent border-0 text-light-analysis px-0 shadow-none fs-6 fw-bold" placeholder="Ex: Supermercado" required autocomplete="off">
                             </div>
 
                             <div class="mb-4">
@@ -516,7 +516,8 @@ $listaIcones = [
     }
 
     .auralis-table>tbody>tr:hover>td {
-        background-color: var(--bg-hover) !important;
+        background-color: rgba(212, 175, 55, 0.1) !important;
+        color: var(--text-light-analysis) !important;
     }
 
     .bg-charcoal-analysis {
@@ -553,8 +554,9 @@ $listaIcones = [
     }
 
     .btn-icon-select:hover {
-        background-color: #333;
-        color: var(--text-light-analysis);
+        background-color: rgba(212, 175, 55, 0.15);
+        border-color: var(--primary-gold-analysis);
+        color: var(--primary-gold-analysis);
     }
 
     .btn-check:checked+.btn-icon-select {
@@ -602,7 +604,7 @@ $listaIcones = [
 
 <div class="modal fade" id="modalEditarCategoria" tabindex="-1" aria-hidden="true">
     <div class="modal-dialog modal-dialog-centered">
-        <div class="modal-content bg-body-tertiary border-secondary-subtle shadow-lg rounded-4">
+        <div class="modal-content border-secondary-subtle shadow-lg rounded-4">
             <div class="modal-header border-bottom border-secondary-subtle p-3">
                 <h5 class="modal-title text-light fw-bold d-flex align-items-center gap-2">
                     <i class="bi bi-pencil-square" style="color: #D4AF37;"></i> Editar Categoria

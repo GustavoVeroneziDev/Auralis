@@ -111,11 +111,11 @@
   background-color: var(--bg-hover) !important;
   border-color: var(--bs-border-color) !important;
 }
-/* table-hover sobre table-dark → linha mais clara no hover */
+/* table-hover sobre table-dark → hover dourado suave */
 .table-dark.table-hover > tbody > tr:hover > *,
 .table-dark tbody tr:hover td,
 .table-dark tbody tr:hover th {
-  background-color: var(--bg-card) !important;
+  background-color: rgba(184, 150, 46, 0.1) !important;
   color: var(--text-main) !important;
 }
 
@@ -165,10 +165,10 @@
   color: var(--text-muted) !important;
 }
 
-/* Inputs bg-transparent no tema claro → fundo de card */
+/* Inputs bg-transparent no tema claro → realmente transparentes (underline style) */
 .bg-transparent.form-control,
 .bg-transparent.form-select {
-  background-color: var(--bg-hover) !important;
+  background-color: transparent !important;
 }
 
 /* Badges e chips de plano */
