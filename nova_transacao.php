@@ -576,7 +576,7 @@ require_once 'geral/header.php';
                         <?php endif; ?>
 
                         <?php if (!$is_edicao): ?>
-                            <div class="d-flex gap-2 mb-4 p-1 rounded-3" style="background:rgba(255,255,255,0.03);border:1px solid #333;">
+                            <div class="d-flex gap-2 mb-4 p-1 rounded-3" style="background:var(--bg-hover);border:1px solid var(--border-color-analysis);">
                                 <a href="?tipo=receita<?= !empty($_GET['data']) ? '&data=' . urlencode($_GET['data']) : '' ?><?= !empty($_GET['carteira_id']) ? '&carteira_id=' . urlencode($_GET['carteira_id']) : '' ?>&voltar=<?= urlencode($_GET['voltar'] ?? 'dashboard.php') ?>"
                                     class="btn flex-grow-1 fw-bold rounded-3 py-2 d-flex align-items-center justify-content-center gap-1"
                                     style="<?= $tipo_sugerido === 'receita' ? 'background:rgba(6,214,160,0.18);color:#6ee7c7;border:1px solid rgba(6,214,160,0.5);' : 'background:transparent;color:#555;border:1px solid transparent;' ?>">
@@ -964,7 +964,7 @@ require_once 'geral/header.php';
                                             <?php foreach ($comprovantes as $comp): ?>
                                                 <?php $isImg = str_starts_with($comp['TipoMime'], 'image/'); ?>
                                                 <div class="d-flex align-items-center gap-2 mb-2 p-2 rounded-3"
-                                                    style="background:rgba(255,255,255,0.04); border:1px solid #333;"
+                                                    style="background:var(--bg-hover);border:1px solid var(--border-color-analysis);"
                                                     id="comp-<?= htmlspecialchars($comp['IDComprovante']) ?>">
                                                     <i class="bi <?= $isImg ? 'bi-image' : 'bi-file-earmark-pdf' ?> flex-shrink-0"
                                                         style="color:<?= $isImg ? '#6ee7c7' : '#f87171' ?>; font-size:1.05rem;"></i>
@@ -984,7 +984,7 @@ require_once 'geral/header.php';
                                                     </a>
                                                     <a href="/comprovante/ver.php?id=<?= htmlspecialchars($comp['IDComprovante']) ?>&download=1"
                                                         class="btn btn-sm rounded-circle d-flex align-items-center justify-content-center flex-shrink-0"
-                                                        style="width:28px;height:28px;padding:0;background:rgba(255,255,255,0.05);color:#888;border:1px solid #333;"
+                                                        style="width:28px;height:28px;padding:0;background:var(--bg-hover);color:var(--text-muted);border:1px solid var(--border-color-analysis);"
                                                         title="Baixar">
                                                         <i class="bi bi-download" style="font-size:0.65rem;"></i>
                                                     </a>
@@ -1060,18 +1060,6 @@ require_once 'geral/header.php';
 
 
 <style>
-    :root {
-        --primary-gold-analysis: #AA8C2C;
-        --gold-glow-analysis: rgba(170, 140, 44, 0.3);
-        --bg-main-analysis: #1F1F1F;
-        --bg-card-analysis: #2A2A2A;
-        --bg-charcoal-analysis: #222222;
-        --border-color-analysis: #333333;
-        --text-light-analysis: #E0E0E0;
-        --text-muted-analysis: #888888;
-        --text-gold-analysis: #D4AF37;
-    }
-
     .auralis-premium-form .text-light {
         color: var(--text-light-analysis) !important;
     }
@@ -1172,7 +1160,7 @@ require_once 'geral/header.php';
     }
 
     .badge-tipo {
-        background: linear-gradient(135deg, #2a2a2a, #1f1f1f);
+        background: var(--bg-charcoal-analysis);
         border: 1px solid var(--border-color-analysis);
         min-width: 180px;
     }
@@ -1553,7 +1541,7 @@ require_once 'geral/header.php';
                 const kb = Math.round(f.size / 1024);
                 const div = document.createElement('div');
                 div.className = 'd-flex align-items-center gap-2 p-2 rounded-3 mb-1';
-                div.style.cssText = 'background:rgba(255,255,255,0.04);border:1px solid #333;';
+                div.style.cssText = 'background:var(--bg-hover);border:1px solid var(--border-color-analysis);';
                 div.innerHTML =
                     '<i class="bi ' + (isImg ? 'bi-image' : 'bi-file-earmark-pdf') + ' flex-shrink-0" style="color:' + (isImg ? '#6ee7c7' : '#f87171') + ';font-size:1rem;"></i>' +
                     '<span class="text-secondary text-truncate flex-grow-1" style="font-size:0.78rem;max-width:220px;">' + f.name + '</span>' +

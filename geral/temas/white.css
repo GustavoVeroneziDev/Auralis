@@ -4,37 +4,47 @@
    ============================================================ */
 :root {
   /* Fundos */
-  --bg-dark:  #f0f2f5;
-  --bg-card:  #ffffff;
-  --bg-hover: #e8eaf0;
+  --bg-dark:  #f2f5f9;       /* bg da página — cinza-azulado pastel */
+  --bg-card:  #ffffff;       /* superfícies de card */
+  --bg-hover: #eaeff6;       /* hover / seções sutis */
 
   /* Acento / destaque — dourado escurecido para contraste no fundo claro */
   --accent:       #b8962e;
   --accent-light: #d4af37;
   --gold-primary:           #c8940a;
   --primary-gold-analysis:  #c8940a;
+  --gold-glow-analysis:     rgba(184, 150, 46, 0.25);
+  --text-gold-analysis:     #c8940a;
 
   /* Texto */
-  --text-main:  #1a1d21;
-  --text-muted: #6b7280;
+  --text-main:  #1e2530;     /* quase-preto levemente azulado */
+  --text-muted: #64748b;     /* slate médio */
 
   /* Bootstrap overrides */
   --bs-primary:          #b8962e;
   --bs-primary-rgb:      184, 150, 46;
   --bs-link-color:       #b8962e;
   --bs-link-hover-color: #d4af37;
-  --bs-body-bg:          #f0f2f5;
-  --bs-body-color:       #1a1d21;
-  --bs-border-color:     #d1d5db;
+  --bs-body-bg:          #f2f5f9;
+  --bs-body-color:       #1e2530;
+  --bs-border-color:     #d0d8e8;
   --bs-secondary-bg:     #ffffff;
 
   /* Componentes */
-  --navbar-bg:           rgba(255, 255, 255, 0.92);
-  --navbar-collapse-bg:  rgba(248, 249, 250, 0.98);
-  --card-border-color:   rgba(0, 0, 0, 0.06);
-  --card-border-feature: rgba(184, 150, 46, 0.2);
+  --navbar-bg:           rgba(255, 255, 255, 0.93);
+  --navbar-collapse-bg:  rgba(248, 250, 253, 0.98);
+  --card-border-color:   rgba(180, 190, 210, 0.45);
+  --card-border-feature: rgba(184, 150, 46, 0.22);
   --card-glow:           rgba(184, 150, 46, 0.1);
   --scrollbar-thumb:     rgba(184, 150, 46, 0.3);
+
+  /* Vars de análise (páginas de formulário/análise) */
+  --bg-main-analysis:      #f2f5f9;
+  --bg-card-analysis:      #ffffff;
+  --bg-charcoal-analysis:  #edf1f7;
+  --border-color-analysis: #c9d3e0;
+  --text-light-analysis:   #1e2530;
+  --text-muted-analysis:   #64748b;
 }
 
 /* ============================================================

@@ -333,14 +333,6 @@ require_once '../geral/header.php';
 </script>
 
 <style>
-    :root {
-        --primary-gold-analysis: #AA8C2C;
-        --bg-card-analysis: #2A2A2A;
-        --bg-charcoal-analysis: #222222;
-        --border-color-analysis: #333333;
-        --text-light-analysis: #E0E0E0;
-    }
-
     .bg-dark {
         background-color: var(--bg-charcoal-analysis) !important;
     }

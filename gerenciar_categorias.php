@@ -480,15 +480,6 @@ $listaIcones = [
 </main>
 
 <style>
-    :root {
-        --primary-gold-analysis: #AA8C2C;
-        --bg-card-analysis: #2A2A2A;
-        --bg-charcoal-analysis: #222222;
-        --border-color-analysis: #333333;
-        --text-light-analysis: #E0E0E0;
-        --text-muted-analysis: #888888;
-    }
-
     .bg-dark {
         background-color: var(--bg-charcoal-analysis) !important;
     }
@@ -525,11 +516,11 @@ $listaIcones = [
     }
 
     .auralis-table>tbody>tr:hover>td {
-        background-color: rgba(255, 255, 255, 0.02) !important;
+        background-color: var(--bg-hover) !important;
     }
 
     .bg-charcoal-analysis {
-        background-color: #1a1d21 !important;
+        background-color: var(--bg-charcoal-analysis) !important;
     }
 
     .fs-7 {

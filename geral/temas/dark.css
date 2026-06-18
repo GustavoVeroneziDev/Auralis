@@ -35,4 +35,14 @@
   --card-border-feature: rgba(212, 175, 55, 0.1);
   --card-glow:          rgba(212, 175, 55, 0.1);
   --scrollbar-thumb:    rgba(212, 175, 55, 0.3);
+
+  /* Vars de análise (páginas de formulário/análise) */
+  --bg-main-analysis:      #121418;
+  --bg-card-analysis:      #252a31;
+  --bg-charcoal-analysis:  #1e2126;
+  --border-color-analysis: #2d3139;
+  --text-light-analysis:   #f8fafc;
+  --text-muted-analysis:   #a1a1aa;
+  --gold-glow-analysis:    rgba(212, 175, 55, 0.3);
+  --text-gold-analysis:    #d4af37;
 }
