@@ -1338,22 +1338,23 @@ require_once 'geral/header.php';
 
 <style>
     .bg-charcoal-analysis {
-        background-color: #1a1d21;
+        background-color: var(--bg-charcoal-analysis);
     }
 
     .auralis-table>tbody>tr.cursor-pointer:hover>td {
-        background-color: rgba(255, 255, 255, 0.03) !important;
+        background-color: var(--table-row-hover) !important;
+        color: var(--text-main) !important;
     }
 
     .cc-dash-card:hover {
-        background: #1c1f2b !important;
-        border-color: #3a3d4e !important;
+        background: var(--bg-hover) !important;
+        border-color: var(--border-color-analysis) !important;
         transform: translateY(-2px);
-        box-shadow: 0 6px 20px rgba(0, 0, 0, 0.4) !important;
+        box-shadow: 0 6px 20px var(--gold-glow-analysis) !important;
     }
 
     .table-active {
-        background-color: #1a1d21 !important;
+        background-color: var(--bg-charcoal-analysis) !important;
     }
 
     .no-spinners::-webkit-outer-spin-button,
