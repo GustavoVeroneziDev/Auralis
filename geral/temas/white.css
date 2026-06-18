@@ -111,6 +111,13 @@
   background-color: var(--bg-hover) !important;
   border-color: var(--bs-border-color) !important;
 }
+/* table-hover sobre table-dark → linha mais clara no hover */
+.table-dark.table-hover > tbody > tr:hover > *,
+.table-dark tbody tr:hover td,
+.table-dark tbody tr:hover th {
+  background-color: var(--bg-card) !important;
+  color: var(--text-main) !important;
+}
 
 /* Modais com background inline — sobrescreve as mais comuns */
 .modal-content {

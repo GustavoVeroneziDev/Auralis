@@ -232,7 +232,7 @@ require_once 'geral/header.php';
                             <?= htmlspecialchars($nome_carteira_atual) ?>
                         </span>
                     </button>
-                    <ul class="dropdown-menu dropdown-menu-dark shadow-lg border-secondary-subtle mt-2" style="background-color:#1a1d21; min-width:220px;">
+                    <ul class="dropdown-menu dropdown-menu-dark shadow-lg border-secondary-subtle mt-2" style="background-color:var(--bg-card-analysis); min-width:220px;">
                         <li class="px-3 pt-2 pb-1 text-secondary small text-uppercase fw-bold tracking-wide">Alternar Carteira</li>
                         <li>
                             <hr class="dropdown-divider border-secondary-subtle my-1">
@@ -288,7 +288,7 @@ require_once 'geral/header.php';
     <!-- ── Cards de resumo ───────────────────────────────────────────────── -->
     <div class="row g-3 mb-4">
         <div class="col-md-4">
-            <div class="card border-secondary-subtle shadow-sm rounded-4" style="background-color:#1c1f24;">
+            <div class="card border-secondary-subtle shadow-sm rounded-4" style="background-color:var(--bg-card-analysis);">
                 <div class="card-body p-3">
                     <div class="d-flex align-items-center gap-2 mb-2" style="font-size:0.8rem; color:#888;">
                         <i class="bi bi-check-circle text-success"></i>Balanço efetivado no mês
@@ -298,7 +298,7 @@ require_once 'geral/header.php';
             </div>
         </div>
         <div class="col-md-4">
-            <div class="card border-secondary-subtle shadow-sm rounded-4" style="background-color:#1c1f24;">
+            <div class="card border-secondary-subtle shadow-sm rounded-4" style="background-color:var(--bg-card-analysis);">
                 <div class="card-body p-3">
                     <div class="d-flex align-items-center gap-2 mb-2" style="font-size:0.8rem; color:#888;">
                         <i class="bi bi-hourglass-split" style="color:#E63946;"></i> A pagar no mês
@@ -308,7 +308,7 @@ require_once 'geral/header.php';
             </div>
         </div>
         <div class="col-md-4">
-            <div class="card border-secondary-subtle shadow-sm rounded-4" style="background-color:#1c1f24;">
+            <div class="card border-secondary-subtle shadow-sm rounded-4" style="background-color:var(--bg-card-analysis);">
                 <div class="card-body p-3">
                     <div class="d-flex align-items-center gap-2 mb-2" style="font-size:0.8rem; color:#888;">
                         <i class="bi bi-clock" style="color:#06D6A0;"></i> A receber no mês
@@ -324,7 +324,7 @@ require_once 'geral/header.php';
 
         <!-- Calendário -->
         <div class="col-xl-8 col-lg-7">
-            <div class="card border-secondary-subtle shadow-sm rounded-4 overflow-hidden" style="background-color:#1c1f24;">
+            <div class="card border-secondary-subtle shadow-sm rounded-4 overflow-hidden" style="background-color:var(--bg-card-analysis);">
                 <div class="card-body p-2 p-md-3">
                     <div id="agenda-grid" class="calendar-grid"></div>
                 </div>
@@ -336,7 +336,7 @@ require_once 'geral/header.php';
 
             <!-- Atrasadas -->
             <div id="panel-atrasadas" class="rounded-4 mb-3 d-none overflow-hidden"
-                style="background-color:#1e1214; border:1px solid rgba(230,57,70,0.35);">
+                style="background-color:var(--bg-card-analysis); border:1px solid rgba(230,57,70,0.35);">
                 <div class="d-flex align-items-center gap-2 px-4 py-3"
                     style="background-color:rgba(230,57,70,0.1); border-bottom:1px solid rgba(230,57,70,0.2);">
                     <i class="bi bi-exclamation-triangle-fill text-danger"></i>
@@ -349,7 +349,7 @@ require_once 'geral/header.php';
 
             <!-- Vencem hoje -->
             <div id="panel-hoje" class="rounded-4 mb-3 d-none overflow-hidden"
-                style="background-color:#1e1a10; border:1px solid rgba(255,184,0,0.35);">
+                style="background-color:var(--bg-card-analysis); border:1px solid rgba(255,184,0,0.35);">
                 <div class="d-flex align-items-center gap-2 px-4 py-3"
                     style="background-color:rgba(255,184,0,0.08); border-bottom:1px solid rgba(255,184,0,0.2);">
                     <i class="bi bi-bell-fill" style="color:#FFB800;"></i>
@@ -362,7 +362,7 @@ require_once 'geral/header.php';
 
             <!-- Próximos 7 dias -->
             <div id="panel-proximos" class="rounded-4 d-none overflow-hidden"
-                style="background-color:#10141e; border:1px solid rgba(59,130,246,0.35);">
+                style="background-color:var(--bg-card-analysis); border:1px solid rgba(59,130,246,0.35);">
                 <div class="d-flex align-items-center gap-2 px-4 py-3"
                     style="background-color:rgba(59,130,246,0.08); border-bottom:1px solid rgba(59,130,246,0.2);">
                     <i class="bi bi-calendar-event" style="color:#60a5fa;"></i>
@@ -395,14 +395,14 @@ require_once 'geral/header.php';
         display: grid;
         grid-template-columns: repeat(7, 1fr);
         gap: 1px;
-        background-color: #2a2d33;
+        background-color: var(--border-color-analysis);
         border-radius: 10px;
         overflow: hidden;
     }
 
     .calendar-day-header {
-        background-color: #1a1d21;
-        color: #AA8C2C;
+        background-color: var(--bg-card-analysis);
+        color: var(--primary-gold-analysis);
         text-align: center;
         padding: 10px 4px;
         font-weight: 700;
@@ -412,7 +412,7 @@ require_once 'geral/header.php';
     }
 
     .calendar-day {
-        background-color: #1c1f24;
+        background-color: var(--bg-card-analysis);
         min-height: 110px;
         max-height: 200px;
         padding: 6px;
@@ -424,22 +424,22 @@ require_once 'geral/header.php';
     }
 
     .calendar-day:hover:not(.empty) {
-        background-color: #21252b;
+        background-color: var(--bg-hover);
     }
 
     .calendar-day.empty {
-        background-color: #15171a;
+        background-color: var(--bg-main-analysis);
         opacity: 0.4;
     }
 
     .calendar-day.today {
         background-color: rgba(170, 140, 44, 0.05);
-        box-shadow: inset 0 0 0 1px #AA8C2C;
+        box-shadow: inset 0 0 0 1px var(--primary-gold-analysis);
     }
 
     .calendar-day.today .day-number {
-        background-color: #AA8C2C;
-        color: #121418;
+        background-color: var(--primary-gold-analysis);
+        color: #1a1d21;
         border-radius: 50%;
         width: 22px;
         height: 22px;
@@ -451,7 +451,7 @@ require_once 'geral/header.php';
     .day-number {
         font-weight: 700;
         font-size: 0.8rem;
-        color: #666;
+        color: var(--text-muted-analysis);
         margin-bottom: 5px;
         line-height: 1;
     }
@@ -470,7 +470,7 @@ require_once 'geral/header.php';
     }
 
     .day-events::-webkit-scrollbar-thumb {
-        background-color: #444;
+        background-color: var(--border-color-analysis);
         border-radius: 10px;
     }
 
@@ -530,7 +530,7 @@ require_once 'geral/header.php';
         align-items: center;
         justify-content: space-between;
         padding: 10px 16px;
-        border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+        border-bottom: 1px solid var(--bs-border-color);
         cursor: pointer;
         transition: background-color 0.15s ease;
     }
@@ -540,7 +540,7 @@ require_once 'geral/header.php';
     }
 
     .sidebar-item:hover {
-        background-color: rgba(255, 255, 255, 0.04);
+        background-color: var(--bg-hover);
     }
 
     /* ── Botões de ação na célula ── */
@@ -1026,7 +1026,7 @@ require_once 'geral/header.php';
     (function () {
         const menu = document.createElement('div');
         menu.id = 'ctx-pill';
-        menu.style.cssText = 'position:fixed;z-index:9999;display:none;background:#1e2128;border:1px solid rgba(255,255,255,.1);border-radius:10px;box-shadow:0 8px 28px rgba(0,0,0,.55);min-width:168px;overflow:hidden;';
+        menu.style.cssText = 'position:fixed;z-index:9999;display:none;background:var(--bg-card-analysis);border:1px solid var(--border-color-analysis);border-radius:10px;box-shadow:0 8px 28px rgba(0,0,0,.25);min-width:168px;overflow:hidden;';
         menu.innerHTML = `
             <div id="ctx-editar"  class="ctx-item"><i class="bi bi-pencil-square" style="color:#f5c542;"></i> Editar</div>
             <div id="ctx-comp"    class="ctx-item" style="display:none;"><i class="bi bi-eye" style="color:#38bdf8;"></i> Ver comprovante</div>
@@ -1035,7 +1035,7 @@ require_once 'geral/header.php';
         document.body.appendChild(menu);
 
         const style = document.createElement('style');
-        style.textContent = `.ctx-item{padding:9px 16px;cursor:pointer;font-size:.855rem;color:#f8fafc;display:flex;align-items:center;gap:9px;transition:background .1s}.ctx-item:hover{background:rgba(255,255,255,.07)}.ctx-danger{color:#f87171!important}.ctx-sep{height:1px;background:rgba(255,255,255,.08);margin:3px 0}`;
+        style.textContent = `.ctx-item{padding:9px 16px;cursor:pointer;font-size:.855rem;color:var(--text-light-analysis);display:flex;align-items:center;gap:9px;transition:background .1s}.ctx-item:hover{background:var(--bg-hover)}.ctx-danger{color:#f87171!important}.ctx-sep{height:1px;background:var(--border-color-analysis);margin:3px 0}`;
         document.head.appendChild(style);
 
         let _transacao = null;
@@ -1100,7 +1100,7 @@ require_once 'geral/header.php';
             const fmtD  = d => d ? d.slice(8,10)+'/'+d.slice(5,7)+'/'+d.slice(0,4) : '—';
             const fmtV  = v => parseFloat(v).toLocaleString('pt-BR', {minimumFractionDigits:2, maximumFractionDigits:2});
 
-            let html = `<div class="px-4 pt-3 pb-3" style="border-bottom:1px solid #2a2d38;">
+            let html = `<div class="px-4 pt-3 pb-3" style="border-bottom:1px solid var(--border-color-analysis);">
                 <div class="d-flex align-items-center gap-3">
                     <div class="rounded-3 d-flex align-items-center justify-content-center flex-shrink-0"
                          style="width:42px;height:42px;background:${cor}22;">
@@ -1125,7 +1125,7 @@ require_once 'geral/header.php';
                     const dt = l.DataCompra ? l.DataCompra.slice(8,10)+'/'+l.DataCompra.slice(5,7) : '—';
                     const parc = parseInt(l.TotalParcelas) > 1
                         ? `<span style="display:inline-flex;align-items:center;background:rgba(124,58,237,.18);color:#a78bfa;border:1px solid rgba(124,58,237,.3);border-radius:999px;padding:0 5px;font-size:0.58rem;font-weight:700;margin-left:4px;">${l.ParcelaAtual}/${l.TotalParcelas}x</span>` : '';
-                    html += `<div class="d-flex align-items-center gap-3 px-4 py-2" style="border-bottom:1px solid rgba(255,255,255,.04);">
+                    html += `<div class="d-flex align-items-center gap-3 px-4 py-2" style="border-bottom:1px solid var(--bs-border-color);">
                         <div style="min-width:0;flex:1;">
                             <div class="text-light d-flex align-items-center flex-wrap" style="font-size:0.83rem;">${esc(l.Descricao)}${parc}</div>
                             <div class="text-secondary" style="font-size:0.7rem;">${l.NomeCategoria ? esc(l.NomeCategoria) : '—'} · ${dt}</div>
@@ -1133,7 +1133,7 @@ require_once 'geral/header.php';
                         <span class="fw-bold text-danger flex-shrink-0" style="font-size:0.85rem;">R$ ${fmtV(l.Valor)}</span>
                     </div>`;
                 });
-                html += `<div class="d-flex justify-content-between px-4 py-3" style="border-top:1px solid #2a2d38;">
+                html += `<div class="d-flex justify-content-between px-4 py-3" style="border-top:1px solid var(--border-color-analysis);">
                     <span class="text-secondary fw-semibold" style="font-size:0.83rem;">Total</span>
                     <span class="fw-bold text-danger" style="font-size:0.9rem;">R$ ${fmtV(total)}</span>
                 </div>`;
@@ -1177,7 +1177,7 @@ require_once 'geral/header.php';
                         html += `<div class="text-center"><img src="${url}" class="img-fluid rounded-3" style="max-height:380px;object-fit:contain;" alt="${a.NomeOriginal}">
                                  <p class="text-secondary small mt-2">${a.NomeOriginal}</p></div>`;
                     } else {
-                        html += `<div class="d-flex align-items-center gap-3 p-3 rounded-3" style="background:rgba(255,255,255,0.04);border:1px solid #333;">
+                        html += `<div class="d-flex align-items-center gap-3 p-3 rounded-3" style="background:var(--bg-hover);border:1px solid var(--border-color-analysis);">
                                      <i class="bi bi-file-earmark-pdf fs-2 text-danger"></i>
                                      <div class="flex-grow-1"><p class="text-light mb-0 fw-semibold">${a.NomeOriginal}</p></div>
                                      <a href="${url}" target="_blank" class="btn btn-sm btn-outline-secondary rounded-pill">Abrir</a>
@@ -1197,7 +1197,7 @@ require_once 'geral/header.php';
      ═══════════════════════════════════════════════════════════════════ -->
 <div class="modal fade" id="modalDia" tabindex="-1" aria-hidden="true">
     <div class="modal-dialog modal-dialog-centered modal-dialog-scrollable" style="max-width: 500px;">
-        <div class="modal-content border-secondary-subtle rounded-4" style="background:#1a1d21;">
+        <div class="modal-content border-secondary-subtle rounded-4" style="background:var(--bg-card-analysis);">
             <div class="modal-header border-bottom border-secondary-subtle px-4 py-3 d-flex align-items-start gap-3">
                 <div>
                     <h5 class="modal-title text-light fw-bold mb-0" id="modalDiaTitulo">—</h5>
@@ -1225,7 +1225,7 @@ require_once 'geral/header.php';
 <!-- MODAL: FATURA DE CARTÃO DE CRÉDITO -->
 <div class="modal fade" id="modalFaturaCC" tabindex="-1" aria-hidden="true">
     <div class="modal-dialog modal-dialog-centered modal-dialog-scrollable" style="max-width:480px;">
-        <div class="modal-content border-secondary-subtle rounded-4" style="background:#1a1d21;">
+        <div class="modal-content border-secondary-subtle rounded-4" style="background:var(--bg-card-analysis);">
             <div class="modal-header border-secondary-subtle px-4 py-3">
                 <h6 class="modal-title fw-bold text-light mb-0">
                     <i class="bi bi-credit-card-2-front me-2" style="color:#a78bfa;"></i>Fatura do Cartão

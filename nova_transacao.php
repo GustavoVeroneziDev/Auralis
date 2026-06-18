@@ -567,7 +567,7 @@ require_once 'geral/header.php';
                 </div>
             <?php else: ?>
 
-                <div class="card bg-body-tertiary border-secondary-subtle shadow-sm rounded-4">
+                <div class="card border-secondary-subtle shadow-sm rounded-4">
                     <form id="formTransacao" method="POST" action="" novalidate enctype="multipart/form-data" class="auralis-premium-form p-4">
                         <input type="hidden" name="tipo_registro" value="<?= htmlspecialchars($tipo_sugerido) ?>">
                         <input type="hidden" name="voltar" value="<?= htmlspecialchars($_urlVoltar) ?>">
@@ -1009,7 +1009,7 @@ require_once 'geral/header.php';
 
                                 <label for="comprovantes" id="dropzone"
                                     class="d-flex flex-column align-items-center justify-content-center rounded-3 text-center"
-                                    style="border:2px dashed #333; padding:1.25rem 1rem; cursor:pointer; transition:border-color .2s, background .2s;">
+                                    style="border:2px dashed var(--border-color-analysis); padding:1.25rem 1rem; cursor:pointer; transition:border-color .2s, background .2s;">
                                     <i class="bi bi-cloud-upload mb-1 text-secondary-analysis" style="font-size:1.5rem;"></i>
                                     <span class="text-secondary" style="font-size:0.8rem;">Clique ou arraste arquivos aqui</span>
                                     <span style="font-size:0.68rem; color:#444;">Imagens (JPG, PNG, WEBP) ou PDF · máx. 5 MB cada</span>
