@@ -36,3 +36,170 @@
   --card-glow:           rgba(184, 150, 46, 0.1);
   --scrollbar-thumb:     rgba(184, 150, 46, 0.3);
 }
+
+/* ============================================================
+   Overrides de classes Bootstrap para tema claro
+   Necessário porque bg-dark, text-light etc. são hardcoded no HTML
+   ============================================================ */
+
+/* Fundo escuro → fundo de card claro */
+.bg-dark {
+  background-color: var(--bg-card) !important;
+  color: var(--text-main) !important;
+}
+
+/* Texto claro → texto escuro */
+.text-light,
+.text-white {
+  color: var(--text-main) !important;
+}
+
+/* Texto secundário (muted) */
+.text-secondary {
+  color: var(--text-muted) !important;
+}
+
+/* Navbar — links e toggler */
+.nav-link {
+  color: var(--text-main) !important;
+}
+.nav-link:hover,
+.nav-link.active {
+  color: var(--accent) !important;
+}
+.navbar-toggler .bi-list {
+  color: var(--text-main) !important;
+}
+
+/* Dropdown */
+.dropdown-menu {
+  background-color: var(--bg-card) !important;
+  border-color: var(--bs-border-color) !important;
+  color: var(--text-main);
+}
+.dropdown-item {
+  color: var(--text-main) !important;
+}
+.dropdown-item:hover,
+.dropdown-item:focus {
+  background-color: var(--bg-hover) !important;
+  color: var(--text-main) !important;
+}
+.dropdown-divider {
+  border-color: var(--bs-border-color) !important;
+}
+
+/* Tabela escura → clara */
+.table-dark,
+.table-dark th,
+.table-dark td {
+  --bs-table-bg:           var(--bg-hover);
+  --bs-table-color:        var(--text-main);
+  --bs-table-border-color: var(--bs-border-color);
+  --bs-table-striped-bg:   var(--bg-hover);
+  color: var(--text-main) !important;
+  background-color: var(--bg-hover) !important;
+  border-color: var(--bs-border-color) !important;
+}
+
+/* Modais com background inline — sobrescreve as mais comuns */
+.modal-content {
+  background-color: var(--bg-card) !important;
+  color: var(--text-main);
+  border-color: var(--bs-border-color) !important;
+}
+.modal-header,
+.modal-footer {
+  border-color: var(--bs-border-color) !important;
+}
+.modal-title {
+  color: var(--text-main);
+}
+
+/* Botão fechar modal — não precisa ser branco no tema claro */
+.btn-close-white {
+  filter: none;
+}
+
+/* Formulários */
+.form-control,
+.form-select {
+  background-color: var(--bg-card) !important;
+  color: var(--text-main) !important;
+  border-color: var(--bs-border-color) !important;
+}
+.form-control::placeholder {
+  color: var(--text-muted) !important;
+}
+.form-control:focus,
+.form-select:focus {
+  background-color: var(--bg-card) !important;
+  color: var(--text-main) !important;
+  border-color: var(--accent) !important;
+  box-shadow: 0 0 0 0.2rem rgba(184, 150, 46, 0.2) !important;
+}
+.form-label {
+  color: var(--text-main);
+}
+/* Inputs desabilitados */
+.form-control:disabled,
+.form-control[readonly] {
+  background-color: var(--bg-hover) !important;
+  color: var(--text-muted) !important;
+}
+
+/* Inputs bg-transparent no tema claro → fundo de card */
+.bg-transparent.form-control,
+.bg-transparent.form-select {
+  background-color: var(--bg-hover) !important;
+}
+
+/* Badges e chips de plano */
+.badge.bg-secondary {
+  background-color: var(--bg-hover) !important;
+  color: var(--text-muted) !important;
+}
+
+/* Botão primário */
+.btn-primary {
+  background-color: var(--accent) !important;
+  border-color: var(--accent) !important;
+  color: #fff !important;
+}
+.btn-primary:hover {
+  background-color: var(--accent-light) !important;
+  border-color: var(--accent-light) !important;
+}
+
+/* Btn outline-light → outline escuro no tema claro */
+.btn-outline-light {
+  color: var(--text-main) !important;
+  border-color: var(--bs-border-color) !important;
+}
+.btn-outline-light:hover {
+  background-color: var(--bg-hover) !important;
+  color: var(--text-main) !important;
+}
+
+/* Alert de info Google SSO */
+.alert-info {
+  background-color: rgba(184, 150, 46, 0.08) !important;
+  color: var(--accent) !important;
+  border-color: rgba(184, 150, 46, 0.3) !important;
+}
+
+/* Hr separadores */
+hr.border-secondary-subtle {
+  border-color: var(--bs-border-color) !important;
+}
+
+/* Scrollbar */
+::-webkit-scrollbar-track {
+  background: var(--bg-dark);
+}
+
+/* Body background explícito */
+body {
+  background-color: var(--bg-dark);
+  color: var(--text-main);
+}

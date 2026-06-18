@@ -77,7 +77,7 @@ $_themeColor = $_bsMode === 'light' ? '#f0f2f5' : '#121418';
             <a class="navbar-brand d-flex align-items-center" href="<?php echo isset($_SESSION['usuario_id']) ? '/dashboard.php' : '/geral/index.php'; ?>"
                 style="font-family: 'Aquire', sans-serif; font-weight: 700; font-size: 1.6rem; letter-spacing: 0.04em; text-decoration: none;">
                 <img src="/geral/img/LogoAuralisSemEscudo.png" alt="Logo Auralis" class="me-2" style="height: 36px; width: auto; object-fit: contain;">
-                <span style="color: gold;">Aura</span><span class="text-light" style="font-weight: 700;">lis</span>
+                <span style="color: gold;">Aura</span><span style="color: var(--text-main); font-weight: 700;">lis</span>
             </a>
 
             <button class="navbar-toggler border-0 shadow-none p-2" type="button" data-bs-toggle="collapse"
