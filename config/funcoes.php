@@ -368,8 +368,9 @@ if (!function_exists('temasDisponiveis')) {
     function temasDisponiveis()
     {
         return [
-            'dark'  => ['nome' => 'Dark',  'bs_mode' => 'dark',  'conquista' => null],
-            'white' => ['nome' => 'White', 'bs_mode' => 'light', 'conquista' => null],
+            'dark'    => ['nome' => 'Dark',    'bs_mode' => 'dark',  'conquista' => null],
+            'white'   => ['nome' => 'White',   'bs_mode' => 'light', 'conquista' => null],
+            'sistema' => ['nome' => 'Sistema', 'bs_mode' => 'auto',  'conquista' => null],
         ];
     }
 }

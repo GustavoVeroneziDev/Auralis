@@ -18,7 +18,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
     try {
         // CORREÇÃO: Adicionado o StatusConta na busca
-        $sql = "SELECT IDUsuario, Nome, Email, Senha, NivelAcesso, StatusConta, Plano FROM Usuario WHERE Email = :email LIMIT 1";
+        $sql = "SELECT IDUsuario, Nome, Email, Senha, NivelAcesso, StatusConta, Plano, Tema FROM Usuario WHERE Email = :email LIMIT 1";
         $stmt = $pdo->prepare($sql);
         $stmt->execute([':email' => $email]);
         

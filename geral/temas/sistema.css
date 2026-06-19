@@ -1,0 +1,7 @@
+/* ============================================================
+   AURALIS — Tema: Sistema (segue preferência do SO)
+   Delega para dark.css no modo escuro e white.css no modo claro.
+   O atributo data-bs-theme é corrigido por JS no header.php.
+   ============================================================ */
+@import url("dark.css") (prefers-color-scheme: dark);
+@import url("white.css") (prefers-color-scheme: light);

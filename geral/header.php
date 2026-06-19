@@ -39,14 +39,27 @@ $_temasDisponiveis = function_exists('temasDisponiveis') ? temasDisponiveis() : 
 $_temaAtual = isset($_SESSION['tema']) && isset($_temasDisponiveis[$_SESSION['tema']])
     ? $_SESSION['tema']
     : 'dark';
-$_bsMode    = $_temasDisponiveis[$_temaAtual]['bs_mode'] ?? 'dark';
-$_themeColor = $_bsMode === 'light' ? '#f0f2f5' : '#121418';
+$_bsMode     = $_temasDisponiveis[$_temaAtual]['bs_mode'] ?? 'dark';
+$_bsModeHtml = $_bsMode === 'auto' ? 'dark' : $_bsMode; // fallback SSR; JS corrige antes do paint
+$_themeColor  = $_bsMode === 'light' ? '#f0f2f5' : '#121418';
 ?>
 <!DOCTYPE html>
-<html lang="pt-BR" data-bs-theme="<?= htmlspecialchars($_bsMode) ?>">
+<html lang="pt-BR" data-bs-theme="<?= htmlspecialchars($_bsModeHtml) ?>">
 
 <head>
     <meta charset="UTF-8">
+    <?php if ($_bsMode === 'auto'): ?>
+    <script>
+    (function(){
+        var h = document.documentElement;
+        var pref = window.matchMedia('(prefers-color-scheme: light)').matches ? 'light' : 'dark';
+        h.setAttribute('data-bs-theme', pref);
+        window.matchMedia('(prefers-color-scheme: dark)').addEventListener('change', function(e){
+            h.setAttribute('data-bs-theme', e.matches ? 'dark' : 'light');
+        });
+    })();
+    </script>
+    <?php endif; ?>
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <meta name="theme-color" content="<?= htmlspecialchars($_themeColor) ?>">
     <title>Auralis</title>
