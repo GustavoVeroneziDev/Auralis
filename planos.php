@@ -57,22 +57,15 @@ function _itensLimite($row)
 }
 
 $_extras_plano = [
-    'free' => [
-        ['ok', 'Temas Dark, White e Sistema'],
-        ['no', 'Temas variados (Oceano, Âmbar, Aurora, Cosmos...)'],
-        ['no', 'Suporte prioritário'],
-        ['no', 'Exportação de dados'],
-    ],
-    'pro'  => [
-        ['ok', 'Temas variados (Oceano, Âmbar, Aurora, Cosmos)'],
-        ['ok', 'Suporte prioritário por e-mail'],
-        ['ok', 'Exportação CSV (em breve)'],
-    ],
-    'vip'  => [
-        ['ok', 'Todos os temas, incluindo Fortune'],
-        ['ok', 'Suporte prioritário VIP'],
-        ['ok', 'Exportação CSV (em breve)'],
-    ],
+    'free' => [['no', 'Exportação de dados']],
+    'pro'  => [['ok', 'Exportação CSV (em breve)']],
+    'vip'  => [['ok', 'Exportação CSV (em breve)']],
+];
+
+$_temas_plano = [
+    'free' => ['ok', 'Temas Black & White'],
+    'pro'  => ['ok', 'Temas variados'],
+    'vip'  => ['ok', 'Todos os temas desbloqueados'],
 ];
 
 // ── Helper: adiciona itens de recurso (✅/❌) para um card ───────────────
@@ -188,8 +181,14 @@ require_once 'geral/header.php';
         ];
 
         foreach ($cards as $slug => $c):
-            $row   = $limitesRaw[$slug] ?? $limitesRaw['free'];
-            $itens = array_merge(_itensLimite($row), _itensRecursos($slug, $recursos), $_extras_plano[$slug] ?? []);
+            $row          = $limitesRaw[$slug] ?? $limitesRaw['free'];
+            $recursoItens = _itensRecursos($slug, $recursos);
+            $insertAt     = count($recursoItens);
+            foreach ($recursoItens as $ri => [, $rl]) {
+                if (stripos($rl, 'mobile') !== false) { $insertAt = $ri + 1; break; }
+            }
+            array_splice($recursoItens, $insertAt, 0, [$_temas_plano[$slug]]);
+            $itens = array_merge(_itensLimite($row), $recursoItens, $_extras_plano[$slug] ?? []);
         ?>
             <div class="col-12 col-md-4">
                 <div class="card rounded-4 shadow-sm h-100 position-relative overflow-hidden"

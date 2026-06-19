@@ -49,22 +49,15 @@ function _lp_itensLimite($row)
 }
 
 $_lp_extras = [
-    'free' => [
-        ['ok', 'Temas Dark, White e Sistema'],
-        ['no', 'Temas variados (Oceano, Âmbar, Aurora, Cosmos...)'],
-        ['no', 'Suporte prioritário'],
-        ['no', 'Exportação de dados'],
-    ],
-    'pro'  => [
-        ['ok', 'Temas variados (Oceano, Âmbar, Aurora, Cosmos)'],
-        ['ok', 'Suporte prioritário por e-mail'],
-        ['ok', 'Exportação CSV (em breve)'],
-    ],
-    'vip'  => [
-        ['ok', 'Todos os temas, incluindo Fortune'],
-        ['ok', 'Suporte prioritário VIP'],
-        ['ok', 'Exportação CSV (em breve)'],
-    ],
+    'free' => [['no', 'Exportação de dados']],
+    'pro'  => [['ok', 'Exportação CSV (em breve)']],
+    'vip'  => [['ok', 'Exportação CSV (em breve)']],
+];
+
+$_lp_temas = [
+    'free' => ['ok', 'Temas Black & White'],
+    'pro'  => ['ok', 'Temas variados'],
+    'vip'  => ['ok', 'Todos os temas desbloqueados'],
 ];
 
 function _lp_itensRecursos($planoCarta, $recursos)
@@ -500,8 +493,15 @@ function _lp_itensRecursos($planoCarta, $recursos)
             ];
 
             foreach ($lpCards as $slug => $c):
-                $row   = $_lp_raw[$slug] ?? $_lp_raw['free'];
-                $itens = array_merge(_lp_itensLimite($row), _lp_itensRecursos($slug, $_lp_recursos), $_lp_extras[$slug] ?? []);
+                $row          = $_lp_raw[$slug] ?? $_lp_raw['free'];
+                $recursoItens = _lp_itensRecursos($slug, $_lp_recursos);
+                // Injeta o item de temas logo após "suporte mobile"
+                $insertAt = count($recursoItens);
+                foreach ($recursoItens as $ri => [, $rl]) {
+                    if (stripos($rl, 'mobile') !== false) { $insertAt = $ri + 1; break; }
+                }
+                array_splice($recursoItens, $insertAt, 0, [$_lp_temas[$slug]]);
+                $itens = array_merge(_lp_itensLimite($row), $recursoItens, $_lp_extras[$slug] ?? []);
             ?>
                 <div class="col-12 col-md-4 card-animado surgir-baixo" style="transition-delay:<?= $c['delay'] ?>;">
                     <div class="card rounded-4 shadow-sm h-100 position-relative overflow-hidden"
