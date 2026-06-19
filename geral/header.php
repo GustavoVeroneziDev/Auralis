@@ -183,7 +183,7 @@ $_themeColor  = $_bsMode === 'light' ? '#f0f2f5' : '#121418';
                                     $corPlano = '#7c3aed'; // Roxo PRO
                                     $iconePlano = '<i class="fi fi-br-crown d-flex align-items-center" style="font-size: 1rem; margin-top: 2px;" title="Auralis PRO"></i>';
                                 } else {
-                                    $corPlano = '#E0E0E0'; // Branco/Cinza claro para Free
+                                    $corPlano = 'var(--text-main)'; // Segue o tema para Free
                                     $iconePlano = '';      // Free não tem ícone extra
                                 }
                                 ?>
