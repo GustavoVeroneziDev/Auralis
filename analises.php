@@ -181,9 +181,11 @@ function analisesBadgeVar(float $atual, float $anterior, bool $invertido = false
     if ($abs < 0.5) return '';
     $subiu    = $delta > 0;
     $positivo = $invertido ? !$subiu : $subiu;
-    $cor  = $positivo ? '28a745' : 'dc3545';
-    $icon = $subiu ? 'bi-arrow-up-short' : 'bi-arrow-down-short';
-    return "<span style='display:inline-flex;align-items:center;background:#{$cor}22;color:#{$cor};border:1px solid #{$cor}44;border-radius:999px;padding:1px 7px;font-size:0.68rem;font-weight:600;'><i class='bi {$icon}'></i>{$abs}%</span>";
+    $bg     = $positivo ? 'var(--color-income-bg)'    : 'var(--color-expense-bg)';
+    $color  = $positivo ? 'var(--color-income-text)'  : 'var(--color-expense-text)';
+    $border = $positivo ? 'var(--color-income-border)' : 'var(--color-expense-border)';
+    $icon   = $subiu ? 'bi-arrow-up-short' : 'bi-arrow-down-short';
+    return "<span style='display:inline-flex;align-items:center;background:{$bg};color:{$color};border:1px solid {$border};border-radius:999px;padding:1px 7px;font-size:0.68rem;font-weight:600;'><i class='bi {$icon}'></i>{$abs}%</span>";
 }
 
 // JSON Despesas
@@ -227,7 +229,7 @@ require_once 'geral/header.php';
                     </button>
 
                     <!-- Lista de Carteiras -->
-                    <ul class="dropdown-menu dropdown-menu-dark shadow-lg border-secondary-subtle mt-2 w-100" style="background-color: #1a1d21; min-width: 220px;">
+                    <ul class="dropdown-menu shadow-lg border-secondary-subtle mt-2 w-100" style="background-color: var(--bg-card); min-width: 220px;">
                         <li class="px-3 py-1 text-secondary small text-uppercase fw-bold tracking-wide">Alternar Carteira</li>
                         <li>
                             <hr class="dropdown-divider border-secondary-subtle">
@@ -332,7 +334,7 @@ require_once 'geral/header.php';
     <?php if ($totalDespesas > 0): ?>
         <div class="row g-4 mb-5">
             <div class="col-lg-6">
-                <div class="card bg-dark border-secondary-subtle shadow-sm rounded-4 h-100">
+                <div class="card border-secondary-subtle shadow-sm rounded-4 h-100" style="background:var(--bg-card);">
                     <div class="card-header border-bottom border-secondary-subtle bg-transparent p-4">
                         <h5 class="text-light fw-bold mb-0">Distribuição de Despesas</h5>
                     </div>
@@ -349,7 +351,7 @@ require_once 'geral/header.php';
             </div>
 
             <div class="col-lg-6">
-                <div class="card bg-dark border-secondary-subtle shadow-sm rounded-4 h-100">
+                <div class="card border-secondary-subtle shadow-sm rounded-4 h-100" style="background:var(--bg-card);">
                     <div class="card-header border-bottom border-secondary-subtle bg-transparent p-4 d-flex justify-content-between align-items-center">
                         <h5 class="text-light fw-bold mb-0">Detalhamento</h5>
                         <span class="badge bg-secondary text-dark" id="badge-categoria-despesa">Geral</span>
@@ -368,7 +370,7 @@ require_once 'geral/header.php';
     <?php if ($totalReceitas > 0): ?>
         <div class="row g-4 mb-5">
             <div class="col-lg-6">
-                <div class="card bg-dark border-secondary-subtle shadow-sm rounded-4 h-100">
+                <div class="card border-secondary-subtle shadow-sm rounded-4 h-100" style="background:var(--bg-card);">
                     <div class="card-header border-bottom border-secondary-subtle bg-transparent p-4">
                         <h5 class="text-light fw-bold mb-0">Distribuição de Receitas</h5>
                     </div>
@@ -385,7 +387,7 @@ require_once 'geral/header.php';
             </div>
 
             <div class="col-lg-6">
-                <div class="card bg-dark border-secondary-subtle shadow-sm rounded-4 h-100">
+                <div class="card border-secondary-subtle shadow-sm rounded-4 h-100" style="background:var(--bg-card);">
                     <div class="card-header border-bottom border-secondary-subtle bg-transparent p-4 d-flex justify-content-between align-items-center">
                         <h5 class="text-light fw-bold mb-0">Detalhamento</h5>
                         <span class="badge bg-secondary text-dark" id="badge-categoria-receita">Geral</span>
@@ -413,7 +415,7 @@ require_once 'geral/header.php';
 
 <style>
     .bg-card-analysis {
-        background-color: #2A2A2A;
+        background-color: var(--bg-card-analysis);
     }
 
     .tracking-wide {
@@ -432,18 +434,18 @@ require_once 'geral/header.php';
 
     #lista-detalhes-despesa::-webkit-scrollbar-thumb,
     #lista-detalhes-receita::-webkit-scrollbar-thumb {
-        background-color: #444;
+        background-color: var(--bs-border-color);
         border-radius: 10px;
     }
 </style>
 <div class="modal fade" id="modalSeletorMes" tabindex="-1" aria-hidden="true">
     <div class="modal-dialog modal-dialog-centered modal-sm">
-        <div class="modal-content bg-dark border-secondary-subtle shadow-lg rounded-4">
+        <div class="modal-content border-secondary-subtle shadow-lg rounded-4" style="background:var(--bg-card);">
             <div class="modal-header border-bottom border-secondary-subtle p-3">
                 <h6 class="modal-title text-light fw-bold">
                     <i class="bi bi-calendar3 me-2" style="color: var(--primary-gold-analysis);"></i> Selecionar Período
                 </h6>
-                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
             </div>
             <div class="modal-body p-4 text-center">
 
@@ -523,9 +525,11 @@ require_once 'geral/header.php';
         if (abs < 0.5) return '';
         const subiu = delta > 0;
         const positivo = invertido ? !subiu : subiu;
-        const cor = positivo ? '28a745' : 'dc3545';
+        const bg = positivo ? 'var(--color-income-bg)' : 'var(--color-expense-bg)';
+        const color = positivo ? 'var(--color-income-text)' : 'var(--color-expense-text)';
+        const border = positivo ? 'var(--color-income-border)' : 'var(--color-expense-border)';
         const icon = subiu ? 'bi-arrow-up-short' : 'bi-arrow-down-short';
-        return `<span style="display:inline-flex;align-items:center;background:#${cor}22;color:#${cor};border:1px solid #${cor}44;border-radius:999px;padding:1px 7px;font-size:0.68rem;font-weight:600;"><i class="bi ${icon}"></i> ${abs}%</span>`;
+        return `<span style="display:inline-flex;align-items:center;background:${bg};color:${color};border:1px solid ${border};border-radius:999px;padding:1px 7px;font-size:0.68rem;font-weight:600;"><i class="bi ${icon}"></i> ${abs}%</span>`;
     }
 
     const coresDespesas = ['#AA8C2C', '#D4AF37', '#E7C665', '#E63946', '#F4A261', '#E9C46A', '#9C6644'];
@@ -568,14 +572,17 @@ require_once 'geral/header.php';
                 ctx.textAlign = 'center';
                 ctx.textBaseline = 'middle';
 
+                const sliceTextMain = getComputedStyle(document.documentElement).getPropertyValue('--text-main').trim() || '#f8fafc';
+                const sliceTextMuted = getComputedStyle(document.documentElement).getPropertyValue('--text-muted').trim() || '#a1a1aa';
+
                 // Percentagem em cima — maior e em negrito
                 ctx.font = 'bold 11px Inter, sans-serif';
-                ctx.fillStyle = 'rgba(255,255,255,0.95)';
+                ctx.fillStyle = sliceTextMain;
                 ctx.fillText(Math.round(pct) + '%', x, y - 7);
 
                 // Nome embaixo — menor
                 ctx.font = '9px Inter, sans-serif';
-                ctx.fillStyle = 'rgba(255,255,255,0.75)';
+                ctx.fillStyle = sliceTextMuted;
                 ctx.fillText(label, x, y + 6);
             });
             ctx.restore();
@@ -586,6 +593,13 @@ require_once 'geral/header.php';
         const canvas = document.getElementById(canvasId);
         if (!canvas) return null;
 
+        const style = getComputedStyle(document.documentElement);
+        const bgCard = style.getPropertyValue('--bg-card').trim() || '#1e2126';
+        const bgDark = style.getPropertyValue('--bg-dark').trim() || '#1a1d21';
+        const textMain = style.getPropertyValue('--text-main').trim() || '#f8fafc';
+        const textMuted = style.getPropertyValue('--text-muted').trim() || '#a1a1aa';
+        const accentRgb = style.getPropertyValue('--bs-primary-rgb').trim() || '212,175,55';
+
         const chart = new Chart(canvas.getContext('2d'), {
             type: 'doughnut',
             data: {
@@ -594,7 +608,7 @@ require_once 'geral/header.php';
                     data: valores,
                     backgroundColor: cores,
                     borderWidth: 3,
-                    borderColor: '#1a1d21',
+                    borderColor: bgDark,
                     hoverBorderWidth: 0,
                     hoverOffset: 6,
                 }]
@@ -623,11 +637,11 @@ require_once 'geral/header.php';
                                 return ` ${val} (${pct}%)`;
                             }
                         },
-                        backgroundColor: '#1e2126',
-                        borderColor: 'rgba(212,175,55,0.3)',
+                        backgroundColor: bgCard,
+                        borderColor: `rgba(${accentRgb},0.3)`,
                         borderWidth: 1,
-                        titleColor: '#f8fafc',
-                        bodyColor: '#a1a1aa',
+                        titleColor: textMain,
+                        bodyColor: textMuted,
                         padding: 10,
                     }
                 },

@@ -417,10 +417,10 @@ require_once '../geral/header.php';
 <!-- ── Modal: Excluir lançamento ───────────────────────────────────────── -->
 <div class="modal fade" id="modalExcluirLanc" tabindex="-1">
     <div class="modal-dialog modal-dialog-centered">
-        <div class="modal-content border-secondary-subtle shadow-lg" style="background:#1a1d21;">
+        <div class="modal-content border-secondary-subtle shadow-lg" style="background:var(--bg-card);">
             <div class="modal-header border-secondary-subtle px-4 py-3">
                 <h6 class="modal-title fw-bold text-light mb-0">Remover lançamento</h6>
-                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
             </div>
             <div class="modal-body px-4 py-3">
                 <p class="text-secondary mb-0">Deseja remover <strong class="text-light" id="excluirLancNome"></strong>?</p>
@@ -462,7 +462,7 @@ require_once '../geral/header.php';
 <!-- ── Modal: Editar lançamento ────────────────────────────────────────── -->
 <div class="modal fade" id="modalEditarLanc" tabindex="-1">
     <div class="modal-dialog modal-dialog-centered">
-        <div class="modal-content border-secondary-subtle shadow-lg" style="background:#1a1d21;">
+        <div class="modal-content border-secondary-subtle shadow-lg" style="background:var(--bg-card);">
             <form method="POST">
                 <input type="hidden" name="action" value="editar_lancamento">
                 <input type="hidden" name="lancamento_id" id="editarLancId">
@@ -471,7 +471,7 @@ require_once '../geral/header.php';
                 <input type="hidden" name="parcela_atual" id="editarLancParcelaAtual">
                 <div class="modal-header border-secondary-subtle px-4 py-3">
                     <h6 class="modal-title fw-bold text-light mb-0">Editar lançamento</h6>
-                    <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
                 </div>
                 <div class="modal-body px-4 py-3 d-flex flex-column gap-3">
                     <div>
@@ -498,7 +498,7 @@ require_once '../geral/header.php';
                     <div>
                         <label class="form-label text-secondary small">Categoria</label>
                         <select name="categoria_id" id="editarLancCat"
-                            class="form-select text-light border-secondary" style="background-color:#1e1e2e;">
+                            class="form-select border-secondary">
                             <option value="">— Sem categoria —</option>
                             <?php foreach ($categorias as $cat): ?>
                             <option value="<?= $cat['IDCategoria'] ?>"><?= htmlspecialchars($cat['NomeCategoria']) ?></option>
@@ -536,10 +536,10 @@ require_once '../geral/header.php';
 <!-- ── Modal: Fechar fatura ────────────────────────────────────────────── -->
 <div class="modal fade" id="modalFecharFatura" tabindex="-1">
     <div class="modal-dialog modal-dialog-centered">
-        <div class="modal-content border-secondary-subtle shadow-lg" style="background:#1a1d21;">
+        <div class="modal-content border-secondary-subtle shadow-lg" style="background:var(--bg-card);">
             <div class="modal-header border-secondary-subtle px-4 py-3">
                 <h6 class="modal-title fw-bold text-light mb-0">Fechar fatura</h6>
-                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
             </div>
             <div class="modal-body px-4 py-3">
                 <p class="text-secondary mb-1">Deseja fechar a fatura de <strong class="text-light" id="fecharFaturaTotal"></strong>?</p>

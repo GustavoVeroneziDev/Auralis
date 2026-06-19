@@ -207,7 +207,7 @@ require_once 'geral/header.php';
     <div class="row g-4 mb-5">
 
         <div class="col-lg-6">
-            <div class="card bg-dark border-secondary-subtle shadow-sm rounded-4 h-100">
+            <div class="card border-secondary-subtle shadow-sm rounded-4 h-100" style="background:var(--bg-card);">
                 <div class="card-header border-bottom border-secondary-subtle bg-transparent p-4">
                     <h5 class="text-light fw-bold mb-0">Perfil Público</h5>
                 </div>
@@ -236,7 +236,7 @@ require_once 'geral/header.php';
         </div>
 
         <div class="col-lg-6">
-            <div class="card bg-dark border-secondary-subtle shadow-sm rounded-4 h-100">
+            <div class="card border-secondary-subtle shadow-sm rounded-4 h-100" style="background:var(--bg-card);">
                 <div class="card-header border-bottom border-secondary-subtle bg-transparent p-4">
                     <h5 class="text-light fw-bold mb-0">Segurança</h5>
                 </div>
@@ -292,7 +292,7 @@ require_once 'geral/header.php';
             $temasAdicionais = array_filter($temasCfg, fn($t) => ($t['secao'] ?? 'padrao') === 'adicional');
 
             // Renderiza um card de tema
-            $renderCard = function(string $slug, array $info) use ($temaAtivo, $planoUsuario, $planoPeso): void {
+            $renderCard = function (string $slug, array $info) use ($temaAtivo, $planoUsuario, $planoPeso): void {
                 $ativo              = $temaAtivo === $slug;
                 $conquista          = $info['conquista'] ?? null;
                 $planoMinimo        = $info['plano_minimo'] ?? null;
@@ -300,7 +300,7 @@ require_once 'geral/header.php';
                 $bloqPlano          = $planoMinimo && (($planoPeso[$planoUsuario] ?? 0) < ($planoPeso[$planoMinimo] ?? 0));
                 $bloqueado          = $bloqConquista || $bloqPlano;
                 $labelPlano         = $planoMinimo ? strtoupper($planoMinimo) : '';
-                ?>
+            ?>
                 <div class="col-6 col-md-3">
                     <form method="POST" action="">
                         <input type="hidden" name="action" value="trocar_tema">
@@ -418,7 +418,7 @@ require_once 'geral/header.php';
                         </p>
                     </form>
                 </div>
-                <?php
+            <?php
             };
             ?>
             <div class="card border-secondary-subtle shadow-sm rounded-4" style="background:var(--bg-card);">
@@ -431,13 +431,17 @@ require_once 'geral/header.php';
                     <!-- Seção: Padrão -->
                     <p class="small fw-semibold text-uppercase mb-2" style="color:var(--text-muted);letter-spacing:.07em;">Padrão</p>
                     <div class="row g-3 mb-4">
-                        <?php foreach ($temasPadrao as $slug => $info) { $renderCard($slug, $info); } ?>
+                        <?php foreach ($temasPadrao as $slug => $info) {
+                            $renderCard($slug, $info);
+                        } ?>
                     </div>
 
                     <!-- Seção: Adicionais -->
                     <p class="small fw-semibold text-uppercase mb-2" style="color:var(--text-muted);letter-spacing:.07em;">Adicionais</p>
                     <div class="row g-3">
-                        <?php foreach ($temasAdicionais as $slug => $info) { $renderCard($slug, $info); } ?>
+                        <?php foreach ($temasAdicionais as $slug => $info) {
+                            $renderCard($slug, $info);
+                        } ?>
                     </div>
                 </div>
             </div>
@@ -464,10 +468,10 @@ require_once 'geral/header.php';
 
 <div class="modal fade" id="modalExcluirConta" tabindex="-1" aria-hidden="true">
     <div class="modal-dialog modal-dialog-centered">
-        <div class="modal-content bg-dark border-danger border-opacity-50 shadow-lg rounded-4">
+        <div class="modal-content border-danger border-opacity-50 shadow-lg rounded-4" style="background:var(--bg-card);">
             <div class="modal-header border-bottom border-secondary-subtle">
                 <h5 class="modal-title text-danger fw-bold"><i class="bi bi-shield-x me-2"></i> Verificação de Segurança</h5>
-                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
             </div>
             <form method="POST" action="">
                 <div class="modal-body p-4">

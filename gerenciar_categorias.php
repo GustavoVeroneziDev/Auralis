@@ -218,7 +218,7 @@ $listaIcones = [
     <?php endif; ?>
 
     <?php if ($erro): ?>
-        <div class="alert d-flex align-items-center gap-2 rounded-3 shadow-sm border-0 fw-semibold mb-3" style="background:#ef444418;color:#fca5a5;border:1px solid #ef444444 !important;">
+        <div class="alert d-flex align-items-center gap-2 rounded-3 shadow-sm border-0 fw-semibold mb-3" style="background:var(--color-expense-bg);color:var(--color-expense-text);border:1px solid var(--color-expense-border) !important;">
             <i class="bi bi-exclamation-triangle-fill"></i> <span><?= $erro ?></span>
             <?php if (!empty($_limitesGC) && strpos($erro, 'limite') !== false): ?>
                 &nbsp;<a href="/planos.php?upgrade=pro" class="fw-bold" style="color:#f87171;">Assinar PRO &rarr;</a>
@@ -227,14 +227,14 @@ $listaIcones = [
     <?php endif; ?>
 
     <?php if (!empty($categorias_bloqueadas_ids)): ?>
-        <div class="alert d-flex align-items-start gap-3 rounded-3 border-0 mb-3" style="background:#f59e0b15;border:1px solid #f59e0b44 !important;">
-            <i class="bi bi-lock-fill mt-1 flex-shrink-0" style="color:#f59e0b;"></i>
+        <div class="alert d-flex align-items-start gap-3 rounded-3 border-0 mb-3" style="background:var(--color-pending-bg);border:1px solid var(--color-today-bg) !important;">
+            <i class="bi bi-lock-fill mt-1 flex-shrink-0" style="color:var(--accent);"></i>
             <div>
                 <strong class="text-light">Categorias bloqueadas</strong>
                 <p class="mb-1 text-secondary" style="font-size:0.85rem;">
                     Você tem <?= count($categorias_bloqueadas_ids) ?> categoria(s) além do limite do plano Free (<?= $_limitesGC['categorias'] ?> no total). Elas estão bloqueadas para uso em novas transações, mas você ainda pode editar, mesclar ou excluir.
                 </p>
-                <a href="/planos.php?upgrade=pro" class="btn btn-sm rounded-pill fw-semibold" style="background:#f59e0b20;color:#fbbf24;border:1px solid #f59e0b55;font-size:0.8rem;">
+                <a href="/planos.php?upgrade=pro" class="btn btn-sm rounded-pill fw-semibold" style="background:var(--color-pending-bg);color:var(--color-pending-text);border:1px solid var(--color-pending-text);font-size:0.8rem;opacity:0.8;">
                     <i class="bi bi-star-fill me-1"></i> Assinar PRO — categorias ilimitadas
                 </a>
             </div>
@@ -252,14 +252,14 @@ $listaIcones = [
                     <h5 class="text-light fw-bold mb-4 d-flex align-items-center gap-2">
                         <i class="bi bi-plus-circle text-primary" style="color: var(--primary-gold-analysis) !important;"></i> Nova Categoria
                         <?php if (!$_podeCriarCat): ?>
-                            <span style="background:#7c3aed22;color:#a78bfa;border:1px solid #7c3aed55;border-radius:999px;padding:1px 6px;font-size:0.6rem;font-weight:700;" class="ms-auto"><i class="bi bi-lock-fill" style="font-size:0.55rem;"></i> PRO</span>
+                            <span style="background:var(--color-card-bg);color:var(--color-card-text);border:1px solid var(--color-card-border);border-radius:999px;padding:1px 6px;font-size:0.6rem;font-weight:700;" class="ms-auto"><i class="bi bi-lock-fill" style="font-size:0.55rem;"></i> PRO</span>
                         <?php endif; ?>
                     </h5>
                     <?php if (!$_podeCriarCat): ?>
                         <div class="text-center py-4">
-                            <i class="bi bi-lock-fill mb-3 d-block" style="font-size:2rem;color:#7c3aed;"></i>
+                            <i class="bi bi-lock-fill mb-3 d-block" style="font-size:2rem;color:var(--color-card-text);"></i>
                             <p class="text-secondary mb-3" style="font-size:0.875rem;">Você atingiu o limite de <strong><?= $_limitesGC['categorias'] ?> categorias</strong> do plano Free.</p>
-                            <a href="/planos.php?upgrade=pro" class="btn rounded-pill fw-bold w-100" style="background:#7c3aed;color:#fff;border:none;">
+                            <a href="/planos.php?upgrade=pro" class="btn rounded-pill fw-bold w-100" style="background:var(--color-card-text);color:#fff;border:none;">
                                 <i class="bi bi-star-fill me-1"></i> Assinar PRO
                             </a>
                             <p class="text-secondary mt-2 mb-0" style="font-size:0.75rem;">Ou exclua uma categoria existente para liberar espaço.</p>
@@ -300,11 +300,11 @@ $listaIcones = [
                                     <?php foreach ($gruposIcones as $nomeGrupo => $icones): ?>
 
                                         <div class="d-flex align-items-center mt-3 mb-2">
-                                            <hr class="flex-grow-1" style="border-color: #D4AF37; opacity: 0.35;">
-                                            <span class="mx-3" style="font-size: 0.65rem; font-weight: 800; text-transform: uppercase; letter-spacing: 1.5px; color: #D4AF37;">
+                                            <hr class="flex-grow-1" style="border-color: var(--primary-gold-analysis); opacity: 0.35;">
+                                            <span class="mx-3" style="font-size: 0.65rem; font-weight: 800; text-transform: uppercase; letter-spacing: 1.5px; color: var(--primary-gold-analysis);">
                                                 <?= $nomeGrupo ?>
                                             </span>
-                                            <hr class="flex-grow-1" style="border-color: #D4AF37; opacity: 0.35;">
+                                            <hr class="flex-grow-1" style="border-color: var(--primary-gold-analysis); opacity: 0.35;">
                                         </div>
 
                                         <div class="d-flex flex-wrap gap-2 justify-content-center">
@@ -358,7 +358,7 @@ $listaIcones = [
                                                 </div>
                                                 <span class="text-light fw-semibold fs-6"><?= htmlspecialchars($cat['NomeCategoria']) ?></span>
                                                 <?php if ($_catBloqueada): ?>
-                                                    <span class="ms-2" style="background:#f59e0b18;color:#fbbf24;border:1px solid #f59e0b44;border-radius:999px;padding:1px 6px;font-size:0.6rem;font-weight:700;"><i class="bi bi-lock-fill" style="font-size:0.55rem;"></i> Bloqueada</span>
+                                                    <span class="ms-2" style="background:var(--color-pending-bg);color:var(--color-pending-text);border:1px solid var(--color-today-bg);border-radius:999px;padding:1px 6px;font-size:0.6rem;font-weight:700;"><i class="bi bi-lock-fill" style="font-size:0.55rem;"></i> Bloqueada</span>
                                                 <?php endif; ?>
                                             </div>
                                         </td>
@@ -429,7 +429,7 @@ $listaIcones = [
                                                 </div>
                                                 <span class="text-light fw-semibold fs-6"><?= htmlspecialchars($cat['NomeCategoria']) ?></span>
                                                 <?php if ($_catBloqueada): ?>
-                                                    <span class="ms-2" style="background:#f59e0b18;color:#fbbf24;border:1px solid #f59e0b44;border-radius:999px;padding:1px 6px;font-size:0.6rem;font-weight:700;"><i class="bi bi-lock-fill" style="font-size:0.55rem;"></i> Bloqueada</span>
+                                                    <span class="ms-2" style="background:var(--color-pending-bg);color:var(--color-pending-text);border:1px solid var(--color-today-bg);border-radius:999px;padding:1px 6px;font-size:0.6rem;font-weight:700;"><i class="bi bi-lock-fill" style="font-size:0.55rem;"></i> Bloqueada</span>
                                                 <?php endif; ?>
                                             </div>
                                         </td>
@@ -583,7 +583,7 @@ $listaIcones = [
                 <h6 class="modal-title text-light fw-bold">
                     <i class="bi bi-trash3 me-2 text-danger"></i> Excluir Categoria
                 </h6>
-                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
             </div>
             <form method="POST" action="">
                 <div class="modal-body p-4 text-center">
@@ -607,9 +607,9 @@ $listaIcones = [
         <div class="modal-content border-secondary-subtle shadow-lg rounded-4">
             <div class="modal-header border-bottom border-secondary-subtle p-3">
                 <h5 class="modal-title text-light fw-bold d-flex align-items-center gap-2">
-                    <i class="bi bi-pencil-square" style="color: #D4AF37;"></i> Editar Categoria
+                    <i class="bi bi-pencil-square" style="color: var(--primary-gold-analysis);"></i> Editar Categoria
                 </h5>
-                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
             </div>
             <form method="POST" action="" class="auralis-premium-form">
                 <div class="modal-body p-4" style="max-height: 65vh; overflow-y: auto;">
@@ -636,11 +636,11 @@ $listaIcones = [
                         <div class="w-100">
                             <?php foreach ($gruposIcones as $nomeGrupo => $icones): ?>
                                 <div class="d-flex align-items-center mt-3 mb-2">
-                                    <hr class="flex-grow-1" style="border-color: #D4AF37; opacity: 0.35;">
-                                    <span class="mx-3" style="font-size: 0.65rem; font-weight: 800; text-transform: uppercase; letter-spacing: 1.5px; color: #D4AF37;">
+                                    <hr class="flex-grow-1" style="border-color: var(--primary-gold-analysis); opacity: 0.35;">
+                                    <span class="mx-3" style="font-size: 0.65rem; font-weight: 800; text-transform: uppercase; letter-spacing: 1.5px; color: var(--primary-gold-analysis);">
                                         <?= $nomeGrupo ?>
                                     </span>
-                                    <hr class="flex-grow-1" style="border-color: #D4AF37; opacity: 0.35;">
+                                    <hr class="flex-grow-1" style="border-color: var(--primary-gold-analysis); opacity: 0.35;">
                                 </div>
                                 <div class="d-flex flex-wrap gap-2 justify-content-center">
                                     <?php foreach ($icones as $icone): ?>

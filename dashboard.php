@@ -527,11 +527,11 @@ function badgeVar(float $atual, float $anterior, bool $invertido = false): strin
     if ($abs < 0.5) return '';
     $subiu    = $delta > 0;
     $positivo = $invertido ? !$subiu : $subiu;
-    // bg-opacity-20 deixa o badge invisível porque text-{cor} combina com bg-{cor}.
-    // Usamos text-white sobre fundo colorido sólido.
-    $cor  = $positivo ? '28a745' : 'dc3545';
-    $icon = $subiu ? 'bi-arrow-up-short' : 'bi-arrow-down-short';
-    return "<span class='ms-1' style='display:inline-flex;align-items:center;background:#{$cor}22;color:#{$cor};border:1px solid #{$cor}44;border-radius:999px;padding:1px 7px;font-size:0.68rem;font-weight:600;'><i class='bi {$icon}'></i>{$abs}%</span>";
+    $bg     = $positivo ? 'var(--color-income-bg)'     : 'var(--color-expense-bg)';
+    $color  = $positivo ? 'var(--color-income-text)'   : 'var(--color-expense-text)';
+    $border = $positivo ? 'var(--color-income-border)'  : 'var(--color-expense-border)';
+    $icon   = $subiu ? 'bi-arrow-up-short' : 'bi-arrow-down-short';
+    return "<span class='ms-1' style='display:inline-flex;align-items:center;background:{$bg};color:{$color};border:1px solid {$border};border-radius:999px;padding:1px 7px;font-size:0.68rem;font-weight:600;'><i class='bi {$icon}'></i>{$abs}%</span>";
 }
 
 require_once 'geral/header.php';
@@ -584,7 +584,7 @@ require_once 'geral/header.php';
             <?php if ($msg): ?>
                 <div class="alert alert-success d-flex align-items-center gap-2 rounded-3 shadow-sm border-0 bg-success bg-opacity-10 text-success fw-semibold alert-dismissible fade show" role="alert">
                     <i class="bi bi-check-circle-fill"></i> <span><?php echo $msg ?></span>
-                    <button type="button" class="btn-close btn-close-white opacity-50" data-bs-dismiss="alert" aria-label="Close"></button>
+                    <button type="button" class="btn-close opacity-50" data-bs-dismiss="alert" aria-label="Close"></button>
                 </div>
             <?php endif; ?>
         <?php endif; ?>
@@ -789,7 +789,7 @@ require_once 'geral/header.php';
                         <a href="/cartao_credito/fatura.php?cartao=<?php echo urlencode($fat['IDCartao']) ?>"
                             class="text-decoration-none d-block h-100">
                             <div class="h-100 rounded-4 shadow-sm cc-dash-card"
-                                style="background:#161820; border:1px solid #2a2d38; border-left:3px solid <?php echo $corCartao ?> !important; transition:all .18s;">
+                                style="background:var(--bg-card); border:1px solid var(--bs-border-color); border-left:3px solid <?php echo $corCartao ?> !important; transition:all .18s;">
                                 <div class="p-3">
                                     <!-- Cabeçalho do cartão -->
                                     <div class="d-flex align-items-start justify-content-between mb-3">
@@ -827,7 +827,7 @@ require_once 'geral/header.php';
                                     </div>
 
                                     <!-- Rodapé -->
-                                    <div class="mt-2 pt-2 d-flex align-items-center gap-1" style="border-top:1px solid #2a2d38;color:#6c757d;font-size:0.72rem;">
+                                    <div class="mt-2 pt-2 d-flex align-items-center gap-1" style="border-top:1px solid var(--bs-border-color);color:var(--text-muted);font-size:0.72rem;">
                                         <i class="bi bi-arrow-right-circle" style="font-size:0.75rem;"></i>
                                         Ver fatura completa
                                     </div>
@@ -1045,7 +1045,7 @@ require_once 'geral/header.php';
                 <h5 class="modal-title text-light fw-bold">
                     <i class="bi bi-sliders me-2 text-primary" style="color: var(--primary-gold-analysis) !important;"></i> Ajustar Saldo Real
                 </h5>
-                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
             </div>
             <form method="POST" action="">
                 <div class="modal-body p-4">
@@ -1084,7 +1084,7 @@ require_once 'geral/header.php';
                 <h6 class="modal-title text-light fw-bold">
                     <i class="bi bi-calendar3 me-2" style="color: var(--primary-gold-analysis);"></i> Selecionar Período
                 </h6>
-                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
             </div>
             <div class="modal-body p-4 text-center">
                 <div class="d-flex justify-content-center align-items-center mb-4 bg-charcoal-analysis rounded-pill p-1 border border-secondary-subtle">
@@ -1124,7 +1124,7 @@ require_once 'geral/header.php';
                 <h6 class="modal-title text-light fw-bold">
                     <i class="bi bi-trash3 me-2 text-danger"></i> Excluir Recorrência
                 </h6>
-                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
             </div>
             <form method="POST" action="">
                 <div class="modal-body p-4">
@@ -1170,7 +1170,7 @@ require_once 'geral/header.php';
                 <h6 class="modal-title text-light fw-bold">
                     <i class="bi bi-credit-card-2-front me-2 text-danger"></i> Excluir Parcelamento
                 </h6>
-                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
             </div>
             <form method="POST" action="">
                 <div class="modal-body p-4">
@@ -1217,7 +1217,7 @@ require_once 'geral/header.php';
                 <h6 class="modal-title text-light fw-bold">
                     <i class="bi bi-trash3 me-2 text-danger"></i> Excluir Transação
                 </h6>
-                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
             </div>
             <form method="POST" action="">
                 <div class="modal-body p-4 text-center">
@@ -1241,7 +1241,7 @@ require_once 'geral/header.php';
         <div class="modal-content border-secondary-subtle" style="background:var(--bg-card);">
             <div class="modal-header border-secondary-subtle px-4 py-3">
                 <h6 class="modal-title fw-bold text-light mb-0"><i class="bi bi-paperclip me-2"></i>Comprovantes</h6>
-                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
             </div>
             <div class="modal-body p-4" id="modalComprovantesBody">
                 <div class="text-center text-secondary py-4"><i class="bi bi-hourglass-split me-2"></i>Carregando...</div>
@@ -1376,8 +1376,8 @@ require_once 'geral/header.php';
     }
 
     .modal-boas-vindas-content {
-        background-color: #181A1F !important;
-        border: 1px solid rgba(255, 255, 255, 0.08) !important;
+        background-color: var(--bg-card) !important;
+        border: 1px solid var(--bs-border-color) !important;
         box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.7);
     }
 

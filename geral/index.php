@@ -84,7 +84,7 @@ function _lp_itensRecursos($planoCarta, $recursos)
             </a>
             <a href="#funcionalidades"
                 class="btn btn-lg px-5 rounded-pill fw-semibold"
-                style="background:rgba(255,255,255,.06);color:#f8fafc;border:1px solid rgba(255,255,255,.12);font-size:1rem;">
+                style="background:var(--bg-hover);color:var(--text-main);border:1px solid var(--bs-border-color);font-size:1rem;">
                 Ver funcionalidades
             </a>
         </div>
@@ -271,8 +271,8 @@ function _lp_itensRecursos($planoCarta, $recursos)
                     'icone_cor_ok' => '',
                     'btn_m_text'   => 'Começar grátis',
                     'btn_a_text'   => 'Começar grátis',
-                    'btn_m_style'  => 'background:rgba(255,255,255,.06);color:#f8fafc;border:1px solid rgba(255,255,255,.1);',
-                    'btn_a_style'  => 'background:rgba(255,255,255,.06);color:#f8fafc;border:1px solid rgba(255,255,255,.1);',
+                    'btn_m_style'  => 'background:var(--bg-hover);color:var(--text-main);border:1px solid var(--bs-border-color);',
+                    'btn_a_style'  => 'background:var(--bg-hover);color:var(--text-main);border:1px solid var(--bs-border-color);',
                     'btn_m_href'   => '/usuario/cadastro.php',
                     'btn_a_href'   => '/usuario/cadastro.php',
                     'delay'        => '0s',
