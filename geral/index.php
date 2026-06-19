@@ -139,38 +139,99 @@ function _lp_itensRecursos($planoCarta, $recursos)
             <p class="text-secondary mx-auto" style="max-width:460px;font-size:0.95rem;">Um painel limpo e inteligente — sem ruído, sem confusão.</p>
         </div>
 
-        <div class="position-relative mx-auto card-animado surgir-baixo" style="max-width:860px;">
-            <!-- Barra de browser decorativa -->
-            <div class="d-flex align-items-center gap-2 px-3 rounded-top-4" style="background:#1a1d21;border:1px solid #2d3139;border-bottom:0;height:38px;">
-                <div style="width:11px;height:11px;border-radius:50%;background:#ff5f57;flex-shrink:0;"></div>
-                <div style="width:11px;height:11px;border-radius:50%;background:#febc2e;flex-shrink:0;"></div>
-                <div style="width:11px;height:11px;border-radius:50%;background:#28c840;flex-shrink:0;"></div>
-                <div class="mx-auto px-3 py-1 rounded-2 text-secondary d-none d-sm-block" style="background:#121418;font-size:0.7rem;min-width:180px;text-align:center;letter-spacing:0.01em;">auralis.app/dashboard</div>
-            </div>
-            <!-- Área da screenshot — troque o <img> abaixo quando tiver o asset -->
-            <div class="rounded-bottom-4 overflow-hidden position-relative" style="border:1px solid #2d3139;border-top:0;background:#121418;min-height:360px;">
-                <!-- SCREENSHOT: descomente e ajuste o src quando tiver a imagem
-                <img src="/geral/img/preview-dashboard.png" alt="Dashboard Auralis" class="w-100 d-block" style="display:block;">
-                -->
-                <div class="d-flex flex-column align-items-center justify-content-center gap-3 position-absolute top-0 start-0 w-100 h-100" style="min-height:360px;">
-                    <div class="d-flex gap-3 flex-wrap justify-content-center">
-                        <?php foreach ([['bi-graph-up-arrow','Saldo em tempo real'],['bi-calendar3','Agenda financeira'],['bi-pie-chart-fill','Análises']] as [$ic, $lb]): ?>
-                            <div class="rounded-3 px-4 py-3 d-flex align-items-center gap-2" style="background:#1e2126;border:1px solid #2d3139;font-size:0.82rem;">
-                                <i class="bi <?= $ic ?>" style="color:var(--accent);font-size:1.1rem;"></i>
-                                <span class="text-light fw-semibold"><?= $lb ?></span>
-                            </div>
-                        <?php endforeach; ?>
-                    </div>
-                    <p class="text-secondary mb-0" style="font-size:0.8rem;">
-                        <i class="bi bi-image me-1 opacity-50"></i> Preview em breve
-                    </p>
+        <!-- Abas de navegação -->
+        <div class="d-flex justify-content-center gap-2 mb-4 flex-wrap">
+            <?php foreach ([
+                ['dashboard', 'bi-speedometer2', 'Dashboard',  'Visão geral do mês'],
+                ['analises',  'bi-pie-chart-fill','Análises',   'Gastos por categoria'],
+                ['agenda',    'bi-calendar3',     'Agenda',     'Calendário financeiro'],
+            ] as [$tab, $icon, $label, $sub]):
+            ?>
+                <button class="preview-tab-btn <?= $tab === 'dashboard' ? 'active' : '' ?> d-flex align-items-center gap-2 px-3 py-2 rounded-3 border-0 transition-hover"
+                    data-preview="/geral/img/preview-<?= $tab ?>.png"
+                    data-label="auralis.app/<?= $tab ?>"
+                    style="font-size:0.82rem;cursor:pointer;">
+                    <i class="bi <?= $icon ?>"></i>
+                    <span class="fw-semibold"><?= $label ?></span>
+                    <span class="d-none d-sm-inline text-secondary" style="font-size:0.75rem;">— <?= $sub ?></span>
+                </button>
+            <?php endforeach; ?>
+        </div>
+
+        <!-- Frame de browser + screenshot -->
+        <div class="position-relative mx-auto card-animado surgir-baixo" style="max-width:900px;">
+            <!-- Barra de browser -->
+            <div class="d-flex align-items-center gap-2 px-3 rounded-top-4" style="background:#1a1d21;border:1px solid #2d3139;border-bottom:0;height:36px;">
+                <div class="d-flex gap-1 flex-shrink-0">
+                    <div style="width:10px;height:10px;border-radius:50%;background:#ff5f57;"></div>
+                    <div style="width:10px;height:10px;border-radius:50%;background:#febc2e;"></div>
+                    <div style="width:10px;height:10px;border-radius:50%;background:#28c840;"></div>
+                </div>
+                <div class="mx-auto px-3 py-1 rounded-2 text-secondary d-none d-sm-flex align-items-center gap-1" style="background:#121418;font-size:0.68rem;min-width:200px;justify-content:center;">
+                    <i class="bi bi-lock-fill" style="font-size:0.6rem;opacity:.5;"></i>
+                    <span id="previewUrl">auralis.app/dashboard</span>
                 </div>
             </div>
+
+            <!-- Imagem -->
+            <div class="rounded-bottom-4 overflow-hidden" style="border:1px solid #2d3139;border-top:0;background:#121418;line-height:0;">
+                <img id="previewImg"
+                    src="/geral/img/preview-dashboard.png"
+                    alt="Auralis Dashboard"
+                    style="width:100%;display:block;transition:opacity .2s ease,transform .2s ease;">
+                <!-- Gradiente de fade na base (efeito "há mais abaixo") -->
+                <div class="position-absolute bottom-0 start-0 w-100" style="height:80px;background:linear-gradient(to top,#121418,transparent);pointer-events:none;"></div>
+            </div>
+
             <!-- Brilho decorativo -->
-            <div class="position-absolute" style="bottom:-40px;left:50%;transform:translateX(-50%);width:400px;height:100px;background:var(--accent);filter:blur(80px);opacity:0.05;pointer-events:none;"></div>
+            <div class="position-absolute" style="bottom:-50px;left:50%;transform:translateX(-50%);width:500px;height:120px;background:var(--accent);filter:blur(90px);opacity:0.06;border-radius:50%;pointer-events:none;"></div>
         </div>
     </div>
 </section>
+
+<style>
+.preview-tab-btn {
+    background: var(--bg-card);
+    color: var(--text-muted);
+    border: 1px solid var(--bs-border-color) !important;
+}
+.preview-tab-btn.active {
+    background: var(--bg-card);
+    color: var(--text-main);
+    border-color: var(--accent) !important;
+    box-shadow: 0 0 0 1px var(--accent)33;
+}
+.preview-tab-btn:hover:not(.active) {
+    background: var(--bg-hover);
+    color: var(--text-main);
+}
+</style>
+<script>
+(function(){
+    var tabs = document.querySelectorAll('.preview-tab-btn');
+    var img  = document.getElementById('previewImg');
+    var url  = document.getElementById('previewUrl');
+    tabs.forEach(function(btn){
+        btn.addEventListener('click', function(){
+            if (this.classList.contains('active')) return;
+            tabs.forEach(function(b){ b.classList.remove('active'); });
+            this.classList.add('active');
+            var src = this.dataset.preview;
+            var lbl = this.dataset.label;
+            img.style.opacity = '0';
+            img.style.transform = 'translateY(6px)';
+            setTimeout(function(){
+                img.src = src;
+                if (url) url.textContent = lbl;
+                img.onload = function(){
+                    img.style.opacity = '1';
+                    img.style.transform = 'translateY(0)';
+                };
+            }, 180);
+        });
+    });
+})();
+</script>
 
 <!-- ── DOR ───────────────────────────────────────────────────────────────── -->
 <section class="py-5 border-top border-secondary-subtle">
