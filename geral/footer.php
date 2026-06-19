@@ -54,14 +54,9 @@ function auralisToast(msg) {
 }
 if (window._pendingToast) auralisToast(window._pendingToast);
 
-// Preservar posição de scroll em recargas por formulário POST
+// Salvar posição de scroll antes de qualquer POST
 (function() {
     var key = 'auralis_scroll_' + location.pathname;
-    var saved = sessionStorage.getItem(key);
-    if (saved !== null) {
-        sessionStorage.removeItem(key);
-        window.scrollTo(0, parseInt(saved, 10));
-    }
     document.addEventListener('submit', function(e) {
         if (e.target.method && e.target.method.toLowerCase() === 'post') {
             sessionStorage.setItem(key, window.scrollY);

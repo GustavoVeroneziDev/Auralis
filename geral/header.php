@@ -60,6 +60,19 @@ $_themeColor  = $_bsMode === 'light' ? '#f0f2f5' : '#121418';
     })();
     </script>
     <?php endif; ?>
+    <script>
+    (function(){
+        var key = 'auralis_scroll_' + location.pathname;
+        var y = sessionStorage.getItem(key);
+        if (y !== null) {
+            sessionStorage.removeItem(key);
+            history.scrollRestoration = 'manual';
+            document.addEventListener('DOMContentLoaded', function() {
+                document.documentElement.scrollTop = parseInt(y, 10);
+            }, {once: true});
+        }
+    })();
+    </script>
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <meta name="theme-color" content="<?= htmlspecialchars($_themeColor) ?>">
     <title>Auralis</title>
