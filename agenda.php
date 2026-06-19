@@ -59,7 +59,10 @@ if (isset($_GET['ajax']) && $_GET['acao'] === 'fatura_detalhe') {
     ob_clean();
     header('Content-Type: application/json; charset=utf-8');
     $faturaId = trim($_GET['fatura_id'] ?? '');
-    if (!$faturaId) { echo json_encode(['ok' => false]); exit; }
+    if (!$faturaId) {
+        echo json_encode(['ok' => false]);
+        exit;
+    }
     try {
         $stmtF = $pdo->prepare("
             SELECT f.IDFatura, f.DataFechamento, f.DataVencimento, f.Status, f.FKCartao,
@@ -70,7 +73,10 @@ if (isset($_GET['ajax']) && $_GET['acao'] === 'fatura_detalhe') {
         ");
         $stmtF->execute([':fid' => $faturaId, ':uid' => $usuario_id]);
         $fatura = $stmtF->fetch(PDO::FETCH_ASSOC);
-        if (!$fatura) { echo json_encode(['ok' => false]); exit; }
+        if (!$fatura) {
+            echo json_encode(['ok' => false]);
+            exit;
+        }
 
         $stmtL = $pdo->prepare("
             SELECT l.Descricao, l.Valor, l.DataCompra, l.ParcelaAtual, l.TotalParcelas,
@@ -232,7 +238,7 @@ require_once 'geral/header.php';
                             <?= htmlspecialchars($nome_carteira_atual) ?>
                         </span>
                     </button>
-                    <ul class="dropdown-menu dropdown-menu-dark shadow-lg border-secondary-subtle mt-2" style="background-color:#1a1d21; min-width:220px;">
+                    <ul class="dropdown-menu dropdown-menu-dark shadow-lg border-secondary-subtle mt-2" style="background-color:var(--bg-card-analysis); min-width:220px;">
                         <li class="px-3 pt-2 pb-1 text-secondary small text-uppercase fw-bold tracking-wide">Alternar Carteira</li>
                         <li>
                             <hr class="dropdown-divider border-secondary-subtle my-1">
@@ -265,7 +271,7 @@ require_once 'geral/header.php';
                 </div>
 
                 <!-- Navegação de mês -->
-                <div class="d-flex align-items-center bg-dark border border-secondary-subtle rounded-pill shadow-sm px-2 py-1 gap-1">
+                <div class="d-flex align-items-center border border-secondary-subtle rounded-pill shadow-sm px-2 py-1 gap-1" style="background:var(--bg-card);">
                     <button type="button" class="btn btn-sm btn-link text-secondary shadow-none" onclick="window.mudarMes(-1)">
                         <i class="bi bi-chevron-left fs-6"></i>
                     </button>
@@ -288,9 +294,9 @@ require_once 'geral/header.php';
     <!-- ── Cards de resumo ───────────────────────────────────────────────── -->
     <div class="row g-3 mb-4">
         <div class="col-md-4">
-            <div class="card border-secondary-subtle shadow-sm rounded-4" style="background-color:#1c1f24;">
+            <div class="card border-secondary-subtle shadow-sm rounded-4" style="background-color:var(--bg-card-analysis);">
                 <div class="card-body p-3">
-                    <div class="d-flex align-items-center gap-2 mb-2" style="font-size:0.8rem; color:#888;">
+                    <div class="d-flex align-items-center gap-2 mb-2" style="font-size:0.8rem; color:var(--text-muted);">
                         <i class="bi bi-check-circle text-success"></i>Balanço efetivado no mês
                     </div>
                     <h4 id="saldoEfetivado" class="fw-bold mb-0 text-secondary">—</h4>
@@ -298,9 +304,9 @@ require_once 'geral/header.php';
             </div>
         </div>
         <div class="col-md-4">
-            <div class="card border-secondary-subtle shadow-sm rounded-4" style="background-color:#1c1f24;">
+            <div class="card border-secondary-subtle shadow-sm rounded-4" style="background-color:var(--bg-card-analysis);">
                 <div class="card-body p-3">
-                    <div class="d-flex align-items-center gap-2 mb-2" style="font-size:0.8rem; color:#888;">
+                    <div class="d-flex align-items-center gap-2 mb-2" style="font-size:0.8rem; color:var(--text-muted);">
                         <i class="bi bi-hourglass-split" style="color:#E63946;"></i> A pagar no mês
                     </div>
                     <h4 id="saldoPago" class="fw-bold mb-0 text-danger">—</h4>
@@ -308,9 +314,9 @@ require_once 'geral/header.php';
             </div>
         </div>
         <div class="col-md-4">
-            <div class="card border-secondary-subtle shadow-sm rounded-4" style="background-color:#1c1f24;">
+            <div class="card border-secondary-subtle shadow-sm rounded-4" style="background-color:var(--bg-card-analysis);">
                 <div class="card-body p-3">
-                    <div class="d-flex align-items-center gap-2 mb-2" style="font-size:0.8rem; color:#888;">
+                    <div class="d-flex align-items-center gap-2 mb-2" style="font-size:0.8rem; color:var(--text-muted);">
                         <i class="bi bi-clock" style="color:#06D6A0;"></i> A receber no mês
                     </div>
                     <h4 id="saldoEsperado" class="fw-bold mb-0 text-success">—</h4>
@@ -324,7 +330,7 @@ require_once 'geral/header.php';
 
         <!-- Calendário -->
         <div class="col-xl-8 col-lg-7">
-            <div class="card border-secondary-subtle shadow-sm rounded-4 overflow-hidden" style="background-color:#1c1f24;">
+            <div class="card border-secondary-subtle shadow-sm rounded-4 overflow-hidden" style="background-color:var(--bg-card-analysis);">
                 <div class="card-body p-2 p-md-3">
                     <div id="agenda-grid" class="calendar-grid"></div>
                 </div>
@@ -336,7 +342,7 @@ require_once 'geral/header.php';
 
             <!-- Atrasadas -->
             <div id="panel-atrasadas" class="rounded-4 mb-3 d-none overflow-hidden"
-                style="background-color:#1e1214; border:1px solid rgba(230,57,70,0.35);">
+                style="background-color:var(--bg-card-analysis); border:1px solid rgba(230,57,70,0.35);">
                 <div class="d-flex align-items-center gap-2 px-4 py-3"
                     style="background-color:rgba(230,57,70,0.1); border-bottom:1px solid rgba(230,57,70,0.2);">
                     <i class="bi bi-exclamation-triangle-fill text-danger"></i>
@@ -349,7 +355,7 @@ require_once 'geral/header.php';
 
             <!-- Vencem hoje -->
             <div id="panel-hoje" class="rounded-4 mb-3 d-none overflow-hidden"
-                style="background-color:#1e1a10; border:1px solid rgba(255,184,0,0.35);">
+                style="background-color:var(--bg-card-analysis); border:1px solid rgba(255,184,0,0.35);">
                 <div class="d-flex align-items-center gap-2 px-4 py-3"
                     style="background-color:rgba(255,184,0,0.08); border-bottom:1px solid rgba(255,184,0,0.2);">
                     <i class="bi bi-bell-fill" style="color:#FFB800;"></i>
@@ -362,7 +368,7 @@ require_once 'geral/header.php';
 
             <!-- Próximos 7 dias -->
             <div id="panel-proximos" class="rounded-4 d-none overflow-hidden"
-                style="background-color:#10141e; border:1px solid rgba(59,130,246,0.35);">
+                style="background-color:var(--bg-card-analysis); border:1px solid rgba(59,130,246,0.35);">
                 <div class="d-flex align-items-center gap-2 px-4 py-3"
                     style="background-color:rgba(59,130,246,0.08); border-bottom:1px solid rgba(59,130,246,0.2);">
                     <i class="bi bi-calendar-event" style="color:#60a5fa;"></i>
@@ -395,14 +401,14 @@ require_once 'geral/header.php';
         display: grid;
         grid-template-columns: repeat(7, 1fr);
         gap: 1px;
-        background-color: #2a2d33;
+        background-color: var(--border-color-analysis);
         border-radius: 10px;
         overflow: hidden;
     }
 
     .calendar-day-header {
-        background-color: #1a1d21;
-        color: #AA8C2C;
+        background-color: var(--bg-card-analysis);
+        color: var(--primary-gold-analysis);
         text-align: center;
         padding: 10px 4px;
         font-weight: 700;
@@ -412,7 +418,7 @@ require_once 'geral/header.php';
     }
 
     .calendar-day {
-        background-color: #1c1f24;
+        background-color: var(--bg-card-analysis);
         min-height: 110px;
         max-height: 200px;
         padding: 6px;
@@ -424,22 +430,22 @@ require_once 'geral/header.php';
     }
 
     .calendar-day:hover:not(.empty) {
-        background-color: #21252b;
+        background-color: var(--bg-hover);
     }
 
     .calendar-day.empty {
-        background-color: #15171a;
+        background-color: var(--bg-main-analysis);
         opacity: 0.4;
     }
 
     .calendar-day.today {
         background-color: rgba(170, 140, 44, 0.05);
-        box-shadow: inset 0 0 0 1px #AA8C2C;
+        box-shadow: inset 0 0 0 1px var(--primary-gold-analysis);
     }
 
     .calendar-day.today .day-number {
-        background-color: #AA8C2C;
-        color: #121418;
+        background-color: var(--primary-gold-analysis);
+        color: #1a1d21;
         border-radius: 50%;
         width: 22px;
         height: 22px;
@@ -451,7 +457,7 @@ require_once 'geral/header.php';
     .day-number {
         font-weight: 700;
         font-size: 0.8rem;
-        color: #666;
+        color: var(--text-muted-analysis);
         margin-bottom: 5px;
         line-height: 1;
     }
@@ -470,7 +476,7 @@ require_once 'geral/header.php';
     }
 
     .day-events::-webkit-scrollbar-thumb {
-        background-color: #444;
+        background-color: var(--border-color-analysis);
         border-radius: 10px;
     }
 
@@ -497,23 +503,23 @@ require_once 'geral/header.php';
     }
 
     .calendar-event.evento-pago {
-        background-color: rgba(6, 214, 160, 0.18);
-        color: #b8f5e8;
+        background-color: var(--color-income-bg);
+        color: var(--color-income-text);
     }
 
     .calendar-event.evento-atrasado {
-        background-color: rgba(230, 57, 70, 0.22);
-        color: #f8b4b9;
+        background-color: var(--color-expense-bg);
+        color: var(--color-expense-text);
     }
 
     .calendar-event.evento-hoje {
-        background-color: rgba(255, 184, 0, 0.22);
-        color: #f5e2a0;
+        background-color: var(--color-today-bg);
+        color: var(--color-today-text);
     }
 
     .calendar-event.evento-pendente {
-        background-color: rgba(59, 130, 246, 0.22);
-        color: #a0c4f8;
+        background-color: var(--color-pending-bg);
+        color: var(--color-pending-text);
     }
 
     .event-desc {
@@ -530,7 +536,7 @@ require_once 'geral/header.php';
         align-items: center;
         justify-content: space-between;
         padding: 10px 16px;
-        border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+        border-bottom: 1px solid var(--bs-border-color);
         cursor: pointer;
         transition: background-color 0.15s ease;
     }
@@ -540,7 +546,7 @@ require_once 'geral/header.php';
     }
 
     .sidebar-item:hover {
-        background-color: rgba(255, 255, 255, 0.04);
+        background-color: var(--bg-hover);
     }
 
     /* ── Botões de ação na célula ── */
@@ -727,6 +733,10 @@ require_once 'geral/header.php';
     const mesesNomes = ['Janeiro', 'Fevereiro', 'Março', 'Abril', 'Maio', 'Junho', 'Julho', 'Agosto', 'Setembro', 'Outubro', 'Novembro', 'Dezembro'];
     const diasSemana = ['Dom', 'Seg', 'Ter', 'Qua', 'Qui', 'Sex', 'Sáb'];
 
+    function cssVar(name) {
+        return getComputedStyle(document.documentElement).getPropertyValue(name).trim();
+    }
+
     function formatarMoeda(v) {
         return new Intl.NumberFormat('pt-BR', {
             style: 'currency',
@@ -820,15 +830,17 @@ require_once 'geral/header.php';
     // ── Sidebar ───────────────────────────────────────────────────────────
     function itemSidebar(item) {
         const isRec = item.tipo === 'receita';
-        const corValor = isRec ? '#6ee7c7' : '#f87171';
+        const incomeColor = cssVar('--color-income-text') || '#6ee7c7';
+        const expenseColor = cssVar('--color-expense-text') || '#f87171';
+        const corValor = isRec ? incomeColor : expenseColor;
         const sinal = isRec ? '+' : '-';
         const arrow = isRec ?
-            `<i class="bi bi-arrow-up-short" style="color:#6ee7c7;font-size:1.15rem;flex-shrink:0;"></i>` :
-            `<i class="bi bi-arrow-down-short" style="color:#f87171;font-size:1.15rem;flex-shrink:0;"></i>`;
+            `<i class="bi bi-arrow-up-short" style="color:${incomeColor};font-size:1.15rem;flex-shrink:0;"></i>` :
+            `<i class="bi bi-arrow-down-short" style="color:${expenseColor};font-size:1.15rem;flex-shrink:0;"></i>`;
 
-        const clickSb = item.fatura_id
-            ? `abrirModalFaturaCC('${item.fatura_id}','${item.cartao_id}')`
-            : `window.location.href='nova_transacao.php?voltar=agenda.php&editar=${encodeURIComponent(item.id)}'`;
+        const clickSb = item.fatura_id ?
+            `abrirModalFaturaCC('${item.fatura_id}','${item.cartao_id}')` :
+            `window.location.href='nova_transacao.php?voltar=agenda.php&editar=${encodeURIComponent(item.id)}'`;
         return `<div class="sidebar-item" onclick="${clickSb}">
             <div class="d-flex align-items-center gap-2" style="min-width:0;">
                 ${arrow}
@@ -899,24 +911,28 @@ require_once 'geral/header.php';
         if (!transacoesDoDia || transacoesDoDia.length === 0) {
             body.innerHTML = `<div class="text-center text-secondary py-5" style="font-size:0.88rem;">Nenhuma transação registrada neste dia.</div>`;
         } else {
+            const incomeColor = cssVar('--color-income-text') || '#6ee7c7';
+            const expenseColor = cssVar('--color-expense-text') || '#f87171';
+            const cardColor = cssVar('--color-card-text') || '#a78bfa';
+            const pendingColor = cssVar('--color-pending-text') || '#f5e2a0';
             body.innerHTML = transacoesDoDia.map(t => {
                 const isRec = t.tipo === 'receita';
-                const corVal = isRec ? '#6ee7c7' : '#f87171';
+                const corVal = isRec ? incomeColor : expenseColor;
                 const sinal = isRec ? '+' : '-';
                 const statusBadge = t.status === 'efetivado' ?
-                    `<span class="badge rounded-pill" style="background:rgba(6,214,160,0.15);color:#6ee7c7;border:1px solid rgba(6,214,160,0.3);font-size:0.65rem;white-space:nowrap;">Efetivado</span>` :
-                    `<span class="badge rounded-pill" style="background:rgba(255,184,0,0.15);color:#f5e2a0;border:1px solid rgba(255,184,0,0.3);font-size:0.65rem;white-space:nowrap;">Pendente</span>`;
+                    `<span class="badge rounded-pill" style="background:var(--color-income-bg);color:${incomeColor};border:1px solid var(--color-income-border);font-size:0.65rem;white-space:nowrap;">Efetivado</span>` :
+                    `<span class="badge rounded-pill" style="background:var(--color-pending-bg);color:${pendingColor};border:1px solid var(--color-today-bg);font-size:0.65rem;white-space:nowrap;">Pendente</span>`;
 
-                const btnComp = (_temAcessoCompAgenda && t.tem_comprovante > 0)
-                    ? `<button onclick="event.stopPropagation();abrirComprovantes('${t.id}')" class="btn btn-sm btn-outline-info rounded-pill px-2 py-0 mt-1" title="Ver comprovante"><i class="bi bi-eye"></i></button>`
-                    : '';
+                const btnComp = (_temAcessoCompAgenda && t.tem_comprovante > 0) ?
+                    `<button onclick="event.stopPropagation();abrirComprovantes('${t.id}')" class="btn btn-sm btn-outline-info rounded-pill px-2 py-0 mt-1" title="Ver comprovante"><i class="bi bi-eye"></i></button>` :
+                    '';
                 const isCC = !!t.fatura_id;
-                const clickDia = isCC
-                    ? `abrirModalDiaCC('${t.fatura_id}','${t.cartao_id}')`
-                    : `window.location.href='nova_transacao.php?voltar=agenda.php&editar=${encodeURIComponent(t.id)}'`;
-                const iconeEsq = isCC
-                    ? `<i class="bi bi-credit-card-2-front" style="color:#a78bfa;font-size:1.3rem;flex-shrink:0;"></i>`
-                    : `<i class="bi bi-arrow-${isRec ? 'up' : 'down'}-short" style="color:${corVal};font-size:1.5rem;flex-shrink:0;"></i>`;
+                const clickDia = isCC ?
+                    `abrirModalDiaCC('${t.fatura_id}','${t.cartao_id}')` :
+                    `window.location.href='nova_transacao.php?voltar=agenda.php&editar=${encodeURIComponent(t.id)}'`;
+                const iconeEsq = isCC ?
+                    `<i class="bi bi-credit-card-2-front" style="color:${cardColor};font-size:1.3rem;flex-shrink:0;"></i>` :
+                    `<i class="bi bi-arrow-${isRec ? 'up' : 'down'}-short" style="color:${corVal};font-size:1.5rem;flex-shrink:0;"></i>`;
                 return `<div class="d-flex align-items-center gap-3 px-4 py-3 border-bottom border-secondary-subtle"
                              style="cursor:pointer;transition:background .12s ease;"
                              onmouseover="this.style.background='rgba(255,255,255,0.03)'"
@@ -998,16 +1014,26 @@ require_once 'geral/header.php';
                 pill.className = `calendar-event ${cls}`;
                 pill.title = `${t.titulo} — ${formatarMoeda(t.valor)}`;
                 if (t.fatura_id) {
-                    pill.onclick = (e) => { e.stopPropagation(); abrirModalFaturaCC(t.fatura_id, t.cartao_id); };
+                    pill.onclick = (e) => {
+                        e.stopPropagation();
+                        abrirModalFaturaCC(t.fatura_id, t.cartao_id);
+                    };
                     pill.innerHTML = `<i class="bi bi-credit-card-2-front" style="color:#a78bfa;font-size:0.8rem;flex-shrink:0;line-height:1;"></i><span class="event-desc">${esc(t.titulo)}</span>`;
                 } else {
-                    pill.onclick = (e) => { e.stopPropagation(); window.location.href = `nova_transacao.php?voltar=agenda.php&editar=${encodeURIComponent(t.id)}`; };
-                    pill.addEventListener('contextmenu', (e) => { e.preventDefault(); e.stopPropagation(); window._mostrarMenuPill(e.clientX, e.clientY, t); });
-                    const arrow = isRec
-                        ? `<i class="bi bi-arrow-up-short" style="color:#6ee7c7;font-size:0.95rem;flex-shrink:0;line-height:1;"></i>`
-                        : `<i class="bi bi-arrow-down-short" style="color:#f87171;font-size:0.95rem;flex-shrink:0;line-height:1;"></i>`;
-                    const rep = (t.Recorrente == 1)
-                        ? `<i class="bi bi-arrow-repeat ms-1" style="opacity:0.55;font-size:0.6rem;flex-shrink:0;"></i>` : '';
+                    pill.onclick = (e) => {
+                        e.stopPropagation();
+                        window.location.href = `nova_transacao.php?voltar=agenda.php&editar=${encodeURIComponent(t.id)}`;
+                    };
+                    pill.addEventListener('contextmenu', (e) => {
+                        e.preventDefault();
+                        e.stopPropagation();
+                        window._mostrarMenuPill(e.clientX, e.clientY, t);
+                    });
+                    const arrow = isRec ?
+                        `<i class="bi bi-arrow-up-short" style="color:#6ee7c7;font-size:0.95rem;flex-shrink:0;line-height:1;"></i>` :
+                        `<i class="bi bi-arrow-down-short" style="color:#f87171;font-size:0.95rem;flex-shrink:0;line-height:1;"></i>`;
+                    const rep = (t.Recorrente == 1) ?
+                        `<i class="bi bi-arrow-repeat ms-1" style="opacity:0.55;font-size:0.6rem;flex-shrink:0;"></i>` : '';
                     pill.innerHTML = `${arrow}<span class="event-desc">${esc(t.titulo)}</span>${rep}`;
                 }
                 eventsDiv.appendChild(pill);
@@ -1023,10 +1049,10 @@ require_once 'geral/header.php';
     }
 
     // ── Context menu dos pills do calendário ────────────────────────────────
-    (function () {
+    (function() {
         const menu = document.createElement('div');
         menu.id = 'ctx-pill';
-        menu.style.cssText = 'position:fixed;z-index:9999;display:none;background:#1e2128;border:1px solid rgba(255,255,255,.1);border-radius:10px;box-shadow:0 8px 28px rgba(0,0,0,.55);min-width:168px;overflow:hidden;';
+        menu.style.cssText = 'position:fixed;z-index:9999;display:none;background:var(--bg-card-analysis);border:1px solid var(--border-color-analysis);border-radius:10px;box-shadow:0 8px 28px rgba(0,0,0,.25);min-width:168px;overflow:hidden;';
         menu.innerHTML = `
             <div id="ctx-editar"  class="ctx-item"><i class="bi bi-pencil-square" style="color:#f5c542;"></i> Editar</div>
             <div id="ctx-comp"    class="ctx-item" style="display:none;"><i class="bi bi-eye" style="color:#38bdf8;"></i> Ver comprovante</div>
@@ -1035,23 +1061,32 @@ require_once 'geral/header.php';
         document.body.appendChild(menu);
 
         const style = document.createElement('style');
-        style.textContent = `.ctx-item{padding:9px 16px;cursor:pointer;font-size:.855rem;color:#f8fafc;display:flex;align-items:center;gap:9px;transition:background .1s}.ctx-item:hover{background:rgba(255,255,255,.07)}.ctx-danger{color:#f87171!important}.ctx-sep{height:1px;background:rgba(255,255,255,.08);margin:3px 0}`;
+        style.textContent = `.ctx-item{padding:9px 16px;cursor:pointer;font-size:.855rem;color:var(--text-light-analysis);display:flex;align-items:center;gap:9px;transition:background .1s}.ctx-item:hover{background:var(--bg-hover)}.ctx-danger{color:#f87171!important}.ctx-sep{height:1px;background:var(--border-color-analysis);margin:3px 0}`;
         document.head.appendChild(style);
 
         let _transacao = null;
 
-        function fechar() { menu.style.display = 'none'; _transacao = null; }
+        function fechar() {
+            menu.style.display = 'none';
+            _transacao = null;
+        }
         document.addEventListener('click', fechar);
         document.addEventListener('keydown', e => e.key === 'Escape' && fechar());
         menu.addEventListener('click', e => e.stopPropagation());
 
-        window._mostrarMenuPill = function (x, y, t) {
+        window._mostrarMenuPill = function(x, y, t) {
             _transacao = t;
-            document.getElementById('ctx-editar').onclick  = () => { fechar(); window.location.href = `nova_transacao.php?voltar=agenda.php&editar=${encodeURIComponent(t.id)}`; };
+            document.getElementById('ctx-editar').onclick = () => {
+                fechar();
+                window.location.href = `nova_transacao.php?voltar=agenda.php&editar=${encodeURIComponent(t.id)}`;
+            };
             const btnComp = document.getElementById('ctx-comp');
             if (_temAcessoCompAgenda && t.tem_comprovante > 0) {
                 btnComp.style.display = 'flex';
-                btnComp.onclick = () => { fechar(); abrirComprovantes(t.id); };
+                btnComp.onclick = () => {
+                    fechar();
+                    abrirComprovantes(t.id);
+                };
             } else {
                 btnComp.style.display = 'none';
             }
@@ -1060,47 +1095,64 @@ require_once 'geral/header.php';
                 const desc = t.titulo.length > 40 ? t.titulo.slice(0, 40) + '…' : t.titulo;
                 if (!confirm(`Excluir "${desc}"?\n\nEsta ação é irreversível.`)) return;
                 fetch('agenda.php', {
-                    method: 'POST',
-                    headers: {'Content-Type': 'application/x-www-form-urlencoded'},
-                    body: `action=excluir_rapido&registro_id=${encodeURIComponent(t.id)}`
-                })
-                .then(r => r.json())
-                .then(d => { if (d.ok) window.carregarMes(anoAtual, mesAtual); else alert('Erro ao excluir.'); })
-                .catch(() => alert('Erro de conexão.'));
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/x-www-form-urlencoded'
+                        },
+                        body: `action=excluir_rapido&registro_id=${encodeURIComponent(t.id)}`
+                    })
+                    .then(r => r.json())
+                    .then(d => {
+                        if (d.ok) window.carregarMes(anoAtual, mesAtual);
+                        else alert('Erro ao excluir.');
+                    })
+                    .catch(() => alert('Erro de conexão.'));
             };
 
             // Posiciona sem sair da viewport
             menu.style.display = 'block';
-            const mw = menu.offsetWidth, mh = menu.offsetHeight;
-            const vw = window.innerWidth,   vh = window.innerHeight;
+            const mw = menu.offsetWidth,
+                mh = menu.offsetHeight;
+            const vw = window.innerWidth,
+                vh = window.innerHeight;
             menu.style.left = (x + mw > vw ? x - mw : x) + 'px';
-            menu.style.top  = (y + mh > vh ? y - mh : y) + 'px';
+            menu.style.top = (y + mh > vh ? y - mh : y) + 'px';
         };
     })();
 
     // ── Modal de Fatura de Cartão ─────────────────────────────────────────
     async function abrirModalFaturaCC(faturaId, cartaoId) {
         const modalEl = document.getElementById('modalFaturaCC');
-        const modal   = new bootstrap.Modal(modalEl);
+        const modal = new bootstrap.Modal(modalEl);
         document.getElementById('modalFaturaCCBody').innerHTML =
             '<div class="text-center py-5 text-secondary"><i class="bi bi-hourglass-split me-2"></i>Carregando...</div>';
         document.getElementById('modalFaturaCCLink').href =
             '/cartao_credito/fatura.php?cartao=' + encodeURIComponent(cartaoId);
         modal.show();
         try {
-            const r    = await fetch(`agenda.php?ajax=1&acao=fatura_detalhe&fatura_id=${encodeURIComponent(faturaId)}`);
+            const r = await fetch(`agenda.php?ajax=1&acao=fatura_detalhe&fatura_id=${encodeURIComponent(faturaId)}`);
             const data = await r.json();
-            if (!data.ok) { document.getElementById('modalFaturaCCBody').innerHTML = '<p class="text-danger text-center py-4 px-4">Erro ao carregar fatura.</p>'; return; }
+            if (!data.ok) {
+                document.getElementById('modalFaturaCCBody').innerHTML = '<p class="text-danger text-center py-4 px-4">Erro ao carregar fatura.</p>';
+                return;
+            }
 
             const f = data.fatura;
             const cor = f.Cor || '#7c3aed';
-            const stMap = { aberta: ['#22c55e','ABERTA'], fechada: ['#FFB800','FECHADA'], paga: ['#6ee7c7','PAGA'] };
-            const [stCor, stLabel] = stMap[f.Status] || ['#888','—'];
+            const stMap = {
+                aberta: ['#22c55e', 'ABERTA'],
+                fechada: ['#FFB800', 'FECHADA'],
+                paga: ['#6ee7c7', 'PAGA']
+            };
+            const [stCor, stLabel] = stMap[f.Status] || ['#888', '—'];
             const total = data.lancamentos.reduce((s, l) => s + parseFloat(l.Valor), 0);
-            const fmtD  = d => d ? d.slice(8,10)+'/'+d.slice(5,7)+'/'+d.slice(0,4) : '—';
-            const fmtV  = v => parseFloat(v).toLocaleString('pt-BR', {minimumFractionDigits:2, maximumFractionDigits:2});
+            const fmtD = d => d ? d.slice(8, 10) + '/' + d.slice(5, 7) + '/' + d.slice(0, 4) : '—';
+            const fmtV = v => parseFloat(v).toLocaleString('pt-BR', {
+                minimumFractionDigits: 2,
+                maximumFractionDigits: 2
+            });
 
-            let html = `<div class="px-4 pt-3 pb-3" style="border-bottom:1px solid #2a2d38;">
+            let html = `<div class="px-4 pt-3 pb-3" style="border-bottom:1px solid var(--border-color-analysis);">
                 <div class="d-flex align-items-center gap-3">
                     <div class="rounded-3 d-flex align-items-center justify-content-center flex-shrink-0"
                          style="width:42px;height:42px;background:${cor}22;">
@@ -1122,10 +1174,10 @@ require_once 'geral/header.php';
                 html += '<div class="text-center text-secondary py-5" style="font-size:0.85rem;">Nenhum lançamento nesta fatura.</div>';
             } else {
                 data.lancamentos.forEach(l => {
-                    const dt = l.DataCompra ? l.DataCompra.slice(8,10)+'/'+l.DataCompra.slice(5,7) : '—';
-                    const parc = parseInt(l.TotalParcelas) > 1
-                        ? `<span style="display:inline-flex;align-items:center;background:rgba(124,58,237,.18);color:#a78bfa;border:1px solid rgba(124,58,237,.3);border-radius:999px;padding:0 5px;font-size:0.58rem;font-weight:700;margin-left:4px;">${l.ParcelaAtual}/${l.TotalParcelas}x</span>` : '';
-                    html += `<div class="d-flex align-items-center gap-3 px-4 py-2" style="border-bottom:1px solid rgba(255,255,255,.04);">
+                    const dt = l.DataCompra ? l.DataCompra.slice(8, 10) + '/' + l.DataCompra.slice(5, 7) : '—';
+                    const parc = parseInt(l.TotalParcelas) > 1 ?
+                        `<span style="display:inline-flex;align-items:center;background:rgba(124,58,237,.18);color:#a78bfa;border:1px solid rgba(124,58,237,.3);border-radius:999px;padding:0 5px;font-size:0.58rem;font-weight:700;margin-left:4px;">${l.ParcelaAtual}/${l.TotalParcelas}x</span>` : '';
+                    html += `<div class="d-flex align-items-center gap-3 px-4 py-2" style="border-bottom:1px solid var(--bs-border-color);">
                         <div style="min-width:0;flex:1;">
                             <div class="text-light d-flex align-items-center flex-wrap" style="font-size:0.83rem;">${esc(l.Descricao)}${parc}</div>
                             <div class="text-secondary" style="font-size:0.7rem;">${l.NomeCategoria ? esc(l.NomeCategoria) : '—'} · ${dt}</div>
@@ -1133,13 +1185,13 @@ require_once 'geral/header.php';
                         <span class="fw-bold text-danger flex-shrink-0" style="font-size:0.85rem;">R$ ${fmtV(l.Valor)}</span>
                     </div>`;
                 });
-                html += `<div class="d-flex justify-content-between px-4 py-3" style="border-top:1px solid #2a2d38;">
+                html += `<div class="d-flex justify-content-between px-4 py-3" style="border-top:1px solid var(--border-color-analysis);">
                     <span class="text-secondary fw-semibold" style="font-size:0.83rem;">Total</span>
                     <span class="fw-bold text-danger" style="font-size:0.9rem;">R$ ${fmtV(total)}</span>
                 </div>`;
             }
             document.getElementById('modalFaturaCCBody').innerHTML = html;
-        } catch(e) {
+        } catch (e) {
             document.getElementById('modalFaturaCCBody').innerHTML = '<p class="text-danger text-center py-4 px-4">Erro ao carregar fatura.</p>';
         }
     }
@@ -1161,23 +1213,29 @@ require_once 'geral/header.php';
 
     function abrirComprovantes(registroId) {
         const modal = new bootstrap.Modal(document.getElementById('modalComprovantesAgenda'));
-        const body  = document.getElementById('modalComprovantesAgendaBody');
+        const body = document.getElementById('modalComprovantesAgendaBody');
         body.innerHTML = '<div class="text-center text-secondary py-4"><i class="bi bi-hourglass-split me-2"></i>Carregando...</div>';
         modal.show();
         fetch('/comprovante/listar_ajax.php?registro=' + encodeURIComponent(registroId))
             .then(r => r.json())
             .then(data => {
-                if (data.erro) { body.innerHTML = '<p class="text-danger text-center py-3">' + data.erro + '</p>'; return; }
-                if (!data.arquivos.length) { body.innerHTML = '<p class="text-secondary text-center py-3">Nenhum comprovante encontrado.</p>'; return; }
+                if (data.erro) {
+                    body.innerHTML = '<p class="text-danger text-center py-3">' + data.erro + '</p>';
+                    return;
+                }
+                if (!data.arquivos.length) {
+                    body.innerHTML = '<p class="text-secondary text-center py-3">Nenhum comprovante encontrado.</p>';
+                    return;
+                }
                 let html = '<div class="d-flex flex-column gap-3">';
                 data.arquivos.forEach(a => {
                     const isImg = a.TipoMime.startsWith('image/');
-                    const url   = '/comprovante/ver.php?id=' + encodeURIComponent(a.IDComprovante);
+                    const url = '/comprovante/ver.php?id=' + encodeURIComponent(a.IDComprovante);
                     if (isImg) {
                         html += `<div class="text-center"><img src="${url}" class="img-fluid rounded-3" style="max-height:380px;object-fit:contain;" alt="${a.NomeOriginal}">
                                  <p class="text-secondary small mt-2">${a.NomeOriginal}</p></div>`;
                     } else {
-                        html += `<div class="d-flex align-items-center gap-3 p-3 rounded-3" style="background:rgba(255,255,255,0.04);border:1px solid #333;">
+                        html += `<div class="d-flex align-items-center gap-3 p-3 rounded-3" style="background:var(--bg-hover);border:1px solid var(--border-color-analysis);">
                                      <i class="bi bi-file-earmark-pdf fs-2 text-danger"></i>
                                      <div class="flex-grow-1"><p class="text-light mb-0 fw-semibold">${a.NomeOriginal}</p></div>
                                      <a href="${url}" target="_blank" class="btn btn-sm btn-outline-secondary rounded-pill">Abrir</a>
@@ -1188,7 +1246,9 @@ require_once 'geral/header.php';
                 html += '</div>';
                 body.innerHTML = html;
             })
-            .catch(() => { body.innerHTML = '<p class="text-danger text-center py-3">Erro ao carregar comprovantes.</p>'; });
+            .catch(() => {
+                body.innerHTML = '<p class="text-danger text-center py-3">Erro ao carregar comprovantes.</p>';
+            });
     }
 </script>
 
@@ -1197,13 +1257,13 @@ require_once 'geral/header.php';
      ═══════════════════════════════════════════════════════════════════ -->
 <div class="modal fade" id="modalDia" tabindex="-1" aria-hidden="true">
     <div class="modal-dialog modal-dialog-centered modal-dialog-scrollable" style="max-width: 500px;">
-        <div class="modal-content border-secondary-subtle rounded-4" style="background:#1a1d21;">
+        <div class="modal-content border-secondary-subtle rounded-4" style="background:var(--bg-card-analysis);">
             <div class="modal-header border-bottom border-secondary-subtle px-4 py-3 d-flex align-items-start gap-3">
                 <div>
                     <h5 class="modal-title text-light fw-bold mb-0" id="modalDiaTitulo">—</h5>
                     <div class="text-secondary" id="modalDiaSubtitulo" style="font-size:0.8rem;">—</div>
                 </div>
-                <button type="button" class="btn-close btn-close-white ms-auto flex-shrink-0 mt-1" data-bs-dismiss="modal"></button>
+                <button type="button" class="btn-close ms-auto flex-shrink-0 mt-1" data-bs-dismiss="modal"></button>
             </div>
             <div class="modal-body p-0" id="modalDiaBody"></div>
             <div class="modal-footer border-top border-secondary-subtle px-4 gap-2 justify-content-start flex-wrap">
@@ -1225,17 +1285,17 @@ require_once 'geral/header.php';
 <!-- MODAL: FATURA DE CARTÃO DE CRÉDITO -->
 <div class="modal fade" id="modalFaturaCC" tabindex="-1" aria-hidden="true">
     <div class="modal-dialog modal-dialog-centered modal-dialog-scrollable" style="max-width:480px;">
-        <div class="modal-content border-secondary-subtle rounded-4" style="background:#1a1d21;">
+        <div class="modal-content border-secondary-subtle rounded-4" style="background:var(--bg-card-analysis);">
             <div class="modal-header border-secondary-subtle px-4 py-3">
                 <h6 class="modal-title fw-bold text-light mb-0">
                     <i class="bi bi-credit-card-2-front me-2" style="color:#a78bfa;"></i>Fatura do Cartão
                 </h6>
-                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
             </div>
             <div class="modal-body p-0" id="modalFaturaCCBody"></div>
             <div class="modal-footer border-secondary-subtle px-4 py-3 d-flex justify-content-between">
                 <a id="modalFaturaCCLink" href="#" class="btn btn-sm fw-semibold rounded-pill px-3"
-                   style="background:rgba(124,58,237,.18);color:#a78bfa;border:1px solid rgba(124,58,237,.3);">
+                    style="background:rgba(124,58,237,.18);color:#a78bfa;border:1px solid rgba(124,58,237,.3);">
                     <i class="bi bi-arrow-right-circle me-1"></i> Ver fatura completa
                 </a>
                 <button type="button" class="btn btn-sm btn-link text-secondary text-decoration-none"
@@ -1251,7 +1311,7 @@ require_once 'geral/header.php';
         <div class="modal-content border-secondary-subtle" style="background:var(--bg-card);">
             <div class="modal-header border-secondary-subtle px-4 py-3">
                 <h6 class="modal-title fw-bold text-light mb-0"><i class="bi bi-paperclip me-2"></i>Comprovantes</h6>
-                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
             </div>
             <div class="modal-body p-4" id="modalComprovantesAgendaBody">
                 <div class="text-center text-secondary py-4"><i class="bi bi-hourglass-split me-2"></i>Carregando...</div>

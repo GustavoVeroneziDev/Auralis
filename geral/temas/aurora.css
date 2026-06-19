@@ -1,0 +1,65 @@
+/* ============================================================
+   AURALIS — Tema: Aurora
+   Paleta: roxo-negro profundo + ciano/teal + coral
+   data-bs-theme="dark"
+   ============================================================ */
+:root {
+  /* Fundos */
+  --bg-dark: #0a0518;
+  --bg-card: #150d2e;
+  --bg-hover: #1e1440;
+
+  /* Acento — ciano/teal elétrico */
+  --accent: #38bcd8;
+  --accent-light: #6dd5ec;
+  --gold-primary: #38bcd8;
+  --primary-gold-analysis: #38bcd8;
+  --gold-glow-analysis: rgba(56, 188, 216, 0.35);
+  --text-gold-analysis: #6dd5ec;
+
+  /* Texto */
+  --text-main: #e4f0f6;
+  --text-muted: #6898b0;
+
+  /* Bootstrap overrides */
+  --bs-primary: #38bcd8;
+  --bs-primary-rgb: 56, 188, 216;
+  --bs-link-color: #38bcd8;
+  --bs-link-hover-color: #6dd5ec;
+  --bs-body-bg: #0a0518;
+  --bs-body-color: #e4f0f6;
+  --bs-border-color: #2a1e50;
+  --bs-secondary-bg: #150d2e;
+
+  /* Componentes */
+  --navbar-bg: rgba(10, 5, 24, 0.9);
+  --navbar-collapse-bg: rgba(10, 5, 24, 0.97);
+  --card-border-color: rgba(56, 188, 216, 0.14);
+  --card-border-feature: rgba(56, 188, 216, 0.22);
+  --card-glow: rgba(56, 188, 216, 0.18);
+  --scrollbar-thumb: rgba(56, 188, 216, 0.4);
+
+  /* Vars de análise */
+  --bg-main-analysis: #0a0518;
+  --bg-card-analysis: #1e1440;
+  --bg-charcoal-analysis: #150d2e;
+  --border-color-analysis: #2a1e50;
+  --text-light-analysis: #e4f0f6;
+  --text-muted-analysis: #6898b0;
+
+  /* Cores semânticas */
+  --color-income-bg: rgba(6, 214, 160, 0.15);
+  --color-income-text: #6ee7c7;
+  --color-income-border: rgba(6, 214, 160, 0.4);
+  --color-expense-bg: rgba(255, 90, 110, 0.15);
+  --color-expense-text: #ff8a9a;
+  --color-expense-border: rgba(255, 90, 110, 0.4);
+  --color-card-bg: rgba(56, 188, 216, 0.15);
+  --color-card-text: #6dd5ec;
+  --color-card-border: rgba(56, 188, 216, 0.45);
+  --color-pending-bg: rgba(99, 102, 241, 0.2);
+  --color-pending-text: #a5b4fc;
+  --color-today-bg: rgba(56, 188, 216, 0.2);
+  --color-today-text: #6dd5ec;
+  --table-row-hover: rgba(56, 188, 216, 0.1);
+}

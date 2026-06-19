@@ -174,9 +174,7 @@ require_once '../geral/header.php';
 
     <!-- Alertas -->
     <?php if ($sucesso): ?>
-        <div class="alert alert-success d-flex align-items-center gap-2 rounded-3 border-0 bg-success bg-opacity-10 text-success fw-semibold mb-4">
-            <i class="bi bi-check-circle-fill"></i> <?= htmlspecialchars($sucesso) ?>
-        </div>
+        <script>window._pendingToast = <?= json_encode($sucesso) ?>;</script>
     <?php endif; ?>
     <?php if ($erro): ?>
         <div class="alert alert-danger d-flex align-items-center gap-2 rounded-3 border-0 bg-danger bg-opacity-10 text-danger fw-semibold mb-4">

@@ -161,7 +161,7 @@ require_once '../geral/header.php';
             <p class="text-secondary mb-0 small">Gerencie seus cartões e acompanhe as faturas</p>
         </div>
         <button class="btn fw-bold rounded-pill px-4"
-            style="background:linear-gradient(135deg,#7c3aed,#a78bfa);color:#fff;border:none;"
+            style="background:var(--color-card-text);color:#fff;border:none;"
             data-bs-toggle="modal" data-bs-target="#modalCartao" onclick="abrirModalNovo()">
             <i class="bi bi-plus-lg me-1"></i> Novo Cartão
         </button>
@@ -176,7 +176,7 @@ require_once '../geral/header.php';
 
     <?php if (empty($cartoes)): ?>
         <div class="text-center py-5">
-            <i class="bi bi-credit-card-2-front" style="font-size:3rem;color:#374151;"></i>
+            <i class="bi bi-credit-card-2-front" style="font-size:3rem;color:var(--text-muted);"></i>
             <p class="text-secondary mt-3">Você ainda não tem cartões de crédito cadastrados.</p>
             <button class="btn btn-outline-secondary rounded-pill px-4"
                 data-bs-toggle="modal" data-bs-target="#modalCartao" onclick="abrirModalNovo()">
@@ -226,7 +226,7 @@ require_once '../geral/header.php';
                                             <?php endif; ?>
                                         </span>
                                     </div>
-                                    <div class="progress rounded-pill" style="height:5px;background:rgba(255,255,255,.08);">
+                                    <div class="progress rounded-pill" style="height:5px;background:var(--bg-hover);">
                                         <div class="progress-bar rounded-pill" style="width:<?= min(100, $d['pct']) ?>%;background:<?= $excedido ? '#ef4444' : $cor ?>;"></div>
                                     </div>
                                     <?php if ($excedido): ?>
@@ -239,18 +239,18 @@ require_once '../geral/header.php';
                         <!-- Datas -->
                         <?php if ($fatura): ?>
                         <div class="d-flex gap-3 mb-4">
-                            <div class="flex-grow-1 p-2 rounded-3 text-center" style="background:rgba(255,255,255,.04);border:1px solid #333;">
+                            <div class="flex-grow-1 p-2 rounded-3 text-center" style="background:var(--bg-hover);border:1px solid var(--bs-border-color);">
                                 <p class="text-secondary mb-0" style="font-size:0.68rem;text-transform:uppercase;letter-spacing:.06em;">Fecha em</p>
                                 <p class="text-light fw-semibold mb-0 small">
                                     <?php
-                                    if ($d['diasAte'] === 0) echo '<span style="color:#f87171;">Hoje</span>';
-                                    elseif ($d['diasAte'] === 1) echo '<span style="color:#fbbf24;">Amanhã</span>';
+                                    if ($d['diasAte'] === 0) echo '<span style="color:var(--color-expense-text);">Hoje</span>';
+                                    elseif ($d['diasAte'] === 1) echo '<span style="color:var(--accent);">Amanhã</span>';
                                     else echo $d['diasAte'] . ' dias';
                                     ?>
                                 </p>
                                 <p class="text-secondary mb-0" style="font-size:0.68rem;"><?= date('d/m', strtotime($fatura['DataFechamento'])) ?></p>
                             </div>
-                            <div class="flex-grow-1 p-2 rounded-3 text-center" style="background:rgba(255,255,255,.04);border:1px solid #333;">
+                            <div class="flex-grow-1 p-2 rounded-3 text-center" style="background:var(--bg-hover);border:1px solid var(--bs-border-color);">
                                 <p class="text-secondary mb-0" style="font-size:0.68rem;text-transform:uppercase;letter-spacing:.06em;">Vence em</p>
                                 <p class="text-light fw-semibold mb-0 small"><?= date('d/m', strtotime($fatura['DataVencimento'])) ?></p>
                                 <p class="text-secondary mb-0" style="font-size:0.68rem;">dia <?= $c['DiaVencimento'] ?></p>
@@ -287,14 +287,14 @@ require_once '../geral/header.php';
 <!-- MODAL: Adicionar / Editar Cartão -->
 <div class="modal fade" id="modalCartao" tabindex="-1" aria-hidden="true">
     <div class="modal-dialog modal-dialog-centered" style="max-width:480px;">
-        <div class="modal-content border-secondary-subtle" style="background:#1a1d21;">
+        <div class="modal-content border-secondary-subtle">
             <form method="POST" action="">
                 <input type="hidden" name="action" value="salvar_cartao">
                 <input type="hidden" name="id_cartao" id="mc_id">
 
                 <div class="modal-header border-secondary-subtle px-4 py-3">
                     <h6 class="modal-title fw-bold text-light mb-0" id="mc_titulo">Novo Cartão</h6>
-                    <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
                 </div>
 
                 <div class="modal-body px-4 py-3 d-flex flex-column gap-3">
@@ -306,7 +306,7 @@ require_once '../geral/header.php';
                     <div class="row g-2">
                         <div class="col-6">
                             <label class="form-label text-secondary small">Bandeira</label>
-                            <select name="bandeira" id="mc_bandeira" class="form-select text-light border-secondary" style="background-color:#1e1e2e;">
+                            <select name="bandeira" id="mc_bandeira" class="form-select border-secondary">
                                 <?php foreach ($bandeiras as $k => $v): ?>
                                     <option value="<?= $k ?>"><?= $v ?></option>
                                 <?php endforeach; ?>
@@ -314,7 +314,7 @@ require_once '../geral/header.php';
                         </div>
                         <div class="col-6">
                             <label class="form-label text-secondary small">Cor</label>
-                            <select name="cor" id="mc_cor" class="form-select text-light border-secondary" style="background-color:#1e1e2e;">
+                            <select name="cor" id="mc_cor" class="form-select border-secondary">
                                 <?php foreach ($cores as $hex => $nome): ?>
                                     <option value="<?= $hex ?>"><?= $nome ?></option>
                                 <?php endforeach; ?>
@@ -346,7 +346,7 @@ require_once '../geral/header.php';
 
                     <div>
                         <label class="form-label text-secondary small">Carteira para pagamento da fatura</label>
-                        <select name="carteira_debito" id="mc_carteira" class="form-select text-light border-secondary" style="background-color:#1e1e2e;">
+                        <select name="carteira_debito" id="mc_carteira" class="form-select border-secondary">
                             <option value="">— Não definido —</option>
                             <?php foreach ($carteiras as $cart): ?>
                                 <option value="<?= $cart['IDCarteira'] ?>"><?= htmlspecialchars($cart['TipoCarteira']) ?></option>
@@ -359,7 +359,7 @@ require_once '../geral/header.php';
                 <div class="modal-footer border-secondary-subtle d-flex justify-content-between p-3">
                     <button type="button" class="btn btn-sm btn-link text-secondary text-decoration-none" data-bs-dismiss="modal">Cancelar</button>
                     <button type="submit" class="btn btn-sm fw-bold rounded-pill px-4"
-                        style="background:linear-gradient(135deg,#7c3aed,#a78bfa);color:#fff;border:none;">
+                        style="background:var(--color-card-text);color:#fff;border:none;">
                         Salvar
                     </button>
                 </div>
@@ -371,12 +371,12 @@ require_once '../geral/header.php';
 <!-- MODAL: Excluir Cartão -->
 <div class="modal fade" id="modalExcluirCartao" tabindex="-1" aria-hidden="true">
     <div class="modal-dialog modal-dialog-centered" style="max-width:420px;">
-        <div class="modal-content border-secondary-subtle shadow-lg rounded-4" style="background:#1a1d21;">
+        <div class="modal-content border-secondary-subtle shadow-lg rounded-4">
             <div class="modal-header border-secondary-subtle p-3">
                 <h6 class="modal-title fw-bold text-light mb-0">
                     <i class="bi bi-trash3 me-2 text-danger"></i> Excluir Cartão
                 </h6>
-                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
             </div>
             <form method="POST">
                 <input type="hidden" name="action" value="excluir_cartao">
@@ -384,7 +384,7 @@ require_once '../geral/header.php';
                 <div class="modal-body p-4 text-center">
                     <p class="text-secondary mb-1">Você está prestes a excluir o cartão</p>
                     <p class="text-light fw-bold fs-5 mb-3" id="excluir_cartao_nome">—</p>
-                    <div class="rounded-3 p-3 text-start" style="background:rgba(220,38,38,.08);border:1px solid rgba(220,38,38,.25);">
+                    <div class="rounded-3 p-3 text-start" style="background:var(--color-expense-bg);border:1px solid var(--color-expense-border);">
                         <p class="text-secondary small mb-0">
                             <i class="bi bi-exclamation-triangle text-warning me-1"></i>
                             Todos os <strong class="text-light">lançamentos</strong> e <strong class="text-light">faturas</strong> deste cartão serão removidos permanentemente. Esta ação não pode ser desfeita.
@@ -453,13 +453,13 @@ function abrirModalEditar(c) {
 
 <style>
 #modalCartao .form-select option {
-    background-color: #1e1e2e;
-    color: #e0e0e0;
+    background-color: var(--bg-card);
+    color: var(--text-main);
 }
 #modalCartao .form-select option:hover,
 #modalCartao .form-select option:checked {
-    background-color: #2d2b55;
-    color: #fff;
+    background-color: var(--bg-hover);
+    color: var(--text-main);
 }
 </style>
 <?php require_once '../geral/footer.php'; ?>

@@ -1,0 +1,65 @@
+/* ============================================================
+   AURALIS — Tema: Oceano
+   Paleta: navy profundo + azul-ardósia + laranja queimado
+   data-bs-theme="dark"
+   ============================================================ */
+:root {
+  /* Fundos */
+  --bg-dark: #0d1230;
+  --bg-card: #16204a;
+  --bg-hover: #1f2d60;
+
+  /* Acento — laranja queimado sobre navy */
+  --accent: #e06c43;
+  --accent-light: #f09a78;
+  --gold-primary: #e06c43;
+  --primary-gold-analysis: #e06c43;
+  --gold-glow-analysis: rgba(224, 108, 67, 0.35);
+  --text-gold-analysis: #f09a78;
+
+  /* Texto */
+  --text-main: #dce8f5;
+  --text-muted: #7290b8;
+
+  /* Bootstrap overrides */
+  --bs-primary: #e06c43;
+  --bs-primary-rgb: 224, 108, 67;
+  --bs-link-color: #e06c43;
+  --bs-link-hover-color: #f09a78;
+  --bs-body-bg: #0d1230;
+  --bs-body-color: #dce8f5;
+  --bs-border-color: #253560;
+  --bs-secondary-bg: #16204a;
+
+  /* Componentes */
+  --navbar-bg: rgba(13, 18, 48, 0.9);
+  --navbar-collapse-bg: rgba(13, 18, 48, 0.97);
+  --card-border-color: rgba(224, 108, 67, 0.15);
+  --card-border-feature: rgba(224, 108, 67, 0.22);
+  --card-glow: rgba(224, 108, 67, 0.18);
+  --scrollbar-thumb: rgba(224, 108, 67, 0.4);
+
+  /* Vars de análise */
+  --bg-main-analysis: #0d1230;
+  --bg-card-analysis: #1f2d60;
+  --bg-charcoal-analysis: #16204a;
+  --border-color-analysis: #253560;
+  --text-light-analysis: #dce8f5;
+  --text-muted-analysis: #7290b8;
+
+  /* Cores semânticas */
+  --color-income-bg: rgba(6, 214, 160, 0.15);
+  --color-income-text: #6ee7c7;
+  --color-income-border: rgba(6, 214, 160, 0.4);
+  --color-expense-bg: rgba(230, 57, 70, 0.15);
+  --color-expense-text: #f87171;
+  --color-expense-border: rgba(230, 57, 70, 0.4);
+  --color-card-bg: rgba(224, 108, 67, 0.15);
+  --color-card-text: #f09a78;
+  --color-card-border: rgba(224, 108, 67, 0.45);
+  --color-pending-bg: rgba(59, 130, 246, 0.2);
+  --color-pending-text: #93c5fd;
+  --color-today-bg: rgba(224, 108, 67, 0.22);
+  --color-today-text: #f09a78;
+  --table-row-hover: rgba(224, 108, 67, 0.12);
+}

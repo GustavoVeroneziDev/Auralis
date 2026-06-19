@@ -149,7 +149,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'])) {
                             "UPDATE FaturaCartao SET Status='fechada' WHERE FKRegistroPagamento=:rid AND FKUsuario=:uid AND Status='paga'"
                         )->execute([':rid' => $id_registro, ':uid' => $usuario_id]);
                     }
-                } catch (PDOException $e) {}
+                } catch (PDOException $e) {
+                }
                 header("Location: " . $redirectBase);
                 exit;
             } catch (PDOException $e) {
@@ -430,7 +431,8 @@ try {
     ");
     $stmtFC->execute([':uid' => $usuario_id]);
     $faturasAbertasDash = $stmtFC->fetchAll(PDO::FETCH_ASSOC);
-} catch (PDOException $e) {}
+} catch (PDOException $e) {
+}
 
 // Remove Registros de preview de CC da lista de transações (não são transações reais)
 try {
@@ -442,7 +444,8 @@ try {
     if (!empty($idsPreview)) {
         $transacoes = array_values(array_filter($transacoes, fn($t) => !in_array($t['IDRegistro'], $idsPreview)));
     }
-} catch (PDOException $e) {}
+} catch (PDOException $e) {
+}
 
 // ── Verifica se assinatura ainda está válida (1x por sessão) ────────────
 verificarExpiracao($pdo);
@@ -524,11 +527,11 @@ function badgeVar(float $atual, float $anterior, bool $invertido = false): strin
     if ($abs < 0.5) return '';
     $subiu    = $delta > 0;
     $positivo = $invertido ? !$subiu : $subiu;
-    // bg-opacity-20 deixa o badge invisível porque text-{cor} combina com bg-{cor}.
-    // Usamos text-white sobre fundo colorido sólido.
-    $cor  = $positivo ? '28a745' : 'dc3545';
-    $icon = $subiu ? 'bi-arrow-up-short' : 'bi-arrow-down-short';
-    return "<span class='ms-1' style='display:inline-flex;align-items:center;background:#{$cor}22;color:#{$cor};border:1px solid #{$cor}44;border-radius:999px;padding:1px 7px;font-size:0.68rem;font-weight:600;'><i class='bi {$icon}'></i>{$abs}%</span>";
+    $bg     = $positivo ? 'var(--color-income-bg)'     : 'var(--color-expense-bg)';
+    $color  = $positivo ? 'var(--color-income-text)'   : 'var(--color-expense-text)';
+    $border = $positivo ? 'var(--color-income-border)'  : 'var(--color-expense-border)';
+    $icon   = $subiu ? 'bi-arrow-up-short' : 'bi-arrow-down-short';
+    return "<span class='ms-1' style='display:inline-flex;align-items:center;background:{$bg};color:{$color};border:1px solid {$border};border-radius:999px;padding:1px 7px;font-size:0.68rem;font-weight:600;'><i class='bi {$icon}'></i>{$abs}%</span>";
 }
 
 require_once 'geral/header.php';
@@ -553,37 +556,21 @@ require_once 'geral/header.php';
         </div>
     <?php else: ?>
 
-        <?php if (isset($_GET['sucesso'])): ?>
-            <?php
-            $msg = '';
-            if ($_GET['sucesso'] === 'registro') {
-                $msg = 'Transação salva com sucesso!';
-            }
-            if ($_GET['sucesso'] === 'editado') {
-                $msg = 'Transação atualizada com sucesso!';
-            }
-            if ($_GET['sucesso'] === 'excluido') {
-                $msg = 'Transação excluída!';
-            }
-            if ($_GET['sucesso'] === 'ajustado') {
-                $msg = 'Prontinho! Seu saldo foi ajustado e agora está real.';
-            }
-            // ADICIONE ESTA CONDIÇÃO AQUI:
-            if ($_GET['sucesso'] === 'criada') {
-                $msg = 'Nova carteira criada! Agora informe seu saldo para começar.';
-            }
+        <?php
+        $msg = '';
+        if (isset($_GET['sucesso'])) {
+            if ($_GET['sucesso'] === 'registro')  $msg = 'Transação salva!';
+            if ($_GET['sucesso'] === 'editado')   $msg = 'Transação atualizada!';
+            if ($_GET['sucesso'] === 'excluido')  $msg = 'Transação excluída!';
+            if ($_GET['sucesso'] === 'ajustado')  $msg = 'Saldo ajustado com sucesso!';
+            if ($_GET['sucesso'] === 'criada')    $msg = 'Nova carteira criada!';
             if ($_GET['sucesso'] === 'parcelado') {
                 $n = isset($_GET['parcelas']) ? (int)$_GET['parcelas'] : '';
-                $msg = "Compra parcelada em {$n}x registrada com sucesso!";
+                $msg = "Compra parcelada em {$n}x registrada!";
             }
-            ?>
-
-            <?php if ($msg): ?>
-                <div class="alert alert-success d-flex align-items-center gap-2 rounded-3 shadow-sm border-0 bg-success bg-opacity-10 text-success fw-semibold alert-dismissible fade show" role="alert">
-                    <i class="bi bi-check-circle-fill"></i> <span><?php echo $msg ?></span>
-                    <button type="button" class="btn-close btn-close-white opacity-50" data-bs-dismiss="alert" aria-label="Close"></button>
-                </div>
-            <?php endif; ?>
+        }
+        if ($msg): ?>
+            <script>window._pendingToast = <?php echo json_encode($msg) ?>;</script>
         <?php endif; ?>
 
         <div class="mb-3 border-bottom border-secondary-subtle pb-3">
@@ -593,34 +580,34 @@ require_once 'geral/header.php';
 
                     <h2 class="fw-bold text-light mb-0 d-none d-lg-block me-2" style="white-space: nowrap; font-size: clamp(1rem, 2vw, 1.35rem);">Visão Geral</h2>
 
-                    <div class="d-flex align-items-center bg-dark border border-secondary-subtle rounded-pill shadow-sm flex-shrink-0" style="padding: 2px 4px;">
-                        <a href="<?php echo $link_ant ?>" class="btn btn-sm btn-link text-light opacity-75 transition-hover text-decoration-none d-flex align-items-center justify-content-center" style="width: 30px; height: 30px;">
-                            <i class="bi bi-caret-left-fill" style="font-size: 0.65rem;"></i>
+                    <div class="d-flex align-items-center rounded-pill shadow-sm flex-shrink-0" style="padding:2px 4px;background:var(--bg-card);border:1px solid var(--card-border-color);">
+                        <a href="<?php echo $link_ant ?>" class="btn btn-sm btn-link transition-hover text-decoration-none d-flex align-items-center justify-content-center" style="width:30px;height:30px;color:var(--accent);">
+                            <i class="bi bi-caret-left-fill" style="font-size:0.65rem;"></i>
                         </a>
 
-                        <button type="button" class="btn btn-link text-light text-decoration-none fw-semibold px-1 transition-hover d-flex align-items-center justify-content-center"
-                            style="font-size: 0.875rem; white-space: nowrap;"
+                        <button type="button" class="btn btn-link text-decoration-none fw-semibold px-1 transition-hover d-flex align-items-center justify-content-center"
+                            style="font-size:0.875rem;white-space:nowrap;color:var(--text-main);"
                             data-bs-toggle="modal" data-bs-target="#modalSeletorMes">
                             <?php echo $nome_mes ?> <span class="d-none d-sm-inline ms-1"><?php echo $ano_atual ?></span>
                             <i class="bi bi-chevron-down ms-1 opacity-75" style="font-size: 0.65rem;"></i>
                         </button>
 
-                        <a href="<?php echo $link_prox ?>" class="btn btn-sm btn-link text-light opacity-75 transition-hover text-decoration-none d-flex align-items-center justify-content-center" style="width: 30px; height: 30px;">
-                            <i class="bi bi-caret-right-fill" style="font-size: 0.65rem;"></i>
+                        <a href="<?php echo $link_prox ?>" class="btn btn-sm btn-link transition-hover text-decoration-none d-flex align-items-center justify-content-center" style="width:30px;height:30px;color:var(--accent);">
+                            <i class="bi bi-caret-right-fill" style="font-size:0.65rem;"></i>
                         </a>
                     </div>
 
                     <div class="dropdown flex-shrink-0">
-                        <button class="btn border-secondary-subtle text-light shadow-sm fw-semibold dropdown-toggle d-flex align-items-center rounded-3 transition-hover px-2 px-sm-3"
-                            type="button" data-bs-toggle="dropdown" aria-expanded="false"
-                            style="font-size: 0.875rem; background-color: var(--bg-charcoal-analysis); max-width: 200px;">
+                        <button class="btn shadow-sm fw-semibold dropdown-toggle d-flex align-items-center rounded-3 transition-hover px-2 px-sm-3"
+                            style="background:var(--bg-card);border:1px solid var(--card-border-color);color:var(--text-main);font-size:0.875rem;max-width:200px;"
+                            type="button" data-bs-toggle="dropdown" aria-expanded="false">
                             <span class="text-truncate d-flex align-items-center">
-                                <i class="bi bi-wallet2 me-1 me-sm-2" style="color: var(--primary-gold-analysis); flex-shrink: 0;"></i>
+                                <i class="bi bi-wallet2 me-1 me-sm-2" style="color:var(--accent);flex-shrink:0;"></i>
                                 <?php echo htmlspecialchars($nome_carteira_atual); ?>
                             </span>
                         </button>
 
-                        <ul class="dropdown-menu dropdown-menu-dark shadow-lg border-secondary-subtle mt-2" style="background-color:#1a1d21; min-width:220px;">
+                        <ul class="dropdown-menu shadow-lg border-secondary-subtle mt-2" style="background-color:var(--bg-card);border-color:var(--card-border-color);min-width:220px;">
                             <li class="px-3 pt-2 pb-1 text-secondary small text-uppercase fw-bold tracking-wide">Alternar Carteira</li>
                             <li>
                                 <hr class="dropdown-divider border-secondary-subtle my-1">
@@ -700,11 +687,6 @@ require_once 'geral/header.php';
                         <div class="fw-bold text-success mb-1" style="font-size: var(--fs-card-val);">R$ <?php echo number_format($receitasMes ?? 0, 2, ',', '.') ?></div>
                         <div class="mt-2 d-flex align-items-center flex-wrap gap-1">
                             <?php echo badgeVar($receitasMes, $receitasMesAnt, false); ?>
-                            <?php if ($receitasPendentes > 0): ?>
-                                <span style="display:inline-flex;align-items:center;background:#FFB80022;color:#FFB800;border:1px solid #FFB80055;border-radius:999px;padding:1px 7px;font-size:0.68rem;font-weight:600;" title="A receber este mês">
-                                    <i class="bi bi-clock me-1"></i>+ R$ <?php echo number_format($receitasPendentes, 2, ',', '.') ?>
-                                </span>
-                            <?php endif; ?>
                         </div>
                     </div>
                 </div>
@@ -722,11 +704,6 @@ require_once 'geral/header.php';
                         <div class="fw-bold text-danger mb-1" style="font-size: var(--fs-card-val);">R$ <?php echo number_format($despesasMes ?? 0, 2, ',', '.') ?></div>
                         <div class="mt-2 d-flex align-items-center flex-wrap gap-1">
                             <?php echo badgeVar($despesasMes, $despesasMesAnt, true); ?>
-                            <?php if ($despesasPendentes > 0): ?>
-                                <span style="display:inline-flex;align-items:center;background:#FFB80022;color:#FFB800;border:1px solid #FFB80055;border-radius:999px;padding:1px 7px;font-size:0.68rem;font-weight:600;" title="A pagar este mês">
-                                    <i class="bi bi-clock me-1"></i>+ R$ <?php echo number_format($despesasPendentes, 2, ',', '.') ?>
-                                </span>
-                            <?php endif; ?>
                         </div>
                     </div>
                 </div>
@@ -771,79 +748,79 @@ require_once 'geral/header.php';
         <?php endif; ?>
 
         <?php if (!empty($faturasAbertasDash)): ?>
-        <!-- ── Seção de Cartões de Crédito ───────────────────────────────── -->
-        <div class="d-flex align-items-center justify-content-between mb-3 mt-4">
-            <h4 class="fw-bold text-light mb-0">
-                <i class="bi bi-credit-card-2-front me-2" style="color: var(--primary-gold-analysis);"></i>
-                Cartões de Crédito
-            </h4>
-            <a href="cartao_credito/index.php" class="btn btn-sm btn-outline-secondary rounded-pill px-3 d-flex align-items-center gap-1" style="font-size:0.8rem;">
-                <i class="bi bi-gear"></i> <span class="d-none d-sm-inline">Gerenciar</span>
-            </a>
-        </div>
-
-        <div class="row g-3 mb-4">
-            <?php foreach ($faturasAbertasDash as $fat):
-                $corCartao  = htmlspecialchars($fat['Cor'] ?? '#7c3aed');
-                $dataFech   = (!empty($fat['DataFechamento']) && $fat['DataFechamento'] !== '0000-00-00')
-                               ? date('d/m/Y', strtotime($fat['DataFechamento'])) : '—';
-                $dataVenc   = (!empty($fat['DataVencimento']) && $fat['DataVencimento'] !== '0000-00-00')
-                               ? date('d/m/Y', strtotime($fat['DataVencimento'])) : '—';
-                $totalFat   = (float)$fat['TotalAcumulado'];
-                $bandeira   = ucfirst($fat['Bandeira'] ?? 'Cartão');
-            ?>
-            <div class="col-12 col-sm-6 col-xl-4">
-                <a href="/cartao_credito/fatura.php?cartao=<?php echo urlencode($fat['IDCartao']) ?>"
-                   class="text-decoration-none d-block h-100">
-                    <div class="h-100 rounded-4 shadow-sm cc-dash-card"
-                         style="background:#161820; border:1px solid #2a2d38; border-left:3px solid <?php echo $corCartao ?> !important; transition:all .18s;">
-                        <div class="p-3">
-                            <!-- Cabeçalho do cartão -->
-                            <div class="d-flex align-items-start justify-content-between mb-3">
-                                <div class="d-flex align-items-center gap-2">
-                                    <div class="d-flex align-items-center justify-content-center rounded-3 flex-shrink-0"
-                                         style="width:36px;height:36px;background:<?php echo $corCartao ?>22;">
-                                        <i class="bi bi-credit-card-2-front" style="color:<?php echo $corCartao ?>;font-size:1rem;"></i>
-                                    </div>
-                                    <div>
-                                        <div class="fw-bold text-light lh-1" style="font-size:0.9rem;"><?php echo htmlspecialchars($fat['NomeCartao']) ?></div>
-                                        <div class="text-secondary mt-1" style="font-size:0.7rem;"><?php echo $bandeira ?></div>
-                                    </div>
-                                </div>
-                                <span class="flex-shrink-0" style="display:inline-flex;align-items:center;background:#22c55e18;color:#22c55e;border:1px solid #22c55e33;border-radius:999px;padding:2px 8px;font-size:0.62rem;font-weight:700;letter-spacing:.03em;">
-                                    ● ABERTA
-                                </span>
-                            </div>
-
-                            <!-- Datas + total -->
-                            <div class="d-flex align-items-end justify-content-between">
-                                <div>
-                                    <div class="text-secondary mb-1" style="font-size:0.68rem;">
-                                        <i class="bi bi-lock me-1" style="font-size:0.6rem;"></i>Fecha <?php echo $dataFech ?>
-                                    </div>
-                                    <div class="text-secondary" style="font-size:0.68rem;">
-                                        <i class="bi bi-calendar-check me-1" style="font-size:0.6rem;"></i>Vence <?php echo $dataVenc ?>
-                                    </div>
-                                </div>
-                                <div class="text-end">
-                                    <div class="text-secondary mb-1" style="font-size:0.62rem;">Total acumulado</div>
-                                    <div class="fw-bold <?php echo $totalFat > 0 ? 'text-danger' : 'text-secondary' ?>" style="font-size:1.05rem;">
-                                        R$ <?php echo number_format($totalFat, 2, ',', '.') ?>
-                                    </div>
-                                </div>
-                            </div>
-
-                            <!-- Rodapé -->
-                            <div class="mt-2 pt-2 d-flex align-items-center gap-1" style="border-top:1px solid #2a2d38;color:#6c757d;font-size:0.72rem;">
-                                <i class="bi bi-arrow-right-circle" style="font-size:0.75rem;"></i>
-                                Ver fatura completa
-                            </div>
-                        </div>
-                    </div>
+            <!-- ── Seção de Cartões de Crédito ───────────────────────────────── -->
+            <div class="d-flex align-items-center justify-content-between mb-3 mt-4">
+                <h4 class="fw-bold text-light mb-0">
+                    <i class="bi bi-credit-card-2-front me-2" style="color: var(--primary-gold-analysis);"></i>
+                    Cartões de Crédito
+                </h4>
+                <a href="cartao_credito/index.php" class="btn btn-sm btn-outline-secondary rounded-pill px-3 d-flex align-items-center gap-1" style="font-size:0.8rem;">
+                    <i class="bi bi-gear"></i> <span class="d-none d-sm-inline">Gerenciar</span>
                 </a>
             </div>
-            <?php endforeach; ?>
-        </div>
+
+            <div class="row g-3 mb-4">
+                <?php foreach ($faturasAbertasDash as $fat):
+                    $corCartao  = htmlspecialchars($fat['Cor'] ?? '#7c3aed');
+                    $dataFech   = (!empty($fat['DataFechamento']) && $fat['DataFechamento'] !== '0000-00-00')
+                        ? date('d/m/Y', strtotime($fat['DataFechamento'])) : '—';
+                    $dataVenc   = (!empty($fat['DataVencimento']) && $fat['DataVencimento'] !== '0000-00-00')
+                        ? date('d/m/Y', strtotime($fat['DataVencimento'])) : '—';
+                    $totalFat   = (float)$fat['TotalAcumulado'];
+                    $bandeira   = ucfirst($fat['Bandeira'] ?? 'Cartão');
+                ?>
+                    <div class="col-12 col-sm-6 col-xl-4">
+                        <a href="/cartao_credito/fatura.php?cartao=<?php echo urlencode($fat['IDCartao']) ?>"
+                            class="text-decoration-none d-block h-100">
+                            <div class="h-100 rounded-4 shadow-sm cc-dash-card"
+                                style="background:var(--bg-card); border:1px solid var(--bs-border-color); border-left:3px solid <?php echo $corCartao ?> !important; transition:all .18s;">
+                                <div class="p-3">
+                                    <!-- Cabeçalho do cartão -->
+                                    <div class="d-flex align-items-start justify-content-between mb-3">
+                                        <div class="d-flex align-items-center gap-2">
+                                            <div class="d-flex align-items-center justify-content-center rounded-3 flex-shrink-0"
+                                                style="width:36px;height:36px;background:<?php echo $corCartao ?>22;">
+                                                <i class="bi bi-credit-card-2-front" style="color:<?php echo $corCartao ?>;font-size:1rem;"></i>
+                                            </div>
+                                            <div>
+                                                <div class="fw-bold text-light lh-1" style="font-size:0.9rem;"><?php echo htmlspecialchars($fat['NomeCartao']) ?></div>
+                                                <div class="text-secondary mt-1" style="font-size:0.7rem;"><?php echo $bandeira ?></div>
+                                            </div>
+                                        </div>
+                                        <span class="flex-shrink-0" style="display:inline-flex;align-items:center;background:#22c55e18;color:#22c55e;border:1px solid #22c55e33;border-radius:999px;padding:2px 8px;font-size:0.62rem;font-weight:700;letter-spacing:.03em;">
+                                            ● ABERTA
+                                        </span>
+                                    </div>
+
+                                    <!-- Datas + total -->
+                                    <div class="d-flex align-items-end justify-content-between">
+                                        <div>
+                                            <div class="text-secondary mb-1" style="font-size:0.68rem;">
+                                                <i class="bi bi-lock me-1" style="font-size:0.6rem;"></i>Fecha <?php echo $dataFech ?>
+                                            </div>
+                                            <div class="text-secondary" style="font-size:0.68rem;">
+                                                <i class="bi bi-calendar-check me-1" style="font-size:0.6rem;"></i>Vence <?php echo $dataVenc ?>
+                                            </div>
+                                        </div>
+                                        <div class="text-end">
+                                            <div class="text-secondary mb-1" style="font-size:0.62rem;">Total acumulado</div>
+                                            <div class="fw-bold <?php echo $totalFat > 0 ? 'text-danger' : 'text-secondary' ?>" style="font-size:1.05rem;">
+                                                R$ <?php echo number_format($totalFat, 2, ',', '.') ?>
+                                            </div>
+                                        </div>
+                                    </div>
+
+                                    <!-- Rodapé -->
+                                    <div class="mt-2 pt-2 d-flex align-items-center gap-1" style="border-top:1px solid var(--bs-border-color);color:var(--text-muted);font-size:0.72rem;">
+                                        <i class="bi bi-arrow-right-circle" style="font-size:0.75rem;"></i>
+                                        Ver fatura completa
+                                    </div>
+                                </div>
+                            </div>
+                        </a>
+                    </div>
+                <?php endforeach; ?>
+            </div>
         <?php endif; ?>
 
         <h4 class="fw-bold text-light mb-3 mt-4">Transações de <?php echo $nome_mes ?></h4>
@@ -1052,7 +1029,7 @@ require_once 'geral/header.php';
                 <h5 class="modal-title text-light fw-bold">
                     <i class="bi bi-sliders me-2 text-primary" style="color: var(--primary-gold-analysis) !important;"></i> Ajustar Saldo Real
                 </h5>
-                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
             </div>
             <form method="POST" action="">
                 <div class="modal-body p-4">
@@ -1091,7 +1068,7 @@ require_once 'geral/header.php';
                 <h6 class="modal-title text-light fw-bold">
                     <i class="bi bi-calendar3 me-2" style="color: var(--primary-gold-analysis);"></i> Selecionar Período
                 </h6>
-                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
             </div>
             <div class="modal-body p-4 text-center">
                 <div class="d-flex justify-content-center align-items-center mb-4 bg-charcoal-analysis rounded-pill p-1 border border-secondary-subtle">
@@ -1131,7 +1108,7 @@ require_once 'geral/header.php';
                 <h6 class="modal-title text-light fw-bold">
                     <i class="bi bi-trash3 me-2 text-danger"></i> Excluir Recorrência
                 </h6>
-                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
             </div>
             <form method="POST" action="">
                 <div class="modal-body p-4">
@@ -1177,7 +1154,7 @@ require_once 'geral/header.php';
                 <h6 class="modal-title text-light fw-bold">
                     <i class="bi bi-credit-card-2-front me-2 text-danger"></i> Excluir Parcelamento
                 </h6>
-                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
             </div>
             <form method="POST" action="">
                 <div class="modal-body p-4">
@@ -1224,7 +1201,7 @@ require_once 'geral/header.php';
                 <h6 class="modal-title text-light fw-bold">
                     <i class="bi bi-trash3 me-2 text-danger"></i> Excluir Transação
                 </h6>
-                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
             </div>
             <form method="POST" action="">
                 <div class="modal-body p-4 text-center">
@@ -1248,7 +1225,7 @@ require_once 'geral/header.php';
         <div class="modal-content border-secondary-subtle" style="background:var(--bg-card);">
             <div class="modal-header border-secondary-subtle px-4 py-3">
                 <h6 class="modal-title fw-bold text-light mb-0"><i class="bi bi-paperclip me-2"></i>Comprovantes</h6>
-                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
             </div>
             <div class="modal-body p-4" id="modalComprovantesBody">
                 <div class="text-center text-secondary py-4"><i class="bi bi-hourglass-split me-2"></i>Carregando...</div>
@@ -1345,22 +1322,23 @@ require_once 'geral/header.php';
 
 <style>
     .bg-charcoal-analysis {
-        background-color: #1a1d21;
+        background-color: var(--bg-charcoal-analysis);
     }
 
     .auralis-table>tbody>tr.cursor-pointer:hover>td {
-        background-color: rgba(255, 255, 255, 0.03) !important;
+        background-color: var(--table-row-hover) !important;
+        color: var(--text-main) !important;
     }
 
     .cc-dash-card:hover {
-        background: #1c1f2b !important;
-        border-color: #3a3d4e !important;
+        background: var(--bg-hover) !important;
+        border-color: var(--border-color-analysis) !important;
         transform: translateY(-2px);
-        box-shadow: 0 6px 20px rgba(0,0,0,0.4) !important;
+        box-shadow: 0 6px 20px var(--gold-glow-analysis) !important;
     }
 
     .table-active {
-        background-color: #1a1d21 !important;
+        background-color: var(--bg-charcoal-analysis) !important;
     }
 
     .no-spinners::-webkit-outer-spin-button,
@@ -1382,8 +1360,8 @@ require_once 'geral/header.php';
     }
 
     .modal-boas-vindas-content {
-        background-color: #181A1F !important;
-        border: 1px solid rgba(255, 255, 255, 0.08) !important;
+        background-color: var(--bg-card) !important;
+        border: 1px solid var(--bs-border-color) !important;
         box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.7);
     }
 
@@ -1482,18 +1460,24 @@ require_once 'geral/header.php';
 
     function abrirComprovantes(registroId) {
         const modal = new bootstrap.Modal(document.getElementById('modalComprovantes'));
-        const body  = document.getElementById('modalComprovantesBody');
+        const body = document.getElementById('modalComprovantesBody');
         body.innerHTML = '<div class="text-center text-secondary py-4"><i class="bi bi-hourglass-split me-2"></i>Carregando...</div>';
         modal.show();
         fetch('/comprovante/listar_ajax.php?registro=' + encodeURIComponent(registroId))
             .then(r => r.json())
             .then(data => {
-                if (data.erro) { body.innerHTML = '<p class="text-danger text-center py-3">' + data.erro + '</p>'; return; }
-                if (!data.arquivos.length) { body.innerHTML = '<p class="text-secondary text-center py-3">Nenhum comprovante encontrado.</p>'; return; }
+                if (data.erro) {
+                    body.innerHTML = '<p class="text-danger text-center py-3">' + data.erro + '</p>';
+                    return;
+                }
+                if (!data.arquivos.length) {
+                    body.innerHTML = '<p class="text-secondary text-center py-3">Nenhum comprovante encontrado.</p>';
+                    return;
+                }
                 let html = '<div class="d-flex flex-column gap-3">';
                 data.arquivos.forEach(a => {
                     const isImg = a.TipoMime.startsWith('image/');
-                    const url   = '/comprovante/ver.php?id=' + encodeURIComponent(a.IDComprovante);
+                    const url = '/comprovante/ver.php?id=' + encodeURIComponent(a.IDComprovante);
                     if (isImg) {
                         html += `<div class="text-center"><img src="${url}" class="img-fluid rounded-3" style="max-height:420px;object-fit:contain;" alt="${a.NomeOriginal}">
                                  <p class="text-secondary small mt-2">${a.NomeOriginal}</p></div>`;
@@ -1509,7 +1493,9 @@ require_once 'geral/header.php';
                 html += '</div>';
                 body.innerHTML = html;
             })
-            .catch(() => { body.innerHTML = '<p class="text-danger text-center py-3">Erro ao carregar comprovantes.</p>'; });
+            .catch(() => {
+                body.innerHTML = '<p class="text-danger text-center py-3">Erro ao carregar comprovantes.</p>';
+            });
     }
 </script>
 

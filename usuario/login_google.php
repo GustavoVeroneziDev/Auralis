@@ -46,7 +46,7 @@ if (isset($_GET['code'])) {
 
             // 4. Procura se esse e-mail já existe no Auralis
             // CORREÇÃO 1: Adicionado o 'Plano' no SELECT
-            $sql = "SELECT IDUsuario, Nome, NivelAcesso, StatusConta, Plano FROM Usuario WHERE Email = :email LIMIT 1";
+            $sql = "SELECT IDUsuario, Nome, NivelAcesso, StatusConta, Plano, Tema FROM Usuario WHERE Email = :email LIMIT 1";
             $stmt = $pdo->prepare($sql);
             $stmt->execute([':email' => $email]);
             $usuario = $stmt->fetch();
@@ -66,6 +66,7 @@ if (isset($_GET['code'])) {
 
                 // CORREÇÃO 2: Forçar minúsculas (strtolower)
                 $_SESSION['plano']        = strtolower($usuario['Plano'] ?? 'free');
+                $_SESSION['tema']         = strtolower($usuario['Tema'] ?? 'dark');
 
                 header("Location: ../dashboard.php");
                 exit;
@@ -135,7 +136,7 @@ if (isset($_GET['code'])) {
                 <body>
                     <div class='container'>
                         <div class='header'>
-                            <img src='https://meuauralis.com/geral/img/logoAuralis-SemFundo.png' alt='Auralis'>
+                            <img src='https://meuauralis.com/geral/img/LogoAuralisSemEscudo.png' alt='Auralis'>
                         </div>
                         <div class='content'>
                             <h2>Bem-vindo ao Auralis, " . htmlspecialchars($primeiro_nome) . "!</h2>
@@ -172,6 +173,7 @@ if (isset($_GET['code'])) {
 
                 // CORREÇÃO 3: Define a sessão de plano para utilizadores novos pelo Google
                 $_SESSION['plano']        = 'free';
+                $_SESSION['tema']         = 'dark';
 
                 header("Location: ../dashboard.php");
                 exit;

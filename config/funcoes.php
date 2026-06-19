@@ -8,11 +8,17 @@ if (!defined('AURALIS_COOKIE_SECRET')) {
 if (!function_exists('gerarUuid')) {
     function gerarUuid()
     {
-        return sprintf('%04x%04x-%04x-%04x-%04x-%04x%04x%04x',
-            mt_rand(0, 0xffff), mt_rand(0, 0xffff),
-            mt_rand(0, 0xffff), mt_rand(0, 0x0fff) | 0x4000,
-            mt_rand(0, 0x3fff) | 0x8000, mt_rand(0, 0xffff),
-            mt_rand(0, 0xffff), mt_rand(0, 0xffff));
+        return sprintf(
+            '%04x%04x-%04x-%04x-%04x-%04x%04x%04x',
+            mt_rand(0, 0xffff),
+            mt_rand(0, 0xffff),
+            mt_rand(0, 0xffff),
+            mt_rand(0, 0x0fff) | 0x4000,
+            mt_rand(0, 0x3fff) | 0x8000,
+            mt_rand(0, 0xffff),
+            mt_rand(0, 0xffff),
+            mt_rand(0, 0xffff)
+        );
     }
 }
 
@@ -110,7 +116,8 @@ if (!function_exists('limitesDoPlano')) {
                     ];
                     return $cache[$plano];
                 }
-            } catch (PDOException $e) {}
+            } catch (PDOException $e) {
+            }
         }
 
         // Fallback hardcoded se a tabela ainda não existir
@@ -260,7 +267,8 @@ if (!function_exists('recursoDisponivelParaPlano')) {
                     $cache[$key] = (bool)$row[$col];
                     return $cache[$key];
                 }
-            } catch (PDOException $e) {}
+            } catch (PDOException $e) {
+            }
         }
 
         // Fallback se tabela não existir
@@ -295,7 +303,8 @@ if (!function_exists('nivelMinimoRecurso')) {
                     $cache[$slug] = $nivel;
                     return $nivel;
                 }
-            } catch (PDOException $e) {}
+            } catch (PDOException $e) {
+            }
         }
 
         $defaults = ['agenda' => 'pro', 'analises' => 'pro', 'comprovantes' => 'pro'];
@@ -350,6 +359,80 @@ if (!function_exists('mpConsultarApi')) {
         $httpCode = curl_getinfo($ch, CURLINFO_HTTP_CODE);
         curl_close($ch);
         return [$httpCode, json_decode($resp, true)];
+    }
+}
+
+// ── Sistema de Temas ──────────────────────────────────────────────────────
+
+if (!function_exists('temasDisponiveis')) {
+    function temasDisponiveis()
+    {
+        return [
+            'dark'    => ['nome' => 'Dark',    'bs_mode' => 'dark',  'conquista' => null, 'plano_minimo' => null,  'secao' => 'padrao'],
+            'white'   => ['nome' => 'White',   'bs_mode' => 'light', 'conquista' => null, 'plano_minimo' => null,  'secao' => 'padrao'],
+            'sistema' => ['nome' => 'Sistema', 'bs_mode' => 'auto',  'conquista' => null, 'plano_minimo' => null,  'secao' => 'padrao'],
+            'oceano'  => ['nome' => 'Oceano',  'bs_mode' => 'dark',  'conquista' => null, 'plano_minimo' => 'pro', 'secao' => 'adicional'],
+            'ambar'   => ['nome' => 'Âmbar',   'bs_mode' => 'dark',  'conquista' => null, 'plano_minimo' => 'pro', 'secao' => 'adicional'],
+            'aurora'  => ['nome' => 'Aurora',  'bs_mode' => 'dark',  'conquista' => null, 'plano_minimo' => 'pro', 'secao' => 'adicional'],
+            'cosmos'  => ['nome' => 'Cosmos',  'bs_mode' => 'dark',  'conquista' => null, 'plano_minimo' => 'pro', 'secao' => 'adicional'],
+            'fortune' => ['nome' => 'Fortune', 'bs_mode' => 'dark',  'conquista' => null, 'plano_minimo' => 'vip', 'secao' => 'adicional'],
+        ];
+    }
+}
+
+if (!function_exists('temaDoUsuario')) {
+    function temaDoUsuario()
+    {
+        $temas = temasDisponiveis();
+        $tema  = $_SESSION['tema'] ?? 'dark';
+        return isset($temas[$tema]) ? $tema : 'dark';
+    }
+}
+
+if (!function_exists('usuarioPossuiConquista')) {
+    function usuarioPossuiConquista($slug)
+    {
+        global $pdo;
+        $uid = $_SESSION['usuario_id'] ?? null;
+        if (!$uid || !$pdo) return false;
+        try {
+            $stmt = $pdo->prepare("
+                SELECT 1 FROM usuario_conquista uc
+                JOIN conquista c ON c.IDConquista = uc.FKConquista
+                WHERE uc.FKUsuario = :uid AND c.Slug = :slug LIMIT 1
+            ");
+            $stmt->execute([':uid' => $uid, ':slug' => $slug]);
+            return (bool)$stmt->fetchColumn();
+        } catch (PDOException $e) {
+            return false;
+        }
+    }
+}
+
+if (!function_exists('concederConquista')) {
+    function concederConquista($slug)
+    {
+        global $pdo;
+        $uid = $_SESSION['usuario_id'] ?? null;
+        if (!$uid || !$pdo) return false;
+        try {
+            $stmt = $pdo->prepare("SELECT IDConquista FROM conquista WHERE Slug = :slug AND Ativo = 1 LIMIT 1");
+            $stmt->execute([':slug' => $slug]);
+            $cid = $stmt->fetchColumn();
+            if (!$cid) return false;
+
+            $check = $pdo->prepare("SELECT 1 FROM usuario_conquista WHERE FKUsuario = :uid AND FKConquista = :cid LIMIT 1");
+            $check->execute([':uid' => $uid, ':cid' => $cid]);
+            if ($check->fetchColumn()) return false;
+
+            $pdo->prepare("
+                INSERT INTO usuario_conquista (IDUsuarioConquista, FKUsuario, FKConquista)
+                VALUES (:id, :uid, :cid)
+            ")->execute([':id' => gerarUuid(), ':uid' => $uid, ':cid' => $cid]);
+            return true;
+        } catch (PDOException $e) {
+            return false;
+        }
     }
 }
 

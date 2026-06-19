@@ -1,0 +1,64 @@
+/* ============================================================
+   AURALIS — Tema: Fortune (exclusivo VIP)
+   data-bs-theme="dark"
+   ============================================================ */
+:root {
+  /* Fundos — preto quente com toque âmbar */
+  --bg-dark: #0c0900;
+  --bg-card: #161100;
+  --bg-hover: #221a00;
+
+  /* Acento — ouro rico */
+  --accent: #d4af37;
+  --accent-light: #f5e642;
+  --gold-primary: #d4af37;
+  --primary-gold-analysis: #d4af37;
+  --gold-glow-analysis: rgba(212, 175, 55, 0.5);
+  --text-gold-analysis: #f0d060;
+
+  /* Texto */
+  --text-main: #fff8e1;
+  --text-muted: #a89060;
+
+  /* Bootstrap overrides */
+  --bs-primary: #d4af37;
+  --bs-primary-rgb: 212, 175, 55;
+  --bs-link-color: #d4af37;
+  --bs-link-hover-color: #f5e642;
+  --bs-body-bg: #0c0900;
+  --bs-body-color: #fff8e1;
+  --bs-border-color: #2e2200;
+  --bs-secondary-bg: #161100;
+
+  /* Componentes */
+  --navbar-bg: rgba(12, 9, 0, 0.9);
+  --navbar-collapse-bg: rgba(12, 9, 0, 0.97);
+  --card-border-color: rgba(212, 175, 55, 0.2);
+  --card-border-feature: rgba(212, 175, 55, 0.28);
+  --card-glow: rgba(212, 175, 55, 0.22);
+  --scrollbar-thumb: rgba(212, 175, 55, 0.45);
+
+  /* Vars de análise */
+  --bg-main-analysis: #0c0900;
+  --bg-card-analysis: #221a00;
+  --bg-charcoal-analysis: #161100;
+  --border-color-analysis: #2e2200;
+  --text-light-analysis: #fff8e1;
+  --text-muted-analysis: #a89060;
+
+  /* Cores semânticas */
+  --color-income-bg: rgba(6, 214, 160, 0.12);
+  --color-income-text: #6ee7c7;
+  --color-income-border: rgba(6, 214, 160, 0.4);
+  --color-expense-bg: rgba(230, 57, 70, 0.12);
+  --color-expense-text: #f87171;
+  --color-expense-border: rgba(230, 57, 70, 0.4);
+  --color-card-bg: rgba(212, 175, 55, 0.14);
+  --color-card-text: #f0d060;
+  --color-card-border: rgba(212, 175, 55, 0.45);
+  --color-pending-bg: rgba(59, 130, 246, 0.12);
+  --color-pending-text: #93c5fd;
+  --color-today-bg: rgba(212, 175, 55, 0.2);
+  --color-today-text: #f5e642;
+  --table-row-hover: rgba(212, 175, 55, 0.14);
+}

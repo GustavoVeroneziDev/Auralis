@@ -35,6 +35,36 @@
 
 <script src="/geral/js/bootstrap.bundle.min.js"></script>
 
+<!-- Toast de sucesso global -->
+<div class="position-fixed bottom-0 end-0 p-3" style="z-index:1090;pointer-events:none;">
+    <div id="auralisToastEl" class="toast border-0 shadow-lg" role="status" aria-live="polite" aria-atomic="true" data-bs-delay="3000" style="background:var(--bg-card);border:1px solid var(--card-border-color) !important;pointer-events:auto;">
+        <div class="d-flex align-items-center gap-2 px-3 py-2">
+            <i class="bi bi-check-circle-fill flex-shrink-0" style="color:var(--accent);font-size:1rem;"></i>
+            <span id="auralisToastMsg" class="fw-semibold" style="font-size:0.9rem;color:var(--text-main);"></span>
+        </div>
+    </div>
+</div>
+<script>
+function auralisToast(msg) {
+    var el = document.getElementById('auralisToastEl');
+    var msgEl = document.getElementById('auralisToastMsg');
+    if (!el || !msgEl) return;
+    msgEl.textContent = msg;
+    bootstrap.Toast.getOrCreateInstance(el).show();
+}
+if (window._pendingToast) auralisToast(window._pendingToast);
+
+// Salvar posição de scroll antes de qualquer POST
+(function() {
+    var key = 'auralis_scroll_' + location.pathname;
+    document.addEventListener('submit', function(e) {
+        if (e.target.method && e.target.method.toLowerCase() === 'post') {
+            sessionStorage.setItem(key, window.scrollY);
+        }
+    }, true);
+})();
+</script>
+
 <script>
     document.addEventListener("DOMContentLoaded", function() {
         const observer = new IntersectionObserver((entries) => {

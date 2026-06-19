@@ -1,0 +1,241 @@
+/* ============================================================
+   AURALIS — Tema: White (claro)
+   data-bs-theme="light"
+   ============================================================ */
+:root {
+  /* Fundos */
+  --bg-dark: #f2f5f9; /* bg da página — cinza-azulado pastel */
+  --bg-card: #ffffff; /* superfícies de card */
+  --bg-hover: #eaeff6; /* hover / seções sutis */
+
+  /* Acento / destaque — dourado escurecido para contraste no fundo claro */
+  --accent: #b8962e;
+  --accent-light: #d4af37;
+  --gold-primary: #ffc300;
+  --primary-gold-analysis: #ffc300;
+  --gold-glow-analysis: rgba(255, 195, 0, 0.25);
+  --text-gold-analysis: #ffc300;
+
+  /* Texto */
+  --text-main: #1e2530; /* quase-preto levemente azulado */
+  --text-muted: #64748b; /* slate médio */
+
+  /* Bootstrap overrides */
+  --bs-primary: #b8962e;
+  --bs-primary-rgb: 184, 150, 46;
+  --bs-link-color: #b8962e;
+  --bs-link-hover-color: #d4af37;
+  --bs-body-bg: #f2f5f9;
+  --bs-body-color: #1e2530;
+  --bs-border-color: #d0d8e8;
+  --bs-secondary-bg: #ffffff;
+
+  /* Componentes */
+  --navbar-bg: rgba(255, 255, 255, 0.93);
+  --navbar-collapse-bg: rgba(248, 250, 253, 0.98);
+  --card-border-color: rgba(180, 190, 210, 0.45);
+  --card-border-feature: rgba(184, 150, 46, 0.22);
+  --card-glow: rgba(184, 150, 46, 0.1);
+  --scrollbar-thumb: rgba(184, 150, 46, 0.3);
+
+  /* Vars de análise (páginas de formulário/análise) */
+  --bg-main-analysis: #f2f5f9;
+  --bg-card-analysis: #ffffff;
+  --bg-charcoal-analysis: #edf1f7;
+  --border-color-analysis: #c9d3e0;
+  --text-light-analysis: #1e2530;
+  --text-muted-analysis: #64748b;
+
+  /* Cores semânticas de status — mais saturadas no tema claro */
+  --color-income-bg: rgba(4, 163, 121, 0.13);
+  --color-income-text: #057a55;
+  --color-income-border: rgba(4, 163, 121, 0.45);
+  --color-expense-bg: rgba(220, 38, 38, 0.1);
+  --color-expense-text: #b91c1c;
+  --color-expense-border: rgba(220, 38, 38, 0.45);
+  --color-card-bg: rgba(109, 40, 217, 0.1);
+  --color-card-text: #6d28d9;
+  --color-card-border: rgba(109, 40, 217, 0.4);
+  --color-pending-bg: rgba(37, 99, 235, 0.1);
+  --color-pending-text: #1d4ed8;
+  --color-today-bg: rgba(180, 100, 0, 0.1);
+  --color-today-text: #92400e;
+  --table-row-hover: rgba(255, 195, 0, 0.2);
+}
+
+/* ============================================================
+   Overrides de classes Bootstrap para tema claro
+   Necessário porque bg-dark, text-light etc. são hardcoded no HTML
+   ============================================================ */
+
+/* Fundo escuro → fundo de card claro */
+.bg-dark {
+  background-color: var(--bg-card) !important;
+  color: var(--text-main) !important;
+}
+
+/* Texto claro → texto escuro */
+.text-light,
+.text-white {
+  color: var(--text-main) !important;
+}
+
+/* Texto secundário (muted) */
+.text-secondary {
+  color: var(--text-muted) !important;
+}
+
+/* Navbar — links e toggler */
+.nav-link {
+  color: var(--text-main) !important;
+}
+.nav-link:hover,
+.nav-link.active {
+  color: var(--accent) !important;
+}
+.navbar-toggler .bi-list {
+  color: var(--text-main) !important;
+}
+
+/* Dropdown */
+.dropdown-menu {
+  background-color: var(--bg-card) !important;
+  border-color: var(--bs-border-color) !important;
+  color: var(--text-main);
+}
+.dropdown-item {
+  color: var(--text-main) !important;
+}
+.dropdown-item:hover,
+.dropdown-item:focus {
+  background-color: var(--bg-hover) !important;
+  color: var(--text-main) !important;
+}
+.dropdown-divider {
+  border-color: var(--bs-border-color) !important;
+}
+
+/* Tabela escura → clara */
+.table-dark,
+.table-dark th,
+.table-dark td {
+  --bs-table-bg: var(--bg-hover);
+  --bs-table-color: var(--text-main);
+  --bs-table-border-color: var(--bs-border-color);
+  --bs-table-striped-bg: var(--bg-hover);
+  color: var(--text-main) !important;
+  background-color: var(--bg-hover) !important;
+  /* Bootstrap 5.3 usa inset box-shadow para colorir células — anula aqui */
+  box-shadow: none !important;
+  border-color: var(--bs-border-color) !important;
+}
+/* table-hover sobre table-dark → hover dourado */
+.table-dark.table-hover > tbody > tr:hover > *,
+.table-dark tbody tr:hover td,
+.table-dark tbody tr:hover th {
+  background-color: var(--table-row-hover) !important;
+  box-shadow: none !important;
+  color: var(--text-main) !important;
+}
+
+/* Modais com background inline — sobrescreve as mais comuns */
+.modal-content {
+  background-color: var(--bg-card) !important;
+  color: var(--text-main);
+  border-color: var(--bs-border-color) !important;
+}
+.modal-header,
+.modal-footer {
+  border-color: var(--bs-border-color) !important;
+}
+.modal-title {
+  color: var(--text-main);
+}
+
+/* Botão fechar modal — não precisa ser branco no tema claro */
+.btn-close-white {
+  filter: none;
+}
+
+/* Formulários */
+.form-control,
+.form-select {
+  background-color: var(--bg-card) !important;
+  color: var(--text-main) !important;
+  border-color: var(--bs-border-color) !important;
+}
+.form-control::placeholder {
+  color: var(--text-muted) !important;
+}
+.form-control:focus,
+.form-select:focus {
+  background-color: var(--bg-card) !important;
+  color: var(--text-main) !important;
+  border-color: var(--accent) !important;
+  box-shadow: 0 0 0 0.2rem rgba(184, 150, 46, 0.2) !important;
+}
+.form-label {
+  color: var(--text-main);
+}
+/* Inputs desabilitados */
+.form-control:disabled,
+.form-control[readonly] {
+  background-color: var(--bg-hover) !important;
+  color: var(--text-muted) !important;
+}
+
+/* Inputs bg-transparent no tema claro → realmente transparentes (underline style) */
+.bg-transparent.form-control,
+.bg-transparent.form-select {
+  background-color: transparent !important;
+}
+
+/* Badges e chips de plano */
+.badge.bg-secondary {
+  background-color: var(--bg-hover) !important;
+  color: var(--text-muted) !important;
+}
+
+/* Botão primário */
+.btn-primary {
+  background-color: var(--accent) !important;
+  border-color: var(--accent) !important;
+  color: #fff !important;
+}
+.btn-primary:hover {
+  background-color: var(--accent-light) !important;
+  border-color: var(--accent-light) !important;
+}
+
+/* Btn outline-light → outline escuro no tema claro */
+.btn-outline-light {
+  color: var(--text-main) !important;
+  border-color: var(--bs-border-color) !important;
+}
+.btn-outline-light:hover {
+  background-color: var(--bg-hover) !important;
+  color: var(--text-main) !important;
+}
+
+/* Alert de info Google SSO */
+.alert-info {
+  background-color: rgba(184, 150, 46, 0.08) !important;
+  color: var(--accent) !important;
+  border-color: rgba(184, 150, 46, 0.3) !important;
+}
+
+/* Hr separadores */
+hr.border-secondary-subtle {
+  border-color: var(--bs-border-color) !important;
+}
+
+/* Scrollbar */
+::-webkit-scrollbar-track {
+  background: var(--bg-dark);
+}
+
+/* Body background explícito */
+body {
+  background-color: var(--bg-dark);
+  color: var(--text-main);
+}

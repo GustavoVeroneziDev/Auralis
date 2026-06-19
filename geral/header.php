@@ -30,14 +30,51 @@ function _navBadgeTag($slug)
 $_ehFreeRestrito = !$_emTrial
     && isset($_SESSION['usuario_id'])
     && strtolower($_SESSION['plano'] ?? 'free') === 'free';
+
+// ── Tema ─────────────────────────────────────────────────────────────────
+$_temasDisponiveis = function_exists('temasDisponiveis') ? temasDisponiveis() : [
+    'dark'  => ['bs_mode' => 'dark'],
+    'white' => ['bs_mode' => 'light'],
+];
+$_temaAtual = isset($_SESSION['tema']) && isset($_temasDisponiveis[$_SESSION['tema']])
+    ? $_SESSION['tema']
+    : 'dark';
+$_bsMode     = $_temasDisponiveis[$_temaAtual]['bs_mode'] ?? 'dark';
+$_bsModeHtml = $_bsMode === 'auto' ? 'dark' : $_bsMode; // fallback SSR; JS corrige antes do paint
+$_themeColor  = $_bsMode === 'light' ? '#f0f2f5' : '#121418';
 ?>
 <!DOCTYPE html>
-<html lang="pt-BR" data-bs-theme="dark">
+<html lang="pt-BR" data-bs-theme="<?= htmlspecialchars($_bsModeHtml) ?>">
 
 <head>
     <meta charset="UTF-8">
+    <?php if ($_bsMode === 'auto'): ?>
+    <script>
+    (function(){
+        var h = document.documentElement;
+        var pref = window.matchMedia('(prefers-color-scheme: light)').matches ? 'light' : 'dark';
+        h.setAttribute('data-bs-theme', pref);
+        window.matchMedia('(prefers-color-scheme: dark)').addEventListener('change', function(e){
+            h.setAttribute('data-bs-theme', e.matches ? 'dark' : 'light');
+        });
+    })();
+    </script>
+    <?php endif; ?>
+    <script>
+    (function(){
+        var key = 'auralis_scroll_' + location.pathname;
+        var y = sessionStorage.getItem(key);
+        if (y !== null) {
+            sessionStorage.removeItem(key);
+            history.scrollRestoration = 'manual';
+            document.addEventListener('DOMContentLoaded', function() {
+                document.documentElement.scrollTop = parseInt(y, 10);
+            }, {once: true});
+        }
+    })();
+    </script>
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <meta name="theme-color" content="#121418">
+    <meta name="theme-color" content="<?= htmlspecialchars($_themeColor) ?>">
     <title>Auralis</title>
     <link rel="shortcut icon" href="/geral/img/icone.ico" type="image/x-icon">
     <link rel="manifest" href="/manifest.json">
@@ -53,20 +90,20 @@ $_ehFreeRestrito = !$_emTrial
     <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.css" rel="stylesheet">
     <link rel='stylesheet' href='https://cdn-uicons.flaticon.com/uicons-bold-rounded/css/uicons-bold-rounded.css'>
     <link rel='stylesheet' href='https://cdn-uicons.flaticon.com/uicons-solid-straight/css/uicons-solid-straight.css'>
+    <link rel="stylesheet" href="/geral/temas/<?= htmlspecialchars($_temaAtual) ?>.css">
     <link rel="stylesheet" href="/geral/style.css">
 </head>
 
 <body class="d-flex flex-column min-vh-100">
 
-    <nav class="navbar navbar-expand-lg border-bottom border-secondary-subtle sticky-top shadow-sm py-2"
-        style="background-color: rgba(18, 20, 24, 0.85); backdrop-filter: blur(12px);">
+    <nav class="navbar navbar-expand-lg border-bottom border-secondary-subtle sticky-top shadow-sm py-2">
 
         <div class="container-fluid px-3 px-xl-5" style="max-width: 1500px;">
 
             <a class="navbar-brand d-flex align-items-center" href="<?php echo isset($_SESSION['usuario_id']) ? '/dashboard.php' : '/geral/index.php'; ?>"
                 style="font-family: 'Aquire', sans-serif; font-weight: 700; font-size: 1.6rem; letter-spacing: 0.04em; text-decoration: none;">
                 <img src="/geral/img/LogoAuralisSemEscudo.png" alt="Logo Auralis" class="me-2" style="height: 36px; width: auto; object-fit: contain;">
-                <span style="color: gold;">Aura</span><span class="text-light" style="font-weight: 700;">lis</span>
+                <span style="color: gold;">Aura</span><span style="color: var(--text-main); font-weight: 700;">lis</span>
             </a>
 
             <button class="navbar-toggler border-0 shadow-none p-2" type="button" data-bs-toggle="collapse"
@@ -116,11 +153,11 @@ $_ehFreeRestrito = !$_emTrial
                             </a>
                         </li>
                         <?php if ($_ehFreeRestrito): ?>
-                        <li class="nav-item">
-                            <a class="nav-link custom-link py-3 py-lg-2 <?php echo ($paginaAtual == 'planos.php') ? 'text-warning active' : ''; ?>" href="/planos.php">
-                                <i class="bi bi-star me-2"></i> Planos
-                            </a>
-                        </li>
+                            <li class="nav-item">
+                                <a class="nav-link custom-link py-3 py-lg-2 <?php echo ($paginaAtual == 'planos.php') ? 'text-warning active' : ''; ?>" href="/planos.php">
+                                    <i class="bi bi-star me-2"></i> Planos
+                                </a>
+                            </li>
                         <?php endif; ?>
                         <?php if (in_array(strtolower($_SESSION['nivel_acesso'] ?? ''), ['admin', 'supremo'])): ?>
                             <li class="nav-item">
@@ -159,7 +196,7 @@ $_ehFreeRestrito = !$_emTrial
                                     $corPlano = '#7c3aed'; // Roxo PRO
                                     $iconePlano = '<i class="fi fi-br-crown d-flex align-items-center" style="font-size: 1rem; margin-top: 2px;" title="Auralis PRO"></i>';
                                 } else {
-                                    $corPlano = '#E0E0E0'; // Branco/Cinza claro para Free
+                                    $corPlano = 'var(--text-main)'; // Segue o tema para Free
                                     $iconePlano = '';      // Free não tem ícone extra
                                 }
                                 ?>

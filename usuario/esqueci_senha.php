@@ -60,7 +60,7 @@
 
 <div class="card-recovery">
     <div class="text-center mb-4">
-        <img src="https://meuauralis.com/geral/img/logoAuralis-SemFundo.png" alt="Auralis" style="max-height: 45px;" class="mb-3">
+        <img src="/geral/img/LogoAuralisSemEscudo.png" alt="Auralis" style="max-height: 45px;" class="mb-3">
         <h4 class="fw-bold text-white">Recuperar Acesso</h4>
         <p class=" small">Insira seu e-mail para receber um link de redefinição de senha.</p>
     </div>

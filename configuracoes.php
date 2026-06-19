@@ -16,7 +16,7 @@ $tipo_mensagem = '';
 // 1. LÓGICA DE ATUALIZAÇÃO (POST)
 // ==============================================================================
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
-    
+
     // AÇÃO 1: ATUALIZAR DADOS PESSOAIS
     if (isset($_POST['action']) && $_POST['action'] === 'update_profile') {
         $nome = trim($_POST['nome']);
@@ -29,7 +29,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                     ':nome' => $nome,
                     ':uid' => $usuario_id
                 ]);
-                
+
                 $_SESSION['usuario_nome'] = $nome;
                 $mensagem = "Seus dados foram atualizados com sucesso!";
                 $tipo_mensagem = "success";
@@ -61,7 +61,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 // Se for Google e mandou o código oculto, autoriza a criação da senha
                 if ($hashBanco === 'GOOGLE_SSO' && $senha_atual === 'GOOGLE_SSO') {
                     $autorizado_senha = true;
-                } 
+                }
                 // Se for usuário comum, verifica a senha digitada
                 elseif (password_verify($senha_atual, $hashBanco)) {
                     $autorizado_senha = true;
@@ -86,7 +86,32 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         }
     }
 
-    // AÇÃO 3: EXCLUIR CONTA (A ZONA DE PERIGO)
+    // AÇÃO 3: TROCAR TEMA
+    if (isset($_POST['action']) && $_POST['action'] === 'trocar_tema') {
+        $novoTema = strtolower(trim($_POST['tema'] ?? ''));
+        $temas    = function_exists('temasDisponiveis') ? temasDisponiveis() : ['dark' => [], 'white' => []];
+        if (isset($temas[$novoTema])) {
+            $conquista = $temas[$novoTema]['conquista'] ?? null;
+            $temAcesso = !$conquista || (function_exists('usuarioPossuiConquista') && usuarioPossuiConquista($conquista));
+            if ($temAcesso) {
+                try {
+                    $pdo->prepare("UPDATE Usuario SET Tema = :tema WHERE IDUsuario = :uid")
+                        ->execute([':tema' => $novoTema, ':uid' => $usuario_id]);
+                    $_SESSION['tema'] = $novoTema;
+                    $mensagem = 'Tema alterado para ' . ucfirst($novoTema) . '!';
+                    $tipo_mensagem = 'success';
+                } catch (PDOException $e) {
+                    $mensagem = 'Erro ao alterar o tema.';
+                    $tipo_mensagem = 'danger';
+                }
+            } else {
+                $mensagem = 'Você ainda não desbloqueou este tema.';
+                $tipo_mensagem = 'warning';
+            }
+        }
+    }
+
+    // AÇÃO 4: EXCLUIR CONTA (A ZONA DE PERIGO)
     if (isset($_POST['action']) && $_POST['action'] === 'delete_account') {
         $senha_confirmacao = $_POST['senha_confirmacao'] ?? '';
 
@@ -116,7 +141,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             }
 
             if ($autorizado_exclusao) {
-                
+
                 $pdo->beginTransaction();
 
                 $pdo->prepare("DELETE FROM RateioRegistro WHERE FKRegistro IN (SELECT IDRegistro FROM Registro WHERE FKUsuario = :uid)")->execute([':uid' => $usuario_id]);
@@ -127,10 +152,10 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 $pdo->prepare("DELETE FROM Categoria WHERE FKUsuario = :uid")->execute([':uid' => $usuario_id]);
                 $pdo->prepare("DELETE FROM ConfiguracaoSistema WHERE FKUsuario = :uid")->execute([':uid' => $usuario_id]);
                 $pdo->prepare("DELETE FROM Carteira WHERE FKUsuarioDono = :uid")->execute([':uid' => $usuario_id]);
-                
+
                 $pdo->prepare("DELETE FROM Usuario WHERE IDUsuario = :uid")->execute([':uid' => $usuario_id]);
 
-                $pdo->commit(); 
+                $pdo->commit();
 
                 session_destroy();
                 setcookie('auralis_remember', '', time() - 3600, '/');
@@ -151,14 +176,13 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 // 2. BUSCA OS DADOS ATUAIS (Incluindo Senha para a lógica do Front-end)
 // ==============================================================================
 try {
-    $sqlBusca = "SELECT Nome, Email, Senha FROM Usuario WHERE IDUsuario = :uid LIMIT 1";
+    $sqlBusca = "SELECT Nome, Email, Senha, Tema FROM Usuario WHERE IDUsuario = :uid LIMIT 1";
     $stmtBusca = $pdo->prepare($sqlBusca);
     $stmtBusca->execute([':uid' => $usuario_id]);
     $dadosUsuario = $stmtBusca->fetch(PDO::FETCH_ASSOC);
-    
+
     // Descobre se é usuário Google para o HTML
     $isGoogleUser = ($dadosUsuario['Senha'] === 'GOOGLE_SSO');
-    
 } catch (PDOException $e) {
     die("Erro ao carregar dados do usuário.");
 }
@@ -167,30 +191,32 @@ require_once 'geral/header.php';
 ?>
 
 <main class="container py-4 mt-2 flex-grow-1" style="min-height: 100vh; padding-inline: var(--space-page-x);">
-    
+
     <div class="d-flex justify-content-between align-items-center mb-4 border-bottom border-secondary-subtle pb-3">
         <h2 class="fw-bold text-light mb-0"><i class="bi bi-gear text-secondary me-2"></i> Configurações da Conta</h2>
     </div>
 
-    <?php if ($mensagem): ?>
+    <?php if ($mensagem && $tipo_mensagem === 'success'): ?>
+        <script>window._pendingToast = <?= json_encode($mensagem) ?>;</script>
+    <?php elseif ($mensagem): ?>
         <div class="alert alert-<?= $tipo_mensagem ?> alert-dismissible fade show d-flex align-items-center rounded-3 shadow-sm border-0" role="alert">
-            <i class="bi <?= $tipo_mensagem === 'success' ? 'bi-check-circle-fill' : 'bi-exclamation-triangle-fill' ?> me-2"></i>
+            <i class="bi bi-exclamation-triangle-fill me-2"></i>
             <strong><?= $mensagem ?></strong>
-            <button type="button" class="btn-close <?php if($tipo_mensagem !== 'warning') echo 'btn-close-white'; ?> opacity-50" data-bs-dismiss="alert" aria-label="Close"></button>
+            <button type="button" class="btn-close opacity-50" data-bs-dismiss="alert" aria-label="Close"></button>
         </div>
     <?php endif; ?>
 
     <div class="row g-4 mb-5">
-        
+
         <div class="col-lg-6">
-            <div class="card bg-dark border-secondary-subtle shadow-sm rounded-4 h-100">
+            <div class="card border-secondary-subtle shadow-sm rounded-4 h-100" style="background:var(--bg-card);">
                 <div class="card-header border-bottom border-secondary-subtle bg-transparent p-4">
                     <h5 class="text-light fw-bold mb-0">Perfil Público</h5>
                 </div>
                 <div class="card-body p-4">
                     <form method="POST" action="">
                         <input type="hidden" name="action" value="update_profile">
-                        
+
                         <div class="mb-3">
                             <label class="form-label text-secondary small mb-1">E-mail de Acesso</label>
                             <input type="email" class="form-control bg-body-tertiary border-secondary-subtle text-secondary shadow-none" value="<?= htmlspecialchars($dadosUsuario['Email']) ?>" disabled>
@@ -212,7 +238,7 @@ require_once 'geral/header.php';
         </div>
 
         <div class="col-lg-6">
-            <div class="card bg-dark border-secondary-subtle shadow-sm rounded-4 h-100">
+            <div class="card border-secondary-subtle shadow-sm rounded-4 h-100" style="background:var(--bg-card);">
                 <div class="card-header border-bottom border-secondary-subtle bg-transparent p-4">
                     <h5 class="text-light fw-bold mb-0">Segurança</h5>
                 </div>
@@ -256,6 +282,174 @@ require_once 'geral/header.php';
             </div>
         </div>
 
+        <!-- APARÊNCIA / TEMA -->
+        <div class="col-12 mt-2">
+            <?php
+            $temasCfg     = function_exists('temasDisponiveis') ? temasDisponiveis() : ['dark' => ['nome' => 'Dark', 'conquista' => null, 'secao' => 'padrao']];
+            $temaAtivo    = $dadosUsuario['Tema'] ?? ($_SESSION['tema'] ?? 'dark');
+            $planoUsuario = strtolower($_SESSION['plano'] ?? 'free');
+            $planoPeso    = ['free' => 0, 'pro' => 1, 'vip' => 2];
+
+            $temasPadrao    = array_filter($temasCfg, fn($t) => ($t['secao'] ?? 'padrao') === 'padrao');
+            $temasAdicionais = array_filter($temasCfg, fn($t) => ($t['secao'] ?? 'padrao') === 'adicional');
+
+            // Renderiza um card de tema
+            $renderCard = function (string $slug, array $info) use ($temaAtivo, $planoUsuario, $planoPeso): void {
+                $ativo              = $temaAtivo === $slug;
+                $conquista          = $info['conquista'] ?? null;
+                $planoMinimo        = $info['plano_minimo'] ?? null;
+                $bloqConquista      = $conquista && !(function_exists('usuarioPossuiConquista') && usuarioPossuiConquista($conquista));
+                $bloqPlano          = $planoMinimo && (($planoPeso[$planoUsuario] ?? 0) < ($planoPeso[$planoMinimo] ?? 0));
+                $bloqueado          = $bloqConquista || $bloqPlano;
+                $labelPlano         = $planoMinimo ? strtoupper($planoMinimo) : '';
+            ?>
+                <div class="col-6 col-md-3">
+                    <form method="POST" action="">
+                        <input type="hidden" name="action" value="trocar_tema">
+                        <input type="hidden" name="tema" value="<?= htmlspecialchars($slug) ?>">
+                        <button type="submit" <?= $bloqueado ? 'disabled' : '' ?>
+                            class="btn w-100 p-0 border-0 rounded-4 overflow-hidden position-relative"
+                            style="outline:2.5px solid <?= $ativo ? 'var(--accent)' : 'transparent' ?>;transition:outline-color .2s,box-shadow .2s;<?= $bloqueado ? 'opacity:.6;cursor:not-allowed;' : '' ?>">
+
+                            <?php if ($slug === 'dark'): ?>
+                                <div class="rounded-4 overflow-hidden" style="background:#121418;padding:14px 10px;">
+                                    <div style="background:#1e2126;border-radius:8px;padding:8px;margin-bottom:6px;">
+                                        <div style="height:6px;width:55%;background:#d4af37;border-radius:4px;margin-bottom:5px;"></div>
+                                        <div style="height:5px;width:75%;background:#2d3139;border-radius:4px;"></div>
+                                    </div>
+                                    <div class="d-flex gap-1">
+                                        <div style="flex:1;background:#252a31;border-radius:6px;height:24px;"></div>
+                                        <div style="flex:1;background:#252a31;border-radius:6px;height:24px;"></div>
+                                    </div>
+                                </div>
+                            <?php elseif ($slug === 'white'): ?>
+                                <div class="rounded-4 overflow-hidden" style="background:#f2f5f9;padding:14px 10px;">
+                                    <div style="background:#fff;border-radius:8px;padding:8px;margin-bottom:6px;border:1px solid #d0d8e8;">
+                                        <div style="height:6px;width:55%;background:#ffc300;border-radius:4px;margin-bottom:5px;"></div>
+                                        <div style="height:5px;width:75%;background:#c9d3e0;border-radius:4px;"></div>
+                                    </div>
+                                    <div class="d-flex gap-1">
+                                        <div style="flex:1;background:#eaeff6;border-radius:6px;height:24px;border:1px solid #d0d8e8;"></div>
+                                        <div style="flex:1;background:#eaeff6;border-radius:6px;height:24px;border:1px solid #d0d8e8;"></div>
+                                    </div>
+                                </div>
+                            <?php elseif ($slug === 'sistema'): ?>
+                                <div class="rounded-4 overflow-hidden" style="background:linear-gradient(to right,#121418 50%,#f2f5f9 50%);padding:14px 10px;">
+                                    <div style="border-radius:8px;padding:8px;margin-bottom:6px;background:linear-gradient(to right,#1e2126 50%,#ffffff 50%);border:1px solid rgba(128,128,128,0.15);">
+                                        <div style="height:6px;width:55%;background:linear-gradient(to right,#d4af37,#ffc300);border-radius:4px;margin-bottom:5px;"></div>
+                                        <div style="height:5px;width:75%;background:linear-gradient(to right,#2d3139,#c9d3e0);border-radius:4px;"></div>
+                                    </div>
+                                    <div class="d-flex gap-1 align-items-center justify-content-center py-1">
+                                        <i class="bi bi-moon-stars-fill" style="color:#d4af37;font-size:0.8rem;"></i>
+                                        <span style="color:#888;font-size:0.65rem;margin:0 6px;">·</span>
+                                        <i class="bi bi-sun-fill" style="color:#b8962e;font-size:0.8rem;"></i>
+                                    </div>
+                                </div>
+                            <?php elseif ($slug === 'oceano'): ?>
+                                <div class="rounded-4 overflow-hidden" style="background:#0d1230;padding:14px 10px;">
+                                    <div style="background:#16204a;border-radius:8px;padding:8px;margin-bottom:6px;border:1px solid #253560;">
+                                        <div style="height:6px;width:55%;background:linear-gradient(90deg,#e06c43,#f09a78);border-radius:4px;margin-bottom:5px;"></div>
+                                        <div style="height:5px;width:75%;background:#253560;border-radius:4px;"></div>
+                                    </div>
+                                    <div class="d-flex gap-1">
+                                        <div style="flex:1;background:#1f2d60;border-radius:6px;height:24px;border:1px solid #253560;"></div>
+                                        <div style="flex:1;background:#1f2d60;border-radius:6px;height:24px;border:1px solid #253560;"></div>
+                                    </div>
+                                </div>
+                            <?php elseif ($slug === 'ambar'): ?>
+                                <div class="rounded-4 overflow-hidden" style="background:#0e0c1a;padding:14px 10px;">
+                                    <div style="background:#181530;border-radius:8px;padding:8px;margin-bottom:6px;border:1px solid #302c50;">
+                                        <div style="height:6px;width:55%;background:linear-gradient(90deg,#f0b030,#f5d060);border-radius:4px;margin-bottom:5px;"></div>
+                                        <div style="height:5px;width:75%;background:#302c50;border-radius:4px;"></div>
+                                    </div>
+                                    <div class="d-flex gap-1">
+                                        <div style="flex:1;background:#221e42;border-radius:6px;height:24px;border:1px solid #302c50;"></div>
+                                        <div style="flex:1;background:#221e42;border-radius:6px;height:24px;border:1px solid #302c50;"></div>
+                                    </div>
+                                </div>
+                            <?php elseif ($slug === 'aurora'): ?>
+                                <div class="rounded-4 overflow-hidden" style="background:#0a0518;padding:14px 10px;">
+                                    <div style="background:#150d2e;border-radius:8px;padding:8px;margin-bottom:6px;border:1px solid #2a1e50;">
+                                        <div style="height:6px;width:55%;background:linear-gradient(90deg,#38bcd8,#6dd5ec);border-radius:4px;margin-bottom:5px;"></div>
+                                        <div style="height:5px;width:75%;background:#2a1e50;border-radius:4px;"></div>
+                                    </div>
+                                    <div class="d-flex gap-1">
+                                        <div style="flex:1;background:#1e1440;border-radius:6px;height:24px;border:1px solid #2a1e50;"></div>
+                                        <div style="flex:1;background:#1e1440;border-radius:6px;height:24px;border:1px solid #2a1e50;"></div>
+                                    </div>
+                                </div>
+                            <?php elseif ($slug === 'cosmos'): ?>
+                                <div class="rounded-4 overflow-hidden" style="background:#0d0a1a;padding:14px 10px;">
+                                    <div style="background:#1a1330;border-radius:8px;padding:8px;margin-bottom:6px;border:1px solid #2d2550;">
+                                        <div style="height:6px;width:55%;background:linear-gradient(90deg,#7c3aed,#a78bfa);border-radius:4px;margin-bottom:5px;"></div>
+                                        <div style="height:5px;width:75%;background:#2d2550;border-radius:4px;"></div>
+                                    </div>
+                                    <div class="d-flex gap-1">
+                                        <div style="flex:1;background:#221b3a;border-radius:6px;height:24px;border:1px solid #2d2550;"></div>
+                                        <div style="flex:1;background:#221b3a;border-radius:6px;height:24px;border:1px solid #2d2550;"></div>
+                                    </div>
+                                </div>
+                            <?php elseif ($slug === 'fortune'): ?>
+                                <div class="rounded-4 overflow-hidden" style="background:#0c0900;padding:14px 10px;">
+                                    <div style="background:#161100;border-radius:8px;padding:8px;margin-bottom:6px;border:1px solid #2e2200;">
+                                        <div style="height:6px;width:55%;background:linear-gradient(90deg,#d4af37,#f5e642);border-radius:4px;margin-bottom:5px;"></div>
+                                        <div style="height:5px;width:75%;background:#2e2200;border-radius:4px;"></div>
+                                    </div>
+                                    <div class="d-flex gap-1">
+                                        <div style="flex:1;background:#221a00;border-radius:6px;height:24px;border:1px solid #2e2200;"></div>
+                                        <div style="flex:1;background:#221a00;border-radius:6px;height:24px;border:1px solid #2e2200;"></div>
+                                    </div>
+                                </div>
+                            <?php endif; ?>
+
+                            <?php if ($ativo): ?>
+                                <span class="position-absolute top-0 end-0 m-1 badge rounded-pill"
+                                    style="background:var(--accent);color:#000;font-size:0.6rem;padding:3px 6px;">
+                                    <i class="bi bi-check-lg"></i>
+                                </span>
+                            <?php endif; ?>
+                            <?php if ($bloqueado): ?>
+                                <span class="position-absolute top-0 start-0 m-1 badge rounded-pill"
+                                    style="background:rgba(0,0,0,0.55);color:#fff;font-size:0.6rem;padding:3px 6px;backdrop-filter:blur(4px);">
+                                    <i class="bi bi-lock-fill me-1"></i><?= $labelPlano ?>
+                                </span>
+                            <?php endif; ?>
+                        </button>
+                        <p class="text-center mt-1 mb-0 small fw-semibold <?= $ativo ? '' : 'text-secondary' ?>">
+                            <?= htmlspecialchars($info['nome']) ?>
+                        </p>
+                    </form>
+                </div>
+            <?php
+            };
+            ?>
+            <div class="card border-secondary-subtle shadow-sm rounded-4" style="background:var(--bg-card);">
+                <div class="card-header border-bottom border-secondary-subtle bg-transparent p-4">
+                    <h5 class="fw-bold mb-0"><i class="bi bi-palette2 me-2" style="color:var(--accent);"></i> Aparência</h5>
+                </div>
+                <div class="card-body p-4">
+                    <p class="text-secondary small mb-4">Escolha como o Auralis aparece para você. Temas adicionais podem ser desbloqueados por plano ou conquistas.</p>
+
+                    <!-- Seção: Padrão -->
+                    <p class="small fw-semibold text-uppercase mb-2" style="color:var(--text-muted);letter-spacing:.07em;">Padrão</p>
+                    <div class="row g-3 mb-4">
+                        <?php foreach ($temasPadrao as $slug => $info) {
+                            $renderCard($slug, $info);
+                        } ?>
+                    </div>
+
+                    <!-- Seção: Adicionais -->
+                    <p class="small fw-semibold text-uppercase mb-2" style="color:var(--text-muted);letter-spacing:.07em;">Adicionais</p>
+                    <div class="row g-3">
+                        <?php foreach ($temasAdicionais as $slug => $info) {
+                            $renderCard($slug, $info);
+                        } ?>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- ZONA DE RISCO -->
         <div class="col-12 mt-2">
             <div class="card border-danger border-opacity-25 bg-transparent shadow-sm rounded-4">
                 <div class="card-body p-4 d-flex justify-content-between align-items-center flex-wrap gap-3">
@@ -276,15 +470,15 @@ require_once 'geral/header.php';
 
 <div class="modal fade" id="modalExcluirConta" tabindex="-1" aria-hidden="true">
     <div class="modal-dialog modal-dialog-centered">
-        <div class="modal-content bg-dark border-danger border-opacity-50 shadow-lg rounded-4">
+        <div class="modal-content border-danger border-opacity-50 shadow-lg rounded-4" style="background:var(--bg-card);">
             <div class="modal-header border-bottom border-secondary-subtle">
                 <h5 class="modal-title text-danger fw-bold"><i class="bi bi-shield-x me-2"></i> Verificação de Segurança</h5>
-                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
             </div>
             <form method="POST" action="">
                 <div class="modal-body p-4">
                     <input type="hidden" name="action" value="delete_account">
-                    
+
                     <?php if ($isGoogleUser): ?>
                         <p class="text-light mb-4">Como você acessa o sistema via Google, digite a palavra <strong class="text-danger">EXCLUIR</strong> abaixo para confirmar a exclusão definitiva da conta:</p>
                         <div class="mb-3">
@@ -298,7 +492,7 @@ require_once 'geral/header.php';
                             <input type="password" name="senha_confirmacao" id="senha_confirmacao" class="form-control form-control-lg bg-transparent border-secondary-subtle text-light shadow-none" required placeholder="Digite sua senha">
                         </div>
                     <?php endif; ?>
-                    
+
                 </div>
                 <div class="modal-footer border-top border-secondary-subtle">
                     <button type="button" class="btn btn-secondary rounded-pill px-4 fw-semibold" data-bs-dismiss="modal">Cancelar</button>
@@ -316,17 +510,17 @@ require_once 'geral/header.php';
     const inputConfirmaSenha = document.getElementById('confirma_senha');
 
     if (formSenha) {
-        formSenha.addEventListener('submit', function (e) {
+        formSenha.addEventListener('submit', function(e) {
             if (inputNovaSenha.value !== inputConfirmaSenha.value) {
-                e.preventDefault(); 
-                inputConfirmaSenha.classList.add('is-invalid'); 
-                inputConfirmaSenha.focus(); 
+                e.preventDefault();
+                inputConfirmaSenha.classList.add('is-invalid');
+                inputConfirmaSenha.focus();
             } else {
-                inputConfirmaSenha.classList.remove('is-invalid'); 
+                inputConfirmaSenha.classList.remove('is-invalid');
             }
         });
 
-        inputConfirmaSenha.addEventListener('input', function () {
+        inputConfirmaSenha.addEventListener('input', function() {
             inputConfirmaSenha.classList.remove('is-invalid');
         });
     }

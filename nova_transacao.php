@@ -555,7 +555,7 @@ require_once 'geral/header.php';
 
             <?php if ($erro): ?>
                 <div class="d-flex align-items-center gap-2 rounded-3 px-4 py-3 mb-3"
-                    style="background-color: rgba(120,0,0,0.35); border: 1px solid rgba(200,50,50,0.45); color: #f28b8b;">
+                    style="background-color:var(--color-expense-bg); border:1px solid var(--color-expense-border); color:var(--color-expense-text);">
                     <i class="bi bi-exclamation-triangle-fill flex-shrink-0" style="font-size:0.95rem;"></i>
                     <span style="font-size:0.9rem; font-weight:500;"><?= htmlspecialchars($erro) ?></span>
                 </div>
@@ -567,7 +567,7 @@ require_once 'geral/header.php';
                 </div>
             <?php else: ?>
 
-                <div class="card bg-body-tertiary border-secondary-subtle shadow-sm rounded-4">
+                <div class="card border-secondary-subtle shadow-sm rounded-4">
                     <form id="formTransacao" method="POST" action="" novalidate enctype="multipart/form-data" class="auralis-premium-form p-4">
                         <input type="hidden" name="tipo_registro" value="<?= htmlspecialchars($tipo_sugerido) ?>">
                         <input type="hidden" name="voltar" value="<?= htmlspecialchars($_urlVoltar) ?>">
@@ -576,23 +576,23 @@ require_once 'geral/header.php';
                         <?php endif; ?>
 
                         <?php if (!$is_edicao): ?>
-                            <div class="d-flex gap-2 mb-4 p-1 rounded-3" style="background:rgba(255,255,255,0.03);border:1px solid #333;">
+                            <div class="d-flex gap-2 mb-4 p-1 rounded-3" style="background:var(--bg-hover);border:1px solid var(--border-color-analysis);">
                                 <a href="?tipo=receita<?= !empty($_GET['data']) ? '&data=' . urlencode($_GET['data']) : '' ?><?= !empty($_GET['carteira_id']) ? '&carteira_id=' . urlencode($_GET['carteira_id']) : '' ?>&voltar=<?= urlencode($_GET['voltar'] ?? 'dashboard.php') ?>"
                                     class="btn flex-grow-1 fw-bold rounded-3 py-2 d-flex align-items-center justify-content-center gap-1"
-                                    style="<?= $tipo_sugerido === 'receita' ? 'background:rgba(6,214,160,0.18);color:#6ee7c7;border:1px solid rgba(6,214,160,0.5);' : 'background:transparent;color:#555;border:1px solid transparent;' ?>">
+                                    style="<?= $tipo_sugerido === 'receita' ? 'background:var(--color-income-bg);color:var(--color-income-text);border:1px solid var(--color-income-border);' : 'background:transparent;color:var(--text-muted);border:1px solid transparent;' ?>">
                                     <i class="bi bi-arrow-up-short" style="font-size:1.3rem;"></i> Receita
                                 </a>
                                 <a href="?tipo=despesa<?= !empty($_GET['data']) ? '&data=' . urlencode($_GET['data']) : '' ?><?= !empty($_GET['carteira_id']) ? '&carteira_id=' . urlencode($_GET['carteira_id']) : '' ?>&voltar=<?= urlencode($_GET['voltar'] ?? 'dashboard.php') ?>"
                                     class="btn flex-grow-1 fw-bold rounded-3 py-2 d-flex align-items-center justify-content-center gap-1"
-                                    style="<?= $tipo_sugerido === 'despesa' ? 'background:rgba(230,57,70,0.18);color:#f87171;border:1px solid rgba(230,57,70,0.5);' : 'background:transparent;color:#555;border:1px solid transparent;' ?>">
+                                    style="<?= $tipo_sugerido === 'despesa' ? 'background:var(--color-expense-bg);color:var(--color-expense-text);border:1px solid var(--color-expense-border);' : 'background:transparent;color:var(--text-muted);border:1px solid transparent;' ?>">
                                     <i class="bi bi-arrow-down-short" style="font-size:1.3rem;"></i> Despesa
                                 </a>
                                 <?php if (!empty($cartoes)): ?>
-                                <a href="?tipo=cartao<?= !empty($_GET['data']) ? '&data=' . urlencode($_GET['data']) : '' ?>&voltar=<?= urlencode($_GET['voltar'] ?? 'dashboard.php') ?><?= !empty($_GET['cartao_id']) ? '&cartao_id=' . urlencode($_GET['cartao_id']) : '' ?>"
-                                    class="btn flex-grow-1 fw-bold rounded-3 py-2 d-flex align-items-center justify-content-center gap-1"
-                                    style="<?= $tipo_sugerido === 'cartao' ? 'background:rgba(124,58,237,0.18);color:#a78bfa;border:1px solid rgba(124,58,237,0.5);' : 'background:transparent;color:#555;border:1px solid transparent;' ?>">
-                                    <i class="bi bi-credit-card-2-front" style="font-size:1rem;"></i> Cartão
-                                </a>
+                                    <a href="?tipo=cartao<?= !empty($_GET['data']) ? '&data=' . urlencode($_GET['data']) : '' ?>&voltar=<?= urlencode($_GET['voltar'] ?? 'dashboard.php') ?><?= !empty($_GET['cartao_id']) ? '&cartao_id=' . urlencode($_GET['cartao_id']) : '' ?>"
+                                        class="btn flex-grow-1 fw-bold rounded-3 py-2 d-flex align-items-center justify-content-center gap-1"
+                                        style="<?= $tipo_sugerido === 'cartao' ? 'background:var(--color-card-bg);color:var(--color-card-text);border:1px solid var(--color-card-border);' : 'background:transparent;color:var(--text-muted);border:1px solid transparent;' ?>">
+                                        <i class="bi bi-credit-card-2-front" style="font-size:1rem;"></i> Cartão
+                                    </a>
                                 <?php endif; ?>
                             </div>
                         <?php else: ?>
@@ -608,446 +608,446 @@ require_once 'geral/header.php';
                         <?php endif; ?>
 
                         <?php if ($tipo_sugerido === 'cartao' && !$is_edicao): ?>
-                        <!-- ── FORMULÁRIO CARTÃO DE CRÉDITO ───────────────── -->
-                        <input type="hidden" name="tipo_registro" value="cartao">
+                            <!-- ── FORMULÁRIO CARTÃO DE CRÉDITO ───────────────── -->
+                            <input type="hidden" name="tipo_registro" value="cartao">
 
-                        <div class="mb-5 d-flex align-items-center justify-content-center pb-3 auralis-line-input">
-                            <input type="text" inputmode="numeric" name="valor" id="valor"
-                                class="form-control form-control-lg bg-transparent border-0 fw-bold text-center fs-1-large valor-input p-0 p-lg-1 no-spinners"
-                                style="color:#a78bfa;"
-                                placeholder="R$ 0,00" required autofocus autocomplete="off"
-                                value="<?= htmlspecialchars($val_valor) ?>"
-                                oninput="mascaraMoeda(this)">
-                        </div>
+                            <div class="mb-5 d-flex align-items-center justify-content-center pb-3 auralis-line-input">
+                                <input type="text" inputmode="numeric" name="valor" id="valor"
+                                    class="form-control form-control-lg bg-transparent border-0 fw-bold text-center fs-1-large valor-input p-0 p-lg-1 no-spinners"
+                                    style="color:#a78bfa;"
+                                    placeholder="R$ 0,00" required autofocus autocomplete="off"
+                                    value="<?= htmlspecialchars($val_valor) ?>"
+                                    oninput="mascaraMoeda(this)">
+                            </div>
 
-                        <div class="d-flex align-items-center mb-4 pb-2 auralis-line-input">
-                            <i class="bi bi-paragraph text-secondary-analysis me-3 w-icon text-center"></i>
-                            <input type="text" name="descricao" id="descricao"
-                                class="form-control bg-transparent border-0 text-light-analysis px-0 shadow-none fs-6 fw-bold"
-                                placeholder="Descrição da compra:" maxlength="255" required
-                                value="<?= htmlspecialchars($val_desc) ?>">
-                        </div>
+                            <div class="d-flex align-items-center mb-4 pb-2 auralis-line-input">
+                                <i class="bi bi-paragraph text-secondary-analysis me-3 w-icon text-center"></i>
+                                <input type="text" name="descricao" id="descricao"
+                                    class="form-control bg-transparent border-0 text-light-analysis px-0 shadow-none fs-6 fw-bold"
+                                    placeholder="Descrição da compra:" maxlength="255" required
+                                    value="<?= htmlspecialchars($val_desc) ?>">
+                            </div>
 
-                        <div class="d-flex align-items-center mb-4 pb-2 auralis-line-input">
-                            <i class="bi bi-credit-card-2-front me-3 w-icon text-center" style="color:#a78bfa;"></i>
-                            <?php $cartaoPreSel = $_GET['cartao_id'] ?? (count($cartoes) === 1 ? $cartoes[0]['IDCartao'] : ''); ?>
-                            <select name="cartao_cc_id" id="cartao_cc_id" class="form-select bg-transparent border-0 text-light-analysis px-0 shadow-none fw-semibold fs-6" required>
-                                <option class="bg-card" value="" disabled <?= empty($cartaoPreSel) ? 'selected' : '' ?>>Selecione o Cartão</option>
-                                <?php foreach ($cartoes as $cc): ?>
-                                    <option class="bg-card" value="<?= htmlspecialchars($cc['IDCartao']) ?>"
-                                        <?= ($cartaoPreSel === $cc['IDCartao']) ? 'selected' : '' ?>>
-                                        <?= htmlspecialchars($cc['Nome']) ?>
-                                    </option>
-                                <?php endforeach; ?>
-                            </select>
-                        </div>
-
-                        <div class="row g-3 mb-4 auralis-line-input">
-                            <div class="col-6 d-flex align-items-center border-end border-border-color pe-3">
-                                <i class="bi bi-tags text-secondary-analysis me-2 fs-7"></i>
-                                <select name="categoria_id" class="form-select bg-transparent border-0 text-muted-analysis px-0 shadow-none fs-7 fw-bold">
-                                    <option class="bg-card" value="">Sem Categoria</option>
-                                    <?php foreach ($categorias as $cat): ?>
-                                        <option class="bg-card" value="<?= htmlspecialchars($cat['IDCategoria']) ?>" <?= ($val_cat == $cat['IDCategoria']) ? 'selected' : '' ?>>
-                                            <?= htmlspecialchars($cat['NomeCategoria']) ?>
+                            <div class="d-flex align-items-center mb-4 pb-2 auralis-line-input">
+                                <i class="bi bi-credit-card-2-front me-3 w-icon text-center" style="color:#a78bfa;"></i>
+                                <?php $cartaoPreSel = $_GET['cartao_id'] ?? (count($cartoes) === 1 ? $cartoes[0]['IDCartao'] : ''); ?>
+                                <select name="cartao_cc_id" id="cartao_cc_id" class="form-select bg-transparent border-0 text-light-analysis px-0 shadow-none fw-semibold fs-6" required>
+                                    <option class="bg-card" value="" disabled <?= empty($cartaoPreSel) ? 'selected' : '' ?>>Selecione o Cartão</option>
+                                    <?php foreach ($cartoes as $cc): ?>
+                                        <option class="bg-card" value="<?= htmlspecialchars($cc['IDCartao']) ?>"
+                                            <?= ($cartaoPreSel === $cc['IDCartao']) ? 'selected' : '' ?>>
+                                            <?= htmlspecialchars($cc['Nome']) ?>
                                         </option>
                                     <?php endforeach; ?>
                                 </select>
                             </div>
-                            <div class="col-6 d-flex align-items-center ps-3">
-                                <i class="bi bi-calendar3 text-secondary-analysis me-2 fs-7"></i>
-                                <input type="date" name="data_registro" class="form-control bg-transparent border-0 text-light-analysis px-0 shadow-none fs-7 fw-bold"
-                                    value="<?= htmlspecialchars($val_data) ?>" required>
-                            </div>
-                        </div>
 
-                        <!-- Parcelamento CC -->
-                        <div class="accordion accordion-flush mb-5 border border-border-color rounded-3 overflow-hidden auralis-line-input" id="accordionCC">
-                            <div class="accordion-item bg-transparent">
-                                <h2 class="accordion-header">
-                                    <button class="accordion-button collapsed bg-transparent text-secondary-analysis shadow-none py-2 px-3 small fs-7"
-                                        type="button" data-bs-toggle="collapse" data-bs-target="#collapseCC">
-                                        <i class="bi bi-sliders me-2"></i> Parcelamento
-                                    </button>
-                                </h2>
-                                <div id="collapseCC" class="accordion-collapse collapse" data-bs-parent="#accordionCC">
-                                    <div class="accordion-body border-top border-border-color pt-3 px-3 pb-4 bg-charcoal">
-                                        <div class="d-flex align-items-start justify-content-between gap-3 mb-3">
-                                            <div>
-                                                <div class="text-light fw-semibold fs-7 mb-1 d-flex align-items-center gap-2">
-                                                    <i class="bi bi-credit-card-2-front" style="color:#a78bfa;"></i>
-                                                    Dividir em parcelas
+                            <div class="row g-3 mb-4 auralis-line-input">
+                                <div class="col-6 d-flex align-items-center border-end border-border-color pe-3">
+                                    <i class="bi bi-tags text-secondary-analysis me-2 fs-7"></i>
+                                    <select name="categoria_id" class="form-select bg-transparent border-0 text-muted-analysis px-0 shadow-none fs-7 fw-bold">
+                                        <option class="bg-card" value="">Sem Categoria</option>
+                                        <?php foreach ($categorias as $cat): ?>
+                                            <option class="bg-card" value="<?= htmlspecialchars($cat['IDCategoria']) ?>" <?= ($val_cat == $cat['IDCategoria']) ? 'selected' : '' ?>>
+                                                <?= htmlspecialchars($cat['NomeCategoria']) ?>
+                                            </option>
+                                        <?php endforeach; ?>
+                                    </select>
+                                </div>
+                                <div class="col-6 d-flex align-items-center ps-3">
+                                    <i class="bi bi-calendar3 text-secondary-analysis me-2 fs-7"></i>
+                                    <input type="date" name="data_registro" class="form-control bg-transparent border-0 text-light-analysis px-0 shadow-none fs-7 fw-bold"
+                                        value="<?= htmlspecialchars($val_data) ?>" required>
+                                </div>
+                            </div>
+
+                            <!-- Parcelamento CC -->
+                            <div class="accordion accordion-flush mb-5 border border-border-color rounded-3 overflow-hidden auralis-line-input" id="accordionCC">
+                                <div class="accordion-item bg-transparent">
+                                    <h2 class="accordion-header">
+                                        <button class="accordion-button collapsed bg-transparent text-secondary-analysis shadow-none py-2 px-3 small fs-7"
+                                            type="button" data-bs-toggle="collapse" data-bs-target="#collapseCC">
+                                            <i class="bi bi-sliders me-2"></i> Parcelamento
+                                        </button>
+                                    </h2>
+                                    <div id="collapseCC" class="accordion-collapse collapse" data-bs-parent="#accordionCC">
+                                        <div class="accordion-body border-top border-border-color pt-3 px-3 pb-4 bg-charcoal">
+                                            <div class="d-flex align-items-start justify-content-between gap-3 mb-3">
+                                                <div>
+                                                    <div class="text-light fw-semibold fs-7 mb-1 d-flex align-items-center gap-2">
+                                                        <i class="bi bi-credit-card-2-front" style="color:#a78bfa;"></i>
+                                                        Dividir em parcelas
+                                                    </div>
+                                                    <div class="text-secondary" style="font-size:0.75rem;">Distribuído automaticamente nas próximas faturas.</div>
                                                 </div>
-                                                <div class="text-secondary" style="font-size:0.75rem;">Distribuído automaticamente nas próximas faturas.</div>
+                                                <div class="form-check form-switch fs-4 mb-0 toggle-analysis flex-shrink-0 mt-1"
+                                                    style="--bs-form-check-bg:transparent;">
+                                                    <input class="form-check-input bg-dark border-border-color shadow-none"
+                                                        type="checkbox" name="parcelado_cc" id="toggle_parcelado_cc">
+                                                </div>
                                             </div>
-                                            <div class="form-check form-switch fs-4 mb-0 toggle-analysis flex-shrink-0 mt-1"
-                                                style="--bs-form-check-bg:transparent;">
-                                                <input class="form-check-input bg-dark border-border-color shadow-none"
-                                                    type="checkbox" name="parcelado_cc" id="toggle_parcelado_cc">
-                                            </div>
-                                        </div>
-                                        <div id="bloco_parc_cc" style="display:none;" class="ps-3 border-start border-border-color">
-                                            <label class="form-label text-secondary-analysis fs-7 mb-1">Em quantas vezes?</label>
-                                            <div class="d-flex align-items-center gap-3">
-                                                <input type="number" name="num_parcelas_cc" id="num_parcelas_cc"
-                                                    class="form-control bg-dark border-border-color text-light-analysis form-control-sm no-spinners fs-7"
-                                                    style="max-width:100px;" min="2" max="48" placeholder="Ex: 3" value="2">
-                                                <div id="preview_parc_cc" class="fs-7"></div>
+                                            <div id="bloco_parc_cc" style="display:none;" class="ps-3 border-start border-border-color">
+                                                <label class="form-label text-secondary-analysis fs-7 mb-1">Em quantas vezes?</label>
+                                                <div class="d-flex align-items-center gap-3">
+                                                    <input type="number" name="num_parcelas_cc" id="num_parcelas_cc"
+                                                        class="form-control bg-dark border-border-color text-light-analysis form-control-sm no-spinners fs-7"
+                                                        style="max-width:100px;" min="2" max="48" placeholder="Ex: 3" value="2">
+                                                    <div id="preview_parc_cc" class="fs-7"></div>
+                                                </div>
                                             </div>
                                         </div>
                                     </div>
                                 </div>
                             </div>
-                        </div>
 
-                        <div class="d-grid mt-2">
-                            <button id="btnSalvar" type="submit" class="btn fw-bold text-light py-3 rounded-pill fs-6 shadow-lg d-flex align-items-center justify-content-center"
-                                style="background:rgba(124,58,237,0.25);border:1px solid rgba(124,58,237,0.5);">
-                                Lançar no Cartão
-                            </button>
-                        </div>
+                            <div class="d-grid mt-2">
+                                <button id="btnSalvar" type="submit" class="btn fw-bold text-light py-3 rounded-pill fs-6 shadow-lg d-flex align-items-center justify-content-center"
+                                    style="background:rgba(124,58,237,0.25);border:1px solid rgba(124,58,237,0.5);">
+                                    Lançar no Cartão
+                                </button>
+                            </div>
 
                         <?php else: /* receita / despesa */ ?>
 
-                        <div class="mb-5 d-flex align-items-center justify-content-center pb-3 auralis-line-input">
-                            <input type="text" inputmode="numeric" name="valor" id="valor"
-                                class="form-control form-control-lg bg-transparent border-0 text-gold-analysis fw-bold text-center fs-1-large valor-input p-0 p-lg-1 no-spinners"
-                                placeholder="R$ 0,00" required autofocus autocomplete="off"
-                                value="<?= htmlspecialchars($val_valor) ?>"
-                                oninput="mascaraMoeda(this)">
-                        </div>
-
-                        <div class="d-flex align-items-center mb-4 pb-2 auralis-line-input">
-                            <i class="bi bi-paragraph text-secondary-analysis me-3 w-icon text-center"></i>
-                            <input type="text" name="descricao" id="descricao"
-                                class="form-control bg-transparent border-0 text-light-analysis px-0 shadow-none fs-6 fw-bold"
-                                placeholder="Descrição:" maxlength="255" required
-                                value="<?= htmlspecialchars($val_desc) ?>">
-                        </div>
-
-                        <div class="d-flex align-items-center justify-content-between mb-4 pb-3 auralis-line-input">
-                            <div class="d-flex align-items-center">
-                                <i class="bi bi-clock-history text-secondary-analysis me-3 w-icon text-center"></i>
-                                <span class="text-light fs-6" id="texto_status">Foi <?= $tipo_sugerido === 'receita' ? 'recebido' : 'pago' ?></span>
+                            <div class="mb-5 d-flex align-items-center justify-content-center pb-3 auralis-line-input">
+                                <input type="text" inputmode="numeric" name="valor" id="valor"
+                                    class="form-control form-control-lg bg-transparent border-0 text-gold-analysis fw-bold text-center fs-1-large valor-input p-0 p-lg-1 no-spinners"
+                                    placeholder="R$ 0,00" required autofocus autocomplete="off"
+                                    value="<?= htmlspecialchars($val_valor) ?>"
+                                    oninput="mascaraMoeda(this)">
                             </div>
-                            <div class="form-check form-switch fs-4 mb-0 toggle-analysis">
-                                <input type="hidden" name="status_registro" id="status_real" value="<?= htmlspecialchars($val_status) ?>">
-                                <input class="form-check-input bg-dark border-border-color shadow-none" type="checkbox" role="switch" id="toggle_status" <?= $val_status === 'efetivado' ? 'checked' : '' ?>>
+
+                            <div class="d-flex align-items-center mb-4 pb-2 auralis-line-input">
+                                <i class="bi bi-paragraph text-secondary-analysis me-3 w-icon text-center"></i>
+                                <input type="text" name="descricao" id="descricao"
+                                    class="form-control bg-transparent border-0 text-light-analysis px-0 shadow-none fs-6 fw-bold"
+                                    placeholder="Descrição:" maxlength="255" required
+                                    value="<?= htmlspecialchars($val_desc) ?>">
                             </div>
-                        </div>
 
-                        <div class="d-flex align-items-center mb-4 pb-2 auralis-line-input">
-                            <i class="bi bi-credit-card text-secondary-analysis me-3 w-icon text-center"></i>
-                            <select name="carteira_id" id="carteira_id" class="form-select bg-transparent border-0 text-light-analysis px-0 shadow-none fw-semibold fs-6" required>
-                                <option class="bg-card" value="" disabled <?= empty($val_cart) ? 'selected' : '' ?>>Selecione a Carteira</option>
-                                <?php foreach ($carteiras as $cart): ?>
-                                    <option class="bg-card" value="<?= htmlspecialchars($cart['IDCarteira']) ?>" <?= ($val_cart == $cart['IDCarteira']) ? 'selected' : '' ?>>
-                                        <?= htmlspecialchars($cart['TipoCarteira']) ?>
-                                    </option>
-                                <?php endforeach; ?>
-                            </select>
-                        </div>
+                            <div class="d-flex align-items-center justify-content-between mb-4 pb-3 auralis-line-input">
+                                <div class="d-flex align-items-center">
+                                    <i class="bi bi-clock-history text-secondary-analysis me-3 w-icon text-center"></i>
+                                    <span class="text-light fs-6" id="texto_status">Foi <?= $tipo_sugerido === 'receita' ? 'recebido' : 'pago' ?></span>
+                                </div>
+                                <div class="form-check form-switch fs-4 mb-0 toggle-analysis">
+                                    <input type="hidden" name="status_registro" id="status_real" value="<?= htmlspecialchars($val_status) ?>">
+                                    <input class="form-check-input bg-dark border-border-color shadow-none" type="checkbox" role="switch" id="toggle_status" <?= $val_status === 'efetivado' ? 'checked' : '' ?>>
+                                </div>
+                            </div>
 
-                        <div class="row g-3 mb-4 auralis-line-input">
-                            <div class="col-6 d-flex align-items-center border-end border-border-color pe-3">
-                                <i class="bi bi-tags text-secondary-analysis me-2 fs-7"></i>
-                                <select name="categoria_id" class="form-select bg-transparent border-0 text-muted-analysis px-0 shadow-none fs-7 fw-bold">
-                                    <option class="bg-card" value="">Sem Categoria</option>
-                                    <?php foreach ($categorias as $cat): ?>
-                                        <option class="bg-card" value="<?= htmlspecialchars($cat['IDCategoria']) ?>" <?= ($val_cat == $cat['IDCategoria']) ? 'selected' : '' ?>>
-                                            <?= htmlspecialchars($cat['NomeCategoria']) ?>
+                            <div class="d-flex align-items-center mb-4 pb-2 auralis-line-input">
+                                <i class="bi bi-credit-card text-secondary-analysis me-3 w-icon text-center"></i>
+                                <select name="carteira_id" id="carteira_id" class="form-select bg-transparent border-0 text-light-analysis px-0 shadow-none fw-semibold fs-6" required>
+                                    <option class="bg-card" value="" disabled <?= empty($val_cart) ? 'selected' : '' ?>>Selecione a Carteira</option>
+                                    <?php foreach ($carteiras as $cart): ?>
+                                        <option class="bg-card" value="<?= htmlspecialchars($cart['IDCarteira']) ?>" <?= ($val_cart == $cart['IDCarteira']) ? 'selected' : '' ?>>
+                                            <?= htmlspecialchars($cart['TipoCarteira']) ?>
                                         </option>
                                     <?php endforeach; ?>
                                 </select>
                             </div>
 
-                            <div class="col-6 d-flex align-items-center ps-3">
-                                <i class="bi bi-calendar3 text-secondary-analysis me-2 fs-7"></i>
-                                <input type="date" name="data_registro" class="form-control bg-transparent border-0 text-light-analysis px-0 shadow-none fs-7 fw-bold"
-                                    value="<?= htmlspecialchars($val_data) ?>" required>
+                            <div class="row g-3 mb-4 auralis-line-input">
+                                <div class="col-6 d-flex align-items-center border-end border-border-color pe-3">
+                                    <i class="bi bi-tags text-secondary-analysis me-2 fs-7"></i>
+                                    <select name="categoria_id" class="form-select bg-transparent border-0 text-muted-analysis px-0 shadow-none fs-7 fw-bold">
+                                        <option class="bg-card" value="">Sem Categoria</option>
+                                        <?php foreach ($categorias as $cat): ?>
+                                            <option class="bg-card" value="<?= htmlspecialchars($cat['IDCategoria']) ?>" <?= ($val_cat == $cat['IDCategoria']) ? 'selected' : '' ?>>
+                                                <?= htmlspecialchars($cat['NomeCategoria']) ?>
+                                            </option>
+                                        <?php endforeach; ?>
+                                    </select>
+                                </div>
+
+                                <div class="col-6 d-flex align-items-center ps-3">
+                                    <i class="bi bi-calendar3 text-secondary-analysis me-2 fs-7"></i>
+                                    <input type="date" name="data_registro" class="form-control bg-transparent border-0 text-light-analysis px-0 shadow-none fs-7 fw-bold"
+                                        value="<?= htmlspecialchars($val_data) ?>" required>
+                                </div>
                             </div>
-                        </div>
 
-                        <?php
-                        // ── INTELIGÊNCIA DE UX: Descobre o que estamos editando ──
-                        $is_parcela    = $is_edicao && !empty($transacao_edit['TotalParcelas']);
-                        $is_recorrente = $is_edicao && ($transacao_edit['Recorrente'] == 1);
-                        ?>
+                            <?php
+                            // ── INTELIGÊNCIA DE UX: Descobre o que estamos editando ──
+                            $is_parcela    = $is_edicao && !empty($transacao_edit['TotalParcelas']);
+                            $is_recorrente = $is_edicao && ($transacao_edit['Recorrente'] == 1);
+                            ?>
 
-                        <div class="accordion accordion-flush mb-5 border border-border-color rounded-3 overflow-hidden auralis-line-input" id="accordionMaisDetalhes">
-                            <div class="accordion-item bg-transparent">
-                                <h2 class="accordion-header">
-                                    <button class="accordion-button <?= (!empty($val_venc) || $val_rec || $is_parcela) ? '' : 'collapsed' ?> bg-transparent text-secondary-analysis shadow-none py-2 px-3 small fs-7"
-                                        type="button" data-bs-toggle="collapse" data-bs-target="#collapseDetalhes">
-                                        <i class="bi bi-sliders me-2"></i> Configurações do lançamento
-                                    </button>
-                                </h2>
-                                <div id="collapseDetalhes" class="accordion-collapse collapse <?= (!empty($val_venc) || $val_rec || $is_parcela) ? 'show' : '' ?>"
-                                    data-bs-parent="#accordionMaisDetalhes">
-                                    <div class="accordion-body border-top border-border-color pt-3 px-3 pb-4 bg-charcoal d-flex flex-column gap-4">
+                            <div class="accordion accordion-flush mb-5 border border-border-color rounded-3 overflow-hidden auralis-line-input" id="accordionMaisDetalhes">
+                                <div class="accordion-item bg-transparent">
+                                    <h2 class="accordion-header">
+                                        <button class="accordion-button <?= (!empty($val_venc) || $val_rec || $is_parcela) ? '' : 'collapsed' ?> bg-transparent text-secondary-analysis shadow-none py-2 px-3 small fs-7"
+                                            type="button" data-bs-toggle="collapse" data-bs-target="#collapseDetalhes">
+                                            <i class="bi bi-sliders me-2"></i> Configurações do lançamento
+                                        </button>
+                                    </h2>
+                                    <div id="collapseDetalhes" class="accordion-collapse collapse <?= (!empty($val_venc) || $val_rec || $is_parcela) ? 'show' : '' ?>"
+                                        data-bs-parent="#accordionMaisDetalhes">
+                                        <div class="accordion-body border-top border-border-color pt-3 px-3 pb-4 bg-charcoal d-flex flex-column gap-4">
 
-                                        <?php if ($is_recorrente && !empty($transacao_edit['GrupoParcela'])): ?>
-                                            <div class="p-3 rounded-3 border border-border-color" style="background:rgba(255,255,255,.03);">
-                                                <div class="form-check form-switch toggle-analysis toggle-analysis-muted">
-                                                    <input class="form-check-input bg-dark border-border-color shadow-none" type="checkbox"
-                                                        name="editar_futuros" id="editar_futuros" checked>
-                                                    <label class="form-check-label text-light fs-7 fw-semibold" for="editar_futuros">
-                                                        Aplicar alterações em <strong>todos os meses futuros pendentes</strong>
-                                                    </label>
-                                                </div>
-                                            </div>
-                                        <?php endif; ?>
-
-                                        <?php if (!$is_edicao || $is_recorrente): ?>
-                                            <!-- ── 1. RECORRENTE ──────────────────────────────────── -->
-                                            <div>
-                                                <div class="d-flex align-items-start justify-content-between gap-3"
-                                                    <?= $is_recorrente ? 'style="pointer-events:none;opacity:0.6;"' : '' ?>>
-                                                    <div>
-                                                        <div class="text-light fw-semibold fs-7 mb-1 d-flex align-items-center gap-2">
-                                                            <i class="bi bi-arrow-repeat text-success"></i>
-                                                            Conta recorrente
-                                                            <?= $is_recorrente ? '<span class="badge bg-secondary" style="font-size:0.6rem;">Fixo</span>' : '' ?>
-                                                        </div>
-                                                        <div class="text-secondary" style="font-size:0.75rem;">
-                                                            Repete todo mês na mesma data — assinaturas, aluguel, academia.
-                                                        </div>
-                                                    </div>
-                                                    <div class="form-check form-switch fs-4 mb-0 toggle-analysis flex-shrink-0 mt-1">
-                                                        <input class="form-check-input bg-dark border-border-color shadow-none"
-                                                            type="checkbox" name="recorrente" id="recorrente"
-                                                            <?= $val_rec ? 'checked' : '' ?>>
-                                                    </div>
-                                                </div>
-
-                                                <div id="bloco_recorrencia" style="display:<?= $val_rec ? 'block' : 'none' ?>;"
-                                                    class="mt-3 ps-3 border-start border-border-color">
-                                                    <label class="form-label text-secondary-analysis fs-7 mb-1">
-                                                        todo mês vence em <span class="text-light fw-semibold">qual</span> dia?
-                                                    </label>
-                                                    <input type="number" name="dia_vencimento" id="dia_vencimento"
-                                                        class="form-control bg-dark border-border-color text-light-analysis form-control-sm no-spinners fs-7"
-                                                        style="max-width:100px;"
-                                                        min="1" max="31" placeholder="Ex: 10"
-                                                        value="<?= htmlspecialchars($val_dia) ?>"
-                                                        <?= $is_recorrente ? 'readonly' : '' ?>>
-                                                    <div class="text-secondary mt-1" style="font-size:0.72rem;">
-                                                        Insira o dia que a cobrança cai todo mês (1 a 31).
-                                                    </div>
-                                                </div>
-                                            </div>
-                                        <?php endif; ?>
-
-                                        <?php if (!$is_edicao): ?>
-                                            <!-- ── 2. PARCELADO ───────────────────────────────────── -->
-                                            <div class="pt-3 border-top border-border-color">
-                                                <div class="d-flex align-items-start justify-content-between gap-3">
-                                                    <div>
-                                                        <div class="text-light fw-semibold fs-7 mb-1 d-flex align-items-center gap-2">
-                                                            <i class="bi bi-credit-card-2-front" style="color:#a78bfa;"></i>
-                                                            <?= $tipo_sugerido === 'receita' ? 'Recebimento parcelado' : 'Compra parcelada' ?>
-                                                        </div>
-                                                        <div class="text-secondary" style="font-size:0.75rem;">
-                                                            <?= $tipo_sugerido === 'receita'
-                                                                ? 'Valor recebido em partes — comissão, prestação de serviço, etc.'
-                                                                : 'Divide o valor em N meses — cartão ou carnê.' ?>
-                                                        </div>
-                                                    </div>
-                                                    <div class="form-check form-switch fs-4 mb-0 toggle-analysis flex-shrink-0 mt-1">
-                                                        <input class="form-check-input bg-dark border-border-color shadow-none"
-                                                            type="checkbox" name="parcelado" id="toggle_parcelado"
-                                                            <?= $val_parcelado ? 'checked' : '' ?>>
-                                                    </div>
-                                                </div>
-
-                                                <div id="bloco_parcelamento" style="display:<?= $val_parcelado ? 'block' : 'none' ?>;"
-                                                    class="mt-3 ps-3 border-start border-border-color">
-
-                                                    <label class="form-label text-secondary-analysis fs-7 mb-1">Em quantas vezes?</label>
-                                                    <div class="d-flex align-items-center gap-3 mb-3">
-                                                        <input type="number" name="num_parcelas" id="num_parcelas"
-                                                            class="form-control bg-dark border-border-color text-light-analysis form-control-sm no-spinners fs-7"
-                                                            style="max-width:100px;" min="2" max="48" placeholder="Ex: 3"
-                                                            value="<?= htmlspecialchars($val_num_parc) ?>">
-                                                        <div id="preview_parcela" class="fs-7"></div>
-                                                    </div>
-
-                                                    <?php
-                                                    $planoFront      = strtolower($_SESSION['plano'] ?? 'free');
-                                                    $testeFront      = function_exists('obterHorasRestantesTeste') ? (obterHorasRestantesTeste() > 0) : false;
-                                                    $liberaJuros     = ($planoFront === 'pro' || $planoFront === 'vip' || $testeFront);
-                                                    $assinanteNativo = ($planoFront === 'pro' || $planoFront === 'vip');
-                                                    ?>
-                                                    <div class="d-flex gap-3 mb-2">
-                                                        <div class="form-check">
-                                                            <input class="form-check-input bg-dark border-border-color shadow-none"
-                                                                type="radio" name="tipo_juros" id="juros_sem" value="sem" checked>
-                                                            <label class="form-check-label text-light fs-7" for="juros_sem">Sem juros</label>
-                                                        </div>
-                                                        <div class="form-check" <?= !$liberaJuros ? 'title="Exclusivo Auralis PRO" data-bs-toggle="tooltip"' : '' ?>>
-                                                            <input class="form-check-input bg-dark border-border-color shadow-none"
-                                                                type="radio" name="tipo_juros" id="juros_com" value="com"
-                                                                <?= !$liberaJuros ? 'disabled' : '' ?>>
-                                                            <label class="form-check-label text-light fs-7 d-flex align-items-center gap-1" for="juros_com">
-                                                                Com juros
-                                                                <?php if (!$assinanteNativo): ?>
-                                                                    <?= function_exists('badgePremium') ? badgePremium('pro', $testeFront) : '' ?>
-                                                                <?php endif; ?>
-                                                            </label>
-                                                        </div>
-                                                    </div>
-
-                                                    <div id="bloco_com_juros" style="display:none;" class="mt-2 bg-charcoal p-3 border border-border-color rounded-3">
-                                                        <label class="form-label text-secondary-analysis fs-7 mb-1">
-                                                            Valor exato de <strong>cada parcela</strong> com juros:
+                                            <?php if ($is_recorrente && !empty($transacao_edit['GrupoParcela'])): ?>
+                                                <div class="p-3 rounded-3 border border-border-color" style="background:rgba(255,255,255,.03);">
+                                                    <div class="form-check form-switch toggle-analysis toggle-analysis-muted">
+                                                        <input class="form-check-input bg-dark border-border-color shadow-none" type="checkbox"
+                                                            name="editar_futuros" id="editar_futuros" checked>
+                                                        <label class="form-check-label text-light fs-7 fw-semibold" for="editar_futuros">
+                                                            Aplicar alterações em <strong>todos os meses futuros pendentes</strong>
                                                         </label>
-                                                        <div class="input-group input-group-sm mb-1" style="max-width:200px;">
-                                                            <span class="input-group-text bg-dark border-border-color text-secondary-analysis fs-7">R$</span>
-                                                            <input type="text" inputmode="numeric" name="valor_parcela_juros" id="valor_parcela_juros"
-                                                                class="form-control bg-dark border-border-color text-gold-analysis fw-bold fs-7 no-spinners"
-                                                                placeholder="0,00"
-                                                                oninput="mascaraMoeda(this); atualizarPreviewParcela();">
-                                                        </div>
-                                                        <div class="text-secondary opacity-75 mt-1" style="font-size:0.7rem;" id="preview_total_juros">
-                                                            <i class="bi bi-calculator me-1"></i> Digite o valor da parcela para calcular.
-                                                        </div>
-                                                    </div>
-
-                                                    <div class="text-secondary mt-2" style="font-size:0.72rem;">
-                                                        <i class="bi bi-info-circle me-1"></i>
-                                                        <?= $tipo_sugerido === 'receita'
-                                                            ? 'Um recebimento por mês a partir da data acima. Mínimo 2x, máximo 48x.'
-                                                            : 'Uma entrada por mês a partir da data acima. Mínimo 2x, máximo 48x.'
-                                                        ?>
                                                     </div>
                                                 </div>
-                                            </div>
-                                        <?php endif; ?>
+                                            <?php endif; ?>
 
-                                        <!-- ── 3. DATA LIMITE PARA PAGAMENTO ─────────────────── -->
-                                        <div id="bloco-vencimento" class="pt-3 border-top border-border-color"
-                                            style="<?= $val_rec ? 'display:none;' : '' ?>">
-                                            <label class="text-light fw-semibold fs-7 mb-1 d-flex align-items-center gap-2">
-                                                <i class="bi bi-calendar-x text-danger"></i>
-                                                Data limite para pagamento
-                                                <span class="badge bg-secondary fw-normal" style="font-size:0.62rem;">Opcional</span>
-                                            </label>
-                                            <div class="text-secondary mb-2" style="font-size:0.75rem;">
-                                                Quando essa conta expira ou vence — ex: boleto, fatura de cartão.
+                                            <?php if (!$is_edicao || $is_recorrente): ?>
+                                                <!-- ── 1. RECORRENTE ──────────────────────────────────── -->
+                                                <div>
+                                                    <div class="d-flex align-items-start justify-content-between gap-3"
+                                                        <?= $is_recorrente ? 'style="pointer-events:none;opacity:0.6;"' : '' ?>>
+                                                        <div>
+                                                            <div class="text-light fw-semibold fs-7 mb-1 d-flex align-items-center gap-2">
+                                                                <i class="bi bi-arrow-repeat text-success"></i>
+                                                                Conta recorrente
+                                                                <?= $is_recorrente ? '<span class="badge bg-secondary" style="font-size:0.6rem;">Fixo</span>' : '' ?>
+                                                            </div>
+                                                            <div class="text-secondary" style="font-size:0.75rem;">
+                                                                Repete todo mês na mesma data — assinaturas, aluguel, academia.
+                                                            </div>
+                                                        </div>
+                                                        <div class="form-check form-switch fs-4 mb-0 toggle-analysis flex-shrink-0 mt-1">
+                                                            <input class="form-check-input bg-dark border-border-color shadow-none"
+                                                                type="checkbox" name="recorrente" id="recorrente"
+                                                                <?= $val_rec ? 'checked' : '' ?>>
+                                                        </div>
+                                                    </div>
+
+                                                    <div id="bloco_recorrencia" style="display:<?= $val_rec ? 'block' : 'none' ?>;"
+                                                        class="mt-3 ps-3 border-start border-border-color">
+                                                        <label class="form-label text-secondary-analysis fs-7 mb-1">
+                                                            todo mês vence em <span class="text-light fw-semibold">qual</span> dia?
+                                                        </label>
+                                                        <input type="number" name="dia_vencimento" id="dia_vencimento"
+                                                            class="form-control bg-dark border-border-color text-light-analysis form-control-sm no-spinners fs-7"
+                                                            style="max-width:100px;"
+                                                            min="1" max="31" placeholder="Ex: 10"
+                                                            value="<?= htmlspecialchars($val_dia) ?>"
+                                                            <?= $is_recorrente ? 'readonly' : '' ?>>
+                                                        <div class="text-secondary mt-1" style="font-size:0.72rem;">
+                                                            Insira o dia que a cobrança cai todo mês (1 a 31).
+                                                        </div>
+                                                    </div>
+                                                </div>
+                                            <?php endif; ?>
+
+                                            <?php if (!$is_edicao): ?>
+                                                <!-- ── 2. PARCELADO ───────────────────────────────────── -->
+                                                <div class="pt-3 border-top border-border-color">
+                                                    <div class="d-flex align-items-start justify-content-between gap-3">
+                                                        <div>
+                                                            <div class="text-light fw-semibold fs-7 mb-1 d-flex align-items-center gap-2">
+                                                                <i class="bi bi-credit-card-2-front" style="color:#a78bfa;"></i>
+                                                                <?= $tipo_sugerido === 'receita' ? 'Recebimento parcelado' : 'Compra parcelada' ?>
+                                                            </div>
+                                                            <div class="text-secondary" style="font-size:0.75rem;">
+                                                                <?= $tipo_sugerido === 'receita'
+                                                                    ? 'Valor recebido em partes — comissão, prestação de serviço, etc.'
+                                                                    : 'Divide o valor em N meses — cartão ou carnê.' ?>
+                                                            </div>
+                                                        </div>
+                                                        <div class="form-check form-switch fs-4 mb-0 toggle-analysis flex-shrink-0 mt-1">
+                                                            <input class="form-check-input bg-dark border-border-color shadow-none"
+                                                                type="checkbox" name="parcelado" id="toggle_parcelado"
+                                                                <?= $val_parcelado ? 'checked' : '' ?>>
+                                                        </div>
+                                                    </div>
+
+                                                    <div id="bloco_parcelamento" style="display:<?= $val_parcelado ? 'block' : 'none' ?>;"
+                                                        class="mt-3 ps-3 border-start border-border-color">
+
+                                                        <label class="form-label text-secondary-analysis fs-7 mb-1">Em quantas vezes?</label>
+                                                        <div class="d-flex align-items-center gap-3 mb-3">
+                                                            <input type="number" name="num_parcelas" id="num_parcelas"
+                                                                class="form-control bg-dark border-border-color text-light-analysis form-control-sm no-spinners fs-7"
+                                                                style="max-width:100px;" min="2" max="48" placeholder="Ex: 3"
+                                                                value="<?= htmlspecialchars($val_num_parc) ?>">
+                                                            <div id="preview_parcela" class="fs-7"></div>
+                                                        </div>
+
+                                                        <?php
+                                                        $planoFront      = strtolower($_SESSION['plano'] ?? 'free');
+                                                        $testeFront      = function_exists('obterHorasRestantesTeste') ? (obterHorasRestantesTeste() > 0) : false;
+                                                        $liberaJuros     = ($planoFront === 'pro' || $planoFront === 'vip' || $testeFront);
+                                                        $assinanteNativo = ($planoFront === 'pro' || $planoFront === 'vip');
+                                                        ?>
+                                                        <div class="d-flex gap-3 mb-2">
+                                                            <div class="form-check">
+                                                                <input class="form-check-input bg-dark border-border-color shadow-none"
+                                                                    type="radio" name="tipo_juros" id="juros_sem" value="sem" checked>
+                                                                <label class="form-check-label text-light fs-7" for="juros_sem">Sem juros</label>
+                                                            </div>
+                                                            <div class="form-check" <?= !$liberaJuros ? 'title="Exclusivo Auralis PRO" data-bs-toggle="tooltip"' : '' ?>>
+                                                                <input class="form-check-input bg-dark border-border-color shadow-none"
+                                                                    type="radio" name="tipo_juros" id="juros_com" value="com"
+                                                                    <?= !$liberaJuros ? 'disabled' : '' ?>>
+                                                                <label class="form-check-label text-light fs-7 d-flex align-items-center gap-1" for="juros_com">
+                                                                    Com juros
+                                                                    <?php if (!$assinanteNativo): ?>
+                                                                        <?= function_exists('badgePremium') ? badgePremium('pro', $testeFront) : '' ?>
+                                                                    <?php endif; ?>
+                                                                </label>
+                                                            </div>
+                                                        </div>
+
+                                                        <div id="bloco_com_juros" style="display:none;" class="mt-2 bg-charcoal p-3 border border-border-color rounded-3">
+                                                            <label class="form-label text-secondary-analysis fs-7 mb-1">
+                                                                Valor exato de <strong>cada parcela</strong> com juros:
+                                                            </label>
+                                                            <div class="input-group input-group-sm mb-1" style="max-width:200px;">
+                                                                <span class="input-group-text bg-dark border-border-color text-secondary-analysis fs-7">R$</span>
+                                                                <input type="text" inputmode="numeric" name="valor_parcela_juros" id="valor_parcela_juros"
+                                                                    class="form-control bg-dark border-border-color text-gold-analysis fw-bold fs-7 no-spinners"
+                                                                    placeholder="0,00"
+                                                                    oninput="mascaraMoeda(this); atualizarPreviewParcela();">
+                                                            </div>
+                                                            <div class="text-secondary opacity-75 mt-1" style="font-size:0.7rem;" id="preview_total_juros">
+                                                                <i class="bi bi-calculator me-1"></i> Digite o valor da parcela para calcular.
+                                                            </div>
+                                                        </div>
+
+                                                        <div class="text-secondary mt-2" style="font-size:0.72rem;">
+                                                            <i class="bi bi-info-circle me-1"></i>
+                                                            <?= $tipo_sugerido === 'receita'
+                                                                ? 'Um recebimento por mês a partir da data acima. Mínimo 2x, máximo 48x.'
+                                                                : 'Uma entrada por mês a partir da data acima. Mínimo 2x, máximo 48x.'
+                                                            ?>
+                                                        </div>
+                                                    </div>
+                                                </div>
+                                            <?php endif; ?>
+
+                                            <!-- ── 3. DATA LIMITE PARA PAGAMENTO ─────────────────── -->
+                                            <div id="bloco-vencimento" class="pt-3 border-top border-border-color"
+                                                style="<?= $val_rec ? 'display:none;' : '' ?>">
+                                                <label class="text-light fw-semibold fs-7 mb-1 d-flex align-items-center gap-2">
+                                                    <i class="bi bi-calendar-x text-danger"></i>
+                                                    Data limite para pagamento
+                                                    <span class="badge bg-secondary fw-normal" style="font-size:0.62rem;">Opcional</span>
+                                                </label>
+                                                <div class="text-secondary mb-2" style="font-size:0.75rem;">
+                                                    Quando essa conta expira ou vence — ex: boleto, fatura de cartão.
+                                                </div>
+                                                <input type="date" name="data_vencimento"
+                                                    class="form-control bg-dark border-border-color text-light-analysis fs-7"
+                                                    value="<?= htmlspecialchars($val_venc) ?>">
                                             </div>
-                                            <input type="date" name="data_vencimento"
-                                                class="form-control bg-dark border-border-color text-light-analysis fs-7"
-                                                value="<?= htmlspecialchars($val_venc) ?>">
+
                                         </div>
-
                                     </div>
                                 </div>
                             </div>
-                        </div>
 
-                        <!-- ── COMPROVANTES / ANEXOS ─────────────────────────── -->
-                        <?php
-                        $planoComp   = strtolower($_SESSION['plano'] ?? 'free');
-                        $testeComp   = function_exists('obterHorasRestantesTeste') ? (obterHorasRestantesTeste() > 0) : false;
-                        $podeAnexar  = ($planoComp === 'pro' || $planoComp === 'vip' || $testeComp);
-                        ?>
-                        <div class="mb-4 pt-3 border-top border-border-color">
+                            <!-- ── COMPROVANTES / ANEXOS ─────────────────────────── -->
+                            <?php
+                            $planoComp   = strtolower($_SESSION['plano'] ?? 'free');
+                            $testeComp   = function_exists('obterHorasRestantesTeste') ? (obterHorasRestantesTeste() > 0) : false;
+                            $podeAnexar  = ($planoComp === 'pro' || $planoComp === 'vip' || $testeComp);
+                            ?>
+                            <div class="mb-4 pt-3 border-top border-border-color">
 
-                            <?php if ($podeAnexar): ?>
+                                <?php if ($podeAnexar): ?>
 
-                                <?php if (!empty($comprovantes)): ?>
-                                    <div class="mb-3">
-                                        <div class="text-secondary-analysis fw-semibold fs-7 mb-2 d-flex align-items-center gap-2">
-                                            <i class="bi bi-paperclip"></i> Comprovantes anexados
+                                    <?php if (!empty($comprovantes)): ?>
+                                        <div class="mb-3">
+                                            <div class="text-secondary-analysis fw-semibold fs-7 mb-2 d-flex align-items-center gap-2">
+                                                <i class="bi bi-paperclip"></i> Comprovantes anexados
+                                            </div>
+                                            <div id="listaComprovantes">
+                                                <?php foreach ($comprovantes as $comp): ?>
+                                                    <?php $isImg = str_starts_with($comp['TipoMime'], 'image/'); ?>
+                                                    <div class="d-flex align-items-center gap-2 mb-2 p-2 rounded-3"
+                                                        style="background:var(--bg-hover);border:1px solid var(--border-color-analysis);"
+                                                        id="comp-<?= htmlspecialchars($comp['IDComprovante']) ?>">
+                                                        <i class="bi <?= $isImg ? 'bi-image' : 'bi-file-earmark-pdf' ?> flex-shrink-0"
+                                                            style="color:<?= $isImg ? '#6ee7c7' : '#f87171' ?>; font-size:1.05rem;"></i>
+                                                        <span class="text-secondary text-truncate flex-grow-1" style="font-size:0.8rem; max-width:180px;"
+                                                            title="<?= htmlspecialchars($comp['NomeOriginal']) ?>">
+                                                            <?= htmlspecialchars($comp['NomeOriginal']) ?>
+                                                        </span>
+                                                        <span class="text-secondary opacity-50 flex-shrink-0" style="font-size:0.7rem;">
+                                                            <?= round($comp['Tamanho'] / 1024) ?> KB
+                                                        </span>
+                                                        <a href="/comprovante/ver.php?id=<?= htmlspecialchars($comp['IDComprovante']) ?>"
+                                                            target="_blank"
+                                                            class="btn btn-sm rounded-circle d-flex align-items-center justify-content-center flex-shrink-0"
+                                                            style="width:28px;height:28px;padding:0;background:rgba(170,140,44,0.1);color:#AA8C2C;border:1px solid rgba(170,140,44,0.3);"
+                                                            title="Visualizar">
+                                                            <i class="bi bi-eye" style="font-size:0.7rem;"></i>
+                                                        </a>
+                                                        <a href="/comprovante/ver.php?id=<?= htmlspecialchars($comp['IDComprovante']) ?>&download=1"
+                                                            class="btn btn-sm rounded-circle d-flex align-items-center justify-content-center flex-shrink-0"
+                                                            style="width:28px;height:28px;padding:0;background:var(--bg-hover);color:var(--text-muted);border:1px solid var(--border-color-analysis);"
+                                                            title="Baixar">
+                                                            <i class="bi bi-download" style="font-size:0.65rem;"></i>
+                                                        </a>
+                                                        <button type="button"
+                                                            class="btn btn-sm rounded-circle d-flex align-items-center justify-content-center flex-shrink-0 btn-deletar-comp"
+                                                            data-id="<?= htmlspecialchars($comp['IDComprovante']) ?>"
+                                                            style="width:28px;height:28px;padding:0;background:rgba(230,57,70,0.1);color:#f87171;border:1px solid rgba(230,57,70,0.3);"
+                                                            title="Remover">
+                                                            <i class="bi bi-trash3" style="font-size:0.65rem;"></i>
+                                                        </button>
+                                                    </div>
+                                                <?php endforeach; ?>
+                                            </div>
                                         </div>
-                                        <div id="listaComprovantes">
-                                            <?php foreach ($comprovantes as $comp): ?>
-                                                <?php $isImg = str_starts_with($comp['TipoMime'], 'image/'); ?>
-                                                <div class="d-flex align-items-center gap-2 mb-2 p-2 rounded-3"
-                                                    style="background:rgba(255,255,255,0.04); border:1px solid #333;"
-                                                    id="comp-<?= htmlspecialchars($comp['IDComprovante']) ?>">
-                                                    <i class="bi <?= $isImg ? 'bi-image' : 'bi-file-earmark-pdf' ?> flex-shrink-0"
-                                                        style="color:<?= $isImg ? '#6ee7c7' : '#f87171' ?>; font-size:1.05rem;"></i>
-                                                    <span class="text-secondary text-truncate flex-grow-1" style="font-size:0.8rem; max-width:180px;"
-                                                        title="<?= htmlspecialchars($comp['NomeOriginal']) ?>">
-                                                        <?= htmlspecialchars($comp['NomeOriginal']) ?>
-                                                    </span>
-                                                    <span class="text-secondary opacity-50 flex-shrink-0" style="font-size:0.7rem;">
-                                                        <?= round($comp['Tamanho'] / 1024) ?> KB
-                                                    </span>
-                                                    <a href="/comprovante/ver.php?id=<?= htmlspecialchars($comp['IDComprovante']) ?>"
-                                                        target="_blank"
-                                                        class="btn btn-sm rounded-circle d-flex align-items-center justify-content-center flex-shrink-0"
-                                                        style="width:28px;height:28px;padding:0;background:rgba(170,140,44,0.1);color:#AA8C2C;border:1px solid rgba(170,140,44,0.3);"
-                                                        title="Visualizar">
-                                                        <i class="bi bi-eye" style="font-size:0.7rem;"></i>
-                                                    </a>
-                                                    <a href="/comprovante/ver.php?id=<?= htmlspecialchars($comp['IDComprovante']) ?>&download=1"
-                                                        class="btn btn-sm rounded-circle d-flex align-items-center justify-content-center flex-shrink-0"
-                                                        style="width:28px;height:28px;padding:0;background:rgba(255,255,255,0.05);color:#888;border:1px solid #333;"
-                                                        title="Baixar">
-                                                        <i class="bi bi-download" style="font-size:0.65rem;"></i>
-                                                    </a>
-                                                    <button type="button"
-                                                        class="btn btn-sm rounded-circle d-flex align-items-center justify-content-center flex-shrink-0 btn-deletar-comp"
-                                                        data-id="<?= htmlspecialchars($comp['IDComprovante']) ?>"
-                                                        style="width:28px;height:28px;padding:0;background:rgba(230,57,70,0.1);color:#f87171;border:1px solid rgba(230,57,70,0.3);"
-                                                        title="Remover">
-                                                        <i class="bi bi-trash3" style="font-size:0.65rem;"></i>
-                                                    </button>
-                                                </div>
-                                            <?php endforeach; ?>
+                                    <?php endif; ?>
+
+                                    <label class="text-secondary-analysis fw-semibold fs-7 mb-2 d-flex align-items-center gap-2" for="comprovantes">
+                                        <i class="bi bi-paperclip"></i>
+                                        <?= !empty($comprovantes) ? 'Adicionar mais arquivos' : 'Comprovante / Anexo' ?>
+                                        <span class="badge bg-secondary fw-normal" style="font-size:0.6rem;">Opcional</span>
+                                    </label>
+
+                                    <label for="comprovantes" id="dropzone"
+                                        class="d-flex flex-column align-items-center justify-content-center rounded-3 text-center"
+                                        style="border:2px dashed var(--border-color-analysis); padding:1.25rem 1rem; cursor:pointer; transition:border-color .2s, background .2s;">
+                                        <i class="bi bi-cloud-upload mb-1 text-secondary-analysis" style="font-size:1.5rem;"></i>
+                                        <span class="text-secondary" style="font-size:0.8rem;">Clique ou arraste arquivos aqui</span>
+                                        <span style="font-size:0.68rem; color:#444;">Imagens (JPG, PNG, WEBP) ou PDF · máx. 5 MB cada</span>
+                                    </label>
+                                    <input type="file" name="comprovantes[]" id="comprovantes"
+                                        accept="image/jpeg,image/png,image/webp,image/gif,application/pdf"
+                                        multiple class="d-none">
+
+                                    <div id="previewNovos" class="mt-2"></div>
+
+                                <?php else: ?>
+
+                                    <a href="/planos.php?upgrade=pro" class="d-flex align-items-center gap-3 rounded-3 text-decoration-none p-3"
+                                        style="border:1px dashed rgba(124,58,237,0.35); background:rgba(124,58,237,0.05);">
+                                        <div class="rounded-circle d-flex align-items-center justify-content-center flex-shrink-0"
+                                            style="width:38px;height:38px;background:rgba(124,58,237,0.12);border:1px solid rgba(124,58,237,0.3);">
+                                            <i class="bi bi-paperclip" style="color:#a78bfa; font-size:1rem;"></i>
                                         </div>
-                                    </div>
+                                        <div>
+                                            <div class="d-flex align-items-center gap-2 mb-1">
+                                                <span class="text-light fw-semibold" style="font-size:0.85rem;">Comprovantes e Anexos</span>
+                                                <span class="badge rounded-pill" style="background:rgba(124,58,237,0.2);color:#a78bfa;border:1px solid rgba(124,58,237,0.4);font-size:0.62rem;padding:2px 7px;">
+                                                    <i class="fi fi-br-crown" style="font-size:0.6rem;vertical-align:middle;margin-right:2px;"></i> PRO
+                                                </span>
+                                            </div>
+                                            <div class="text-secondary" style="font-size:0.75rem;">Anexe boletos, notas fiscais e comprovantes a qualquer registro. <span style="color:#a78bfa;">Fazer upgrade →</span></div>
+                                        </div>
+                                    </a>
+
                                 <?php endif; ?>
 
-                                <label class="text-secondary-analysis fw-semibold fs-7 mb-2 d-flex align-items-center gap-2" for="comprovantes">
-                                    <i class="bi bi-paperclip"></i>
-                                    <?= !empty($comprovantes) ? 'Adicionar mais arquivos' : 'Comprovante / Anexo' ?>
-                                    <span class="badge bg-secondary fw-normal" style="font-size:0.6rem;">Opcional</span>
-                                </label>
+                            </div>
 
-                                <label for="comprovantes" id="dropzone"
-                                    class="d-flex flex-column align-items-center justify-content-center rounded-3 text-center"
-                                    style="border:2px dashed #333; padding:1.25rem 1rem; cursor:pointer; transition:border-color .2s, background .2s;">
-                                    <i class="bi bi-cloud-upload mb-1 text-secondary-analysis" style="font-size:1.5rem;"></i>
-                                    <span class="text-secondary" style="font-size:0.8rem;">Clique ou arraste arquivos aqui</span>
-                                    <span style="font-size:0.68rem; color:#444;">Imagens (JPG, PNG, WEBP) ou PDF · máx. 5 MB cada</span>
-                                </label>
-                                <input type="file" name="comprovantes[]" id="comprovantes"
-                                    accept="image/jpeg,image/png,image/webp,image/gif,application/pdf"
-                                    multiple class="d-none">
-
-                                <div id="previewNovos" class="mt-2"></div>
-
-                            <?php else: ?>
-
-                                <a href="/planos.php?upgrade=pro" class="d-flex align-items-center gap-3 rounded-3 text-decoration-none p-3"
-                                    style="border:1px dashed rgba(124,58,237,0.35); background:rgba(124,58,237,0.05);">
-                                    <div class="rounded-circle d-flex align-items-center justify-content-center flex-shrink-0"
-                                        style="width:38px;height:38px;background:rgba(124,58,237,0.12);border:1px solid rgba(124,58,237,0.3);">
-                                        <i class="bi bi-paperclip" style="color:#a78bfa; font-size:1rem;"></i>
-                                    </div>
-                                    <div>
-                                        <div class="d-flex align-items-center gap-2 mb-1">
-                                            <span class="text-light fw-semibold" style="font-size:0.85rem;">Comprovantes e Anexos</span>
-                                            <span class="badge rounded-pill" style="background:rgba(124,58,237,0.2);color:#a78bfa;border:1px solid rgba(124,58,237,0.4);font-size:0.62rem;padding:2px 7px;">
-                                                <i class="fi fi-br-crown" style="font-size:0.6rem;vertical-align:middle;margin-right:2px;"></i> PRO
-                                            </span>
-                                        </div>
-                                        <div class="text-secondary" style="font-size:0.75rem;">Anexe boletos, notas fiscais e comprovantes a qualquer registro. <span style="color:#a78bfa;">Fazer upgrade →</span></div>
-                                    </div>
-                                </a>
-
-                            <?php endif; ?>
-
-                        </div>
-
-                        <div class="d-grid mt-2">
-                            <button id="btnSalvar" type="submit" class="btn btn-gold fw-bold text-dark py-3 rounded-pill fs-6 shadow-lg d-flex align-items-center justify-content-center transition-hover">
-                                <?= $id_editar ? 'Salvar Alterações' : 'Salvar Transação' ?>
-                            </button>
-                        </div>
+                            <div class="d-grid mt-2">
+                                <button id="btnSalvar" type="submit" class="btn btn-gold fw-bold text-dark py-3 rounded-pill fs-6 shadow-lg d-flex align-items-center justify-content-center transition-hover">
+                                    <?= $id_editar ? 'Salvar Alterações' : 'Salvar Transação' ?>
+                                </button>
+                            </div>
 
                         <?php endif; /* end cartao/receita-despesa */ ?>
 
@@ -1060,18 +1060,6 @@ require_once 'geral/header.php';
 
 
 <style>
-    :root {
-        --primary-gold-analysis: #AA8C2C;
-        --gold-glow-analysis: rgba(170, 140, 44, 0.3);
-        --bg-main-analysis: #1F1F1F;
-        --bg-card-analysis: #2A2A2A;
-        --bg-charcoal-analysis: #222222;
-        --border-color-analysis: #333333;
-        --text-light-analysis: #E0E0E0;
-        --text-muted-analysis: #888888;
-        --text-gold-analysis: #D4AF37;
-    }
-
     .auralis-premium-form .text-light {
         color: var(--text-light-analysis) !important;
     }
@@ -1172,7 +1160,7 @@ require_once 'geral/header.php';
     }
 
     .badge-tipo {
-        background: linear-gradient(135deg, #2a2a2a, #1f1f1f);
+        background: var(--bg-charcoal-analysis);
         border: 1px solid var(--border-color-analysis);
         min-width: 180px;
     }
@@ -1299,7 +1287,7 @@ require_once 'geral/header.php';
                 minimumFractionDigits: 2,
                 maximumFractionDigits: 2
             });
-            previewParcela.innerHTML = '<span style="color:#d4af37;font-weight:600;">' + n + 'x de R$ ' + parcelaStr + '</span>';
+            previewParcela.innerHTML = '<span style="color:var(--accent);font-weight:600;">' + n + 'x de R$ ' + parcelaStr + '</span>';
         } else {
             previewParcela.textContent = '';
         }
@@ -1331,7 +1319,7 @@ require_once 'geral/header.php';
                     currency: 'BRL'
                 });
 
-                previewParcela.innerHTML = '<span style="color:#d4af37;font-weight:600;">' + n + 'x de R$ ' + parcelaStr + '</span>';
+                previewParcela.innerHTML = '<span style="color:var(--accent);font-weight:600;">' + n + 'x de R$ ' + parcelaStr + '</span>';
                 previewTotalJuros.innerHTML = `<span class="text-warning"><i class="bi bi-exclamation-triangle me-1"></i> Total real: ${totalStr} (R$ ${diferenca.toLocaleString('pt-BR', { minimumFractionDigits: 2 })} de juros).</span>`;
             } else {
                 previewParcela.textContent = '';
@@ -1390,7 +1378,7 @@ require_once 'geral/header.php';
         }
         caixa.innerHTML = `
             <div class="d-flex align-items-center gap-2 rounded-3 px-4 py-3 mb-3"
-                style="background-color:rgba(120,0,0,0.35);border:1px solid rgba(200,50,50,0.45);color:#f28b8b;">
+                style="background-color:var(--color-expense-bg);border:1px solid var(--color-expense-border);color:var(--color-expense-text);">
                 <i class="bi bi-exclamation-triangle-fill flex-shrink-0" style="font-size:0.95rem;"></i>
                 <span style="font-size:0.9rem;font-weight:500;">${mensagem}</span>
             </div>`;
@@ -1529,12 +1517,12 @@ require_once 'geral/header.php';
                 dz.style.background = 'rgba(170,140,44,0.05)';
             });
             dz.addEventListener('dragleave', function() {
-                dz.style.borderColor = '#333';
+                dz.style.borderColor = 'var(--border-color-analysis)';
                 dz.style.background = 'transparent';
             });
             dz.addEventListener('drop', function(e) {
                 e.preventDefault();
-                dz.style.borderColor = '#333';
+                dz.style.borderColor = 'var(--border-color-analysis)';
                 dz.style.background = 'transparent';
                 const dt = new DataTransfer();
                 [...(inp.files || []), ...e.dataTransfer.files].forEach(f => dt.items.add(f));
@@ -1553,7 +1541,7 @@ require_once 'geral/header.php';
                 const kb = Math.round(f.size / 1024);
                 const div = document.createElement('div');
                 div.className = 'd-flex align-items-center gap-2 p-2 rounded-3 mb-1';
-                div.style.cssText = 'background:rgba(255,255,255,0.04);border:1px solid #333;';
+                div.style.cssText = 'background:var(--bg-hover);border:1px solid var(--border-color-analysis);';
                 div.innerHTML =
                     '<i class="bi ' + (isImg ? 'bi-image' : 'bi-file-earmark-pdf') + ' flex-shrink-0" style="color:' + (isImg ? '#6ee7c7' : '#f87171') + ';font-size:1rem;"></i>' +
                     '<span class="text-secondary text-truncate flex-grow-1" style="font-size:0.78rem;max-width:220px;">' + f.name + '</span>' +
@@ -1587,25 +1575,29 @@ require_once 'geral/header.php';
     });
 
     // ── PARCELAMENTO CC ─────────────────────────────────────────────────────
-    (function () {
-        const togCC   = document.getElementById('toggle_parcelado_cc');
+    (function() {
+        const togCC = document.getElementById('toggle_parcelado_cc');
         const blocoCC = document.getElementById('bloco_parc_cc');
-        const numCC   = document.getElementById('num_parcelas_cc');
-        const prevCC  = document.getElementById('preview_parc_cc');
-        const valCC   = document.getElementById('valor');
+        const numCC = document.getElementById('num_parcelas_cc');
+        const prevCC = document.getElementById('preview_parc_cc');
+        const valCC = document.getElementById('valor');
         if (!togCC) return;
-        togCC.addEventListener('change', function () {
+        togCC.addEventListener('change', function() {
             blocoCC.style.display = this.checked ? 'block' : 'none';
             calcPreviewCC();
         });
         if (numCC) numCC.addEventListener('input', calcPreviewCC);
         if (valCC) valCC.addEventListener('input', calcPreviewCC);
+
         function calcPreviewCC() {
             if (!togCC.checked || !prevCC) return;
             const n = parseInt(numCC ? numCC.value : 0) || 0;
             const raw = parseFloat((valCC ? valCC.value : '0').replace(/\D/g, '')) / 100 || 0;
             if (raw > 0 && n >= 2) {
-                const p = (raw / n).toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+                const p = (raw / n).toLocaleString('pt-BR', {
+                    minimumFractionDigits: 2,
+                    maximumFractionDigits: 2
+                });
                 prevCC.innerHTML = '<span style="color:#a78bfa;font-weight:600;">' + n + 'x de R$ ' + p + '</span>';
             } else {
                 prevCC.textContent = '';
@@ -1616,14 +1608,14 @@ require_once 'geral/header.php';
     // Preserva descrição, valor e data ao trocar o tipo de transação
     document.querySelectorAll('a[href*="tipo="]').forEach(function(link) {
         link.addEventListener('click', function(e) {
-            const desc  = document.getElementById('descricao');
+            const desc = document.getElementById('descricao');
             const valor = document.getElementById('valor');
-            const data  = document.querySelector('[name="data_registro"]');
+            const data = document.querySelector('[name="data_registro"]');
             if (!desc && !valor) return;
             const params = new URLSearchParams();
-            if (desc  && desc.value.trim())  params.set('_desc', desc.value.trim());
-            if (valor && valor.value.trim()) params.set('_val',  valor.value.trim());
-            if (data  && data.value)         params.set('_data', data.value);
+            if (desc && desc.value.trim()) params.set('_desc', desc.value.trim());
+            if (valor && valor.value.trim()) params.set('_val', valor.value.trim());
+            if (data && data.value) params.set('_data', data.value);
             if (params.toString()) {
                 e.preventDefault();
                 location.href = link.href + '&' + params.toString();
