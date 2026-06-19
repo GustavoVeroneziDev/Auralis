@@ -313,19 +313,31 @@ require_once 'geral/header.php';
                                                     <div style="height:5px;width:75%;background:#2d3139;border-radius:4px;"></div>
                                                 </div>
                                                 <div class="d-flex gap-1">
-                                                    <div style="flex:1;background:#1e2126;border-radius:6px;height:24px;"></div>
-                                                    <div style="flex:1;background:#1e2126;border-radius:6px;height:24px;"></div>
+                                                    <div style="flex:1;background:#252a31;border-radius:6px;height:24px;"></div>
+                                                    <div style="flex:1;background:#252a31;border-radius:6px;height:24px;"></div>
                                                 </div>
                                             </div>
                                         <?php elseif ($slug === 'white'): ?>
-                                            <div class="rounded-4 overflow-hidden" style="background:#f0f2f5;padding:14px 10px;">
-                                                <div style="background:#fff;border-radius:8px;padding:8px;margin-bottom:6px;border:1px solid #e5e7eb;">
-                                                    <div style="height:6px;width:55%;background:#b8962e;border-radius:4px;margin-bottom:5px;"></div>
-                                                    <div style="height:5px;width:75%;background:#d1d5db;border-radius:4px;"></div>
+                                            <div class="rounded-4 overflow-hidden" style="background:#f2f5f9;padding:14px 10px;">
+                                                <div style="background:#fff;border-radius:8px;padding:8px;margin-bottom:6px;border:1px solid #d0d8e8;">
+                                                    <div style="height:6px;width:55%;background:#ffc300;border-radius:4px;margin-bottom:5px;"></div>
+                                                    <div style="height:5px;width:75%;background:#c9d3e0;border-radius:4px;"></div>
                                                 </div>
                                                 <div class="d-flex gap-1">
-                                                    <div style="flex:1;background:#fff;border-radius:6px;height:24px;border:1px solid #e5e7eb;"></div>
-                                                    <div style="flex:1;background:#fff;border-radius:6px;height:24px;border:1px solid #e5e7eb;"></div>
+                                                    <div style="flex:1;background:#eaeff6;border-radius:6px;height:24px;border:1px solid #d0d8e8;"></div>
+                                                    <div style="flex:1;background:#eaeff6;border-radius:6px;height:24px;border:1px solid #d0d8e8;"></div>
+                                                </div>
+                                            </div>
+                                        <?php elseif ($slug === 'sistema'): ?>
+                                            <div class="rounded-4 overflow-hidden" style="background:linear-gradient(to right,#121418 50%,#f2f5f9 50%);padding:14px 10px;">
+                                                <div style="border-radius:8px;padding:8px;margin-bottom:6px;background:linear-gradient(to right,#1e2126 50%,#ffffff 50%);border:1px solid rgba(128,128,128,0.15);">
+                                                    <div style="height:6px;width:55%;background:linear-gradient(to right,#d4af37,#ffc300);border-radius:4px;margin-bottom:5px;"></div>
+                                                    <div style="height:5px;width:75%;background:linear-gradient(to right,#2d3139,#c9d3e0);border-radius:4px;"></div>
+                                                </div>
+                                                <div class="d-flex gap-1 align-items-center justify-content-center py-1">
+                                                    <i class="bi bi-moon-stars-fill" style="color:#d4af37;font-size:0.8rem;"></i>
+                                                    <span style="color:#888;font-size:0.65rem;margin:0 6px;">·</span>
+                                                    <i class="bi bi-sun-fill" style="color:#b8962e;font-size:0.8rem;"></i>
                                                 </div>
                                             </div>
                                         <?php endif; ?>
