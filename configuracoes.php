@@ -283,87 +283,128 @@ require_once 'geral/header.php';
         <!-- APARÊNCIA / TEMA -->
         <div class="col-12 mt-2">
             <?php
-            $temasCfg  = function_exists('temasDisponiveis') ? temasDisponiveis() : ['dark' => ['nome' => 'Dark', 'conquista' => null], 'white' => ['nome' => 'White', 'conquista' => null]];
-            $temaAtivo = $dadosUsuario['Tema'] ?? ($_SESSION['tema'] ?? 'dark');
+            $temasCfg     = function_exists('temasDisponiveis') ? temasDisponiveis() : ['dark' => ['nome' => 'Dark', 'conquista' => null, 'secao' => 'padrao']];
+            $temaAtivo    = $dadosUsuario['Tema'] ?? ($_SESSION['tema'] ?? 'dark');
+            $planoUsuario = strtolower($_SESSION['plano'] ?? 'free');
+            $planoPeso    = ['free' => 0, 'pro' => 1, 'vip' => 2];
+
+            $temasPadrao    = array_filter($temasCfg, fn($t) => ($t['secao'] ?? 'padrao') === 'padrao');
+            $temasAdicionais = array_filter($temasCfg, fn($t) => ($t['secao'] ?? 'padrao') === 'adicional');
+
+            // Renderiza um card de tema
+            $renderCard = function(string $slug, array $info) use ($temaAtivo, $planoUsuario, $planoPeso): void {
+                $ativo              = $temaAtivo === $slug;
+                $conquista          = $info['conquista'] ?? null;
+                $planoMinimo        = $info['plano_minimo'] ?? null;
+                $bloqConquista      = $conquista && !(function_exists('usuarioPossuiConquista') && usuarioPossuiConquista($conquista));
+                $bloqPlano          = $planoMinimo && (($planoPeso[$planoUsuario] ?? 0) < ($planoPeso[$planoMinimo] ?? 0));
+                $bloqueado          = $bloqConquista || $bloqPlano;
+                $labelPlano         = $planoMinimo ? strtoupper($planoMinimo) : '';
+                ?>
+                <div class="col-6 col-md-3">
+                    <form method="POST" action="">
+                        <input type="hidden" name="action" value="trocar_tema">
+                        <input type="hidden" name="tema" value="<?= htmlspecialchars($slug) ?>">
+                        <button type="submit" <?= $bloqueado ? 'disabled' : '' ?>
+                            class="btn w-100 p-0 border-0 rounded-4 overflow-hidden position-relative"
+                            style="outline:2.5px solid <?= $ativo ? 'var(--accent)' : 'transparent' ?>;transition:outline-color .2s,box-shadow .2s;<?= $bloqueado ? 'opacity:.6;cursor:not-allowed;' : '' ?>">
+
+                            <?php if ($slug === 'dark'): ?>
+                                <div class="rounded-4 overflow-hidden" style="background:#121418;padding:14px 10px;">
+                                    <div style="background:#1e2126;border-radius:8px;padding:8px;margin-bottom:6px;">
+                                        <div style="height:6px;width:55%;background:#d4af37;border-radius:4px;margin-bottom:5px;"></div>
+                                        <div style="height:5px;width:75%;background:#2d3139;border-radius:4px;"></div>
+                                    </div>
+                                    <div class="d-flex gap-1">
+                                        <div style="flex:1;background:#252a31;border-radius:6px;height:24px;"></div>
+                                        <div style="flex:1;background:#252a31;border-radius:6px;height:24px;"></div>
+                                    </div>
+                                </div>
+                            <?php elseif ($slug === 'white'): ?>
+                                <div class="rounded-4 overflow-hidden" style="background:#f2f5f9;padding:14px 10px;">
+                                    <div style="background:#fff;border-radius:8px;padding:8px;margin-bottom:6px;border:1px solid #d0d8e8;">
+                                        <div style="height:6px;width:55%;background:#ffc300;border-radius:4px;margin-bottom:5px;"></div>
+                                        <div style="height:5px;width:75%;background:#c9d3e0;border-radius:4px;"></div>
+                                    </div>
+                                    <div class="d-flex gap-1">
+                                        <div style="flex:1;background:#eaeff6;border-radius:6px;height:24px;border:1px solid #d0d8e8;"></div>
+                                        <div style="flex:1;background:#eaeff6;border-radius:6px;height:24px;border:1px solid #d0d8e8;"></div>
+                                    </div>
+                                </div>
+                            <?php elseif ($slug === 'sistema'): ?>
+                                <div class="rounded-4 overflow-hidden" style="background:linear-gradient(to right,#121418 50%,#f2f5f9 50%);padding:14px 10px;">
+                                    <div style="border-radius:8px;padding:8px;margin-bottom:6px;background:linear-gradient(to right,#1e2126 50%,#ffffff 50%);border:1px solid rgba(128,128,128,0.15);">
+                                        <div style="height:6px;width:55%;background:linear-gradient(to right,#d4af37,#ffc300);border-radius:4px;margin-bottom:5px;"></div>
+                                        <div style="height:5px;width:75%;background:linear-gradient(to right,#2d3139,#c9d3e0);border-radius:4px;"></div>
+                                    </div>
+                                    <div class="d-flex gap-1 align-items-center justify-content-center py-1">
+                                        <i class="bi bi-moon-stars-fill" style="color:#d4af37;font-size:0.8rem;"></i>
+                                        <span style="color:#888;font-size:0.65rem;margin:0 6px;">·</span>
+                                        <i class="bi bi-sun-fill" style="color:#b8962e;font-size:0.8rem;"></i>
+                                    </div>
+                                </div>
+                            <?php elseif ($slug === 'cosmos'): ?>
+                                <div class="rounded-4 overflow-hidden" style="background:#0d0a1a;padding:14px 10px;">
+                                    <div style="background:#1a1330;border-radius:8px;padding:8px;margin-bottom:6px;border:1px solid #2d2550;">
+                                        <div style="height:6px;width:55%;background:linear-gradient(90deg,#7c3aed,#a78bfa);border-radius:4px;margin-bottom:5px;"></div>
+                                        <div style="height:5px;width:75%;background:#2d2550;border-radius:4px;"></div>
+                                    </div>
+                                    <div class="d-flex gap-1">
+                                        <div style="flex:1;background:#221b3a;border-radius:6px;height:24px;border:1px solid #2d2550;"></div>
+                                        <div style="flex:1;background:#221b3a;border-radius:6px;height:24px;border:1px solid #2d2550;"></div>
+                                    </div>
+                                </div>
+                            <?php elseif ($slug === 'fortune'): ?>
+                                <div class="rounded-4 overflow-hidden" style="background:#0c0900;padding:14px 10px;">
+                                    <div style="background:#161100;border-radius:8px;padding:8px;margin-bottom:6px;border:1px solid #2e2200;">
+                                        <div style="height:6px;width:55%;background:linear-gradient(90deg,#d4af37,#f5e642);border-radius:4px;margin-bottom:5px;"></div>
+                                        <div style="height:5px;width:75%;background:#2e2200;border-radius:4px;"></div>
+                                    </div>
+                                    <div class="d-flex gap-1">
+                                        <div style="flex:1;background:#221a00;border-radius:6px;height:24px;border:1px solid #2e2200;"></div>
+                                        <div style="flex:1;background:#221a00;border-radius:6px;height:24px;border:1px solid #2e2200;"></div>
+                                    </div>
+                                </div>
+                            <?php endif; ?>
+
+                            <?php if ($ativo): ?>
+                                <span class="position-absolute top-0 end-0 m-1 badge rounded-pill"
+                                    style="background:var(--accent);color:#000;font-size:0.6rem;padding:3px 6px;">
+                                    <i class="bi bi-check-lg"></i>
+                                </span>
+                            <?php endif; ?>
+                            <?php if ($bloqueado): ?>
+                                <span class="position-absolute top-0 start-0 m-1 badge rounded-pill"
+                                    style="background:rgba(0,0,0,0.55);color:#fff;font-size:0.6rem;padding:3px 6px;backdrop-filter:blur(4px);">
+                                    <i class="bi bi-lock-fill me-1"></i><?= $labelPlano ?>
+                                </span>
+                            <?php endif; ?>
+                        </button>
+                        <p class="text-center mt-1 mb-0 small fw-semibold <?= $ativo ? '' : 'text-secondary' ?>">
+                            <?= htmlspecialchars($info['nome']) ?>
+                        </p>
+                    </form>
+                </div>
+                <?php
+            };
             ?>
             <div class="card border-secondary-subtle shadow-sm rounded-4" style="background:var(--bg-card);">
                 <div class="card-header border-bottom border-secondary-subtle bg-transparent p-4">
                     <h5 class="fw-bold mb-0"><i class="bi bi-palette2 me-2" style="color:var(--accent);"></i> Aparência</h5>
                 </div>
                 <div class="card-body p-4">
-                    <p class="text-secondary small mb-3">Escolha como o Auralis aparece para você. Mais temas podem ser desbloqueados através de conquistas.</p>
-                    <div class="row g-3">
-                        <?php foreach ($temasCfg as $slug => $info):
-                            $ativo     = ($temaAtivo === $slug);
-                            $conquista = $info['conquista'] ?? null;
-                            $bloqueado = $conquista && !(function_exists('usuarioPossuiConquista') && usuarioPossuiConquista($conquista));
-                        ?>
-                            <div class="col-6 col-md-3">
-                                <form method="POST" action="">
-                                    <input type="hidden" name="action" value="trocar_tema">
-                                    <input type="hidden" name="tema" value="<?= htmlspecialchars($slug) ?>">
-                                    <button type="submit" <?= $bloqueado ? 'disabled' : '' ?>
-                                        class="btn w-100 p-0 border-0 rounded-4 overflow-hidden position-relative"
-                                        style="outline: 2.5px solid <?= $ativo ? 'var(--accent)' : 'transparent' ?>; transition: outline-color .2s;">
-                                        <!-- Preview visual do tema -->
-                                        <?php if ($slug === 'dark'): ?>
-                                            <div class="rounded-4 overflow-hidden" style="background:#121418;padding:14px 10px;">
-                                                <div style="background:#1e2126;border-radius:8px;padding:8px;margin-bottom:6px;">
-                                                    <div style="height:6px;width:55%;background:#d4af37;border-radius:4px;margin-bottom:5px;"></div>
-                                                    <div style="height:5px;width:75%;background:#2d3139;border-radius:4px;"></div>
-                                                </div>
-                                                <div class="d-flex gap-1">
-                                                    <div style="flex:1;background:#252a31;border-radius:6px;height:24px;"></div>
-                                                    <div style="flex:1;background:#252a31;border-radius:6px;height:24px;"></div>
-                                                </div>
-                                            </div>
-                                        <?php elseif ($slug === 'white'): ?>
-                                            <div class="rounded-4 overflow-hidden" style="background:#f2f5f9;padding:14px 10px;">
-                                                <div style="background:#fff;border-radius:8px;padding:8px;margin-bottom:6px;border:1px solid #d0d8e8;">
-                                                    <div style="height:6px;width:55%;background:#ffc300;border-radius:4px;margin-bottom:5px;"></div>
-                                                    <div style="height:5px;width:75%;background:#c9d3e0;border-radius:4px;"></div>
-                                                </div>
-                                                <div class="d-flex gap-1">
-                                                    <div style="flex:1;background:#eaeff6;border-radius:6px;height:24px;border:1px solid #d0d8e8;"></div>
-                                                    <div style="flex:1;background:#eaeff6;border-radius:6px;height:24px;border:1px solid #d0d8e8;"></div>
-                                                </div>
-                                            </div>
-                                        <?php elseif ($slug === 'sistema'): ?>
-                                            <div class="rounded-4 overflow-hidden" style="background:linear-gradient(to right,#121418 50%,#f2f5f9 50%);padding:14px 10px;">
-                                                <div style="border-radius:8px;padding:8px;margin-bottom:6px;background:linear-gradient(to right,#1e2126 50%,#ffffff 50%);border:1px solid rgba(128,128,128,0.15);">
-                                                    <div style="height:6px;width:55%;background:linear-gradient(to right,#d4af37,#ffc300);border-radius:4px;margin-bottom:5px;"></div>
-                                                    <div style="height:5px;width:75%;background:linear-gradient(to right,#2d3139,#c9d3e0);border-radius:4px;"></div>
-                                                </div>
-                                                <div class="d-flex gap-1 align-items-center justify-content-center py-1">
-                                                    <i class="bi bi-moon-stars-fill" style="color:#d4af37;font-size:0.8rem;"></i>
-                                                    <span style="color:#888;font-size:0.65rem;margin:0 6px;">·</span>
-                                                    <i class="bi bi-sun-fill" style="color:#b8962e;font-size:0.8rem;"></i>
-                                                </div>
-                                            </div>
-                                        <?php endif; ?>
+                    <p class="text-secondary small mb-4">Escolha como o Auralis aparece para você. Temas adicionais podem ser desbloqueados por plano ou conquistas.</p>
 
-                                        <?php if ($ativo): ?>
-                                            <span class="position-absolute top-0 end-0 m-1 badge rounded-pill"
-                                                style="background:var(--accent);color:#000;font-size:0.6rem;padding:3px 6px;">
-                                                <i class="bi bi-check-lg"></i>
-                                            </span>
-                                        <?php endif; ?>
-                                        <?php if ($bloqueado): ?>
-                                            <span class="position-absolute top-0 start-0 m-1 badge rounded-pill bg-secondary"
-                                                style="font-size:0.6rem;padding:3px 6px;">
-                                                <i class="bi bi-lock-fill"></i>
-                                            </span>
-                                        <?php endif; ?>
-                                    </button>
-                                    <p class="text-center mt-1 mb-0 small fw-semibold <?= $ativo ? '' : 'text-secondary' ?>">
-                                        <?= htmlspecialchars($info['nome']) ?>
-                                        <?php if ($bloqueado): ?>
-                                            <span class="text-secondary" style="font-size:0.7rem;"> (bloqueado)</span>
-                                        <?php endif; ?>
-                                    </p>
-                                </form>
-                            </div>
-                        <?php endforeach; ?>
+                    <!-- Seção: Padrão -->
+                    <p class="small fw-semibold text-uppercase mb-2" style="color:var(--text-muted);letter-spacing:.07em;">Padrão</p>
+                    <div class="row g-3 mb-4">
+                        <?php foreach ($temasPadrao as $slug => $info) { $renderCard($slug, $info); } ?>
+                    </div>
+
+                    <!-- Seção: Adicionais -->
+                    <p class="small fw-semibold text-uppercase mb-2" style="color:var(--text-muted);letter-spacing:.07em;">Adicionais</p>
+                    <div class="row g-3">
+                        <?php foreach ($temasAdicionais as $slug => $info) { $renderCard($slug, $info); } ?>
                     </div>
                 </div>
             </div>

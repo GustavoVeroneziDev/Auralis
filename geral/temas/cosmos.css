@@ -1,0 +1,64 @@
+/* ============================================================
+   AURALIS — Tema: Cosmos (exclusivo Pro)
+   data-bs-theme="dark"
+   ============================================================ */
+:root {
+  /* Fundos */
+  --bg-dark: #0d0a1a;
+  --bg-card: #1a1330;
+  --bg-hover: #221b3a;
+
+  /* Acento — violeta/roxo */
+  --accent: #7c3aed;
+  --accent-light: #a78bfa;
+  --gold-primary: #a78bfa;
+  --primary-gold-analysis: #a78bfa;
+  --gold-glow-analysis: rgba(124, 58, 237, 0.35);
+  --text-gold-analysis: #c4b5fd;
+
+  /* Texto */
+  --text-main: #e8e0ff;
+  --text-muted: #8b7fc7;
+
+  /* Bootstrap overrides */
+  --bs-primary: #7c3aed;
+  --bs-primary-rgb: 124, 58, 237;
+  --bs-link-color: #7c3aed;
+  --bs-link-hover-color: #a78bfa;
+  --bs-body-bg: #0d0a1a;
+  --bs-body-color: #e8e0ff;
+  --bs-border-color: #2d2550;
+  --bs-secondary-bg: #1a1330;
+
+  /* Componentes */
+  --navbar-bg: rgba(13, 10, 26, 0.88);
+  --navbar-collapse-bg: rgba(13, 10, 26, 0.97);
+  --card-border-color: rgba(124, 58, 237, 0.15);
+  --card-border-feature: rgba(124, 58, 237, 0.22);
+  --card-glow: rgba(124, 58, 237, 0.18);
+  --scrollbar-thumb: rgba(124, 58, 237, 0.4);
+
+  /* Vars de análise */
+  --bg-main-analysis: #0d0a1a;
+  --bg-card-analysis: #221b3a;
+  --bg-charcoal-analysis: #1a1330;
+  --border-color-analysis: #2d2550;
+  --text-light-analysis: #e8e0ff;
+  --text-muted-analysis: #8b7fc7;
+
+  /* Cores semânticas */
+  --color-income-bg: rgba(6, 214, 160, 0.15);
+  --color-income-text: #6ee7c7;
+  --color-income-border: rgba(6, 214, 160, 0.4);
+  --color-expense-bg: rgba(230, 57, 70, 0.15);
+  --color-expense-text: #f87171;
+  --color-expense-border: rgba(230, 57, 70, 0.4);
+  --color-card-bg: rgba(124, 58, 237, 0.2);
+  --color-card-text: #c4b5fd;
+  --color-card-border: rgba(124, 58, 237, 0.5);
+  --color-pending-bg: rgba(99, 102, 241, 0.2);
+  --color-pending-text: #a5b4fc;
+  --color-today-bg: rgba(124, 58, 237, 0.22);
+  --color-today-text: #c4b5fd;
+  --table-row-hover: rgba(124, 58, 237, 0.12);
+}

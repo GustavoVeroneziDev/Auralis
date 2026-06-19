@@ -368,9 +368,11 @@ if (!function_exists('temasDisponiveis')) {
     function temasDisponiveis()
     {
         return [
-            'dark'    => ['nome' => 'Dark',    'bs_mode' => 'dark',  'conquista' => null],
-            'white'   => ['nome' => 'White',   'bs_mode' => 'light', 'conquista' => null],
-            'sistema' => ['nome' => 'Sistema', 'bs_mode' => 'auto',  'conquista' => null],
+            'dark'    => ['nome' => 'Dark',    'bs_mode' => 'dark',  'conquista' => null, 'plano_minimo' => null,  'secao' => 'padrao'],
+            'white'   => ['nome' => 'White',   'bs_mode' => 'light', 'conquista' => null, 'plano_minimo' => null,  'secao' => 'padrao'],
+            'sistema' => ['nome' => 'Sistema', 'bs_mode' => 'auto',  'conquista' => null, 'plano_minimo' => null,  'secao' => 'padrao'],
+            'cosmos'  => ['nome' => 'Cosmos',  'bs_mode' => 'dark',  'conquista' => null, 'plano_minimo' => 'pro', 'secao' => 'adicional'],
+            'fortune' => ['nome' => 'Fortune', 'bs_mode' => 'dark',  'conquista' => null, 'plano_minimo' => 'vip', 'secao' => 'adicional'],
         ];
     }
 }
