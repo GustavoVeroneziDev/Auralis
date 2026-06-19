@@ -38,28 +38,42 @@ $recursos = recursosParaExibicao();   // ['slug', 'label', 'nivel_minimo']
 function _itensLimite($row)
 {
     $itens = [];
-    // Carteiras
     if ($row['carteiras'] == -1)     $itens[] = ['ok', 'Carteiras ilimitadas'];
     elseif ($row['carteiras'] == 1)  $itens[] = ['ok', '1 carteira'];
     else                             $itens[] = ['ok', "Até {$row['carteiras']} carteiras"];
-    // Cartões de crédito
     $nc = $row['cartoes'] ?? 1;
     if ($nc == -1)    $itens[] = ['ok', 'Cartões de crédito ilimitados'];
     elseif ($nc == 1) $itens[] = ['ok', '1 cartão de crédito'];
     else              $itens[] = ['ok', "Até {$nc} cartões de crédito"];
-    // Registros / mês
     if ($row['transacoes_mes'] == -1) $itens[] = ['ok', 'Registros ilimitados'];
     else                              $itens[] = ['ok', "Até {$row['transacoes_mes']} registros/mês"];
-    // Categorias
     if ($row['categorias'] == -1)  $itens[] = ['ok', 'Categorias ilimitadas'];
     else                           $itens[] = ['ok', "Até {$row['categorias']} categorias"];
-    // Parcelas
     $pmax = $row['parcelas_max'] ?? 3;
     if ($pmax == -1)     $itens[] = ['ok', 'Parcelamento ilimitado'];
     elseif ($pmax <= 3)  $itens[] = ['ok', "Parcelamento em até {$pmax}x"];
     else                 $itens[] = ['ok', "Parcelamento em até {$pmax}x (com juros)"];
     return $itens;
 }
+
+$_extras_plano = [
+    'free' => [
+        ['ok', 'Temas Dark e White'],
+        ['no', 'Temas exclusivos (Cosmos, Fortune...)'],
+        ['no', 'Suporte prioritário'],
+        ['no', 'Exportação de dados'],
+    ],
+    'pro'  => [
+        ['ok', 'Temas Cosmos e Fortune'],
+        ['ok', 'Suporte prioritário por e-mail'],
+        ['ok', 'Exportação CSV (em breve)'],
+    ],
+    'vip'  => [
+        ['ok', 'Todos os temas exclusivos'],
+        ['ok', 'Suporte prioritário VIP'],
+        ['ok', 'Exportação CSV (em breve)'],
+    ],
+];
 
 // ── Helper: adiciona itens de recurso (✅/❌) para um card ───────────────
 function _itensRecursos($planoCarta, $recursos)
@@ -175,7 +189,7 @@ require_once 'geral/header.php';
 
         foreach ($cards as $slug => $c):
             $row   = $limitesRaw[$slug] ?? $limitesRaw['free'];
-            $itens = array_merge(_itensLimite($row), _itensRecursos($slug, $recursos));
+            $itens = array_merge(_itensLimite($row), _itensRecursos($slug, $recursos), $_extras_plano[$slug] ?? []);
         ?>
             <div class="col-12 col-md-4">
                 <div class="card rounded-4 shadow-sm h-100 position-relative overflow-hidden"
@@ -257,6 +271,50 @@ require_once 'geral/header.php';
     <div class="text-center mt-5 text-secondary" style="font-size:0.85rem;">
         <i class="bi bi-shield-check me-1"></i>
         Pagamento seguro. Cancele quando quiser. Sem fidelidade.
+    </div>
+
+    <!-- FAQ -->
+    <div class="mt-5 pt-5 border-top border-secondary-subtle">
+        <div class="text-center mb-4">
+            <h2 class="fw-bold text-light mb-2" style="font-size:1.6rem;">Dúvidas frequentes</h2>
+            <p class="text-secondary" style="font-size:0.9rem;">Tudo o que você precisa saber antes de assinar.</p>
+        </div>
+
+        <div class="accordion mx-auto" id="faqPlanos" style="max-width:680px;">
+            <?php
+            $faqsPlanos = [
+                ['Posso cancelar quando quiser?',
+                 'Sim, sem multa e sem burocracia. Ao cancelar, você mantém o acesso PRO ou VIP até o fim do período já pago. Depois, a conta volta automaticamente para o Free — sem perda de dados.'],
+                ['O que acontece com meus dados se eu cancelar?',
+                 'Seus dados ficam intactos. Ao voltar para o Free, registros e histórico são mantidos. Apenas novos registros ficam sujeitos ao limite do plano Free.'],
+                ['O pagamento é seguro?',
+                 'Sim. O processamento é feito pelo Mercado Pago — uma das maiores plataformas de pagamento da América Latina. Seus dados de cartão nunca passam pelos nossos servidores.'],
+                ['Posso assinar e cancelar no mesmo mês?',
+                 'Sim. Se mudar de ideia logo após assinar, basta cancelar — você continua com acesso até o fim do período pago e não será cobrado novamente.'],
+                ['A assinatura renova automaticamente?',
+                 'Sim, a cobrança é recorrente (mensal ou anual, conforme você escolheu). Você pode cancelar a qualquer momento pelo Mercado Pago ou entrando em contato com o suporte.'],
+                ['Tem desconto para plano anual?',
+                 'Sim — o plano anual sai 33% mais barato que o mensal. PRO anual: R$ 14,99/mês (R$ 179,90/ano). VIP anual: R$ 19,99/mês (R$ 239,90/ano).'],
+            ];
+            foreach ($faqsPlanos as $i => [$q, $a]):
+                $fid = 'faqp' . $i;
+            ?>
+                <div class="accordion-item border-0 mb-2" style="background:var(--bg-card);border-radius:0.75rem !important;overflow:hidden;border:1px solid var(--bs-border-color) !important;">
+                    <h3 class="accordion-header">
+                        <button class="accordion-button collapsed fw-semibold"
+                            type="button" data-bs-toggle="collapse" data-bs-target="#<?= $fid ?>"
+                            style="background:var(--bg-card);color:var(--text-main);font-size:0.875rem;box-shadow:none;">
+                            <?= htmlspecialchars($q) ?>
+                        </button>
+                    </h3>
+                    <div id="<?= $fid ?>" class="accordion-collapse collapse" data-bs-parent="#faqPlanos">
+                        <div class="accordion-body text-secondary" style="font-size:0.85rem;line-height:1.7;padding-top:0;">
+                            <?= htmlspecialchars($a) ?>
+                        </div>
+                    </div>
+                </div>
+            <?php endforeach; ?>
+        </div>
     </div>
 
 </main>

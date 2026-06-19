@@ -33,6 +33,10 @@ function _lp_itensLimite($row)
     if ($row['carteiras'] == -1)      $itens[] = ['ok', 'Carteiras ilimitadas'];
     elseif ($row['carteiras'] == 1)   $itens[] = ['ok', '1 carteira'];
     else                              $itens[] = ['ok', "Até {$row['carteiras']} carteiras"];
+    $nc = $row['cartoes'] ?? 1;
+    if ($nc == -1)    $itens[] = ['ok', 'Cartões de crédito ilimitados'];
+    elseif ($nc == 1) $itens[] = ['ok', '1 cartão de crédito'];
+    else              $itens[] = ['ok', "Até {$nc} cartões de crédito"];
     if ($row['transacoes_mes'] == -1) $itens[] = ['ok', 'Registros ilimitados'];
     else                              $itens[] = ['ok', "Até {$row['transacoes_mes']} registros/mês"];
     if ($row['categorias'] == -1)     $itens[] = ['ok', 'Categorias ilimitadas'];
@@ -43,6 +47,25 @@ function _lp_itensLimite($row)
     else                              $itens[] = ['ok', "Parcelamento em até {$pmax}x (com juros)"];
     return $itens;
 }
+
+$_lp_extras = [
+    'free' => [
+        ['ok', 'Temas Dark e White'],
+        ['no', 'Temas exclusivos (Cosmos, Fortune...)'],
+        ['no', 'Suporte prioritário'],
+        ['no', 'Exportação de dados'],
+    ],
+    'pro'  => [
+        ['ok', 'Temas Cosmos e Fortune'],
+        ['ok', 'Suporte prioritário por e-mail'],
+        ['ok', 'Exportação CSV (em breve)'],
+    ],
+    'vip'  => [
+        ['ok', 'Todos os temas exclusivos'],
+        ['ok', 'Suporte prioritário VIP'],
+        ['ok', 'Exportação CSV (em breve)'],
+    ],
+];
 
 function _lp_itensRecursos($planoCarta, $recursos)
 {
@@ -68,12 +91,12 @@ function _lp_itensRecursos($planoCarta, $recursos)
         </span>
 
         <h1 class="fw-bold text-light mb-4" style="font-size:clamp(2rem,5vw,3.5rem);line-height:1.15;max-width:780px;margin:0 auto;">
-            A inteligência que o<br>
-            <span style="background:linear-gradient(90deg,#d4af37,#f9e596);-webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text;">seu dinheiro precisa.</span>
+            Chega de não saber para onde<br>
+            <span style="background:linear-gradient(90deg,#d4af37,#f9e596);-webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text;">vai o seu dinheiro.</span>
         </h1>
 
         <p class="text-secondary mb-5 mx-auto" style="font-size:clamp(1rem,2vw,1.2rem);max-width:580px;line-height:1.7;">
-            Dashboard em tempo real, parcelamentos automáticos, agenda financeira e análises mês a mês — tudo em um só lugar. Sem planilha. Sem complicação.
+            Registre receitas, despesas e parcelamentos em segundos. O Auralis calcula tudo e mostra — em tempo real — exatamente onde cada centavo está indo.
         </p>
 
         <div class="d-flex gap-3 justify-content-center flex-wrap">
@@ -104,6 +127,102 @@ function _lp_itensRecursos($planoCarta, $recursos)
                     <span class="text-secondary"><?php echo $sub ?></span>
                 </div>
             <?php endforeach; ?>
+        </div>
+    </div>
+</section>
+
+<!-- ── PRODUTO EM AÇÃO ───────────────────────────────────────────────────── -->
+<section class="py-5 border-top border-secondary-subtle">
+    <div class="container">
+        <div class="text-center mb-4">
+            <h2 class="fw-bold text-light mb-2" style="font-size:clamp(1.4rem,3vw,2rem);">Veja o Auralis em ação</h2>
+            <p class="text-secondary mx-auto" style="max-width:460px;font-size:0.95rem;">Um painel limpo e inteligente — sem ruído, sem confusão.</p>
+        </div>
+
+        <div class="position-relative mx-auto card-animado surgir-baixo" style="max-width:860px;">
+            <!-- Barra de browser decorativa -->
+            <div class="d-flex align-items-center gap-2 px-3 rounded-top-4" style="background:#1a1d21;border:1px solid #2d3139;border-bottom:0;height:38px;">
+                <div style="width:11px;height:11px;border-radius:50%;background:#ff5f57;flex-shrink:0;"></div>
+                <div style="width:11px;height:11px;border-radius:50%;background:#febc2e;flex-shrink:0;"></div>
+                <div style="width:11px;height:11px;border-radius:50%;background:#28c840;flex-shrink:0;"></div>
+                <div class="mx-auto px-3 py-1 rounded-2 text-secondary d-none d-sm-block" style="background:#121418;font-size:0.7rem;min-width:180px;text-align:center;letter-spacing:0.01em;">auralis.app/dashboard</div>
+            </div>
+            <!-- Área da screenshot — troque o <img> abaixo quando tiver o asset -->
+            <div class="rounded-bottom-4 overflow-hidden position-relative" style="border:1px solid #2d3139;border-top:0;background:#121418;min-height:360px;">
+                <!-- SCREENSHOT: descomente e ajuste o src quando tiver a imagem
+                <img src="/geral/img/preview-dashboard.png" alt="Dashboard Auralis" class="w-100 d-block" style="display:block;">
+                -->
+                <div class="d-flex flex-column align-items-center justify-content-center gap-3 position-absolute top-0 start-0 w-100 h-100" style="min-height:360px;">
+                    <div class="d-flex gap-3 flex-wrap justify-content-center">
+                        <?php foreach ([['bi-graph-up-arrow','Saldo em tempo real'],['bi-calendar3','Agenda financeira'],['bi-pie-chart-fill','Análises']] as [$ic, $lb]): ?>
+                            <div class="rounded-3 px-4 py-3 d-flex align-items-center gap-2" style="background:#1e2126;border:1px solid #2d3139;font-size:0.82rem;">
+                                <i class="bi <?= $ic ?>" style="color:var(--accent);font-size:1.1rem;"></i>
+                                <span class="text-light fw-semibold"><?= $lb ?></span>
+                            </div>
+                        <?php endforeach; ?>
+                    </div>
+                    <p class="text-secondary mb-0" style="font-size:0.8rem;">
+                        <i class="bi bi-image me-1 opacity-50"></i> Preview em breve
+                    </p>
+                </div>
+            </div>
+            <!-- Brilho decorativo -->
+            <div class="position-absolute" style="bottom:-40px;left:50%;transform:translateX(-50%);width:400px;height:100px;background:var(--accent);filter:blur(80px);opacity:0.05;pointer-events:none;"></div>
+        </div>
+    </div>
+</section>
+
+<!-- ── DOR ───────────────────────────────────────────────────────────────── -->
+<section class="py-5 border-top border-secondary-subtle">
+    <div class="container">
+        <div class="text-center mb-5">
+            <span class="badge mb-3 px-3 py-2 rounded-pill fw-semibold"
+                style="background:#ef444415;color:#f87171;border:1px solid #ef444430;font-size:0.8rem;">
+                Você se identifica com algum desses?
+            </span>
+            <h2 class="fw-bold text-light mb-3" style="font-size:clamp(1.4rem,3vw,2rem);">
+                Controlar dinheiro não deveria ser tão difícil
+            </h2>
+        </div>
+
+        <div class="row g-3 mb-5">
+            <?php
+            $dores = [
+                ['bi-file-earmark-spreadsheet', '#f87171', 'A planilha que nunca fica atualizada',
+                 'Você abre, edita duas células e fecha. Na semana seguinte está desatualizada de novo. Sempre.'],
+                ['bi-exclamation-triangle-fill', '#fbbf24', 'O saldo surpresa no fim do mês',
+                 'Você achava que tinha dinheiro. O extrato discordou. E você não consegue explicar onde foi.'],
+                ['bi-credit-card', '#a78bfa', 'A parcela que aparece do nada',
+                 'Comprou em 6x. Lembrou das 2 primeiras. As outras 4 chegaram como surpresa no cartão.'],
+                ['bi-clock-history', '#6ee7b7', 'Sempre vai organizar amanhã',
+                 'Fica para depois porque dá trabalho. Depois vira semana que vem. Semana que vem vira nunca.'],
+            ];
+            foreach ($dores as $i => [$icon, $color, $title, $desc]):
+            ?>
+                <div class="col-12 col-sm-6 card-animado surgir-baixo" style="transition-delay:<?= $i * 0.1 ?>s;">
+                    <div class="h-100 rounded-4 p-4 position-relative" style="background:var(--bg-card);border:1px solid var(--bs-border-color);border-left:3px solid <?= $color ?>44;">
+                        <div class="d-flex align-items-start gap-3">
+                            <div class="rounded-3 d-flex align-items-center justify-content-center flex-shrink-0"
+                                style="width:40px;height:40px;background:<?= $color ?>18;">
+                                <i class="bi <?= $icon ?>" style="color:<?= $color ?>;font-size:1.1rem;"></i>
+                            </div>
+                            <div>
+                                <h6 class="fw-semibold text-light mb-1" style="font-size:0.9rem;"><?= $title ?></h6>
+                                <p class="text-secondary mb-0" style="font-size:0.82rem;line-height:1.6;"><?= $desc ?></p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            <?php endforeach; ?>
+        </div>
+
+        <div class="text-center">
+            <p class="text-light fw-semibold mb-4" style="font-size:1rem;">O Auralis resolve cada um desses problemas. Você começa hoje, de graça.</p>
+            <a href="/usuario/cadastro.php"
+                class="btn btn-lg px-5 rounded-pill fw-bold shadow-lg"
+                style="background:linear-gradient(135deg,#d4af37,#AA8C2C);color:#121418;font-size:1rem;">
+                Quero organizar minhas finanças
+            </a>
         </div>
     </div>
 </section>
@@ -321,7 +440,7 @@ function _lp_itensRecursos($planoCarta, $recursos)
 
             foreach ($lpCards as $slug => $c):
                 $row   = $_lp_raw[$slug] ?? $_lp_raw['free'];
-                $itens = array_merge(_lp_itensLimite($row), _lp_itensRecursos($slug, $_lp_recursos));
+                $itens = array_merge(_lp_itensLimite($row), _lp_itensRecursos($slug, $_lp_recursos), $_lp_extras[$slug] ?? []);
             ?>
                 <div class="col-12 col-md-4 card-animado surgir-baixo" style="transition-delay:<?= $c['delay'] ?>;">
                     <div class="card rounded-4 shadow-sm h-100 position-relative overflow-hidden"
@@ -390,6 +509,54 @@ function _lp_itensRecursos($planoCarta, $recursos)
             Pagamento seguro. Cancele quando quiser. Sem fidelidade.
             <a href="/planos.php" class="text-secondary ms-2" style="text-decoration:underline dotted;">Ver página completa de planos →</a>
         </p>
+    </div>
+</section>
+
+<!-- ── FAQ ───────────────────────────────────────────────────────────────── -->
+<section class="py-5 border-top border-secondary-subtle" id="faq">
+    <div class="container">
+        <div class="text-center mb-5">
+            <h2 class="fw-bold text-light mb-2" style="font-size:clamp(1.4rem,3vw,2rem);">Perguntas frequentes</h2>
+            <p class="text-secondary" style="font-size:0.95rem;">Se ficou alguma dúvida, provavelmente está aqui.</p>
+        </div>
+
+        <div class="accordion mx-auto" id="faqAcc" style="max-width:700px;">
+            <?php
+            $faqs = [
+                ['É gratuito para sempre?',
+                 'Sim. O plano Free não tem prazo de expiração — você pode usar o Auralis sem pagar nada enquanto quiser. O PRO e o VIP desbloqueiam recursos avançados para quem precisa de mais.'],
+                ['Preciso de cartão de crédito para criar uma conta?',
+                 'Não. O cadastro é gratuito e não exige nenhuma forma de pagamento. Você só paga se decidir fazer upgrade para PRO ou VIP.'],
+                ['Funciona no celular?',
+                 'Sim. O Auralis é um PWA (Progressive Web App) — você pode instalar direto do navegador no Android ou iPhone e usar como um app nativo, com acesso offline parcial e ícone na tela inicial.'],
+                ['Meus dados financeiros estão seguros?',
+                 'Seus dados ficam armazenados em servidores com criptografia em trânsito (HTTPS) e em repouso. Não compartilhamos informações com terceiros. Você pode excluir sua conta e todos os dados a qualquer momento.'],
+                ['Posso cancelar minha assinatura quando quiser?',
+                 'Sim, sem multa e sem burocracia. Ao cancelar, você continua com acesso PRO/VIP até o fim do período já pago. Depois disso, a conta volta automaticamente para o plano Free.'],
+                ['Qual a diferença entre PRO e VIP?',
+                 'O PRO desbloqueia recursos avançados como agenda, análises, comprovantes e múltiplas carteiras. O VIP adiciona carteiras e cartões ilimitados, todos os temas visuais exclusivos e suporte prioritário VIP — ideal para quem gerencia finanças de família ou pequenos negócios.'],
+                ['O que acontece quando atinjo o limite do Free?',
+                 'O sistema avisa antes de chegar ao limite. Quando atingir, você não perde os dados — apenas novos registros ficam bloqueados até o próximo mês ou até você fazer upgrade.'],
+            ];
+            foreach ($faqs as $i => [$q, $a]):
+                $id = 'faq' . $i;
+            ?>
+                <div class="accordion-item border-0 mb-2" style="background:var(--bg-card);border-radius:0.75rem !important;overflow:hidden;border:1px solid var(--bs-border-color) !important;">
+                    <h3 class="accordion-header">
+                        <button class="accordion-button <?= $i > 0 ? 'collapsed' : '' ?> fw-semibold rounded-3"
+                            type="button" data-bs-toggle="collapse" data-bs-target="#<?= $id ?>"
+                            style="background:var(--bg-card);color:var(--text-main);font-size:0.9rem;box-shadow:none;">
+                            <?= htmlspecialchars($q) ?>
+                        </button>
+                    </h3>
+                    <div id="<?= $id ?>" class="accordion-collapse collapse <?= $i === 0 ? 'show' : '' ?>" data-bs-parent="#faqAcc">
+                        <div class="accordion-body text-secondary" style="font-size:0.875rem;line-height:1.7;padding-top:0;">
+                            <?= htmlspecialchars($a) ?>
+                        </div>
+                    </div>
+                </div>
+            <?php endforeach; ?>
+        </div>
     </div>
 </section>
 
