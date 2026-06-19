@@ -556,37 +556,21 @@ require_once 'geral/header.php';
         </div>
     <?php else: ?>
 
-        <?php if (isset($_GET['sucesso'])): ?>
-            <?php
-            $msg = '';
-            if ($_GET['sucesso'] === 'registro') {
-                $msg = 'Transação salva com sucesso!';
-            }
-            if ($_GET['sucesso'] === 'editado') {
-                $msg = 'Transação atualizada com sucesso!';
-            }
-            if ($_GET['sucesso'] === 'excluido') {
-                $msg = 'Transação excluída!';
-            }
-            if ($_GET['sucesso'] === 'ajustado') {
-                $msg = 'Prontinho! Seu saldo foi ajustado e agora está real.';
-            }
-            // ADICIONE ESTA CONDIÇÃO AQUI:
-            if ($_GET['sucesso'] === 'criada') {
-                $msg = 'Nova carteira criada! Agora informe seu saldo para começar.';
-            }
+        <?php
+        $msg = '';
+        if (isset($_GET['sucesso'])) {
+            if ($_GET['sucesso'] === 'registro')  $msg = 'Transação salva!';
+            if ($_GET['sucesso'] === 'editado')   $msg = 'Transação atualizada!';
+            if ($_GET['sucesso'] === 'excluido')  $msg = 'Transação excluída!';
+            if ($_GET['sucesso'] === 'ajustado')  $msg = 'Saldo ajustado com sucesso!';
+            if ($_GET['sucesso'] === 'criada')    $msg = 'Nova carteira criada!';
             if ($_GET['sucesso'] === 'parcelado') {
                 $n = isset($_GET['parcelas']) ? (int)$_GET['parcelas'] : '';
-                $msg = "Compra parcelada em {$n}x registrada com sucesso!";
+                $msg = "Compra parcelada em {$n}x registrada!";
             }
-            ?>
-
-            <?php if ($msg): ?>
-                <div class="alert alert-success d-flex align-items-center gap-2 rounded-3 shadow-sm border-0 bg-success bg-opacity-10 text-success fw-semibold alert-dismissible fade show" role="alert">
-                    <i class="bi bi-check-circle-fill"></i> <span><?php echo $msg ?></span>
-                    <button type="button" class="btn-close opacity-50" data-bs-dismiss="alert" aria-label="Close"></button>
-                </div>
-            <?php endif; ?>
+        }
+        if ($msg): ?>
+            <script>window._pendingToast = <?php echo json_encode($msg) ?>;</script>
         <?php endif; ?>
 
         <div class="mb-3 border-bottom border-secondary-subtle pb-3">
