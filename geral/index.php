@@ -50,18 +50,18 @@ function _lp_itensLimite($row)
 
 $_lp_extras = [
     'free' => [
-        ['ok', 'Temas Dark e White'],
-        ['no', 'Temas exclusivos (Cosmos, Fortune...)'],
+        ['ok', 'Temas Dark, White e Sistema'],
+        ['no', 'Temas variados (Oceano, Âmbar, Aurora, Cosmos...)'],
         ['no', 'Suporte prioritário'],
         ['no', 'Exportação de dados'],
     ],
     'pro'  => [
-        ['ok', 'Temas Cosmos e Fortune'],
+        ['ok', 'Temas variados (Oceano, Âmbar, Aurora, Cosmos)'],
         ['ok', 'Suporte prioritário por e-mail'],
         ['ok', 'Exportação CSV (em breve)'],
     ],
     'vip'  => [
-        ['ok', 'Todos os temas exclusivos'],
+        ['ok', 'Todos os temas, incluindo Fortune'],
         ['ok', 'Suporte prioritário VIP'],
         ['ok', 'Exportação CSV (em breve)'],
     ],
