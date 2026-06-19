@@ -343,6 +343,39 @@ require_once 'geral/header.php';
                                         <i class="bi bi-sun-fill" style="color:#b8962e;font-size:0.8rem;"></i>
                                     </div>
                                 </div>
+                            <?php elseif ($slug === 'oceano'): ?>
+                                <div class="rounded-4 overflow-hidden" style="background:#0d1230;padding:14px 10px;">
+                                    <div style="background:#16204a;border-radius:8px;padding:8px;margin-bottom:6px;border:1px solid #253560;">
+                                        <div style="height:6px;width:55%;background:linear-gradient(90deg,#e06c43,#f09a78);border-radius:4px;margin-bottom:5px;"></div>
+                                        <div style="height:5px;width:75%;background:#253560;border-radius:4px;"></div>
+                                    </div>
+                                    <div class="d-flex gap-1">
+                                        <div style="flex:1;background:#1f2d60;border-radius:6px;height:24px;border:1px solid #253560;"></div>
+                                        <div style="flex:1;background:#1f2d60;border-radius:6px;height:24px;border:1px solid #253560;"></div>
+                                    </div>
+                                </div>
+                            <?php elseif ($slug === 'ambar'): ?>
+                                <div class="rounded-4 overflow-hidden" style="background:#0e0c1a;padding:14px 10px;">
+                                    <div style="background:#181530;border-radius:8px;padding:8px;margin-bottom:6px;border:1px solid #302c50;">
+                                        <div style="height:6px;width:55%;background:linear-gradient(90deg,#f0b030,#f5d060);border-radius:4px;margin-bottom:5px;"></div>
+                                        <div style="height:5px;width:75%;background:#302c50;border-radius:4px;"></div>
+                                    </div>
+                                    <div class="d-flex gap-1">
+                                        <div style="flex:1;background:#221e42;border-radius:6px;height:24px;border:1px solid #302c50;"></div>
+                                        <div style="flex:1;background:#221e42;border-radius:6px;height:24px;border:1px solid #302c50;"></div>
+                                    </div>
+                                </div>
+                            <?php elseif ($slug === 'aurora'): ?>
+                                <div class="rounded-4 overflow-hidden" style="background:#0a0518;padding:14px 10px;">
+                                    <div style="background:#150d2e;border-radius:8px;padding:8px;margin-bottom:6px;border:1px solid #2a1e50;">
+                                        <div style="height:6px;width:55%;background:linear-gradient(90deg,#38bcd8,#6dd5ec);border-radius:4px;margin-bottom:5px;"></div>
+                                        <div style="height:5px;width:75%;background:#2a1e50;border-radius:4px;"></div>
+                                    </div>
+                                    <div class="d-flex gap-1">
+                                        <div style="flex:1;background:#1e1440;border-radius:6px;height:24px;border:1px solid #2a1e50;"></div>
+                                        <div style="flex:1;background:#1e1440;border-radius:6px;height:24px;border:1px solid #2a1e50;"></div>
+                                    </div>
+                                </div>
                             <?php elseif ($slug === 'cosmos'): ?>
                                 <div class="rounded-4 overflow-hidden" style="background:#0d0a1a;padding:14px 10px;">
                                     <div style="background:#1a1330;border-radius:8px;padding:8px;margin-bottom:6px;border:1px solid #2d2550;">
