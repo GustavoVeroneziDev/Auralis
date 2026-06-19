@@ -215,13 +215,13 @@ require_once 'geral/header.php';
 
                 <!-- Seletor de Carteira -->
                 <div class="dropdown flex-grow-1 flex-lg-grow-0" style="min-width: 0;">
-                    <button class="btn border-secondary-subtle text-light shadow-sm fw-semibold dropdown-toggle d-flex align-items-center justify-content-between rounded-3 transition-hover w-100"
+                    <button class="btn shadow-sm fw-semibold dropdown-toggle d-flex align-items-center justify-content-between rounded-3 transition-hover w-100"
                         type="button" data-bs-toggle="dropdown" aria-expanded="false"
-                        style="font-size: 0.875rem; background-color: var(--bg-charcoal-analysis);">
+                        style="font-size:0.875rem;background:var(--bg-card);border:1px solid var(--card-border-color);color:var(--text-main);">
 
                         <!-- A BASE (Botão): Truncamento aplicado aqui -->
                         <div class="d-flex align-items-center text-start" style="min-width: 0;">
-                            <i class="bi bi-wallet2 me-2 flex-shrink-0" style="color: var(--primary-gold-analysis);"></i>
+                            <i class="bi bi-wallet2 me-2 flex-shrink-0" style="color:var(--accent);"></i>
                             <span class="text-truncate" style="max-width: 130px;" title="<?php echo htmlspecialchars($nome_carteira_atual); ?>">
                                 <?php echo htmlspecialchars($nome_carteira_atual); ?>
                             </span>
@@ -229,7 +229,7 @@ require_once 'geral/header.php';
                     </button>
 
                     <!-- Lista de Carteiras -->
-                    <ul class="dropdown-menu shadow-lg border-secondary-subtle mt-2 w-100" style="background-color: var(--bg-card); min-width: 220px;">
+                    <ul class="dropdown-menu shadow-lg mt-2 w-100" style="background-color:var(--bg-card);border-color:var(--card-border-color);min-width:220px;">
                         <li class="px-3 py-1 text-secondary small text-uppercase fw-bold tracking-wide">Alternar Carteira</li>
                         <li>
                             <hr class="dropdown-divider border-secondary-subtle">
@@ -258,19 +258,19 @@ require_once 'geral/header.php';
                     </ul>
                 </div>
 
-                <div class="d-flex align-items-center bg-dark border border-secondary-subtle rounded-pill shadow-sm flex-grow-1 flex-lg-grow-0 justify-content-center" style="padding: 2px 4px;">
-                    <a href="<?php echo $link_ant ?>" class="btn btn-sm btn-link text-light opacity-75 transition-hover text-decoration-none d-flex align-items-center justify-content-center" style="width: 30px; height: 30px;">
+                <div class="d-flex align-items-center rounded-pill shadow-sm flex-grow-1 flex-lg-grow-0 justify-content-center" style="padding:2px 4px;background:var(--bg-card);border:1px solid var(--card-border-color);">
+                    <a href="<?php echo $link_ant ?>" class="btn btn-sm btn-link transition-hover text-decoration-none d-flex align-items-center justify-content-center" style="width:30px;height:30px;color:var(--accent);">
                         <i class="bi bi-caret-left-fill" style="font-size: 0.65rem;"></i>
                     </a>
 
-                    <button type="button" class="btn btn-link text-light text-decoration-none fw-semibold px-1 transition-hover d-flex align-items-center justify-content-center"
-                        style="font-size: 0.875rem; white-space: nowrap;"
+                    <button type="button" class="btn btn-link text-decoration-none fw-semibold px-1 transition-hover d-flex align-items-center justify-content-center"
+                        style="font-size:0.875rem;white-space:nowrap;color:var(--text-main);"
                         data-bs-toggle="modal" data-bs-target="#modalSeletorMes">
                         <?php echo $nome_mes ?> <span class="d-none d-sm-inline ms-1"><?php echo $ano_atual ?></span>
                         <i class="bi bi-chevron-down ms-1 opacity-75" style="font-size: 0.65rem;"></i>
                     </button>
 
-                    <a href="<?php echo $link_prox ?>" class="btn btn-sm btn-link text-light opacity-75 transition-hover text-decoration-none d-flex align-items-center justify-content-center" style="width: 30px; height: 30px;">
+                    <a href="<?php echo $link_prox ?>" class="btn btn-sm btn-link transition-hover text-decoration-none d-flex align-items-center justify-content-center" style="width:30px;height:30px;color:var(--accent);">
                         <i class="bi bi-caret-right-fill" style="font-size: 0.65rem;"></i>
                     </a>
                 </div>
