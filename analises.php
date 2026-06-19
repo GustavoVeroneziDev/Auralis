@@ -275,6 +275,15 @@ require_once 'geral/header.php';
                     </a>
                 </div>
 
+                <!-- Botão exportar CSV -->
+                <a href="/exportar.php?tipo=analises&mes=<?= $mes_atual ?>&ano=<?= $ano_atual ?>&carteira=<?= urlencode($carteira_selecionada ?? '') ?>"
+                    class="btn btn-sm d-flex align-items-center gap-1 rounded-3 flex-shrink-0 no-print"
+                    style="background:var(--bg-card);border:1px solid var(--card-border-color);color:var(--text-main);font-size:0.78rem;"
+                    title="Exportar análises em CSV">
+                    <i class="bi bi-filetype-csv" style="color:var(--accent);font-size:0.9rem;"></i>
+                    <span class="d-none d-sm-inline">CSV</span>
+                </a>
+
             </div>
         </div>
     </div>

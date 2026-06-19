@@ -596,3 +596,65 @@ input[type="number"] {
     box-shadow: 0 4px 16px rgba(212, 175, 55, 0.25);
   }
 }
+
+/* ==========================================================================
+   PRINT — Relatórios e Faturas
+   ========================================================================== */
+@media print {
+  /* Esconder elementos de navegação e interação */
+  nav, .navbar, footer, .modal, .offcanvas,
+  .btn, .dropdown-menu, .toast-container,
+  .no-print, #installModal, [data-bs-toggle],
+  .alert-dismissible .btn-close {
+    display: none !important;
+  }
+
+  /* Forçar fundo branco e texto escuro */
+  html, body {
+    background: #fff !important;
+    color: #1a1a1a !important;
+    font-size: 12pt;
+  }
+
+  /* Cards e tabelas com bordas limpas */
+  .card {
+    background: #fff !important;
+    border: 1px solid #ccc !important;
+    box-shadow: none !important;
+    break-inside: avoid;
+  }
+  .table-dark, .table-dark td, .table-dark th {
+    background: #fff !important;
+    color: #1a1a1a !important;
+    border-color: #ccc !important;
+  }
+  .table-hover tbody tr:hover td {
+    background: #f5f5f5 !important;
+  }
+  .text-secondary, .text-muted { color: #555 !important; }
+  .text-light, .text-white     { color: #1a1a1a !important; }
+  .text-success { color: #166534 !important; }
+  .text-danger  { color: #991b1b !important; }
+
+  /* Cabeçalho de impressão com logo e título */
+  .print-header {
+    display: flex !important;
+    align-items: center;
+    justify-content: space-between;
+    border-bottom: 2px solid #d4af37;
+    padding-bottom: 12px;
+    margin-bottom: 20px;
+  }
+  .print-header-logo { font-size: 1.4rem; font-weight: 800; letter-spacing: -0.02em; }
+  .print-header-meta { font-size: 0.8rem; color: #555; text-align: right; }
+
+  /* Garantir que tabelas não quebrem em páginas */
+  table { page-break-inside: auto; }
+  tr    { page-break-inside: avoid; page-break-after: auto; }
+  thead { display: table-header-group; }
+
+  /* Remover padding excessivo de container */
+  main.container { padding: 0 !important; max-width: 100% !important; }
+  .container     { max-width: 100% !important; padding: 0 12px !important; }
+}
+

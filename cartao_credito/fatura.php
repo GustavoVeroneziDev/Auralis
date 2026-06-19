@@ -210,11 +210,41 @@ require_once '../geral/header.php';
                 <p class="text-secondary small mb-0"><?= $bandeiras[$cartao['Bandeira']] ?> · fecha dia <?= $cartao['DiaFechamento'] ?> · vence dia <?= $cartao['DiaVencimento'] ?></p>
             </div>
         </div>
-        <a href="../nova_transacao.php?tipo=cartao&cartao_id=<?= urlencode($cartaoId) ?>&voltar=<?= urlencode('cartao_credito/fatura.php?cartao='.$cartaoId) ?>"
-           class="btn fw-bold rounded-pill px-3"
-           style="background:<?= $cor ?>22;color:<?= $cor ?>;border:1px solid <?= $cor ?>55;">
-            <i class="bi bi-plus-lg me-1"></i> Lançar no cartão
-        </a>
+        <div class="d-flex align-items-center gap-2 flex-wrap no-print">
+            <?php if ($faturaAberta ?? null): ?>
+                <a href="/exportar.php?tipo=fatura&fatura=<?= urlencode($faturaAberta['IDFatura']) ?>"
+                   class="btn btn-sm d-flex align-items-center gap-1 rounded-3"
+                   style="background:var(--bg-card);border:1px solid var(--card-border-color);color:var(--text-main);font-size:0.78rem;"
+                   title="Exportar fatura em CSV">
+                    <i class="bi bi-filetype-csv" style="color:var(--accent);font-size:0.9rem;"></i>
+                    <span class="d-none d-sm-inline">CSV</span>
+                </a>
+                <button onclick="window.print()"
+                   class="btn btn-sm d-flex align-items-center gap-1 rounded-3"
+                   style="background:var(--bg-card);border:1px solid var(--card-border-color);color:var(--text-main);font-size:0.78rem;"
+                   title="Salvar fatura como PDF">
+                    <i class="bi bi-printer" style="color:var(--accent);font-size:0.9rem;"></i>
+                    <span class="d-none d-sm-inline">PDF</span>
+                </button>
+            <?php endif; ?>
+            <a href="../nova_transacao.php?tipo=cartao&cartao_id=<?= urlencode($cartaoId) ?>&voltar=<?= urlencode('cartao_credito/fatura.php?cartao='.$cartaoId) ?>"
+               class="btn fw-bold rounded-pill px-3"
+               style="background:<?= $cor ?>22;color:<?= $cor ?>;border:1px solid <?= $cor ?>55;">
+                <i class="bi bi-plus-lg me-1"></i> Lançar no cartão
+            </a>
+        </div>
+    </div>
+
+    <!-- Cabeçalho de impressão (só aparece no print) -->
+    <div class="print-header" style="display:none;">
+        <div class="print-header-logo">Auralis</div>
+        <div class="print-header-meta">
+            <?php if ($faturaAberta ?? null): ?>
+                Fatura: <?= htmlspecialchars($cartao['Nome']) ?><br>
+                Vencimento: <?= date('d/m/Y', strtotime($faturaAberta['DataVencimento'])) ?><br>
+            <?php endif; ?>
+            Gerado em <?= date('d/m/Y H:i') ?>
+        </div>
     </div>
 
     <?php if ($erro): ?>

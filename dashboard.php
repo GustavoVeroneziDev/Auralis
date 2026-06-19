@@ -823,7 +823,35 @@ require_once 'geral/header.php';
             </div>
         <?php endif; ?>
 
-        <h4 class="fw-bold text-light mb-3 mt-4">Transações de <?php echo $nome_mes ?></h4>
+        <!-- Cabeçalho de impressão (só aparece no print) -->
+        <div class="print-header" style="display:none;">
+            <div class="print-header-logo">Auralis</div>
+            <div class="print-header-meta">
+                Transações de <?= $nome_mes . ' ' . $ano_atual ?><br>
+                Carteira: <?= htmlspecialchars($nome_carteira_atual ?? '') ?><br>
+                Gerado em <?= date('d/m/Y H:i') ?>
+            </div>
+        </div>
+
+        <div class="d-flex align-items-center justify-content-between mb-3 mt-4">
+            <h4 class="fw-bold text-light mb-0">Transações de <?php echo $nome_mes ?></h4>
+            <div class="d-flex gap-2 no-print">
+                <a href="/exportar.php?tipo=transacoes&mes=<?= $mes_atual ?>&ano=<?= $ano_atual ?>&carteira=<?= urlencode($carteira_selecionada) ?>"
+                    class="btn btn-sm d-flex align-items-center gap-1 rounded-3"
+                    style="background:var(--bg-card);border:1px solid var(--card-border-color);color:var(--text-main);font-size:0.78rem;"
+                    title="Exportar transações do mês em CSV">
+                    <i class="bi bi-filetype-csv" style="color:var(--accent);font-size:0.9rem;"></i>
+                    <span class="d-none d-sm-inline">Exportar CSV</span>
+                </a>
+                <button onclick="window.print()"
+                    class="btn btn-sm d-flex align-items-center gap-1 rounded-3"
+                    style="background:var(--bg-card);border:1px solid var(--card-border-color);color:var(--text-main);font-size:0.78rem;"
+                    title="Salvar relatório como PDF">
+                    <i class="bi bi-printer" style="color:var(--accent);font-size:0.9rem;"></i>
+                    <span class="d-none d-sm-inline">Exportar PDF</span>
+                </button>
+            </div>
+        </div>
 
         <div class="table-responsive rounded-4 border border-secondary-subtle shadow-sm mb-5">
             <table class="table table-dark table-hover align-middle mb-0 auralis-table">
