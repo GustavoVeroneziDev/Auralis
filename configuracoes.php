@@ -196,11 +196,13 @@ require_once 'geral/header.php';
         <h2 class="fw-bold text-light mb-0"><i class="bi bi-gear text-secondary me-2"></i> Configurações da Conta</h2>
     </div>
 
-    <?php if ($mensagem): ?>
+    <?php if ($mensagem && $tipo_mensagem === 'success'): ?>
+        <script>window._pendingToast = <?= json_encode($mensagem) ?>;</script>
+    <?php elseif ($mensagem): ?>
         <div class="alert alert-<?= $tipo_mensagem ?> alert-dismissible fade show d-flex align-items-center rounded-3 shadow-sm border-0" role="alert">
-            <i class="bi <?= $tipo_mensagem === 'success' ? 'bi-check-circle-fill' : 'bi-exclamation-triangle-fill' ?> me-2"></i>
+            <i class="bi bi-exclamation-triangle-fill me-2"></i>
             <strong><?= $mensagem ?></strong>
-            <button type="button" class="btn-close <?php if ($tipo_mensagem !== 'warning') echo 'btn-close-white'; ?> opacity-50" data-bs-dismiss="alert" aria-label="Close"></button>
+            <button type="button" class="btn-close opacity-50" data-bs-dismiss="alert" aria-label="Close"></button>
         </div>
     <?php endif; ?>
 
