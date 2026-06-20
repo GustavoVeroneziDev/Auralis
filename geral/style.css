@@ -653,6 +653,15 @@ input[type="number"] {
   tr    { page-break-inside: avoid; page-break-after: auto; }
   thead { display: table-header-group; }
 
+  /* Canvas (Chart.js) — fundo branco para impressão */
+  canvas { background: #fff !important; }
+
+  /* Ícones coloridos dos cards de análise */
+  .bg-danger.bg-opacity-10  { background: #fee2e2 !important; }
+  .bg-success.bg-opacity-10 { background: #dcfce7 !important; }
+  .bg-warning.bg-opacity-10 { background: #fef9c3 !important; }
+  .bg-info.bg-opacity-10    { background: #e0f2fe !important; }
+
   /* Remover padding excessivo de container */
   main.container { padding: 0 !important; max-width: 100% !important; }
   .container     { max-width: 100% !important; padding: 0 12px !important; }

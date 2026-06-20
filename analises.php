@@ -202,6 +202,11 @@ require_once 'geral/header.php';
 
 <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 
+<div class="print-header" style="display:none;">
+    <div class="print-header-logo">Auralis</div>
+    <div class="print-header-meta">Análises de <?= $nome_mes . ' ' . $ano_atual ?> &mdash; <?= htmlspecialchars($nome_carteira_atual ?? 'Todas as carteiras') ?></div>
+</div>
+
 <main class="container-fluid py-4 mt-2 flex-grow-1" style="max-width: 1500px; padding-inline: var(--space-page-x); min-height: 100vh;">
 
     <div class="mb-4 border-bottom border-secondary-subtle pb-3">
@@ -275,7 +280,7 @@ require_once 'geral/header.php';
                     </a>
                 </div>
 
-                <!-- Botão exportar CSV -->
+                <!-- Botões de exportação -->
                 <a href="/exportar.php?tipo=analises&mes=<?= $mes_atual ?>&ano=<?= $ano_atual ?>&carteira=<?= urlencode($carteira_selecionada ?? '') ?>"
                     class="btn btn-sm d-flex align-items-center gap-1 rounded-3 flex-shrink-0 no-print"
                     style="background:var(--bg-card);border:1px solid var(--card-border-color);color:var(--text-main);font-size:0.78rem;"
@@ -283,6 +288,13 @@ require_once 'geral/header.php';
                     <i class="bi bi-filetype-csv" style="color:var(--accent);font-size:0.9rem;"></i>
                     <span class="d-none d-sm-inline">CSV</span>
                 </a>
+                <button onclick="window.print()"
+                    class="btn btn-sm d-flex align-items-center gap-1 rounded-3 flex-shrink-0 no-print"
+                    style="background:var(--bg-card);border:1px solid var(--card-border-color);color:var(--text-main);font-size:0.78rem;"
+                    title="Exportar análises em PDF">
+                    <i class="bi bi-printer" style="color:var(--accent);font-size:0.9rem;"></i>
+                    <span class="d-none d-sm-inline">PDF</span>
+                </button>
 
             </div>
         </div>
