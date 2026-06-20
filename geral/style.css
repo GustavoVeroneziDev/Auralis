@@ -825,7 +825,8 @@ input[type="number"] {
   cursor: pointer;
   transition: background 0.12s;
   white-space: nowrap;
-  overflow: hidden;
+  overflow: visible;
+  min-width: 0;
 }
 
 .sidebar-user-btn:hover {
