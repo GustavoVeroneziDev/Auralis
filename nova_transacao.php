@@ -45,15 +45,13 @@ if ($id_editar) {
 // UX INTELIGENTE: Pega o tipo para filtrar o banco. Se for edição, trava no tipo original.
 $tipo_sugerido = $_POST['tipo_registro'] ?? ($transacao_edit ? $transacao_edit['TipoRegistro'] : ($_GET['tipo'] ?? 'despesa'));
 
-// Limites do plano para filtrar seletores (em edição, exibe tudo para não quebrar registros existentes)
+// Limites do plano — busca TUDO e marca quais estão acima do limite para renderizar bloqueados
 $_limitesNT  = limitesDoPlano();
 $_planoNT    = strtolower($_SESSION['plano'] ?? 'free');
 $_testeNT    = function_exists('obterHorasRestantesTeste') ? (obterHorasRestantesTeste() > 0) : false;
-$_limCartNT  = ($id_editar || $_planoNT !== 'free' || $_testeNT) ? PHP_INT_MAX : $_limitesNT['carteiras'];
-$_limCatNT   = ($id_editar || $_planoNT !== 'free' || $_testeNT) ? PHP_INT_MAX : $_limitesNT['categorias'];
+$_freeRestNT = ($_planoNT === 'free' && !$_testeNT && !$id_editar);
 
 try {
-    // Busca carteiras (Lembrete: Mudei para a sintaxe do MySQL puro)
     $sqlCarteiras = "
         SELECT DISTINCT c.IDCarteira, c.TipoCarteira
         FROM Carteira c
@@ -63,9 +61,16 @@ try {
     ";
     $stmtC = $pdo->prepare($sqlCarteiras);
     $stmtC->execute([':uid_dono' => $usuario_id, ':uid_membro' => $usuario_id]);
-    $carteiras = array_slice($stmtC->fetchAll(), 0, $_limCartNT === PHP_INT_MAX ? 9999 : $_limCartNT);
+    $carteiras = $stmtC->fetchAll();
 
-    // Busca APENAS as categorias do tipo sugerido
+    // IDs de carteiras além do limite (só relevante para free sem trial, sem edição)
+    $_cartsBloqNT = [];
+    if ($_freeRestNT && $_limitesNT['carteiras'] !== PHP_INT_MAX) {
+        for ($i = $_limitesNT['carteiras']; $i < count($carteiras); $i++) {
+            $_cartsBloqNT[] = $carteiras[$i]['IDCarteira'];
+        }
+    }
+
     $sqlCategorias = "
         SELECT IDCategoria, NomeCategoria
         FROM Categoria
@@ -75,10 +80,20 @@ try {
     $tipoCat = ($tipo_sugerido === 'cartao') ? 'despesa' : $tipo_sugerido;
     $stmtCat = $pdo->prepare($sqlCategorias);
     $stmtCat->execute([':uid' => $usuario_id, ':tipo' => $tipoCat]);
-    $categorias = array_slice($stmtCat->fetchAll(), 0, $_limCatNT === PHP_INT_MAX ? 9999 : $_limCatNT);
+    $categorias = $stmtCat->fetchAll();
+
+    // IDs de categorias além do limite
+    $_catsBloqNT = [];
+    if ($_freeRestNT && $_limitesNT['categorias'] !== PHP_INT_MAX) {
+        for ($i = $_limitesNT['categorias']; $i < count($categorias); $i++) {
+            $_catsBloqNT[] = $categorias[$i]['IDCategoria'];
+        }
+    }
 } catch (PDOException $e) {
     $carteiras = [];
     $categorias = [];
+    $_cartsBloqNT = [];
+    $_catsBloqNT  = [];
 }
 
 $cartoes = (!$id_editar) ? cartao_listarAtivos($pdo, $usuario_id) : [];
@@ -241,18 +256,19 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     elseif (empty($dataRegistro)) $erro = "Selecione a data do registro.";
     elseif (!in_array($statusRegistro, ['pendente', 'efetivado'])) $erro = "Status inválido.";
     elseif (empty($carteiraId)) $erro = "Selecione uma carteira.";
+    elseif (!empty($_cartsBloqNT) && in_array($carteiraId, $_cartsBloqNT)) $erro = "Esta carteira está bloqueada no plano Free. Assine o PRO para usá-la.";
     elseif ($recorrente && ($diaVencimento < 1 || $diaVencimento > 31)) $erro = "Dia de vencimento inválido (1 a 31).";
     elseif ($parcelado && intval($_POST['num_parcelas'] ?? 0) === 1) $erro = "O número de parcelas não pode ser 1. Se não quiser parcelar, desative a opção de parcelamento.";
     elseif ($parcelado && $recorrente) $erro = "Uma transação não pode ser parcelada E recorrente ao mesmo tempo.";
-    elseif ($parcelado && !isset($_POST['id_editar'])) {
+    elseif ($parcelado && !isset($_POST['id_editar']) && !$_testeNT) {
         $_limParcNT = limitesDoPlano()['parcelas_max'];
         if ($numParcelas > $_limParcNT) {
-            $erro = "Seu plano permite parcelar em até {$_limParcNT}x. Assine o PRO para parcelar em até 48x.";
+            $erro = "Seu plano permite parcelar em até {$_limParcNT}x. Assine o PRO para parcelar em até " . limitesDoPlano('pro')['parcelas_max'] . "x.";
         }
     }
 
-    // Verifica limite mensal de registros (apenas para novas transações, não edições)
-    if (!$erro && !isset($_POST['id_editar'])) {
+    // Verifica limite mensal de registros (apenas para novas transações, não edições, não trial)
+    if (!$erro && !isset($_POST['id_editar']) && !$_testeNT) {
         $_limMensalNT = limitesDoPlano()['transacoes_mes'];
         if ($_limMensalNT !== PHP_INT_MAX) {
             $stmtLimMes = $pdo->prepare(
@@ -647,9 +663,13 @@ require_once 'geral/header.php';
                                     <i class="bi bi-tags text-secondary-analysis me-2 fs-7"></i>
                                     <select name="categoria_id" class="form-select bg-transparent border-0 text-muted-analysis px-0 shadow-none fs-7 fw-bold">
                                         <option class="bg-card" value="">Sem Categoria</option>
-                                        <?php foreach ($categorias as $cat): ?>
-                                            <option class="bg-card" value="<?= htmlspecialchars($cat['IDCategoria']) ?>" <?= ($val_cat == $cat['IDCategoria']) ? 'selected' : '' ?>>
-                                                <?= htmlspecialchars($cat['NomeCategoria']) ?>
+                                        <?php foreach ($categorias as $cat):
+                                            $_cbCatNT = in_array($cat['IDCategoria'], $_catsBloqNT); ?>
+                                            <option class="bg-card"
+                                                value="<?= htmlspecialchars($cat['IDCategoria']) ?>"
+                                                <?= ($val_cat == $cat['IDCategoria']) ? 'selected' : '' ?>
+                                                <?= $_cbCatNT ? 'disabled' : '' ?>>
+                                                <?= htmlspecialchars($cat['NomeCategoria']) ?><?= $_cbCatNT ? ' [PRO]' : '' ?>
                                             </option>
                                         <?php endforeach; ?>
                                     </select>
@@ -740,9 +760,13 @@ require_once 'geral/header.php';
                                 <i class="bi bi-credit-card text-secondary-analysis me-3 w-icon text-center"></i>
                                 <select name="carteira_id" id="carteira_id" class="form-select bg-transparent border-0 text-light-analysis px-0 shadow-none fw-semibold fs-6" required>
                                     <option class="bg-card" value="" disabled <?= empty($val_cart) ? 'selected' : '' ?>>Selecione a Carteira</option>
-                                    <?php foreach ($carteiras as $cart): ?>
-                                        <option class="bg-card" value="<?= htmlspecialchars($cart['IDCarteira']) ?>" <?= ($val_cart == $cart['IDCarteira']) ? 'selected' : '' ?>>
-                                            <?= htmlspecialchars($cart['TipoCarteira']) ?>
+                                    <?php foreach ($carteiras as $cart):
+                                        $_cbNT = in_array($cart['IDCarteira'], $_cartsBloqNT); ?>
+                                        <option class="bg-card"
+                                            value="<?= htmlspecialchars($cart['IDCarteira']) ?>"
+                                            <?= ($val_cart == $cart['IDCarteira']) ? 'selected' : '' ?>
+                                            <?= $_cbNT ? 'disabled' : '' ?>>
+                                            <?= htmlspecialchars($cart['TipoCarteira']) ?><?= $_cbNT ? ' [PRO]' : '' ?>
                                         </option>
                                     <?php endforeach; ?>
                                 </select>
@@ -753,9 +777,13 @@ require_once 'geral/header.php';
                                     <i class="bi bi-tags text-secondary-analysis me-2 fs-7"></i>
                                     <select name="categoria_id" class="form-select bg-transparent border-0 text-muted-analysis px-0 shadow-none fs-7 fw-bold">
                                         <option class="bg-card" value="">Sem Categoria</option>
-                                        <?php foreach ($categorias as $cat): ?>
-                                            <option class="bg-card" value="<?= htmlspecialchars($cat['IDCategoria']) ?>" <?= ($val_cat == $cat['IDCategoria']) ? 'selected' : '' ?>>
-                                                <?= htmlspecialchars($cat['NomeCategoria']) ?>
+                                        <?php foreach ($categorias as $cat):
+                                            $_cbCatNT = in_array($cat['IDCategoria'], $_catsBloqNT); ?>
+                                            <option class="bg-card"
+                                                value="<?= htmlspecialchars($cat['IDCategoria']) ?>"
+                                                <?= ($val_cat == $cat['IDCategoria']) ? 'selected' : '' ?>
+                                                <?= $_cbCatNT ? 'disabled' : '' ?>>
+                                                <?= htmlspecialchars($cat['NomeCategoria']) ?><?= $_cbCatNT ? ' [PRO]' : '' ?>
                                             </option>
                                         <?php endforeach; ?>
                                     </select>

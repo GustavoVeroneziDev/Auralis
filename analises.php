@@ -202,14 +202,15 @@ require_once 'geral/header.php';
 
 <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 
+<div class="print-header" style="display:none;">
+    <div class="print-header-logo">Auralis</div>
+    <div class="print-header-meta">Análises de <?= $nome_mes . ' ' . $ano_atual ?> &mdash; <?= htmlspecialchars($nome_carteira_atual ?? 'Todas as carteiras') ?></div>
+</div>
+
 <main class="container-fluid py-4 mt-2 flex-grow-1" style="max-width: 1500px; padding-inline: var(--space-page-x); min-height: 100vh;">
 
     <div class="mb-4 border-bottom border-secondary-subtle pb-3">
         <div class="d-flex flex-column flex-lg-row justify-content-between align-items-lg-center gap-3">
-
-            <h2 class="fw-bold text-light mb-0 d-flex align-items-center gap-2" style="font-size: clamp(1.2rem, 3vw, 1.5rem);">
-                <i class="bi bi-pie-chart-fill" style="color: var(--primary-gold-analysis) !important;"></i> Análises
-            </h2>
 
             <div class="d-flex align-items-center gap-2 w-100 w-lg-auto">
 
@@ -274,6 +275,22 @@ require_once 'geral/header.php';
                         <i class="bi bi-caret-right-fill" style="font-size: 0.65rem;"></i>
                     </a>
                 </div>
+
+                <!-- Botões de exportação -->
+                <a href="/exportar.php?tipo=analises&mes=<?= $mes_atual ?>&ano=<?= $ano_atual ?>&carteira=<?= urlencode($carteira_selecionada ?? '') ?>"
+                    class="btn btn-sm d-flex align-items-center gap-1 rounded-3 flex-shrink-0 no-print"
+                    style="background:var(--bg-card);border:1px solid var(--card-border-color);color:var(--text-main);font-size:0.78rem;"
+                    title="Exportar análises em CSV">
+                    <i class="bi bi-filetype-csv" style="color:var(--accent);font-size:0.9rem;"></i>
+                    <span class="d-none d-sm-inline">CSV</span>
+                </a>
+                <button onclick="window.print()"
+                    class="btn btn-sm d-flex align-items-center gap-1 rounded-3 flex-shrink-0 no-print"
+                    style="background:var(--bg-card);border:1px solid var(--card-border-color);color:var(--text-main);font-size:0.78rem;"
+                    title="Exportar análises em PDF">
+                    <i class="bi bi-printer" style="color:var(--accent);font-size:0.9rem;"></i>
+                    <span class="d-none d-sm-inline">PDF</span>
+                </button>
 
             </div>
         </div>
@@ -564,26 +581,33 @@ require_once 'geral/header.php';
                 const x = arc.x + Math.cos(midAngle) * midRadius;
                 const y = arc.y + Math.sin(midAngle) * midRadius;
 
-                // Nome da categoria (truncado em 10 chars)
-                const label = data.labels[i].length > 10 ?
-                    data.labels[i].substring(0, 9) + '…' :
+                // Nome da categoria (truncado em 12 chars)
+                const label = data.labels[i].length > 12 ?
+                    data.labels[i].substring(0, 11) + '…' :
                     data.labels[i];
 
                 ctx.textAlign = 'center';
                 ctx.textBaseline = 'middle';
 
-                const sliceTextMain = getComputedStyle(document.documentElement).getPropertyValue('--text-main').trim() || '#f8fafc';
-                const sliceTextMuted = getComputedStyle(document.documentElement).getPropertyValue('--text-muted').trim() || '#a1a1aa';
+                // Sombra escura para garantir contraste sobre qualquer cor de fatia
+                ctx.shadowColor = 'rgba(0,0,0,0.75)';
+                ctx.shadowBlur = 5;
+                ctx.shadowOffsetX = 0;
+                ctx.shadowOffsetY = 1;
 
-                // Percentagem em cima — maior e em negrito
-                ctx.font = 'bold 11px Inter, sans-serif';
-                ctx.fillStyle = sliceTextMain;
-                ctx.fillText(Math.round(pct) + '%', x, y - 7);
+                // Percentagem em cima — branco puro, negrito
+                ctx.font = 'bold 12px Inter, sans-serif';
+                ctx.fillStyle = '#ffffff';
+                ctx.fillText(Math.round(pct) + '%', x, y - 8);
 
-                // Nome embaixo — menor
-                ctx.font = '9px Inter, sans-serif';
-                ctx.fillStyle = sliceTextMuted;
-                ctx.fillText(label, x, y + 6);
+                // Nome embaixo — branco levemente suavizado, negrito
+                ctx.font = 'bold 10px Inter, sans-serif';
+                ctx.fillStyle = 'rgba(255,255,255,0.90)';
+                ctx.fillText(label, x, y + 7);
+
+                // Reset shadow
+                ctx.shadowColor = 'transparent';
+                ctx.shadowBlur = 0;
             });
             ctx.restore();
         }

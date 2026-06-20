@@ -138,13 +138,6 @@ require_once '../geral/header.php';
 
     <!-- Cabeçalho -->
     <div class="d-flex justify-content-between align-items-center mb-4 border-bottom border-secondary-subtle pb-3 gap-3 flex-wrap">
-        <h2 class="fw-bold text-light mb-0 d-flex align-items-center gap-2" style="font-size: clamp(1.1rem, 3vw, 1.4rem);">
-            <i class="bi bi-shield-fill-check" style="color:#E63946;"></i>
-            Painel Administrativo
-            <span style="font-size:0.65rem; background:rgba(230,57,70,0.15); color:#f87171; border:1px solid rgba(230,57,70,0.3); border-radius:999px; padding:2px 10px; font-weight:700; letter-spacing:0.06em; vertical-align:middle;">
-                <?= strtoupper($nivelSessao) ?>
-            </span>
-        </h2>
         <a href="/dashboard.php" class="btn btn-outline-secondary btn-sm rounded-pill px-3 flex-shrink-0">
             <i class="bi bi-arrow-left me-1"></i> Voltar
         </a>

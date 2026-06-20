@@ -35,9 +35,10 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action']) && $_POST['
     if (empty($nomeCategoria)) {
         $erro = "O nome da categoria não pode estar vazio.";
     } else {
-        // Verifica limite de categorias do plano
-        $_limitesCat = limitesDoPlano();
-        if ($_limitesCat['categorias'] !== PHP_INT_MAX) {
+        // Verifica limite de categorias do plano (trial tem acesso total)
+        $_limitesCat  = limitesDoPlano();
+        $_emTesteCat  = function_exists('obterHorasRestantesTeste') ? (obterHorasRestantesTeste() > 0) : false;
+        if (!$_emTesteCat && $_limitesCat['categorias'] !== PHP_INT_MAX) {
             $stmtContCat = $pdo->prepare("SELECT COUNT(*) FROM Categoria WHERE FKUsuario = :uid");
             $stmtContCat->execute([':uid' => $usuario_id]);
             if ((int)$stmtContCat->fetchColumn() >= $_limitesCat['categorias']) {
@@ -118,7 +119,8 @@ if (isset($_GET['sucesso'])) {
 // --- 1.4 BUSCA AS CATEGORIAS SEPARANDO POR TIPO ---
 $categorias_receita = [];
 $categorias_despesa = [];
-$categorias_bloqueadas_ids = []; // IDs de categorias "além do limite" para Free
+$categorias_bloqueadas_ids = [];
+$categorias_trial_ids      = [];
 
 try {
     $sqlBusca = "
@@ -133,14 +135,19 @@ try {
     $stmtBusca->execute([':uid' => $usuario_id]);
     $todas = $stmtBusca->fetchAll();
 
-    // Detecta categorias bloqueadas (Free sem trial acima do limite)
-    $_planoGC  = strtolower($_SESSION['plano'] ?? 'free');
-    $_testeGC  = function_exists('obterHorasRestantesTeste') ? (obterHorasRestantesTeste() > 0) : false;
+    // Detecta categorias bloqueadas e categorias "trial" (além do limite mas em período de teste)
+    $_planoGC   = strtolower($_SESSION['plano'] ?? 'free');
+    $_testeGC   = function_exists('obterHorasRestantesTeste') ? (obterHorasRestantesTeste() > 0) : false;
     $_limitesGC = limitesDoPlano();
-    if ($_planoGC === 'free' && !$_testeGC && $_limitesGC['categorias'] !== PHP_INT_MAX) {
+    if ($_planoGC === 'free' && $_limitesGC['categorias'] !== PHP_INT_MAX) {
         $todasOrdenadas = array_values($todas);
         for ($i = $_limitesGC['categorias']; $i < count($todasOrdenadas); $i++) {
-            $categorias_bloqueadas_ids[] = $todasOrdenadas[$i]['IDCategoria'];
+            $id = $todasOrdenadas[$i]['IDCategoria'];
+            if ($_testeGC) {
+                $categorias_trial_ids[]     = $id;
+            } else {
+                $categorias_bloqueadas_ids[] = $id;
+            }
         }
     }
 
@@ -205,7 +212,6 @@ $listaIcones = [
 <main class="container py-4 mt-2 flex-grow-1" style="min-height: 100vh; padding-inline: var(--space-page-x);">
 
     <div class="d-flex justify-content-between align-items-center mb-4 border-bottom border-secondary-subtle pb-3 gap-3">
-        <h2 class="fw-bold text-light mb-0">Minhas Categorias</h2>
         <a href="dashboard.php" class="btn btn-outline-secondary btn-sm rounded-pill px-3 transition-hover">
             <i class="bi bi-arrow-left me-1"></i> Voltar ao Painel
         </a>
@@ -347,16 +353,21 @@ $listaIcones = [
                                 </tr>
                             <?php else: ?>
                                 <?php foreach ($categorias_despesa as $cat): ?>
-                                    <?php $_catBloqueada = in_array($cat['IDCategoria'], $categorias_bloqueadas_ids); ?>
-                                    <tr <?= $_catBloqueada ? 'style="opacity:0.65;"' : '' ?>>
+                                    <?php
+                                        $_catBloqueada = in_array($cat['IDCategoria'], $categorias_bloqueadas_ids);
+                                        $_catTrial     = in_array($cat['IDCategoria'], $categorias_trial_ids);
+                                    ?>
+                                    <tr <?= $_catBloqueada ? 'style="opacity:0.55;"' : '' ?>>
                                         <td class="ps-4 py-3 border-secondary-subtle w-50">
                                             <div class="d-flex align-items-center">
                                                 <div class="icon-circle bg-secondary bg-opacity-10 me-3">
                                                     <i class="bi <?= htmlspecialchars($cat['IconeCategoria'] ?? 'bi-tag') ?> text-light fs-5"></i>
                                                 </div>
                                                 <span class="text-light fw-semibold fs-6"><?= htmlspecialchars($cat['NomeCategoria']) ?></span>
-                                                <?php if ($_catBloqueada): ?>
-                                                    <span class="ms-2" style="background:var(--color-pending-bg);color:var(--color-pending-text);border:1px solid var(--color-today-bg);border-radius:999px;padding:1px 6px;font-size:0.6rem;font-weight:700;"><i class="bi bi-lock-fill" style="font-size:0.55rem;"></i> Bloqueada</span>
+                                                <?php if ($_catTrial): ?>
+                                                    <span class="ms-2 d-inline-flex align-items-center gap-1" style="background:rgba(124,58,237,0.18);color:#a78bfa;border:1px solid rgba(124,58,237,0.4);border-radius:999px;padding:1px 7px;font-size:0.6rem;font-weight:700;"><i class="bi bi-star-fill" style="font-size:0.5rem;"></i> PRO (teste)</span>
+                                                <?php elseif ($_catBloqueada): ?>
+                                                    <span class="ms-2 d-inline-flex align-items-center gap-1" style="background:rgba(124,58,237,0.18);color:#a78bfa;border:1px solid rgba(124,58,237,0.4);border-radius:999px;padding:1px 7px;font-size:0.6rem;font-weight:700;"><i class="bi bi-lock-fill" style="font-size:0.5rem;"></i> PRO</span>
                                                 <?php endif; ?>
                                             </div>
                                         </td>
@@ -418,16 +429,21 @@ $listaIcones = [
                                 </tr>
                             <?php else: ?>
                                 <?php foreach ($categorias_receita as $cat): ?>
-                                    <?php $_catBloqueada = in_array($cat['IDCategoria'], $categorias_bloqueadas_ids); ?>
-                                    <tr <?= $_catBloqueada ? 'style="opacity:0.65;"' : '' ?>>
+                                    <?php
+                                        $_catBloqueada = in_array($cat['IDCategoria'], $categorias_bloqueadas_ids);
+                                        $_catTrial     = in_array($cat['IDCategoria'], $categorias_trial_ids);
+                                    ?>
+                                    <tr <?= $_catBloqueada ? 'style="opacity:0.55;"' : '' ?>>
                                         <td class="ps-4 py-3 border-secondary-subtle w-50">
                                             <div class="d-flex align-items-center">
                                                 <div class="icon-circle bg-secondary bg-opacity-10 me-3">
                                                     <i class="bi <?= htmlspecialchars($cat['IconeCategoria'] ?? 'bi-tag') ?> text-light fs-5"></i>
                                                 </div>
                                                 <span class="text-light fw-semibold fs-6"><?= htmlspecialchars($cat['NomeCategoria']) ?></span>
-                                                <?php if ($_catBloqueada): ?>
-                                                    <span class="ms-2" style="background:var(--color-pending-bg);color:var(--color-pending-text);border:1px solid var(--color-today-bg);border-radius:999px;padding:1px 6px;font-size:0.6rem;font-weight:700;"><i class="bi bi-lock-fill" style="font-size:0.55rem;"></i> Bloqueada</span>
+                                                <?php if ($_catTrial): ?>
+                                                    <span class="ms-2 d-inline-flex align-items-center gap-1" style="background:rgba(124,58,237,0.18);color:#a78bfa;border:1px solid rgba(124,58,237,0.4);border-radius:999px;padding:1px 7px;font-size:0.6rem;font-weight:700;"><i class="bi bi-star-fill" style="font-size:0.5rem;"></i> PRO (teste)</span>
+                                                <?php elseif ($_catBloqueada): ?>
+                                                    <span class="ms-2 d-inline-flex align-items-center gap-1" style="background:rgba(124,58,237,0.18);color:#a78bfa;border:1px solid rgba(124,58,237,0.4);border-radius:999px;padding:1px 7px;font-size:0.6rem;font-weight:700;"><i class="bi bi-lock-fill" style="font-size:0.5rem;"></i> PRO</span>
                                                 <?php endif; ?>
                                             </div>
                                         </td>

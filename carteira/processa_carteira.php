@@ -49,9 +49,10 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
             header("Location: listar_carteiras.php?sucesso=editada");
         } else {
-            // Criação — verificar limite do plano
-            $limites = limitesDoPlano();
-            if ($limites['carteiras'] !== PHP_INT_MAX) {
+            // Criação — verificar limite do plano (trial tem acesso total)
+            $limites  = limitesDoPlano();
+            $emTeste  = function_exists('obterHorasRestantesTeste') ? (obterHorasRestantesTeste() > 0) : false;
+            if (!$emTeste && $limites['carteiras'] !== PHP_INT_MAX) {
                 $stmtCount = $pdo->prepare("SELECT COUNT(*) FROM Carteira WHERE FKUsuarioDono = :uid");
                 $stmtCount->execute([':uid' => $usuarioId]);
                 if ($stmtCount->fetchColumn() >= $limites['carteiras']) {

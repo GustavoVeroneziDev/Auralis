@@ -596,3 +596,395 @@ input[type="number"] {
     box-shadow: 0 4px 16px rgba(212, 175, 55, 0.25);
   }
 }
+
+/* ==========================================================================
+   PREFERÊNCIA DE NAVEGAÇÃO — cards de seleção em configuracoes.php
+   ========================================================================== */
+
+.nav-pref-card {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 10px;
+  padding: 14px 20px;
+  border: 2px solid var(--card-border-color);
+  border-radius: 12px;
+  cursor: pointer;
+  transition: border-color 0.15s, background 0.15s;
+  background: transparent;
+  min-width: 120px;
+  text-align: center;
+  color: var(--text-muted);
+  font-size: 0.85rem;
+  font-weight: 500;
+  user-select: none;
+}
+
+.nav-pref-card:hover {
+  border-color: var(--accent);
+  background: rgba(212, 175, 55, 0.05);
+  color: var(--text-main);
+}
+
+.nav-pref-card.active {
+  border-color: var(--accent);
+  background: rgba(212, 175, 55, 0.08);
+  color: var(--text-main);
+}
+
+.nav-pref-preview {
+  width: 80px;
+  height: 52px;
+  border-radius: 7px;
+  border: 1px solid var(--card-border-color);
+  background: var(--bg-card);
+  overflow: hidden;
+  transition: border-color 0.15s;
+}
+
+.nav-pref-card:hover .nav-pref-preview,
+.nav-pref-card.active .nav-pref-preview {
+  border-color: var(--accent);
+}
+
+/* ==========================================================================
+   SIDEBAR — Layout lateral (usuários logados)
+   ========================================================================== */
+
+/* Sidebar — fixed para cobrir a altura total da página sem gap abaixo */
+.auralis-sidebar {
+  width: 240px;
+  height: 100vh;
+  position: fixed;
+  left: 0;
+  top: 0;
+  background: var(--bg-card);
+  border-right: 1px solid var(--card-border-color);
+  display: flex;
+  flex-direction: column;
+  flex-shrink: 0;
+  transition: width 0.22s cubic-bezier(0.4, 0, 0.2, 1);
+  overflow: visible; /* permite dropdown sair dos limites da sidebar */
+  z-index: 100;
+}
+
+.auralis-sidebar.sidebar-collapsed {
+  width: 64px;
+}
+
+/* Conteúdo recuado da largura da sidebar */
+.auralis-content {
+  margin-left: 240px;
+  transition: margin-left 0.22s cubic-bezier(0.4, 0, 0.2, 1);
+  min-width: 0;
+  overflow-x: hidden;
+}
+
+/* Reduz margem quando sidebar está colapsada */
+#auralis-sidebar.sidebar-collapsed ~ .auralis-content {
+  margin-left: 64px;
+}
+
+/* Logo */
+.sidebar-logo {
+  display: flex;
+  align-items: center;
+  padding: 14px 14px 12px;
+  border-bottom: 1px solid var(--card-border-color);
+  flex-shrink: 0;
+  min-height: 60px;
+}
+
+.sidebar-logo a {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  text-decoration: none;
+  overflow: hidden;
+  white-space: nowrap;
+}
+
+.sidebar-logo img {
+  height: 30px;
+  width: auto;
+  flex-shrink: 0;
+}
+
+.sidebar-logo-text {
+  font-family: 'Aquire', sans-serif;
+  font-size: 1.2rem;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  white-space: nowrap;
+  overflow: hidden;
+  transition: opacity 0.15s, width 0.22s cubic-bezier(0.4, 0, 0.2, 1), max-width 0.22s cubic-bezier(0.4, 0, 0.2, 1);
+  max-width: 160px;
+}
+
+/* Nav items — overflow-x: hidden aqui para clicar labels sem afetar dropdown */
+.sidebar-nav {
+  flex: 1;
+  padding: 10px 0;
+  overflow-y: auto;
+  overflow-x: hidden;
+}
+
+.sidebar-item {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 9px 12px;
+  margin: 1px 8px;
+  border-radius: 8px;
+  color: var(--text-muted);
+  text-decoration: none;
+  font-size: 0.875rem;
+  font-weight: 500;
+  white-space: nowrap;
+  transition: background 0.12s, color 0.12s;
+}
+
+.sidebar-item:hover {
+  background: var(--bg-hover);
+  color: var(--text-main);
+}
+
+.sidebar-item.active {
+  color: var(--accent);
+  background: rgba(212, 175, 55, 0.08);
+}
+
+.sidebar-item i {
+  font-size: 1.05rem;
+  width: 20px;
+  text-align: center;
+  flex-shrink: 0;
+}
+
+/* Label + badge fade on collapse */
+.sidebar-label {
+  transition: opacity 0.15s;
+  overflow: hidden;
+  flex: 1;
+  min-width: 0;
+}
+
+.sidebar-badge {
+  flex-shrink: 0;
+  transition: opacity 0.15s;
+}
+
+.auralis-sidebar.sidebar-collapsed .sidebar-label,
+.auralis-sidebar.sidebar-collapsed .sidebar-badge {
+  opacity: 0;
+  pointer-events: none;
+  flex: 0 0 0px;
+  width: 0;
+  max-width: 0;
+  overflow: hidden;
+  padding: 0;
+  margin: 0;
+}
+
+/* Logo text: opacity + width 0 para remover o espaço no layout */
+.auralis-sidebar.sidebar-collapsed .sidebar-logo-text {
+  opacity: 0;
+  pointer-events: none;
+  max-width: 0;
+  overflow: hidden;
+}
+
+.auralis-sidebar.sidebar-collapsed .sidebar-item {
+  justify-content: center;
+  padding: 9px;
+}
+
+.auralis-sidebar.sidebar-collapsed .sidebar-logo {
+  justify-content: center;
+  padding: 14px 0 12px;
+}
+
+/* Remove gap do flex quando o texto some, para centralizar o ícone */
+.auralis-sidebar.sidebar-collapsed .sidebar-logo a {
+  gap: 0;
+}
+
+/* Bottom section: user + toggle — overflow visible para dropdown escapar */
+.sidebar-bottom {
+  border-top: 1px solid var(--card-border-color);
+  padding: 8px;
+  flex-shrink: 0;
+  overflow: visible;
+}
+
+.sidebar-user-btn {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 8px 10px;
+  border-radius: 8px;
+  color: var(--text-main);
+  background: transparent;
+  border: none;
+  width: 100%;
+  text-align: left;
+  cursor: pointer;
+  transition: background 0.12s;
+  white-space: nowrap;
+  overflow: visible;
+  min-width: 0;
+}
+
+.sidebar-user-btn:hover {
+  background: var(--bg-hover);
+}
+
+.auralis-sidebar.sidebar-collapsed .sidebar-user-btn {
+  justify-content: center;
+  padding: 8px;
+}
+
+.sidebar-toggle {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 7px;
+  border-radius: 8px;
+  color: var(--text-muted);
+  background: transparent;
+  border: none;
+  cursor: pointer;
+  transition: background 0.12s, color 0.12s;
+  margin-top: 4px;
+  width: 100%;
+}
+
+.sidebar-toggle:hover {
+  background: var(--bg-hover);
+  color: var(--text-main);
+}
+
+/* Mobile topbar */
+.auralis-mobile-topbar {
+  display: none;
+  align-items: center;
+  padding: 0 12px;
+  height: 52px;
+  background: var(--bg-card);
+  border-bottom: 1px solid var(--card-border-color);
+  position: sticky;
+  top: 0;
+  z-index: 900;
+  flex-shrink: 0;
+}
+
+/* Overlay for mobile */
+.sidebar-overlay {
+  display: none;
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.55);
+  z-index: 1040;
+}
+
+.sidebar-overlay.active {
+  display: block;
+}
+
+/* Responsive */
+@media (max-width: 991.98px) {
+  .auralis-sidebar {
+    transform: translateX(-100%);
+    transition: transform 0.25s cubic-bezier(0.4, 0, 0.2, 1), width 0.22s;
+    width: 240px !important;
+    z-index: 1050;
+  }
+
+  .auralis-sidebar.mobile-open {
+    transform: translateX(0);
+  }
+
+  /* No mobile sidebar sobrepõe — sem margem */
+  .auralis-content,
+  #auralis-sidebar.sidebar-collapsed ~ .auralis-content {
+    margin-left: 0 !important;
+  }
+
+  .auralis-mobile-topbar {
+    display: flex;
+  }
+}
+
+/* ==========================================================================
+   PRINT — Relatórios e Faturas
+   ========================================================================== */
+@media print {
+  /* Esconder elementos de navegação e interação */
+  nav, .navbar, footer, .modal, .offcanvas,
+  .btn, .dropdown-menu, .toast-container,
+  .no-print, #installModal, [data-bs-toggle]:not(tr):not(td),
+  .alert-dismissible .btn-close {
+    display: none !important;
+  }
+
+  /* Forçar fundo branco e texto escuro */
+  html, body {
+    background: #fff !important;
+    color: #1a1a1a !important;
+    font-size: 12pt;
+  }
+
+  /* Cards e tabelas com bordas limpas */
+  .card {
+    background: #fff !important;
+    border: 1px solid #ccc !important;
+    box-shadow: none !important;
+    break-inside: avoid;
+  }
+  .table-dark, .table-dark td, .table-dark th {
+    background: #fff !important;
+    color: #1a1a1a !important;
+    border-color: #ccc !important;
+  }
+  .table-hover tbody tr:hover td {
+    background: #f5f5f5 !important;
+  }
+  .text-secondary, .text-muted { color: #555 !important; }
+  .text-light, .text-white     { color: #1a1a1a !important; }
+  .text-success { color: #166534 !important; }
+  .text-danger  { color: #991b1b !important; }
+
+  /* Cabeçalho de impressão com logo e título */
+  .print-header {
+    display: flex !important;
+    align-items: center;
+    justify-content: space-between;
+    border-bottom: 2px solid #d4af37;
+    padding-bottom: 12px;
+    margin-bottom: 20px;
+  }
+  .print-header-logo { font-size: 1.4rem; font-weight: 800; letter-spacing: -0.02em; }
+  .print-header-meta { font-size: 0.8rem; color: #555; text-align: right; }
+
+  /* Mostrar colunas responsivas ocultas (Categoria, Data, Status) */
+  .d-none.d-md-table-cell { display: table-cell !important; }
+
+  /* Garantir que tabelas não quebrem em páginas */
+  table { page-break-inside: auto; }
+  tr    { page-break-inside: avoid; page-break-after: auto; }
+  thead { display: table-header-group; }
+
+  /* Canvas (Chart.js) — fundo branco para impressão */
+  canvas { background: #fff !important; }
+
+  /* Ícones coloridos dos cards de análise */
+  .bg-danger.bg-opacity-10  { background: #fee2e2 !important; }
+  .bg-success.bg-opacity-10 { background: #dcfce7 !important; }
+  .bg-warning.bg-opacity-10 { background: #fef9c3 !important; }
+  .bg-info.bg-opacity-10    { background: #e0f2fe !important; }
+
+  /* Remover padding excessivo de container */
+  main.container { padding: 0 !important; max-width: 100% !important; }
+  .container     { max-width: 100% !important; padding: 0 12px !important; }
+}
+

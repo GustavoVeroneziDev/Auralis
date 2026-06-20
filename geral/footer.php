@@ -215,6 +215,52 @@ if (window._pendingToast) auralisToast(window._pendingToast);
         };
     })();
 </script>
+<!-- Sidebar JS -->
+<?php if (isset($_useSidebar) && $_useSidebar): ?>
+<script>
+(function(){
+    var sidebar  = document.getElementById('auralis-sidebar');
+    var overlay  = document.getElementById('sidebarOverlay');
+    var toggle   = document.getElementById('sidebarToggle');
+    var mToggle  = document.getElementById('sidebarMobileToggle');
+    var KEY      = 'auralis_sidebar';
+
+    if (!sidebar) return;
+
+    // Desktop: collapse/expand
+    if (toggle) {
+        toggle.addEventListener('click', function() {
+            var collapsed = sidebar.classList.toggle('sidebar-collapsed');
+            localStorage.setItem(KEY, collapsed ? 'collapsed' : 'expanded');
+            toggle.querySelector('i').className = collapsed
+                ? 'bi bi-layout-sidebar'
+                : 'bi bi-layout-sidebar-reverse';
+        });
+        // Sync icon with initial state
+        if (sidebar.classList.contains('sidebar-collapsed')) {
+            var icon = toggle.querySelector('i');
+            if (icon) icon.className = 'bi bi-layout-sidebar';
+        }
+    }
+
+    // Mobile: open/close
+    function openSidebar() {
+        sidebar.classList.add('mobile-open');
+        overlay.classList.add('active');
+    }
+    function closeSidebar() {
+        sidebar.classList.remove('mobile-open');
+        overlay.classList.remove('active');
+    }
+    if (mToggle) mToggle.addEventListener('click', openSidebar);
+    if (overlay) overlay.addEventListener('click', closeSidebar);
+})();
+</script>
+<?php endif; ?>
+
+<?php if (isset($_useSidebar) && $_useSidebar): ?>
+    </div><!-- /auralis-content -->
+<?php endif; ?>
 </body>
 
 </html>

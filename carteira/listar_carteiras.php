@@ -114,15 +114,21 @@ try {
     $erro = "Erro ao buscar as suas carteiras.";
 }
 
-// Determina carteiras bloqueadas (Free sem trial com mais de 1 carteira)
+// Determina carteiras bloqueadas e carteiras "trial" (além do limite, mas dentro do período de teste)
 require_once '../config/funcoes.php';
-$_planoLC  = strtolower($_SESSION['plano'] ?? 'free');
-$_testeLC  = function_exists('obterHorasRestantesTeste') ? (obterHorasRestantesTeste() > 0) : false;
+$_planoLC   = strtolower($_SESSION['plano'] ?? 'free');
+$_testeLC   = function_exists('obterHorasRestantesTeste') ? (obterHorasRestantesTeste() > 0) : false;
 $_limitesLC = limitesDoPlano();
 $carteiras_bloqueadas_ids = [];
-if ($_planoLC === 'free' && !$_testeLC && $_limitesLC['carteiras'] !== PHP_INT_MAX) {
+$carteiras_trial_ids      = [];
+if ($_planoLC === 'free' && $_limitesLC['carteiras'] !== PHP_INT_MAX) {
     for ($i = $_limitesLC['carteiras']; $i < count($carteiras); $i++) {
-        $carteiras_bloqueadas_ids[] = $carteiras[$i]['IDCarteira'];
+        $id = $carteiras[$i]['IDCarteira'];
+        if ($_testeLC) {
+            $carteiras_trial_ids[] = $id;   // trial: pode usar mas mostra badge PRO (teste)
+        } else {
+            $carteiras_bloqueadas_ids[] = $id; // sem trial: bloqueada
+        }
     }
 }
 
@@ -133,7 +139,6 @@ require_once '../geral/header.php';
 <main class="container-fluid py-4 mt-2 flex-grow-1" style="max-width: 1500px; padding-inline: var(--space-page-x); min-height: 100vh;">
 
     <div class="d-flex justify-content-between align-items-center mb-4 border-bottom border-secondary-subtle pb-3 flex-wrap gap-3">
-        <h2 class="fw-bold text-light mb-0">Minhas Carteiras</h2>
         <div class="d-flex gap-2">
             <a href="../dashboard.php" class="btn btn-outline-secondary btn-sm rounded-pill px-3 transition-hover d-flex align-items-center">
                 <i class="bi bi-arrow-left me-1"></i> Voltar
@@ -176,7 +181,7 @@ require_once '../geral/header.php';
                     Você tem <?= count($carteiras_bloqueadas_ids) ?> carteira(s) além do limite do plano Free (<?= $_limitesLC['carteiras'] ?> no total). Elas estão bloqueadas para novas transações, mas você ainda pode mesclar ou excluir.
                 </p>
                 <a href="/planos.php?upgrade=pro" class="btn btn-sm rounded-pill fw-semibold" style="background:var(--color-pending-bg);color:var(--color-pending-text);border:1px solid var(--color-today-bg);font-size:0.8rem;">
-                    <i class="bi bi-star-fill me-1"></i> Assinar PRO — até 3 carteiras
+                    <i class="bi bi-star-fill me-1"></i> Assinar PRO — até <?= limitesDoPlano('pro')['carteiras'] ?> carteiras
                 </a>
             </div>
         </div>
@@ -184,23 +189,34 @@ require_once '../geral/header.php';
 
     <div class="row g-4">
 
-        <?php foreach ($carteiras as $cart): ?>
-            <?php $_cartBloqueada = in_array($cart['IDCarteira'], $carteiras_bloqueadas_ids); ?>
+        <?php foreach ($carteiras as $cart):
+            $_cartBloqueada = in_array($cart['IDCarteira'], $carteiras_bloqueadas_ids);
+            $_cartTrial     = in_array($cart['IDCarteira'], $carteiras_trial_ids);
+        ?>
             <div class="col-md-6 col-lg-4">
                 <div class="card bg-body-tertiary border-secondary-subtle shadow-sm h-100 rounded-4 auralis-wallet-card position-relative overflow-hidden"
-                    <?= $_cartBloqueada ? 'style="opacity:0.65;border-color:var(--color-today-bg) !important;"' : '' ?>>
+                    <?= $_cartBloqueada ? 'style="opacity:0.55;border-color:rgba(124,58,237,0.35) !important;"' : '' ?>>
+
+                    <?php if ($_cartTrial): ?>
+                        <span class="position-absolute top-0 end-0 m-2 d-flex align-items-center gap-1"
+                              style="background:rgba(124,58,237,0.18);color:#a78bfa;border:1px solid rgba(124,58,237,0.4);border-radius:999px;padding:2px 8px;font-size:0.6rem;font-weight:700;z-index:2;">
+                            <i class="bi bi-star-fill" style="font-size:0.55rem;"></i> PRO (teste)
+                        </span>
+                    <?php elseif ($_cartBloqueada): ?>
+                        <span class="position-absolute top-0 end-0 m-2 d-flex align-items-center gap-1"
+                              style="background:rgba(124,58,237,0.18);color:#a78bfa;border:1px solid rgba(124,58,237,0.4);border-radius:999px;padding:2px 8px;font-size:0.6rem;font-weight:700;z-index:2;">
+                            <i class="bi bi-lock-fill" style="font-size:0.55rem;"></i> PRO
+                        </span>
+                    <?php endif; ?>
 
                     <div class="card-body p-4 position-relative z-1 d-flex flex-column">
                         <div class="d-flex justify-content-between align-items-start mb-4">
                             <div class="d-flex align-items-center gap-3">
                                 <div class="icon-circle bg-primary bg-opacity-10 d-flex justify-content-center align-items-center rounded-3 shadow-sm" style="width: 48px; height: 48px;">
-                                    <i class="bi <?= $_cartBloqueada ? 'bi-lock-fill' : 'bi-bank' ?> fs-4" style="color: <?= $_cartBloqueada ? 'var(--accent)' : 'var(--primary-gold-analysis)' ?> !important;"></i>
+                                    <i class="bi <?= $_cartBloqueada ? 'bi-lock-fill' : 'bi-bank' ?> fs-4" style="color: <?= $_cartBloqueada ? '#a78bfa' : 'var(--primary-gold-analysis)' ?> !important;"></i>
                                 </div>
                                 <div>
                                     <h5 class="fw-bold text-light mb-0"><?= htmlspecialchars($cart['TipoCarteira']) ?></h5>
-                                    <?php if ($_cartBloqueada): ?>
-                                        <span style="background:var(--color-pending-bg);color:var(--color-pending-text);border:1px solid var(--color-today-bg);border-radius:999px;padding:1px 6px;font-size:0.6rem;font-weight:700;"><i class="bi bi-lock-fill" style="font-size:0.55rem;"></i> Bloqueada</span>
-                                    <?php endif; ?>
                                 </div>
                             </div>
 
@@ -264,7 +280,7 @@ require_once '../geral/header.php';
                                 <i class="bi bi-lock-fill fs-3" style="color:var(--color-card-text);"></i>
                             </div>
                             <h6 class="fw-semibold mb-1" style="color:var(--color-card-text);">Limite do plano Free</h6>
-                            <p class="text-secondary mb-0" style="font-size:0.75rem;">Assine o PRO para até 3 carteiras</p>
+                            <p class="text-secondary mb-0" style="font-size:0.75rem;">Assine o PRO para até <?= limitesDoPlano('pro')['carteiras'] ?> carteiras</p>
                         </div>
                     </div>
                 </a>
