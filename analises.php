@@ -581,26 +581,33 @@ require_once 'geral/header.php';
                 const x = arc.x + Math.cos(midAngle) * midRadius;
                 const y = arc.y + Math.sin(midAngle) * midRadius;
 
-                // Nome da categoria (truncado em 10 chars)
-                const label = data.labels[i].length > 10 ?
-                    data.labels[i].substring(0, 9) + '…' :
+                // Nome da categoria (truncado em 12 chars)
+                const label = data.labels[i].length > 12 ?
+                    data.labels[i].substring(0, 11) + '…' :
                     data.labels[i];
 
                 ctx.textAlign = 'center';
                 ctx.textBaseline = 'middle';
 
-                const sliceTextMain = getComputedStyle(document.documentElement).getPropertyValue('--text-main').trim() || '#f8fafc';
-                const sliceTextMuted = getComputedStyle(document.documentElement).getPropertyValue('--text-muted').trim() || '#a1a1aa';
+                // Sombra escura para garantir contraste sobre qualquer cor de fatia
+                ctx.shadowColor = 'rgba(0,0,0,0.75)';
+                ctx.shadowBlur = 5;
+                ctx.shadowOffsetX = 0;
+                ctx.shadowOffsetY = 1;
 
-                // Percentagem em cima — maior e em negrito
-                ctx.font = 'bold 11px Inter, sans-serif';
-                ctx.fillStyle = sliceTextMain;
-                ctx.fillText(Math.round(pct) + '%', x, y - 7);
+                // Percentagem em cima — branco puro, negrito
+                ctx.font = 'bold 12px Inter, sans-serif';
+                ctx.fillStyle = '#ffffff';
+                ctx.fillText(Math.round(pct) + '%', x, y - 8);
 
-                // Nome embaixo — menor
-                ctx.font = '9px Inter, sans-serif';
-                ctx.fillStyle = sliceTextMuted;
-                ctx.fillText(label, x, y + 6);
+                // Nome embaixo — branco levemente suavizado, negrito
+                ctx.font = 'bold 10px Inter, sans-serif';
+                ctx.fillStyle = 'rgba(255,255,255,0.90)';
+                ctx.fillText(label, x, y + 7);
+
+                // Reset shadow
+                ctx.shadowColor = 'transparent';
+                ctx.shadowBlur = 0;
             });
             ctx.restore();
         }
