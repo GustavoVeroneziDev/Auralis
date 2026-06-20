@@ -17,38 +17,61 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && ($_POST['action'] ?? '') === 'resga
         $tipo_resgate = 'danger';
     } else {
         try {
-            $stmt = $pdo->prepare("SELECT * FROM CodigoPromocional WHERE Codigo = :c AND Ativo = 1 LIMIT 1");
+            $stmt = $pdo->prepare("SELECT * FROM codigos_ativacao WHERE UPPER(Codigo) = :c AND Ativo = 1 LIMIT 1");
             $stmt->execute([':c' => $codigo]);
-            $codObj = $stmt->fetch();
+            $cod = $stmt->fetch(PDO::FETCH_ASSOC);
 
-            if (!$codObj) {
-                $msg_resgate  = 'Código inválido ou inexistente.';
+            if (!$cod) {
+                $msg_resgate  = 'Código inválido ou inativo.';
                 $tipo_resgate = 'danger';
-            } elseif ($codObj['DataExpiracao'] && strtotime($codObj['DataExpiracao']) < time()) {
+            } elseif ($cod['DataExpiracao'] && $cod['DataExpiracao'] < date('Y-m-d')) {
                 $msg_resgate  = 'Este código já expirou.';
                 $tipo_resgate = 'danger';
-            } elseif ($codObj['UsoMaximo'] >= 0 && $codObj['UsoAtual'] >= $codObj['UsoMaximo']) {
+            } elseif ($cod['MaxUsos'] !== null && $cod['UsoAtual'] >= $cod['MaxUsos']) {
                 $msg_resgate  = 'Este código já atingiu o limite de usos.';
                 $tipo_resgate = 'danger';
             } else {
-                $jaUsou = $pdo->prepare("SELECT 1 FROM CodigoUso WHERE FKCodigo = :fk AND FKUsuario = :uid LIMIT 1");
-                $jaUsou->execute([':fk' => $codObj['IDCodigo'], ':uid' => $usuario_id]);
+                $jaUsou = $pdo->prepare("SELECT 1 FROM codigos_ativacao_usos WHERE FKCodigo = :cid AND FKUsuario = :uid");
+                $jaUsou->execute([':cid' => $cod['IDCodigo'], ':uid' => $usuario_id]);
                 if ($jaUsou->fetchColumn()) {
-                    $msg_resgate  = 'Você já resgatou este código anteriormente.';
+                    $msg_resgate  = 'Você já utilizou este código.';
                     $tipo_resgate = 'warning';
                 } else {
-                    $pdo->prepare("UPDATE Usuario SET Plano = :plano WHERE IDUsuario = :uid")
-                        ->execute([':plano' => $codObj['PlanoDestino'], ':uid' => $usuario_id]);
-                    $pdo->prepare("INSERT INTO CodigoUso (IDUso, FKCodigo, FKUsuario) VALUES (:id, :fk, :uid)")
-                        ->execute([':id' => gerarUuid(), ':fk' => $codObj['IDCodigo'], ':uid' => $usuario_id]);
-                    $pdo->prepare("UPDATE CodigoPromocional SET UsoAtual = UsoAtual + 1 WHERE IDCodigo = :id")
-                        ->execute([':id' => $codObj['IDCodigo']]);
-                    $_SESSION['plano'] = strtolower($codObj['PlanoDestino']);
-                    header('Location: planos.php?resgatado=' . urlencode(strtolower($codObj['PlanoDestino'])));
+                    // Acumula dias sobre assinatura ativa existente (igual ao resgatar.php)
+                    $stmtExp = $pdo->prepare("SELECT DataExpiracao FROM Assinatura WHERE FKUsuario = :uid AND Status = 'ativa' ORDER BY DataExpiracao DESC LIMIT 1");
+                    $stmtExp->execute([':uid' => $usuario_id]);
+                    $assinaturaAtual = $stmtExp->fetch(PDO::FETCH_ASSOC);
+                    $base = new DateTime('today');
+                    if ($assinaturaAtual && $assinaturaAtual['DataExpiracao'] > date('Y-m-d')) {
+                        $base = new DateTime($assinaturaAtual['DataExpiracao']);
+                    }
+                    $base->modify('+' . $cod['DuracaoDias'] . ' days');
+                    $novaExpiracao = $base->format('Y-m-d');
+
+                    // Nunca faz downgrade de plano
+                    $hierarquia  = ['free' => 0, 'pro' => 1, 'vip' => 2];
+                    $planoAtualS = $_SESSION['plano'] ?? 'free';
+                    $planoRecomp = $cod['PlanoRecompensa'];
+                    $planoFinal  = ($hierarquia[$planoRecomp] ?? 0) > ($hierarquia[$planoAtualS] ?? 0)
+                                    ? $planoRecomp : $planoAtualS;
+
+                    $pdo->beginTransaction();
+                    $pdo->prepare("UPDATE Assinatura SET Status = 'cancelada' WHERE FKUsuario = :uid AND Status = 'ativa'")->execute([':uid' => $usuario_id]);
+                    $pdo->prepare("INSERT INTO Assinatura (IDAssinatura, FKUsuario, Plano, Status, Ciclo, ValorPago, DataInicio, DataExpiracao, IDAssinaturaGW, EmailGateway, FontePagamento) VALUES (:id, :uid, :plano, 'ativa', 'codigo', 0, :inicio, :exp, NULL, NULL, 'codigo_ativacao')")
+                        ->execute([':id' => gerarUuid(), ':uid' => $usuario_id, ':plano' => $planoFinal, ':inicio' => date('Y-m-d'), ':exp' => $novaExpiracao]);
+                    $pdo->prepare("UPDATE Usuario SET Plano = :plano WHERE IDUsuario = :uid")->execute([':plano' => $planoFinal, ':uid' => $usuario_id]);
+                    $pdo->prepare("INSERT INTO codigos_ativacao_usos (IDUso, FKCodigo, FKUsuario) VALUES (:id, :cid, :uid)")->execute([':id' => gerarUuid(), ':cid' => $cod['IDCodigo'], ':uid' => $usuario_id]);
+                    $pdo->prepare("UPDATE codigos_ativacao SET UsoAtual = UsoAtual + 1 WHERE IDCodigo = :id")->execute([':id' => $cod['IDCodigo']]);
+                    $pdo->commit();
+
+                    $_SESSION['plano'] = $planoFinal;
+                    unset($_SESSION['expiracao_verificada']);
+                    header('Location: planos.php?resgatado=' . urlencode($planoFinal));
                     exit;
                 }
             }
         } catch (PDOException $e) {
+            if ($pdo->inTransaction()) $pdo->rollBack();
             $msg_resgate  = 'Erro ao processar o código. Tente novamente.';
             $tipo_resgate = 'danger';
         }
