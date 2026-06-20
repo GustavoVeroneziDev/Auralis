@@ -960,6 +960,9 @@ input[type="number"] {
   .print-header-logo { font-size: 1.4rem; font-weight: 800; letter-spacing: -0.02em; }
   .print-header-meta { font-size: 0.8rem; color: #555; text-align: right; }
 
+  /* Mostrar colunas responsivas ocultas (Categoria, Data, Status) */
+  .d-none.d-md-table-cell { display: table-cell !important; }
+
   /* Garantir que tabelas não quebrem em páginas */
   table { page-break-inside: auto; }
   tr    { page-break-inside: avoid; page-break-after: auto; }
