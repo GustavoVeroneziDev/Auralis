@@ -260,15 +260,15 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     elseif ($recorrente && ($diaVencimento < 1 || $diaVencimento > 31)) $erro = "Dia de vencimento inválido (1 a 31).";
     elseif ($parcelado && intval($_POST['num_parcelas'] ?? 0) === 1) $erro = "O número de parcelas não pode ser 1. Se não quiser parcelar, desative a opção de parcelamento.";
     elseif ($parcelado && $recorrente) $erro = "Uma transação não pode ser parcelada E recorrente ao mesmo tempo.";
-    elseif ($parcelado && !isset($_POST['id_editar'])) {
+    elseif ($parcelado && !isset($_POST['id_editar']) && !$_testeNT) {
         $_limParcNT = limitesDoPlano()['parcelas_max'];
         if ($numParcelas > $_limParcNT) {
             $erro = "Seu plano permite parcelar em até {$_limParcNT}x. Assine o PRO para parcelar em até 48x.";
         }
     }
 
-    // Verifica limite mensal de registros (apenas para novas transações, não edições)
-    if (!$erro && !isset($_POST['id_editar'])) {
+    // Verifica limite mensal de registros (apenas para novas transações, não edições, não trial)
+    if (!$erro && !isset($_POST['id_editar']) && !$_testeNT) {
         $_limMensalNT = limitesDoPlano()['transacoes_mes'];
         if ($_limMensalNT !== PHP_INT_MAX) {
             $stmtLimMes = $pdo->prepare(

@@ -35,9 +35,10 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action']) && $_POST['
     if (empty($nomeCategoria)) {
         $erro = "O nome da categoria não pode estar vazio.";
     } else {
-        // Verifica limite de categorias do plano
-        $_limitesCat = limitesDoPlano();
-        if ($_limitesCat['categorias'] !== PHP_INT_MAX) {
+        // Verifica limite de categorias do plano (trial tem acesso total)
+        $_limitesCat  = limitesDoPlano();
+        $_emTesteCat  = function_exists('obterHorasRestantesTeste') ? (obterHorasRestantesTeste() > 0) : false;
+        if (!$_emTesteCat && $_limitesCat['categorias'] !== PHP_INT_MAX) {
             $stmtContCat = $pdo->prepare("SELECT COUNT(*) FROM Categoria WHERE FKUsuario = :uid");
             $stmtContCat->execute([':uid' => $usuario_id]);
             if ((int)$stmtContCat->fetchColumn() >= $_limitesCat['categorias']) {
