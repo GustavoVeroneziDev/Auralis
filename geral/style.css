@@ -916,7 +916,7 @@ input[type="number"] {
   /* Esconder elementos de navegação e interação */
   nav, .navbar, footer, .modal, .offcanvas,
   .btn, .dropdown-menu, .toast-container,
-  .no-print, #installModal, [data-bs-toggle],
+  .no-print, #installModal, [data-bs-toggle]:not(tr):not(td),
   .alert-dismissible .btn-close {
     display: none !important;
   }
