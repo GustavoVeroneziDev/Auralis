@@ -3,6 +3,58 @@ session_start();
 require_once 'config/conexao.php';
 exigirAcessoMinimo(1);
 
+$usuario_id = $_SESSION['usuario_id'];
+
+// ── Resgatar código promocional ──────────────────────────────────────────────
+$msg_resgate  = '';
+$tipo_resgate = '';
+$resgatado    = $_GET['resgatado'] ?? '';
+
+if ($_SERVER['REQUEST_METHOD'] === 'POST' && ($_POST['action'] ?? '') === 'resgatar_codigo') {
+    $codigo = strtoupper(trim($_POST['codigo'] ?? ''));
+    if (empty($codigo)) {
+        $msg_resgate  = 'Digite um código válido.';
+        $tipo_resgate = 'danger';
+    } else {
+        try {
+            $stmt = $pdo->prepare("SELECT * FROM CodigoPromocional WHERE Codigo = :c AND Ativo = 1 LIMIT 1");
+            $stmt->execute([':c' => $codigo]);
+            $codObj = $stmt->fetch();
+
+            if (!$codObj) {
+                $msg_resgate  = 'Código inválido ou inexistente.';
+                $tipo_resgate = 'danger';
+            } elseif ($codObj['DataExpiracao'] && strtotime($codObj['DataExpiracao']) < time()) {
+                $msg_resgate  = 'Este código já expirou.';
+                $tipo_resgate = 'danger';
+            } elseif ($codObj['UsoMaximo'] >= 0 && $codObj['UsoAtual'] >= $codObj['UsoMaximo']) {
+                $msg_resgate  = 'Este código já atingiu o limite de usos.';
+                $tipo_resgate = 'danger';
+            } else {
+                $jaUsou = $pdo->prepare("SELECT 1 FROM CodigoUso WHERE FKCodigo = :fk AND FKUsuario = :uid LIMIT 1");
+                $jaUsou->execute([':fk' => $codObj['IDCodigo'], ':uid' => $usuario_id]);
+                if ($jaUsou->fetchColumn()) {
+                    $msg_resgate  = 'Você já resgatou este código anteriormente.';
+                    $tipo_resgate = 'warning';
+                } else {
+                    $pdo->prepare("UPDATE Usuario SET Plano = :plano WHERE IDUsuario = :uid")
+                        ->execute([':plano' => $codObj['PlanoDestino'], ':uid' => $usuario_id]);
+                    $pdo->prepare("INSERT INTO CodigoUso (IDUso, FKCodigo, FKUsuario) VALUES (:id, :fk, :uid)")
+                        ->execute([':id' => gerarUuid(), ':fk' => $codObj['IDCodigo'], ':uid' => $usuario_id]);
+                    $pdo->prepare("UPDATE CodigoPromocional SET UsoAtual = UsoAtual + 1 WHERE IDCodigo = :id")
+                        ->execute([':id' => $codObj['IDCodigo']]);
+                    $_SESSION['plano'] = strtolower($codObj['PlanoDestino']);
+                    header('Location: planos.php?resgatado=' . urlencode(strtolower($codObj['PlanoDestino'])));
+                    exit;
+                }
+            }
+        } catch (PDOException $e) {
+            $msg_resgate  = 'Erro ao processar o código. Tente novamente.';
+            $tipo_resgate = 'danger';
+        }
+    }
+}
+
 $planoAtual = obterPlanoAtual();
 $upgrade    = $_GET['upgrade'] ?? '';
 $pageTitle  = "Planos — Auralis";
@@ -316,6 +368,38 @@ require_once 'geral/header.php';
         </div>
     </div>
 
+    <!-- ── Resgatar código ──────────────────────────────────────────────── -->
+    <div class="mt-5 pt-5 border-top border-secondary-subtle">
+        <div class="text-center mb-4">
+            <h2 class="fw-bold text-light mb-1" style="font-size:1.3rem;">
+                <i class="bi bi-ticket-perforated-fill me-2" style="color:var(--accent);"></i>
+                Tem um código promocional?
+            </h2>
+            <p class="text-secondary mb-0" style="font-size:0.88rem;">Insira abaixo e ganhe acesso instantâneo ao plano correspondente.</p>
+        </div>
+
+        <?php if ($msg_resgate): ?>
+            <div class="alert alert-<?= $tipo_resgate ?> mx-auto text-center border-0 rounded-3" style="max-width:480px;">
+                <?= $msg_resgate ?>
+            </div>
+        <?php endif; ?>
+
+        <form method="POST" class="mx-auto d-flex gap-2 flex-wrap justify-content-center" style="max-width:480px;" id="formCodigo">
+            <input type="hidden" name="action" value="resgatar_codigo">
+            <input type="text" name="codigo" id="inputCodigo"
+                   class="form-control form-control-lg bg-transparent border-secondary-subtle text-light text-center fw-bold shadow-none flex-grow-1"
+                   placeholder="XXXX-XXXX-XXXX"
+                   maxlength="50" autocomplete="off"
+                   style="letter-spacing:0.12em;font-size:1rem;min-width:220px;"
+                   oninput="this.value=this.value.toUpperCase()"
+                   value="<?= htmlspecialchars($_POST['codigo'] ?? '') ?>">
+            <button type="submit" class="btn fw-bold px-4 rounded-pill"
+                    style="background:var(--accent);color:#000;">
+                <i class="bi bi-gift-fill me-1"></i> Resgatar
+            </button>
+        </form>
+    </div>
+
 </main>
 
 <script>
@@ -331,5 +415,53 @@ require_once 'geral/header.php';
         anualInfo.forEach(el => el.classList.toggle('d-none', !isAnual));
     });
 </script>
+
+<?php if ($resgatado): ?>
+<script src="https://cdn.jsdelivr.net/npm/canvas-confetti@1.9.3/dist/confetti.browser.min.js"></script>
+<script>
+(function() {
+    var isVip = <?= json_encode($resgatado === 'vip') ?>;
+    var colors = isVip
+        ? ['#d4af37', '#ffb800', '#fff7cc', '#f5e642', '#ffffff']
+        : ['#7c3aed', '#a78bfa', '#c4b5fd', '#ffffff', '#d4af37'];
+
+    function burst(x, angle, spread) {
+        confetti({
+            particleCount: 80,
+            angle: angle,
+            spread: spread,
+            origin: { x: x, y: 0.8 },
+            colors: colors,
+            scalar: 1.1,
+            drift: 0,
+            gravity: 0.9,
+            ticks: 220
+        });
+    }
+
+    // Primeiro burst imediato
+    burst(0.25, 120, 70);
+    burst(0.75, 60, 70);
+
+    // Chuva central após 400ms
+    setTimeout(function() {
+        confetti({
+            particleCount: 120,
+            spread: 100,
+            origin: { x: 0.5, y: 0.55 },
+            colors: colors,
+            scalar: 1.2,
+            ticks: 280
+        });
+    }, 400);
+
+    // Lados finais
+    setTimeout(function() {
+        burst(0.1, 110, 50);
+        burst(0.9, 70, 50);
+    }, 750);
+})();
+</script>
+<?php endif; ?>
 
 <?php require_once 'geral/footer.php'; ?>
