@@ -210,7 +210,7 @@ require_once '../geral/header.php';
                     Você tem <?= count($cartoes_bloqueados_ids) ?> cartão(ões) além do limite do plano Free (<?= $_limitesCC['cartoes'] ?> no total). Eles ficam visíveis mas não podem ser usados em novas transações.
                 </p>
                 <a href="\planos.php?upgrade=pro" class="btn btn-sm rounded-pill fw-semibold" style="background:var(--color-pending-bg);color:var(--color-pending-text);border:1px solid var(--color-today-bg);font-size:0.8rem;">
-                    <i class="bi bi-star-fill me-1"></i> Assinar PRO — até 3 cartões
+                    <i class="bi bi-star-fill me-1"></i> Assinar PRO — até <?= limitesDoPlano('pro')['cartoes'] ?> cartões
                 </a>
             </div>
         </div>

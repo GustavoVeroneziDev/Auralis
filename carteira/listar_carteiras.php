@@ -181,7 +181,7 @@ require_once '../geral/header.php';
                     Você tem <?= count($carteiras_bloqueadas_ids) ?> carteira(s) além do limite do plano Free (<?= $_limitesLC['carteiras'] ?> no total). Elas estão bloqueadas para novas transações, mas você ainda pode mesclar ou excluir.
                 </p>
                 <a href="/planos.php?upgrade=pro" class="btn btn-sm rounded-pill fw-semibold" style="background:var(--color-pending-bg);color:var(--color-pending-text);border:1px solid var(--color-today-bg);font-size:0.8rem;">
-                    <i class="bi bi-star-fill me-1"></i> Assinar PRO — até 3 carteiras
+                    <i class="bi bi-star-fill me-1"></i> Assinar PRO — até <?= limitesDoPlano('pro')['carteiras'] ?> carteiras
                 </a>
             </div>
         </div>
@@ -280,7 +280,7 @@ require_once '../geral/header.php';
                                 <i class="bi bi-lock-fill fs-3" style="color:var(--color-card-text);"></i>
                             </div>
                             <h6 class="fw-semibold mb-1" style="color:var(--color-card-text);">Limite do plano Free</h6>
-                            <p class="text-secondary mb-0" style="font-size:0.75rem;">Assine o PRO para até 3 carteiras</p>
+                            <p class="text-secondary mb-0" style="font-size:0.75rem;">Assine o PRO para até <?= limitesDoPlano('pro')['carteiras'] ?> carteiras</p>
                         </div>
                     </div>
                 </a>

@@ -263,7 +263,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     elseif ($parcelado && !isset($_POST['id_editar']) && !$_testeNT) {
         $_limParcNT = limitesDoPlano()['parcelas_max'];
         if ($numParcelas > $_limParcNT) {
-            $erro = "Seu plano permite parcelar em até {$_limParcNT}x. Assine o PRO para parcelar em até 48x.";
+            $erro = "Seu plano permite parcelar em até {$_limParcNT}x. Assine o PRO para parcelar em até " . limitesDoPlano('pro')['parcelas_max'] . "x.";
         }
     }
 
