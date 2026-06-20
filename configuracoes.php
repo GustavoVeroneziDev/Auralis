@@ -444,16 +444,47 @@ require_once 'geral/header.php';
                     <p class="text-secondary small mb-4">Escolha como prefere navegar pelo sistema.</p>
                     <form method="POST" class="d-flex gap-3 flex-wrap">
                         <input type="hidden" name="action" value="trocar_nav">
+
+                        <!-- Sidebar -->
                         <label class="nav-pref-card <?= $navAtual === 'sidebar' ? 'active' : '' ?>">
                             <input type="radio" name="nav_tipo" value="sidebar" <?= $navAtual === 'sidebar' ? 'checked' : '' ?> onchange="this.form.submit()" style="display:none;">
-                            <i class="bi bi-layout-sidebar"></i>
+                            <!-- mini preview: coluna lateral + conteúdo -->
+                            <div class="nav-pref-preview" style="display:flex;overflow:hidden;">
+                                <div style="width:14px;background:var(--bg-hover);border-right:1px solid var(--card-border-color);display:flex;flex-direction:column;align-items:center;padding:5px 0;gap:4px;">
+                                    <div style="width:8px;height:8px;background:var(--accent);border-radius:50%;opacity:.7;"></div>
+                                    <div style="width:6px;height:3px;background:var(--card-border-color);border-radius:2px;"></div>
+                                    <div style="width:6px;height:3px;background:var(--card-border-color);border-radius:2px;"></div>
+                                    <div style="width:6px;height:3px;background:var(--card-border-color);border-radius:2px;"></div>
+                                </div>
+                                <div style="flex:1;padding:6px 7px;display:flex;flex-direction:column;gap:4px;">
+                                    <div style="height:4px;width:75%;background:var(--accent);border-radius:2px;opacity:.4;"></div>
+                                    <div style="height:3px;width:55%;background:var(--card-border-color);border-radius:2px;"></div>
+                                    <div style="height:3px;width:65%;background:var(--card-border-color);border-radius:2px;"></div>
+                                </div>
+                            </div>
                             <span>Barra lateral</span>
                         </label>
+
+                        <!-- Top navbar -->
                         <label class="nav-pref-card <?= $navAtual === 'top' ? 'active' : '' ?>">
                             <input type="radio" name="nav_tipo" value="top" <?= $navAtual === 'top' ? 'checked' : '' ?> onchange="this.form.submit()" style="display:none;">
-                            <i class="bi bi-layout-navbar"></i>
+                            <!-- mini preview: navbar no topo + conteúdo -->
+                            <div class="nav-pref-preview" style="display:flex;flex-direction:column;overflow:hidden;">
+                                <div style="height:14px;background:var(--bg-hover);border-bottom:1px solid var(--card-border-color);display:flex;align-items:center;padding:0 6px;gap:4px;">
+                                    <div style="width:10px;height:10px;background:var(--accent);border-radius:50%;opacity:.7;"></div>
+                                    <div style="width:6px;height:3px;background:var(--card-border-color);border-radius:2px;"></div>
+                                    <div style="width:6px;height:3px;background:var(--card-border-color);border-radius:2px;"></div>
+                                    <div style="width:6px;height:3px;background:var(--card-border-color);border-radius:2px;"></div>
+                                </div>
+                                <div style="flex:1;padding:6px 7px;display:flex;flex-direction:column;gap:4px;">
+                                    <div style="height:4px;width:75%;background:var(--accent);border-radius:2px;opacity:.4;"></div>
+                                    <div style="height:3px;width:55%;background:var(--card-border-color);border-radius:2px;"></div>
+                                    <div style="height:3px;width:65%;background:var(--card-border-color);border-radius:2px;"></div>
+                                </div>
+                            </div>
                             <span>Barra superior</span>
                         </label>
+
                     </form>
                 </div>
             </div>

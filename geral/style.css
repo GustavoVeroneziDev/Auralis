@@ -605,19 +605,19 @@ input[type="number"] {
   display: flex;
   flex-direction: column;
   align-items: center;
-  justify-content: center;
-  gap: 8px;
-  padding: 18px 28px;
+  gap: 10px;
+  padding: 14px 20px;
   border: 2px solid var(--card-border-color);
   border-radius: 12px;
   cursor: pointer;
   transition: border-color 0.15s, background 0.15s;
   background: transparent;
-  min-width: 130px;
+  min-width: 120px;
   text-align: center;
   color: var(--text-muted);
-  font-size: 0.875rem;
+  font-size: 0.85rem;
   font-weight: 500;
+  user-select: none;
 }
 
 .nav-pref-card:hover {
@@ -628,13 +628,23 @@ input[type="number"] {
 
 .nav-pref-card.active {
   border-color: var(--accent);
-  background: rgba(212, 175, 55, 0.1);
+  background: rgba(212, 175, 55, 0.08);
   color: var(--text-main);
 }
 
-.nav-pref-card i {
-  font-size: 1.6rem;
-  color: var(--accent);
+.nav-pref-preview {
+  width: 80px;
+  height: 52px;
+  border-radius: 7px;
+  border: 1px solid var(--card-border-color);
+  background: var(--bg-card);
+  overflow: hidden;
+  transition: border-color 0.15s;
+}
+
+.nav-pref-card:hover .nav-pref-preview,
+.nav-pref-card.active .nav-pref-preview {
+  border-color: var(--accent);
 }
 
 /* ==========================================================================
@@ -705,6 +715,10 @@ input[type="number"] {
   font-size: 1.2rem;
   font-weight: 700;
   letter-spacing: 0.04em;
+  white-space: nowrap;
+  overflow: hidden;
+  transition: opacity 0.15s, width 0.22s cubic-bezier(0.4, 0, 0.2, 1), max-width 0.22s cubic-bezier(0.4, 0, 0.2, 1);
+  max-width: 160px;
 }
 
 /* Nav items — overflow-x: hidden aqui para clicar labels sem afetar dropdown */
@@ -761,10 +775,17 @@ input[type="number"] {
 }
 
 .auralis-sidebar.sidebar-collapsed .sidebar-label,
-.auralis-sidebar.sidebar-collapsed .sidebar-badge,
+.auralis-sidebar.sidebar-collapsed .sidebar-badge {
+  opacity: 0;
+  pointer-events: none;
+}
+
+/* Logo text: opacity + width 0 para remover o espaço no layout */
 .auralis-sidebar.sidebar-collapsed .sidebar-logo-text {
   opacity: 0;
   pointer-events: none;
+  max-width: 0;
+  overflow: hidden;
 }
 
 .auralis-sidebar.sidebar-collapsed .sidebar-item {
