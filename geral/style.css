@@ -598,6 +598,240 @@ input[type="number"] {
 }
 
 /* ==========================================================================
+   SIDEBAR — Layout lateral (usuários logados)
+   ========================================================================== */
+
+/* Sidebar */
+.auralis-sidebar {
+  width: 240px;
+  min-height: 100vh;
+  height: 100vh;
+  position: sticky;
+  top: 0;
+  background: var(--bg-card);
+  border-right: 1px solid var(--card-border-color);
+  display: flex;
+  flex-direction: column;
+  flex-shrink: 0;
+  transition: width 0.22s cubic-bezier(0.4, 0, 0.2, 1);
+  overflow: hidden;
+  z-index: 100;
+}
+
+.auralis-sidebar.sidebar-collapsed {
+  width: 64px;
+}
+
+/* Content area */
+.auralis-content {
+  min-width: 0;
+  overflow-x: hidden;
+}
+
+/* Logo */
+.sidebar-logo {
+  display: flex;
+  align-items: center;
+  padding: 14px 14px 12px;
+  border-bottom: 1px solid var(--card-border-color);
+  flex-shrink: 0;
+  min-height: 60px;
+}
+
+.sidebar-logo a {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  text-decoration: none;
+  overflow: hidden;
+  white-space: nowrap;
+}
+
+.sidebar-logo img {
+  height: 30px;
+  width: auto;
+  flex-shrink: 0;
+}
+
+.sidebar-logo-text {
+  font-family: 'Aquire', sans-serif;
+  font-size: 1.2rem;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+}
+
+/* Nav items */
+.sidebar-nav {
+  flex: 1;
+  padding: 10px 0;
+  overflow-y: auto;
+  overflow-x: hidden;
+}
+
+.sidebar-item {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 9px 12px;
+  margin: 1px 8px;
+  border-radius: 8px;
+  color: var(--text-muted);
+  text-decoration: none;
+  font-size: 0.875rem;
+  font-weight: 500;
+  white-space: nowrap;
+  transition: background 0.12s, color 0.12s;
+}
+
+.sidebar-item:hover {
+  background: var(--bg-hover);
+  color: var(--text-main);
+}
+
+.sidebar-item.active {
+  color: var(--accent);
+  background: rgba(212, 175, 55, 0.08);
+}
+
+.sidebar-item i {
+  font-size: 1.05rem;
+  width: 20px;
+  text-align: center;
+  flex-shrink: 0;
+}
+
+/* Label + badge fade on collapse */
+.sidebar-label {
+  transition: opacity 0.15s;
+  overflow: hidden;
+  flex: 1;
+  min-width: 0;
+}
+
+.sidebar-badge {
+  flex-shrink: 0;
+  transition: opacity 0.15s;
+}
+
+.auralis-sidebar.sidebar-collapsed .sidebar-label,
+.auralis-sidebar.sidebar-collapsed .sidebar-badge,
+.auralis-sidebar.sidebar-collapsed .sidebar-logo-text {
+  opacity: 0;
+  pointer-events: none;
+}
+
+.auralis-sidebar.sidebar-collapsed .sidebar-item {
+  justify-content: center;
+  padding: 9px;
+}
+
+.auralis-sidebar.sidebar-collapsed .sidebar-logo {
+  justify-content: center;
+  padding: 14px 0 12px;
+}
+
+/* Bottom section: user + toggle */
+.sidebar-bottom {
+  border-top: 1px solid var(--card-border-color);
+  padding: 8px;
+  flex-shrink: 0;
+}
+
+.sidebar-user-btn {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 8px 10px;
+  border-radius: 8px;
+  color: var(--text-main);
+  background: transparent;
+  border: none;
+  width: 100%;
+  text-align: left;
+  cursor: pointer;
+  transition: background 0.12s;
+  white-space: nowrap;
+  overflow: hidden;
+}
+
+.sidebar-user-btn:hover {
+  background: var(--bg-hover);
+}
+
+.auralis-sidebar.sidebar-collapsed .sidebar-user-btn {
+  justify-content: center;
+  padding: 8px;
+}
+
+.sidebar-toggle {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 7px;
+  border-radius: 8px;
+  color: var(--text-muted);
+  background: transparent;
+  border: none;
+  cursor: pointer;
+  transition: background 0.12s, color 0.12s;
+  margin-top: 4px;
+  width: 100%;
+}
+
+.sidebar-toggle:hover {
+  background: var(--bg-hover);
+  color: var(--text-main);
+}
+
+/* Mobile topbar */
+.auralis-mobile-topbar {
+  display: none;
+  align-items: center;
+  padding: 0 12px;
+  height: 52px;
+  background: var(--bg-card);
+  border-bottom: 1px solid var(--card-border-color);
+  position: sticky;
+  top: 0;
+  z-index: 900;
+  flex-shrink: 0;
+}
+
+/* Overlay for mobile */
+.sidebar-overlay {
+  display: none;
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.55);
+  z-index: 1040;
+}
+
+.sidebar-overlay.active {
+  display: block;
+}
+
+/* Responsive */
+@media (max-width: 991.98px) {
+  .auralis-sidebar {
+    position: fixed;
+    left: 0;
+    top: 0;
+    transform: translateX(-100%);
+    transition: transform 0.25s cubic-bezier(0.4, 0, 0.2, 1), width 0.22s;
+    width: 240px !important;
+    z-index: 1050;
+  }
+
+  .auralis-sidebar.mobile-open {
+    transform: translateX(0);
+  }
+
+  .auralis-mobile-topbar {
+    display: flex;
+  }
+}
+
+/* ==========================================================================
    PRINT — Relatórios e Faturas
    ========================================================================== */
 @media print {

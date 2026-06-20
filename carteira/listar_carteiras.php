@@ -133,7 +133,6 @@ require_once '../geral/header.php';
 <main class="container-fluid py-4 mt-2 flex-grow-1" style="max-width: 1500px; padding-inline: var(--space-page-x); min-height: 100vh;">
 
     <div class="d-flex justify-content-between align-items-center mb-4 border-bottom border-secondary-subtle pb-3 flex-wrap gap-3">
-        <h2 class="fw-bold text-light mb-0">Minhas Carteiras</h2>
         <div class="d-flex gap-2">
             <a href="../dashboard.php" class="btn btn-outline-secondary btn-sm rounded-pill px-3 transition-hover d-flex align-items-center">
                 <i class="bi bi-arrow-left me-1"></i> Voltar

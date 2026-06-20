@@ -212,10 +212,6 @@ require_once 'geral/header.php';
     <div class="mb-4 border-bottom border-secondary-subtle pb-3">
         <div class="d-flex flex-column flex-lg-row justify-content-between align-items-lg-center gap-3">
 
-            <h2 class="fw-bold text-light mb-0 d-flex align-items-center gap-2" style="font-size: clamp(1.2rem, 3vw, 1.5rem);">
-                <i class="bi bi-pie-chart-fill" style="color: var(--primary-gold-analysis) !important;"></i> Análises
-            </h2>
-
             <div class="d-flex align-items-center gap-2 w-100 w-lg-auto">
 
                 <!-- Seletor de Carteira -->

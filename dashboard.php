@@ -578,8 +578,6 @@ require_once 'geral/header.php';
 
                 <div class="d-flex align-items-center justify-content-between justify-content-lg-start gap-2 w-100 w-lg-auto">
 
-                    <h2 class="fw-bold text-light mb-0 d-none d-lg-block me-2" style="white-space: nowrap; font-size: clamp(1rem, 2vw, 1.35rem);">Visão Geral</h2>
-
                     <div class="d-flex align-items-center rounded-pill shadow-sm flex-shrink-0" style="padding:2px 4px;background:var(--bg-card);border:1px solid var(--card-border-color);">
                         <a href="<?php echo $link_ant ?>" class="btn btn-sm btn-link transition-hover text-decoration-none d-flex align-items-center justify-content-center" style="width:30px;height:30px;color:var(--accent);">
                             <i class="bi bi-caret-left-fill" style="font-size:0.65rem;"></i>

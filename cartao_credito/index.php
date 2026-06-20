@@ -156,10 +156,6 @@ require_once '../geral/header.php';
 <main class="container py-4 mt-2 flex-grow-1" style="padding-inline:var(--space-page-x);max-width:1100px;">
 
     <div class="d-flex align-items-center justify-content-between mb-4 border-bottom border-secondary-subtle pb-3 flex-wrap gap-3">
-        <div>
-            <h2 class="fw-bold text-light mb-0">Cartões de Crédito</h2>
-            <p class="text-secondary mb-0 small">Gerencie seus cartões e acompanhe as faturas</p>
-        </div>
         <button class="btn fw-bold rounded-pill px-4"
             style="background:var(--color-card-text);color:#fff;border:none;"
             data-bs-toggle="modal" data-bs-target="#modalCartao" onclick="abrirModalNovo()">

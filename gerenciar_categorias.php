@@ -205,7 +205,6 @@ $listaIcones = [
 <main class="container py-4 mt-2 flex-grow-1" style="min-height: 100vh; padding-inline: var(--space-page-x);">
 
     <div class="d-flex justify-content-between align-items-center mb-4 border-bottom border-secondary-subtle pb-3 gap-3">
-        <h2 class="fw-bold text-light mb-0">Minhas Categorias</h2>
         <a href="dashboard.php" class="btn btn-outline-secondary btn-sm rounded-pill px-3 transition-hover">
             <i class="bi bi-arrow-left me-1"></i> Voltar ao Painel
         </a>
