@@ -105,8 +105,12 @@ if (isset($_SESSION['usuario_id'])) {
     <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.css" rel="stylesheet">
     <link rel='stylesheet' href='https://cdn-uicons.flaticon.com/uicons-bold-rounded/css/uicons-bold-rounded.css'>
     <link rel='stylesheet' href='https://cdn-uicons.flaticon.com/uicons-solid-straight/css/uicons-solid-straight.css'>
-    <link rel="stylesheet" href="/geral/temas/<?= htmlspecialchars($_temaAtual) ?>.css">
-    <link rel="stylesheet" href="/geral/style.css">
+    <?php
+    $_cssV   = @filemtime(__DIR__ . '/style.css') ?: 1;
+    $_temaV  = @filemtime(__DIR__ . '/temas/' . $_temaAtual . '.css') ?: 1;
+    ?>
+    <link rel="stylesheet" href="/geral/temas/<?= htmlspecialchars($_temaAtual) ?>.css?v=<?= $_temaV ?>">
+    <link rel="stylesheet" href="/geral/style.css?v=<?= $_cssV ?>">
 </head>
 
 <?php if (isset($_SESSION['usuario_id'])): ?>
