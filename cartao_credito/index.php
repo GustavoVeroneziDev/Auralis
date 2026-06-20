@@ -349,6 +349,22 @@ require_once '../geral/header.php';
                 </div>
             </div>
         </div>
+        <?php else: ?>
+        <div class="col-12 col-md-6 col-lg-4">
+            <a href="/planos.php?upgrade=pro" class="text-decoration-none">
+                <div class="card h-100 rounded-4 d-flex align-items-center justify-content-center transition-hover"
+                     style="min-height:220px;background:var(--color-card-bg);border:1px dashed var(--color-card-border);">
+                    <div class="card-body text-center d-flex flex-column align-items-center justify-content-center p-4">
+                        <div class="rounded-circle d-flex align-items-center justify-content-center mb-3"
+                             style="width:50px;height:50px;background:var(--color-card-bg);">
+                            <i class="bi bi-lock-fill fs-3" style="color:var(--color-card-text);"></i>
+                        </div>
+                        <h6 class="fw-semibold mb-1" style="color:var(--color-card-text);">Limite do plano Free</h6>
+                        <p class="text-secondary mb-0" style="font-size:0.75rem;">Assine o PRO para até <?= $_limitesCC['cartoes'] ?> cartão(ões)</p>
+                    </div>
+                </div>
+            </a>
+        </div>
         <?php endif; ?>
     </div>
 </main>
