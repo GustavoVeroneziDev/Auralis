@@ -46,7 +46,7 @@ if (isset($_GET['code'])) {
 
             // 4. Procura se esse e-mail já existe no Auralis
             // CORREÇÃO 1: Adicionado o 'Plano' no SELECT
-            $sql = "SELECT IDUsuario, Nome, NivelAcesso, StatusConta, Plano, Tema FROM Usuario WHERE Email = :email LIMIT 1";
+            $sql = "SELECT IDUsuario, Nome, NivelAcesso, StatusConta, Plano, Tema, NavTipo FROM Usuario WHERE Email = :email LIMIT 1";
             $stmt = $pdo->prepare($sql);
             $stmt->execute([':email' => $email]);
             $usuario = $stmt->fetch();
@@ -67,6 +67,7 @@ if (isset($_GET['code'])) {
                 // CORREÇÃO 2: Forçar minúsculas (strtolower)
                 $_SESSION['plano']        = strtolower($usuario['Plano'] ?? 'free');
                 $_SESSION['tema']         = strtolower($usuario['Tema'] ?? 'dark');
+                $_SESSION['nav_tipo']     = strtolower($usuario['NavTipo'] ?? 'sidebar');
 
                 header("Location: ../dashboard.php");
                 exit;
@@ -174,6 +175,7 @@ if (isset($_GET['code'])) {
                 // CORREÇÃO 3: Define a sessão de plano para utilizadores novos pelo Google
                 $_SESSION['plano']        = 'free';
                 $_SESSION['tema']         = 'dark';
+                $_SESSION['nav_tipo']     = 'sidebar';
 
                 header("Location: ../dashboard.php");
                 exit;

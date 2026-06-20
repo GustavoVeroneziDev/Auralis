@@ -111,7 +111,22 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         }
     }
 
-    // AÇÃO 4: EXCLUIR CONTA (A ZONA DE PERIGO)
+    // AÇÃO 4: TROCAR NAVEGAÇÃO
+    if (isset($_POST['action']) && $_POST['action'] === 'trocar_nav') {
+        $novoNav = in_array($_POST['nav_tipo'] ?? '', ['sidebar', 'top']) ? $_POST['nav_tipo'] : 'sidebar';
+        try {
+            $pdo->prepare("UPDATE Usuario SET NavTipo = :nav WHERE IDUsuario = :uid")
+                ->execute([':nav' => $novoNav, ':uid' => $usuario_id]);
+            $_SESSION['nav_tipo'] = $novoNav;
+            header('Location: configuracoes.php');
+            exit;
+        } catch (PDOException $e) {
+            $mensagem = 'Erro ao salvar preferência de navegação.';
+            $tipo_mensagem = 'danger';
+        }
+    }
+
+    // AÇÃO 5: EXCLUIR CONTA (A ZONA DE PERIGO)
     if (isset($_POST['action']) && $_POST['action'] === 'delete_account') {
         $senha_confirmacao = $_POST['senha_confirmacao'] ?? '';
 
@@ -419,6 +434,30 @@ require_once 'geral/header.php';
             <?php
             };
             ?>
+            <!-- Navegação -->
+            <?php $navAtual = $_SESSION['nav_tipo'] ?? 'sidebar'; ?>
+            <div class="card border-secondary-subtle shadow-sm rounded-4 mb-4" style="background:var(--bg-card);">
+                <div class="card-header border-bottom border-secondary-subtle bg-transparent p-4">
+                    <h5 class="fw-bold mb-0"><i class="bi bi-layout-sidebar me-2" style="color:var(--accent);"></i> Navegação</h5>
+                </div>
+                <div class="card-body p-4">
+                    <p class="text-secondary small mb-4">Escolha como prefere navegar pelo sistema.</p>
+                    <form method="POST" class="d-flex gap-3 flex-wrap">
+                        <input type="hidden" name="action" value="trocar_nav">
+                        <label class="nav-pref-card <?= $navAtual === 'sidebar' ? 'active' : '' ?>">
+                            <input type="radio" name="nav_tipo" value="sidebar" <?= $navAtual === 'sidebar' ? 'checked' : '' ?> onchange="this.form.submit()" style="display:none;">
+                            <i class="bi bi-layout-sidebar"></i>
+                            <span>Barra lateral</span>
+                        </label>
+                        <label class="nav-pref-card <?= $navAtual === 'top' ? 'active' : '' ?>">
+                            <input type="radio" name="nav_tipo" value="top" <?= $navAtual === 'top' ? 'checked' : '' ?> onchange="this.form.submit()" style="display:none;">
+                            <i class="bi bi-layout-navbar"></i>
+                            <span>Barra superior</span>
+                        </label>
+                    </form>
+                </div>
+            </div>
+
             <div class="card border-secondary-subtle shadow-sm rounded-4" style="background:var(--bg-card);">
                 <div class="card-header border-bottom border-secondary-subtle bg-transparent p-4">
                     <h5 class="fw-bold mb-0"><i class="bi bi-palette2 me-2" style="color:var(--accent);"></i> Aparência</h5>

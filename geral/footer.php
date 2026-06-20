@@ -216,7 +216,7 @@ if (window._pendingToast) auralisToast(window._pendingToast);
     })();
 </script>
 <!-- Sidebar JS -->
-<?php if (isset($_SESSION['usuario_id'])): ?>
+<?php if (isset($_useSidebar) && $_useSidebar): ?>
 <script>
 (function(){
     var sidebar  = document.getElementById('auralis-sidebar');
@@ -258,7 +258,7 @@ if (window._pendingToast) auralisToast(window._pendingToast);
 </script>
 <?php endif; ?>
 
-<?php if (isset($_SESSION['usuario_id'])): ?>
+<?php if (isset($_useSidebar) && $_useSidebar): ?>
     </div><!-- /auralis-content -->
 <?php endif; ?>
 </body>
