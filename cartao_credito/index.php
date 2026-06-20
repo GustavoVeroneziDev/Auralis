@@ -58,9 +58,10 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                                 ':df'=>$diaFech,':dv'=>$diaVenc,':cd'=>$carteiraDb,':id'=>$id,':uid'=>$uid]);
                     $sucesso = 'Cartão atualizado com sucesso.';
                 } else {
-                    // Criação — verifica limite do plano
-                    $limites = limitesDoPlano();
-                    if ($limites['cartoes'] !== PHP_INT_MAX) {
+                    // Criação — verifica limite do plano (trial tem acesso total)
+                    $limites   = limitesDoPlano();
+                    $emTesteCC = function_exists('obterHorasRestantesTeste') ? (obterHorasRestantesTeste() > 0) : false;
+                    if (!$emTesteCC && $limites['cartoes'] !== PHP_INT_MAX) {
                         $stmtQtd = $pdo->prepare("SELECT COUNT(*) FROM CartaoCredito WHERE FKUsuario = :uid AND Ativo = 1");
                         $stmtQtd->execute([':uid' => $uid]);
                         if ((int)$stmtQtd->fetchColumn() >= $limites['cartoes']) {
@@ -125,6 +126,24 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 cartao_verificarFechamentos($pdo, $uid);
 $cartoes = cartao_listarAtivos($pdo, $uid);
 
+// Detecta cartões bloqueados e em trial
+$_planoCC   = strtolower($_SESSION['plano'] ?? 'free');
+$_testeCC   = function_exists('obterHorasRestantesTeste') ? (obterHorasRestantesTeste() > 0) : false;
+$_limitesCC = limitesDoPlano();
+$cartoes_bloqueados_ids = [];
+$cartoes_trial_ids      = [];
+if ($_planoCC === 'free' && $_limitesCC['cartoes'] !== PHP_INT_MAX) {
+    for ($i = $_limitesCC['cartoes']; $i < count($cartoes); $i++) {
+        $id = $cartoes[$i]['IDCartao'];
+        if ($_testeCC) {
+            $cartoes_trial_ids[] = $id;
+        } else {
+            $cartoes_bloqueados_ids[] = $id;
+        }
+    }
+}
+$_podeCriarCC = ($_limitesCC['cartoes'] === PHP_INT_MAX) || count($cartoes) < $_limitesCC['cartoes'] || $_testeCC;
+
 // Pré-carrega dados de fatura aberta e total para cada cartão
 $dadosCartoes = [];
 foreach ($cartoes as $c) {
@@ -156,11 +175,23 @@ require_once '../geral/header.php';
 <main class="container py-4 mt-2 flex-grow-1" style="padding-inline:var(--space-page-x);max-width:1100px;">
 
     <div class="d-flex align-items-center justify-content-between mb-4 border-bottom border-secondary-subtle pb-3 flex-wrap gap-3">
-        <button class="btn fw-bold rounded-pill px-4"
-            style="background:var(--color-card-text);color:#fff;border:none;"
-            data-bs-toggle="modal" data-bs-target="#modalCartao" onclick="abrirModalNovo()">
-            <i class="bi bi-plus-lg me-1"></i> Novo Cartão
-        </button>
+        <div class="d-flex gap-2 align-items-center">
+            <a href="../dashboard.php" class="btn btn-outline-secondary btn-sm rounded-pill px-3 d-flex align-items-center">
+                <i class="bi bi-arrow-left me-1"></i> Voltar
+            </a>
+            <?php if ($_podeCriarCC): ?>
+                <button class="btn btn-sm fw-bold rounded-pill px-4"
+                    style="background:var(--color-card-text);color:#fff;border:none;"
+                    data-bs-toggle="modal" data-bs-target="#modalCartao" onclick="abrirModalNovo()">
+                    <i class="bi bi-plus-lg me-1"></i> Novo Cartão
+                </button>
+            <?php else: ?>
+                <span class="d-inline-flex align-items-center gap-1 px-3 py-1 rounded-pill fw-semibold"
+                      style="background:rgba(124,58,237,0.15);color:#a78bfa;border:1px solid rgba(124,58,237,0.35);font-size:0.8rem;">
+                    <i class="bi bi-lock-fill"></i> Limite atingido &mdash; PRO
+                </span>
+            <?php endif; ?>
+        </div>
     </div>
 
     <?php if ($erro): ?>
@@ -170,114 +201,156 @@ require_once '../geral/header.php';
         <div class="alert rounded-3 mb-4" style="background:rgba(22,163,74,.15);border:1px solid rgba(22,163,74,.4);color:#86efac;"><?= htmlspecialchars($sucesso) ?></div>
     <?php endif; ?>
 
-    <?php if (empty($cartoes)): ?>
-        <div class="text-center py-5">
-            <i class="bi bi-credit-card-2-front" style="font-size:3rem;color:var(--text-muted);"></i>
-            <p class="text-secondary mt-3">Você ainda não tem cartões de crédito cadastrados.</p>
-            <button class="btn btn-outline-secondary rounded-pill px-4"
-                data-bs-toggle="modal" data-bs-target="#modalCartao" onclick="abrirModalNovo()">
-                Adicionar primeiro cartão
-            </button>
+    <?php if (!empty($cartoes_bloqueados_ids)): ?>
+        <div class="alert d-flex align-items-start gap-3 rounded-3 border-0 mb-4" style="background:var(--color-pending-bg);border:1px solid var(--color-today-bg) !important;">
+            <i class="bi bi-lock-fill mt-1 flex-shrink-0" style="color:var(--accent);"></i>
+            <div>
+                <strong class="text-light">Cartões bloqueados</strong>
+                <p class="mb-1 text-secondary" style="font-size:0.85rem;">
+                    Você tem <?= count($cartoes_bloqueados_ids) ?> cartão(ões) além do limite do plano Free (<?= $_limitesCC['cartoes'] ?> no total). Eles ficam visíveis mas não podem ser usados em novas transações.
+                </p>
+                <a href="\planos.php?upgrade=pro" class="btn btn-sm rounded-pill fw-semibold" style="background:var(--color-pending-bg);color:var(--color-pending-text);border:1px solid var(--color-today-bg);font-size:0.8rem;">
+                    <i class="bi bi-star-fill me-1"></i> Assinar PRO — até 3 cartões
+                </a>
+            </div>
         </div>
-    <?php else: ?>
-        <div class="row g-4">
-            <?php foreach ($cartoes as $c):
-                $d   = $dadosCartoes[$c['IDCartao']];
-                $cor = $c['Cor'];
-                $fatura = $d['fatura'];
-            ?>
-            <div class="col-12 col-md-6 col-lg-4">
-                <div class="card rounded-4 shadow-sm h-100" style="background:var(--bg-card);border:1.5px solid <?= $cor ?>55;">
+    <?php endif; ?>
 
-                    <!-- Visual do cartão -->
-                    <div class="rounded-top-4 p-4 position-relative overflow-hidden"
-                        style="background:linear-gradient(135deg,<?= $cor ?>cc,<?= $cor ?>66);min-height:120px;">
-                        <div style="position:absolute;top:-20px;right:-20px;width:120px;height:120px;background:rgba(255,255,255,.07);border-radius:50%;"></div>
-                        <div style="position:absolute;bottom:-30px;right:20px;width:80px;height:80px;background:rgba(255,255,255,.05);border-radius:50%;"></div>
-                        <div class="d-flex justify-content-between align-items-start position-relative">
-                            <div>
-                                <p class="fw-bold text-white mb-0" style="font-size:1.1rem;text-shadow:0 1px 3px rgba(0,0,0,.4);"><?= htmlspecialchars($c['Nome']) ?></p>
-                                <p class="text-white opacity-75 mb-0 small"><?= $bandeiras[$c['Bandeira']] ?? 'Cartão' ?></p>
-                            </div>
-                            <i class="bi bi-credit-card-2-front text-white opacity-75" style="font-size:1.6rem;"></i>
+    <div class="row g-4">
+        <?php if (empty($cartoes)): ?>
+            <div class="col-12 text-center py-4">
+                <i class="bi bi-credit-card-2-front" style="font-size:2.5rem;color:var(--text-muted);"></i>
+                <p class="text-secondary mt-3 mb-0">Você ainda não tem cartões de crédito cadastrados.</p>
+            </div>
+        <?php endif; ?>
+
+        <?php foreach ($cartoes as $c):
+            $d        = $dadosCartoes[$c['IDCartao']];
+            $cor      = $c['Cor'];
+            $fatura   = $d['fatura'];
+            $_cTrial  = in_array($c['IDCartao'], $cartoes_trial_ids);
+            $_cBlock  = in_array($c['IDCartao'], $cartoes_bloqueados_ids);
+        ?>
+        <div class="col-12 col-md-6 col-lg-4">
+            <div class="card rounded-4 shadow-sm h-100 position-relative"
+                 style="background:var(--bg-card);border:1.5px solid <?= $cor ?>55;<?= $_cBlock ? 'opacity:0.55;' : '' ?>">
+
+                <?php if ($_cTrial): ?>
+                    <span class="position-absolute top-0 end-0 m-2 d-flex align-items-center gap-1 px-2 py-1"
+                          style="background:rgba(124,58,237,0.18);color:#a78bfa;border:1px solid rgba(124,58,237,0.4);border-radius:999px;font-size:0.6rem;font-weight:700;z-index:10;">
+                        <i class="bi bi-star-fill"></i> PRO (teste)
+                    </span>
+                <?php elseif ($_cBlock): ?>
+                    <span class="position-absolute top-0 end-0 m-2 d-flex align-items-center gap-1 px-2 py-1"
+                          style="background:rgba(124,58,237,0.18);color:#a78bfa;border:1px solid rgba(124,58,237,0.4);border-radius:999px;font-size:0.6rem;font-weight:700;z-index:10;">
+                        <i class="bi bi-lock-fill"></i> PRO
+                    </span>
+                <?php endif; ?>
+
+                <!-- Visual do cartão -->
+                <div class="rounded-top-4 p-4 position-relative overflow-hidden"
+                    style="background:linear-gradient(135deg,<?= $cor ?>cc,<?= $cor ?>66);min-height:120px;">
+                    <div style="position:absolute;top:-20px;right:-20px;width:120px;height:120px;background:rgba(255,255,255,.07);border-radius:50%;"></div>
+                    <div style="position:absolute;bottom:-30px;right:20px;width:80px;height:80px;background:rgba(255,255,255,.05);border-radius:50%;"></div>
+                    <div class="d-flex justify-content-between align-items-start position-relative">
+                        <div>
+                            <p class="fw-bold text-white mb-0" style="font-size:1.1rem;text-shadow:0 1px 3px rgba(0,0,0,.4);"><?= htmlspecialchars($c['Nome']) ?></p>
+                            <p class="text-white opacity-75 mb-0 small"><?= $bandeiras[$c['Bandeira']] ?? 'Cartão' ?></p>
                         </div>
+                        <i class="bi bi-credit-card-2-front text-white opacity-75" style="font-size:1.6rem;"></i>
+                    </div>
+                </div>
+
+                <div class="card-body p-4">
+                    <!-- Fatura atual -->
+                    <div class="mb-3">
+                        <p class="text-secondary small mb-1">Fatura aberta</p>
+                        <p class="fw-bold text-light mb-0" style="font-size:1.5rem;">
+                            R$ <?= number_format($d['total'], 2, ',', '.') ?>
+                        </p>
+                        <?php if ($c['Limite']): ?>
+                            <?php $excedido = $d['pct'] !== null && $d['pct'] > 100; ?>
+                            <div class="mt-2">
+                                <div class="d-flex justify-content-between small mb-1" style="color:<?= $excedido ? '#fca5a5' : '' ?>">
+                                    <span class="text-secondary">Usado</span>
+                                    <span>
+                                        <?= $d['pct'] ?>% de R$ <?= number_format($c['Limite'], 2, ',', '.') ?>
+                                        <?php if ($excedido): ?>
+                                            <i class="bi bi-exclamation-triangle-fill ms-1" style="color:#ef4444;" title="Limite excedido"></i>
+                                        <?php endif; ?>
+                                    </span>
+                                </div>
+                                <div class="progress rounded-pill" style="height:5px;background:var(--bg-hover);">
+                                    <div class="progress-bar rounded-pill" style="width:<?= min(100, $d['pct']) ?>%;background:<?= $excedido ? '#ef4444' : $cor ?>;"></div>
+                                </div>
+                                <?php if ($excedido): ?>
+                                    <p class="mb-0 mt-1" style="font-size:.7rem;color:#fca5a5;">Limite excedido</p>
+                                <?php endif; ?>
+                            </div>
+                        <?php endif; ?>
                     </div>
 
-                    <div class="card-body p-4">
-                        <!-- Fatura atual -->
-                        <div class="mb-3">
-                            <p class="text-secondary small mb-1">Fatura aberta</p>
-                            <p class="fw-bold text-light mb-0" style="font-size:1.5rem;">
-                                R$ <?= number_format($d['total'], 2, ',', '.') ?>
+                    <!-- Datas -->
+                    <?php if ($fatura): ?>
+                    <div class="d-flex gap-3 mb-4">
+                        <div class="flex-grow-1 p-2 rounded-3 text-center" style="background:var(--bg-hover);border:1px solid var(--bs-border-color);">
+                            <p class="text-secondary mb-0" style="font-size:0.68rem;text-transform:uppercase;letter-spacing:.06em;">Fecha em</p>
+                            <p class="text-light fw-semibold mb-0 small">
+                                <?php
+                                if ($d['diasAte'] === 0) echo '<span style="color:var(--color-expense-text);">Hoje</span>';
+                                elseif ($d['diasAte'] === 1) echo '<span style="color:var(--accent);">Amanhã</span>';
+                                else echo $d['diasAte'] . ' dias';
+                                ?>
                             </p>
-                            <?php if ($c['Limite']): ?>
-                                <?php $excedido = $d['pct'] !== null && $d['pct'] > 100; ?>
-                                <div class="mt-2">
-                                    <div class="d-flex justify-content-between small mb-1" style="color:<?= $excedido ? '#fca5a5' : '' ?>">
-                                        <span class="text-secondary">Usado</span>
-                                        <span>
-                                            <?= $d['pct'] ?>% de R$ <?= number_format($c['Limite'], 2, ',', '.') ?>
-                                            <?php if ($excedido): ?>
-                                                <i class="bi bi-exclamation-triangle-fill ms-1" style="color:#ef4444;" title="Limite excedido"></i>
-                                            <?php endif; ?>
-                                        </span>
-                                    </div>
-                                    <div class="progress rounded-pill" style="height:5px;background:var(--bg-hover);">
-                                        <div class="progress-bar rounded-pill" style="width:<?= min(100, $d['pct']) ?>%;background:<?= $excedido ? '#ef4444' : $cor ?>;"></div>
-                                    </div>
-                                    <?php if ($excedido): ?>
-                                        <p class="mb-0 mt-1" style="font-size:.7rem;color:#fca5a5;">Limite excedido</p>
-                                    <?php endif; ?>
-                                </div>
-                            <?php endif; ?>
+                            <p class="text-secondary mb-0" style="font-size:0.68rem;"><?= date('d/m', strtotime($fatura['DataFechamento'])) ?></p>
                         </div>
+                        <div class="flex-grow-1 p-2 rounded-3 text-center" style="background:var(--bg-hover);border:1px solid var(--bs-border-color);">
+                            <p class="text-secondary mb-0" style="font-size:0.68rem;text-transform:uppercase;letter-spacing:.06em;">Vence em</p>
+                            <p class="text-light fw-semibold mb-0 small"><?= date('d/m', strtotime($fatura['DataVencimento'])) ?></p>
+                            <p class="text-secondary mb-0" style="font-size:0.68rem;">dia <?= $c['DiaVencimento'] ?></p>
+                        </div>
+                    </div>
+                    <?php endif; ?>
 
-                        <!-- Datas -->
-                        <?php if ($fatura): ?>
-                        <div class="d-flex gap-3 mb-4">
-                            <div class="flex-grow-1 p-2 rounded-3 text-center" style="background:var(--bg-hover);border:1px solid var(--bs-border-color);">
-                                <p class="text-secondary mb-0" style="font-size:0.68rem;text-transform:uppercase;letter-spacing:.06em;">Fecha em</p>
-                                <p class="text-light fw-semibold mb-0 small">
-                                    <?php
-                                    if ($d['diasAte'] === 0) echo '<span style="color:var(--color-expense-text);">Hoje</span>';
-                                    elseif ($d['diasAte'] === 1) echo '<span style="color:var(--accent);">Amanhã</span>';
-                                    else echo $d['diasAte'] . ' dias';
-                                    ?>
-                                </p>
-                                <p class="text-secondary mb-0" style="font-size:0.68rem;"><?= date('d/m', strtotime($fatura['DataFechamento'])) ?></p>
-                            </div>
-                            <div class="flex-grow-1 p-2 rounded-3 text-center" style="background:var(--bg-hover);border:1px solid var(--bs-border-color);">
-                                <p class="text-secondary mb-0" style="font-size:0.68rem;text-transform:uppercase;letter-spacing:.06em;">Vence em</p>
-                                <p class="text-light fw-semibold mb-0 small"><?= date('d/m', strtotime($fatura['DataVencimento'])) ?></p>
-                                <p class="text-secondary mb-0" style="font-size:0.68rem;">dia <?= $c['DiaVencimento'] ?></p>
-                            </div>
-                        </div>
-                        <?php endif; ?>
-
-                        <!-- Ações -->
-                        <div class="d-flex gap-2">
-                            <a href="fatura.php?cartao=<?= urlencode($c['IDCartao']) ?>"
-                               class="btn btn-sm flex-grow-1 rounded-pill fw-semibold"
-                               style="background:<?= $cor ?>22;color:<?= $cor ?>;border:1px solid <?= $cor ?>55;">
-                                <i class="bi bi-list-ul me-1"></i> Ver Fatura
-                            </a>
-                            <button class="btn btn-sm btn-outline-secondary rounded-pill px-3"
-                                onclick="abrirModalEditar(<?= htmlspecialchars(json_encode($c)) ?>)"
-                                data-bs-toggle="modal" data-bs-target="#modalCartao" title="Editar">
-                                <i class="bi bi-pencil-square"></i>
-                            </button>
-                            <button class="btn btn-sm btn-outline-danger rounded-pill px-3" title="Excluir"
-                                data-bs-toggle="modal" data-bs-target="#modalExcluirCartao"
-                                onclick="abrirModalExcluir('<?= $c['IDCartao'] ?>', '<?= htmlspecialchars($c['Nome'], ENT_QUOTES) ?>')">
-                                <i class="bi bi-trash3"></i>
-                            </button>
-                        </div>
+                    <!-- Ações -->
+                    <div class="d-flex gap-2">
+                        <a href="fatura.php?cartao=<?= urlencode($c['IDCartao']) ?>"
+                           class="btn btn-sm flex-grow-1 rounded-pill fw-semibold"
+                           style="background:<?= $cor ?>22;color:<?= $cor ?>;border:1px solid <?= $cor ?>55;">
+                            <i class="bi bi-list-ul me-1"></i> Ver Fatura
+                        </a>
+                        <button class="btn btn-sm btn-outline-secondary rounded-pill px-3"
+                            onclick="abrirModalEditar(<?= htmlspecialchars(json_encode($c)) ?>)"
+                            data-bs-toggle="modal" data-bs-target="#modalCartao" title="Editar">
+                            <i class="bi bi-pencil-square"></i>
+                        </button>
+                        <button class="btn btn-sm btn-outline-danger rounded-pill px-3" title="Excluir"
+                            data-bs-toggle="modal" data-bs-target="#modalExcluirCartao"
+                            onclick="abrirModalExcluir('<?= $c['IDCartao'] ?>', '<?= htmlspecialchars($c['Nome'], ENT_QUOTES) ?>')">
+                            <i class="bi bi-trash3"></i>
+                        </button>
                     </div>
                 </div>
             </div>
-            <?php endforeach; ?>
         </div>
-    <?php endif; ?>
+        <?php endforeach; ?>
+
+        <?php if ($_podeCriarCC): ?>
+        <div class="col-12 col-md-6 col-lg-4">
+            <div class="card rounded-4 h-100 d-flex align-items-center justify-content-center"
+                 style="background:transparent;border:2px dashed var(--bs-border-color);cursor:pointer;min-height:220px;"
+                 data-bs-toggle="modal" data-bs-target="#modalCartao" onclick="abrirModalNovo()">
+                <div class="text-center text-secondary py-4">
+                    <div class="d-flex align-items-center justify-content-center mb-3"
+                         style="width:56px;height:56px;border-radius:50%;background:rgba(212,175,55,0.12);border:2px solid rgba(212,175,55,0.25);margin:0 auto;">
+                        <i class="bi bi-plus-lg" style="font-size:1.4rem;color:var(--accent);"></i>
+                    </div>
+                    <p class="mb-0 fw-semibold" style="font-size:0.9rem;">Adicionar Novo Cartão</p>
+                </div>
+            </div>
+        </div>
+        <?php endif; ?>
+    </div>
 </main>
 
 <!-- MODAL: Adicionar / Editar Cartão -->
