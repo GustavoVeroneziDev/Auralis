@@ -778,8 +778,12 @@ input[type="number"] {
 .auralis-sidebar.sidebar-collapsed .sidebar-badge {
   opacity: 0;
   pointer-events: none;
+  flex: 0 0 0px;
+  width: 0;
   max-width: 0;
   overflow: hidden;
+  padding: 0;
+  margin: 0;
 }
 
 /* Logo text: opacity + width 0 para remover o espaço no layout */
