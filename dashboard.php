@@ -138,6 +138,16 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'])) {
                 $sqlToggle  = "UPDATE Registro SET StatusRegistro = :status WHERE IDRegistro = :id AND FKUsuario = :uid";
                 $stmtToggle = $pdo->prepare($sqlToggle);
                 $stmtToggle->execute([':status' => $novo_status, ':id' => $id_registro, ':uid' => $usuario_id]);
+                // Se for transferência, sincroniza o par (ambos os lados)
+                try {
+                    $chkTransf = $pdo->prepare("SELECT GrupoParcela FROM Registro WHERE IDRegistro = :id AND FKUsuario = :uid AND TipoRegistro IN ('transferencia_saida','transferencia_entrada')");
+                    $chkTransf->execute([':id' => $id_registro, ':uid' => $usuario_id]);
+                    $grupoPar = $chkTransf->fetchColumn();
+                    if ($grupoPar) {
+                        $pdo->prepare("UPDATE Registro SET StatusRegistro = :status WHERE GrupoParcela = :g AND FKUsuario = :uid AND TipoRegistro IN ('transferencia_saida','transferencia_entrada') AND IDRegistro != :id")
+                            ->execute([':status' => $novo_status, ':g' => $grupoPar, ':uid' => $usuario_id, ':id' => $id_registro]);
+                    }
+                } catch (PDOException $e) {}
                 // Sincroniza status da fatura de cartão vinculada
                 try {
                     if ($novo_status === 'efetivado') {
@@ -335,10 +345,12 @@ if ($carteira_selecionada) {
     try {
         $sqlSaldo = "
                 SELECT
-                    COALESCE(SUM(CASE WHEN TipoRegistro = 'receita'           THEN Valor ELSE 0 END), 0) as total_rec_hist,
-                    COALESCE(SUM(CASE WHEN TipoRegistro = 'despesa'           THEN Valor ELSE 0 END), 0) as total_des_hist,
-                    COALESCE(SUM(CASE WHEN TipoRegistro = 'cofrinho'          THEN Valor ELSE 0 END), 0) as total_cof_dep,
-                    COALESCE(SUM(CASE WHEN TipoRegistro = 'cofrinho_retirada' THEN Valor ELSE 0 END), 0) as total_cof_ret
+                    COALESCE(SUM(CASE WHEN TipoRegistro = 'receita'               THEN Valor ELSE 0 END), 0) as total_rec_hist,
+                    COALESCE(SUM(CASE WHEN TipoRegistro = 'despesa'               THEN Valor ELSE 0 END), 0) as total_des_hist,
+                    COALESCE(SUM(CASE WHEN TipoRegistro = 'cofrinho'              THEN Valor ELSE 0 END), 0) as total_cof_dep,
+                    COALESCE(SUM(CASE WHEN TipoRegistro = 'cofrinho_retirada'     THEN Valor ELSE 0 END), 0) as total_cof_ret,
+                    COALESCE(SUM(CASE WHEN TipoRegistro = 'transferencia_entrada' THEN Valor ELSE 0 END), 0) as total_transf_in,
+                    COALESCE(SUM(CASE WHEN TipoRegistro = 'transferencia_saida'   THEN Valor ELSE 0 END), 0) as total_transf_out
                 FROM Registro
                 WHERE FKCarteira = :carteira_id
                   AND FKUsuario = :usuario_id
@@ -351,8 +363,10 @@ if ($carteira_selecionada) {
         if ($resultSaldo) {
             $saldoAtual = (float) $resultSaldo['total_rec_hist']
                 + (float) $resultSaldo['total_cof_ret']
+                + (float) $resultSaldo['total_transf_in']
                 - (float) $resultSaldo['total_des_hist']
-                - (float) $resultSaldo['total_cof_dep'];
+                - (float) $resultSaldo['total_cof_dep']
+                - (float) $resultSaldo['total_transf_out'];
         }
 
         // CORREÇÃO: EXTRACT trocado por MONTH() e YEAR()
@@ -388,9 +402,17 @@ if ($carteira_selecionada) {
                     r.DataVencimento, r.Recorrente, r.DiaVencimento,
                     r.GrupoParcela, r.ParcelaAtual, r.TotalParcelas,
                     c.NomeCategoria, c.IconeCategoria,
-                    (SELECT COUNT(*) FROM Comprovante WHERE FKRegistro = r.IDRegistro AND FKUsuario = r.FKUsuario) AS qtd_comprovantes
+                    (SELECT COUNT(*) FROM Comprovante WHERE FKRegistro = r.IDRegistro AND FKUsuario = r.FKUsuario) AS qtd_comprovantes,
+                    cart_par.TipoCarteira AS NomeCarteiraTransferencia
                 FROM Registro r
                 LEFT JOIN Categoria c ON r.FKCategoria = c.IDCategoria
+                LEFT JOIN Registro r_par ON (
+                    r.TipoRegistro IN ('transferencia_saida','transferencia_entrada')
+                    AND r.GrupoParcela IS NOT NULL
+                    AND r_par.GrupoParcela = r.GrupoParcela
+                    AND r_par.IDRegistro != r.IDRegistro
+                )
+                LEFT JOIN Carteira cart_par ON cart_par.IDCarteira = r_par.FKCarteira
                 WHERE r.FKCarteira = :carteira_id
                   AND r.FKUsuario = :usuario_id
                   AND r.TipoRegistro NOT IN ('cofrinho','cofrinho_retirada')
@@ -677,6 +699,15 @@ require_once 'geral/header.php';
                         style="font-size: 0.875rem; padding: 0.375rem 0.875rem;">
                         <i class="bi bi-arrow-down-short fs-5"></i> Despesa
                     </a>
+
+                    <?php if ($totalCarteiras >= 2): ?>
+                    <button type="button"
+                        class="btn btn-outline-info fw-semibold d-flex align-items-center justify-content-center gap-1 rounded-pill transition-hover shadow-sm flex-grow-1"
+                        style="font-size: 0.875rem; padding: 0.375rem 0.875rem;"
+                        data-bs-toggle="modal" data-bs-target="#modalTransferencia">
+                        <i class="bi bi-arrow-left-right" style="font-size:0.95rem;"></i> Transferir
+                    </button>
+                    <?php endif; ?>
                 </div>
 
             </div>
@@ -978,17 +1009,25 @@ require_once 'geral/header.php';
                 </thead>
                 <tbody class="border-top-0">
                     <?php foreach ($transacoes as $index => $t):
-                        $isDespesa     = ($t['TipoRegistro'] === 'despesa');
-                        $sinalValor    = $isDespesa ? '-' : '+';
-                        $corValor      = $isDespesa ? 'text-danger' : 'text-success';
-                        $dataFormatada = date('d/m/Y', strtotime($t['MomentoRegistro']));
-                        $iconeTipo = $isDespesa
-                            ? '<span class="d-inline-flex align-items-center justify-content-center rounded-circle bg-danger bg-opacity-10 flex-shrink-0 me-3" style="width:32px;height:32px;min-width:32px;"><i class="bi bi-arrow-down-short text-danger" style="font-size:1.1rem;"></i></span>'
-                            : '<span class="d-inline-flex align-items-center justify-content-center rounded-circle bg-success bg-opacity-10 flex-shrink-0 me-3" style="width:32px;height:32px;min-width:32px;"><i class="bi bi-arrow-up-short text-success" style="font-size:1.1rem;"></i></span>';
+                        $isTransfSaida  = ($t['TipoRegistro'] === 'transferencia_saida');
+                        $isTransfEntr   = ($t['TipoRegistro'] === 'transferencia_entrada');
+                        $isTransfer     = $isTransfSaida || $isTransfEntr;
+                        $isDespesa      = ($t['TipoRegistro'] === 'despesa');
+                        $sinalValor     = ($isDespesa || $isTransfSaida) ? '-' : '+';
+                        $corValor       = ($isDespesa || $isTransfSaida) ? 'text-danger' : 'text-success';
+                        $dataFormatada  = date('d/m/Y', strtotime($t['MomentoRegistro']));
+
+                        if ($isTransfer) {
+                            $iconeTipo = '<span class="d-inline-flex align-items-center justify-content-center rounded-circle flex-shrink-0 me-3" style="width:32px;height:32px;min-width:32px;background:rgba(96,165,250,0.12);"><i class="bi bi-arrow-left-right" style="color:#60a5fa;font-size:0.85rem;"></i></span>';
+                        } elseif ($isDespesa) {
+                            $iconeTipo = '<span class="d-inline-flex align-items-center justify-content-center rounded-circle bg-danger bg-opacity-10 flex-shrink-0 me-3" style="width:32px;height:32px;min-width:32px;"><i class="bi bi-arrow-down-short text-danger" style="font-size:1.1rem;"></i></span>';
+                        } else {
+                            $iconeTipo = '<span class="d-inline-flex align-items-center justify-content-center rounded-circle bg-success bg-opacity-10 flex-shrink-0 me-3" style="width:32px;height:32px;min-width:32px;"><i class="bi bi-arrow-up-short text-success" style="font-size:1.1rem;"></i></span>';
+                        }
 
                         $rowId           = "transacao-" . $index;
                         $isPendente      = ($t['StatusRegistro'] === 'pendente');
-                        $textoAcaoStatus = $isDespesa ? 'Marcar como Pago' : 'Marcar como Recebido';
+                        $textoAcaoStatus = $isTransfer ? 'Confirmar' : ($isDespesa ? 'Marcar como Pago' : 'Marcar como Recebido');
                     ?>
                         <tr data-bs-toggle="collapse" data-bs-target="#<?php echo $rowId ?>" class="cursor-pointer transition-hover" style="cursor: pointer;">
 
@@ -1002,6 +1041,11 @@ require_once 'geral/header.php';
                                             <?php endif; ?>
                                             <?php echo htmlspecialchars($t['Descricao']) ?>
                                         </span>
+                                        <?php if ($isTransfer && !empty($t['NomeCarteiraTransferencia'])): ?>
+                                            <div class="mt-1" style="font-size:0.72rem;color:#60a5fa;">
+                                                <?php echo $isTransfSaida ? '→' : '←' ?> <?php echo htmlspecialchars($t['NomeCarteiraTransferencia']) ?>
+                                            </div>
+                                        <?php endif; ?>
 
                                         <div class="mt-1 d-flex flex-wrap gap-1 align-items-center">
 
@@ -1054,24 +1098,37 @@ require_once 'geral/header.php';
                                     <div class="p-3 p-md-4 bg-charcoal-analysis border-bottom border-secondary-subtle d-flex flex-column flex-md-row justify-content-between align-items-start gap-3">
 
                                         <div class="d-flex gap-4 w-100 w-md-auto">
-                                            <?php $labelData = $isDespesa ? 'Vencimento' : 'Recebimento'; ?>
-                                            <div>
-                                                <span class="d-block text-secondary small text-uppercase mb-1"><?php echo $labelData ?></span>
-                                                <span class="text-light fs-6">
-                                                    <?php echo (! empty($t['DataVencimento']) && strtotime($t['DataVencimento'])) ? date('d/m/Y', strtotime($t['DataVencimento'])) : '<span class="text-muted">Não definido</span>' ?>
-                                                </span>
-                                            </div>
+                                            <?php if ($isTransfer): ?>
+                                                <div>
+                                                    <span class="d-block text-secondary small text-uppercase mb-1"><?php echo $isTransfSaida ? 'Destino' : 'Origem' ?></span>
+                                                    <span class="text-light fs-6" style="color:#60a5fa!important;">
+                                                        <?php echo htmlspecialchars($t['NomeCarteiraTransferencia'] ?? '—') ?>
+                                                    </span>
+                                                </div>
+                                                <div>
+                                                    <span class="d-block text-secondary small text-uppercase mb-1">Data</span>
+                                                    <span class="text-light fs-6"><?php echo $dataFormatada ?></span>
+                                                </div>
+                                            <?php else: ?>
+                                                <?php $labelData = $isDespesa ? 'Vencimento' : 'Recebimento'; ?>
+                                                <div>
+                                                    <span class="d-block text-secondary small text-uppercase mb-1"><?php echo $labelData ?></span>
+                                                    <span class="text-light fs-6">
+                                                        <?php echo (! empty($t['DataVencimento']) && strtotime($t['DataVencimento'])) ? date('d/m/Y', strtotime($t['DataVencimento'])) : '<span class="text-muted">Não definido</span>' ?>
+                                                    </span>
+                                                </div>
 
-                                            <?php if ($t['Recorrente'] == 1): ?>
-                                                <div>
-                                                    <span class="d-block text-secondary small text-uppercase mb-1">Recorrência</span>
-                                                    <span class="text-light fs-6">Sim (Dia <?php echo htmlspecialchars($t['DiaVencimento']); ?>)</span>
-                                                </div>
-                                            <?php elseif (!empty($t['TotalParcelas']) && $t['TotalParcelas'] > 1): ?>
-                                                <div>
-                                                    <span class="d-block text-secondary small text-uppercase mb-1">Parcelado</span>
-                                                    <span class="text-light fs-6">Parcela <?php echo $t['ParcelaAtual']; ?> de <?php echo $t['TotalParcelas']; ?></span>
-                                                </div>
+                                                <?php if ($t['Recorrente'] == 1): ?>
+                                                    <div>
+                                                        <span class="d-block text-secondary small text-uppercase mb-1">Recorrência</span>
+                                                        <span class="text-light fs-6">Sim (Dia <?php echo htmlspecialchars($t['DiaVencimento']); ?>)</span>
+                                                    </div>
+                                                <?php elseif (!empty($t['TotalParcelas']) && $t['TotalParcelas'] > 1): ?>
+                                                    <div>
+                                                        <span class="d-block text-secondary small text-uppercase mb-1">Parcelado</span>
+                                                        <span class="text-light fs-6">Parcela <?php echo $t['ParcelaAtual']; ?> de <?php echo $t['TotalParcelas']; ?></span>
+                                                    </div>
+                                                <?php endif; ?>
                                             <?php endif; ?>
                                         </div>
 
@@ -1092,9 +1149,11 @@ require_once 'geral/header.php';
                                                 <?php endif; ?>
                                             </form>
 
+                                            <?php if (!$isTransfer): ?>
                                             <a href="nova_transacao.php?editar=<?php echo $t['IDRegistro'] ?>&voltar=<?php echo urlencode($_uv_dash) ?>" class="btn btn-sm btn-outline-warning rounded-pill fw-semibold px-3 d-inline-flex align-items-center gap-1 transition-hover">
                                                 <i class="bi bi-pencil-square"></i> <span class="d-none d-sm-inline">Editar</span>
                                             </a>
+                                            <?php endif; ?>
 
                                             <?php if ($_temAcessoComp && ($t['qtd_comprovantes'] ?? 0) > 0): ?>
                                                 <button type="button"
@@ -1105,6 +1164,14 @@ require_once 'geral/header.php';
                                                 </button>
                                             <?php endif; ?>
 
+                                            <?php if ($isTransfer): ?>
+                                                <!-- BOTÃO: EXCLUIR TRANSFERÊNCIA (par inteiro) -->
+                                                <button type="button"
+                                                    class="btn btn-sm btn-outline-danger rounded-pill fw-semibold px-3 d-inline-flex align-items-center gap-1 transition-hover"
+                                                    onclick="excluirTransferencia('<?php echo htmlspecialchars($t['GrupoParcela'] ?? '') ?>')">
+                                                    <i class="bi bi-trash3"></i> <span class="d-none d-sm-inline">Excluir</span>
+                                                </button>
+                                            <?php else: ?>
                                             <?php
                                             // Identifica o tipo de transação
                                             $is_recorrente = ($t['Recorrente'] == 1 && !empty($t['GrupoParcela']) && empty($t['TotalParcelas']));
@@ -1145,6 +1212,7 @@ require_once 'geral/header.php';
                                                     <i class="bi bi-trash3"></i> <span class="d-none d-sm-inline">Excluir</span>
                                                 </button>
                                             <?php endif; ?>
+                                            <?php endif; // isTransfer ?>
                                         </div>
                                     </div>
                                 </div>
@@ -1460,6 +1528,94 @@ require_once 'geral/header.php';
     </div>
 </div>
 
+<!-- ── Modal: Transferência entre Carteiras ─────────────────────────────── -->
+<?php if ($totalCarteiras >= 2): ?>
+<div class="modal fade" id="modalTransferencia" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content border-secondary-subtle rounded-4" style="background:var(--bg-card);">
+            <div class="modal-header border-secondary-subtle pb-2">
+                <div class="d-flex align-items-center gap-2">
+                    <span class="d-inline-flex align-items-center justify-content-center rounded-3" style="width:34px;height:34px;background:rgba(96,165,250,0.12);">
+                        <i class="bi bi-arrow-left-right" style="color:#60a5fa;font-size:0.95rem;"></i>
+                    </span>
+                    <h5 class="modal-title fw-bold text-light mb-0">Transferência entre Carteiras</h5>
+                </div>
+                <button type="button" class="btn-close btn-close-white opacity-50" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body pt-3">
+                <div id="transf-erro" class="alert alert-danger d-none py-2 small" role="alert"></div>
+
+                <div class="mb-3">
+                    <label class="form-label text-secondary small fw-semibold text-uppercase mb-1">De (origem)</label>
+                    <select id="transf-de" class="form-select bg-body-tertiary border-secondary-subtle text-light">
+                        <?php foreach ($carteiras as $cart): ?>
+                            <option value="<?php echo htmlspecialchars($cart['IDCarteira']) ?>"
+                                <?php echo ($carteira_selecionada == $cart['IDCarteira']) ? 'selected' : '' ?>>
+                                <?php echo htmlspecialchars($cart['TipoCarteira']) ?>
+                            </option>
+                        <?php endforeach; ?>
+                    </select>
+                </div>
+
+                <div class="d-flex justify-content-center my-1">
+                    <i class="bi bi-arrow-down text-secondary" style="font-size:1.1rem;"></i>
+                </div>
+
+                <div class="mb-3">
+                    <label class="form-label text-secondary small fw-semibold text-uppercase mb-1">Para (destino)</label>
+                    <select id="transf-para" class="form-select bg-body-tertiary border-secondary-subtle text-light">
+                        <?php foreach ($carteiras as $cart): ?>
+                            <option value="<?php echo htmlspecialchars($cart['IDCarteira']) ?>"
+                                <?php echo ($carteira_selecionada != $cart['IDCarteira']) ? 'selected' : '' ?>>
+                                <?php echo htmlspecialchars($cart['TipoCarteira']) ?>
+                            </option>
+                        <?php endforeach; ?>
+                    </select>
+                </div>
+
+                <div class="mb-3">
+                    <label class="form-label text-secondary small fw-semibold text-uppercase mb-1">Valor</label>
+                    <div class="input-group">
+                        <span class="input-group-text bg-body-tertiary border-secondary-subtle text-secondary fw-bold">R$</span>
+                        <input type="number" id="transf-valor" class="form-control bg-body-tertiary border-secondary-subtle text-light"
+                            min="0.01" step="0.01" placeholder="0,00">
+                    </div>
+                </div>
+
+                <div class="mb-3">
+                    <label class="form-label text-secondary small fw-semibold text-uppercase mb-1">Descrição</label>
+                    <input type="text" id="transf-desc" class="form-control bg-body-tertiary border-secondary-subtle text-light"
+                        value="Transferência entre carteiras" maxlength="120">
+                </div>
+
+                <div class="row g-2">
+                    <div class="col-7">
+                        <label class="form-label text-secondary small fw-semibold text-uppercase mb-1">Data</label>
+                        <input type="date" id="transf-data" class="form-control bg-body-tertiary border-secondary-subtle text-light"
+                            value="<?php echo date('Y-m-d') ?>">
+                    </div>
+                    <div class="col-5">
+                        <label class="form-label text-secondary small fw-semibold text-uppercase mb-1">Status</label>
+                        <select id="transf-status" class="form-select bg-body-tertiary border-secondary-subtle text-light">
+                            <option value="efetivado">Efetivado</option>
+                            <option value="pendente">Pendente</option>
+                        </select>
+                    </div>
+                </div>
+            </div>
+            <div class="modal-footer border-secondary-subtle pt-2">
+                <button type="button" class="btn btn-outline-secondary rounded-pill px-4" data-bs-dismiss="modal">Cancelar</button>
+                <button type="button" id="transf-salvar"
+                    class="btn fw-semibold rounded-pill px-4"
+                    style="background:rgba(96,165,250,0.15);color:#60a5fa;border:1px solid rgba(96,165,250,0.35);">
+                    <i class="bi bi-arrow-left-right me-1"></i> Transferir
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+<?php endif; ?>
+
 <style>
     .bg-charcoal-analysis {
         background-color: var(--bg-charcoal-analysis);
@@ -1635,6 +1791,88 @@ require_once 'geral/header.php';
             })
             .catch(() => {
                 body.innerHTML = '<p class="text-danger text-center py-3">Erro ao carregar comprovantes.</p>';
+            });
+    }
+
+    // ── Transferência entre Carteiras ──────────────────────────────────────
+    (function() {
+        var btn = document.getElementById('transf-salvar');
+        if (!btn) return;
+        btn.addEventListener('click', function() {
+            var de     = document.getElementById('transf-de').value;
+            var para   = document.getElementById('transf-para').value;
+            var valor  = parseFloat(document.getElementById('transf-valor').value);
+            var desc   = document.getElementById('transf-desc').value.trim();
+            var data   = document.getElementById('transf-data').value;
+            var status = document.getElementById('transf-status').value;
+            var erroEl = document.getElementById('transf-erro');
+
+            erroEl.classList.add('d-none');
+            if (de === para)       { erroEl.textContent = 'Selecione carteiras diferentes.'; erroEl.classList.remove('d-none'); return; }
+            if (!valor || valor <= 0) { erroEl.textContent = 'Informe um valor válido.'; erroEl.classList.remove('d-none'); return; }
+            if (!data)             { erroEl.textContent = 'Informe a data.'; erroEl.classList.remove('d-none'); return; }
+
+            btn.disabled = true;
+            btn.innerHTML = '<span class="spinner-border spinner-border-sm me-1"></span> Transferindo...';
+
+            var fd = new FormData();
+            fd.append('acao',   'criar');
+            fd.append('de',     de);
+            fd.append('para',   para);
+            fd.append('valor',  valor);
+            fd.append('desc',   desc || 'Transferência entre carteiras');
+            fd.append('data',   data);
+            fd.append('status', status);
+
+            fetch('carteira/transferencia.php', { method: 'POST', body: fd })
+                .then(function(r) { return r.json(); })
+                .then(function(res) {
+                    if (res.ok) {
+                        bootstrap.Modal.getInstance(document.getElementById('modalTransferencia')).hide();
+                        window.location.reload();
+                    } else {
+                        var msgs = {
+                            carteiras_iguais:  'Selecione carteiras diferentes.',
+                            valor_invalido:    'Valor inválido.',
+                            carteira_invalida: 'Carteira inválida ou sem permissão.',
+                            data_invalida:     'Data inválida.'
+                        };
+                        erroEl.textContent = msgs[res.erro] || ('Erro: ' + (res.erro || 'desconhecido'));
+                        erroEl.classList.remove('d-none');
+                        btn.disabled = false;
+                        btn.innerHTML = '<i class="bi bi-arrow-left-right me-1"></i> Transferir';
+                    }
+                })
+                .catch(function() {
+                    erroEl.textContent = 'Erro de comunicação. Tente novamente.';
+                    erroEl.classList.remove('d-none');
+                    btn.disabled = false;
+                    btn.innerHTML = '<i class="bi bi-arrow-left-right me-1"></i> Transferir';
+                });
+        });
+
+        // Limpa erro e reseta botão ao reabrir o modal
+        var modal = document.getElementById('modalTransferencia');
+        if (modal) {
+            modal.addEventListener('show.bs.modal', function() {
+                document.getElementById('transf-erro').classList.add('d-none');
+                btn.disabled = false;
+                btn.innerHTML = '<i class="bi bi-arrow-left-right me-1"></i> Transferir';
+                document.getElementById('transf-valor').value = '';
+            });
+        }
+    })();
+
+    function excluirTransferencia(grupo) {
+        if (!grupo || !confirm('Excluir esta transferência? Isso remove o registro em ambas as carteiras.')) return;
+        var fd = new FormData();
+        fd.append('acao',  'excluir');
+        fd.append('grupo', grupo);
+        fetch('carteira/transferencia.php', { method: 'POST', body: fd })
+            .then(function(r) { return r.json(); })
+            .then(function(res) {
+                if (res.ok) { window.location.reload(); }
+                else { alert('Erro ao excluir: ' + (res.erro || 'desconhecido')); }
             });
     }
 
