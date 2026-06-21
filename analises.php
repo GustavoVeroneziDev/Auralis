@@ -1197,42 +1197,6 @@ require_once 'geral/header.php';
     </div>
 </div>
 
-<!-- ══════════════════════════════════════════════════════════════════════ -->
-<!-- ── Modal: Depositar ────────────────────────────────────────────── -->
-<!-- ══════════════════════════════════════════════════════════════════════ -->
-<div class="modal fade" id="modalDepositar" tabindex="-1" aria-hidden="true">
-    <div class="modal-dialog modal-dialog-centered" style="max-width:380px;">
-        <div class="modal-content border-secondary-subtle shadow-lg rounded-4" style="background:var(--bg-card);">
-            <div class="modal-header border-bottom border-secondary-subtle p-4">
-                <h6 class="modal-title text-light fw-bold" id="modalDepositarTitulo">
-                    <i class="bi bi-arrow-down-circle me-2" style="color:#f59e0b;"></i> Depositar
-                </h6>
-                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
-            </div>
-            <form method="POST" action="cofrinho/processa_cofrinho.php?acao=depositar">
-                <input type="hidden" name="id_cofrinho" id="depositar_id_cofrinho">
-                <div class="modal-body p-4">
-                    <label class="form-label text-secondary small fw-semibold">Valor do depósito (R$) *</label>
-                    <input type="number" name="valor" id="depositar_valor"
-                           class="form-control form-control-lg rounded-3 border-secondary-subtle"
-                           style="background:var(--bg-hover);color:var(--text-main);font-size:1.4rem;font-weight:700;"
-                           placeholder="0,00" min="0.01" step="0.01" required autofocus>
-                    <div class="text-secondary small mt-2">
-                        <i class="bi bi-info-circle me-1"></i>O valor será debitado do saldo da carteira vinculada.
-                    </div>
-                </div>
-                <div class="modal-footer border-top border-secondary-subtle p-3">
-                    <button type="button" class="btn btn-outline-secondary rounded-pill px-3" data-bs-dismiss="modal">Cancelar</button>
-                    <button type="submit" class="btn fw-semibold rounded-pill px-4"
-                            style="background:rgba(245,158,11,0.15);color:#f59e0b;border:1px solid rgba(245,158,11,0.4);">
-                        <i class="bi bi-check-lg me-1"></i> Confirmar depósito
-                    </button>
-                </div>
-            </form>
-        </div>
-    </div>
-</div>
-
 <!-- ── Modal: Editar Cofrinho ─────────────────────────────────────────── -->
 <div class="modal fade" id="modalEditarCofrinho" tabindex="-1" aria-hidden="true">
     <div class="modal-dialog modal-dialog-centered" style="max-width:480px;">
