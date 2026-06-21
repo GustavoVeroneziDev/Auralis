@@ -213,7 +213,7 @@ require_once '../geral/header.php';
                     Você tem <?= count($cartoes_bloqueados_ids) ?> cartão(ões) além do limite do plano <?= $_nomePlanoCC ?> (<?= $_limitesCC['cartoes'] ?> no total). Eles ficam visíveis mas não podem ser usados em novas transações.
                 </p>
                 <a href="/planos.php?upgrade=<?= $_upgradeSlugCC ?>" class="btn btn-sm rounded-pill fw-semibold" style="background:var(--color-pending-bg);color:var(--color-pending-text);border:1px solid var(--color-today-bg);font-size:0.8rem;">
-                    <i class="bi bi-star-fill me-1"></i> Assinar <?= $_nomeUpgradeCC ?> — até <?= limitesDoPlano($_upgradeSlugCC)['cartoes'] ?> cartões
+                    <i class="bi bi-star-fill me-1"></i> Assinar <?= $_nomeUpgradeCC ?> — até <?= exibirLimite(limitesDoPlano($_upgradeSlugCC)['cartoes']) ?> cartões
                 </a>
             </div>
         </div>
@@ -363,7 +363,7 @@ require_once '../geral/header.php';
                             <i class="bi bi-lock-fill fs-3" style="color:var(--color-card-text);"></i>
                         </div>
                         <h6 class="fw-semibold mb-1" style="color:var(--color-card-text);">Limite do plano <?= $_nomePlanoCC ?></h6>
-                        <p class="text-secondary mb-0" style="font-size:0.75rem;">Assine o <?= $_nomeUpgradeCC ?> para até <?= limitesDoPlano($_upgradeSlugCC)['cartoes'] ?> cartão(ões)</p>
+                        <p class="text-secondary mb-0" style="font-size:0.75rem;">Assine o <?= $_nomeUpgradeCC ?> para até <?= exibirLimite(limitesDoPlano($_upgradeSlugCC)['cartoes']) ?> cartão(ões)</p>
                     </div>
                 </div>
             </a>

@@ -90,6 +90,12 @@ if (!function_exists('badgePlano')) {
     }
 }
 
+if (!function_exists('exibirLimite')) {
+    function exibirLimite($valor) {
+        return $valor === PHP_INT_MAX ? 'ilimitado' : $valor;
+    }
+}
+
 if (!function_exists('limitesDoPlano')) {
     function limitesDoPlano($planoExplicito = null)
     {
