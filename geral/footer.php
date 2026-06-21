@@ -240,9 +240,17 @@ if (window._pendingToast) auralisToast(window._pendingToast);
     if (overlay) overlay.addEventListener('click', closeSidebar);
 
     // Desktop: collapse/expand — no mobile fecha a sidebar em vez de colapsar
+    function isMobile() { return window.innerWidth < 992; }
+
     if (toggle) {
+        // Adapta ícone para mobile ao carregar
+        if (isMobile()) {
+            var mIcon = toggle.querySelector('i');
+            if (mIcon) mIcon.className = 'bi bi-chevron-left';
+        }
+
         toggle.addEventListener('click', function() {
-            if (window.innerWidth < 992) {
+            if (isMobile()) {
                 closeSidebar();
                 return;
             }
@@ -252,12 +260,28 @@ if (window._pendingToast) auralisToast(window._pendingToast);
                 ? 'bi bi-layout-sidebar'
                 : 'bi bi-layout-sidebar-reverse';
         });
-        // Sync icon with initial state
-        if (sidebar.classList.contains('sidebar-collapsed')) {
+        // Sync icon with initial state (desktop)
+        if (!isMobile() && sidebar.classList.contains('sidebar-collapsed')) {
             var icon = toggle.querySelector('i');
             if (icon) icon.className = 'bi bi-layout-sidebar';
         }
     }
+
+    // Fecha sidebar ao redimensionar para desktop (evita ficar preso em mobile-open)
+    window.addEventListener('resize', function() {
+        if (!isMobile() && toggle) {
+            var dIcon = toggle.querySelector('i');
+            if (dIcon && dIcon.className === 'bi bi-chevron-left') {
+                dIcon.className = sidebar.classList.contains('sidebar-collapsed')
+                    ? 'bi bi-layout-sidebar'
+                    : 'bi bi-layout-sidebar-reverse';
+            }
+        }
+        if (isMobile() && toggle) {
+            var mIcon2 = toggle.querySelector('i');
+            if (mIcon2) mIcon2.className = 'bi bi-chevron-left';
+        }
+    });
 })();
 </script>
 <?php endif; ?>

@@ -910,9 +910,14 @@ input[type="number"] {
     margin-left: 0 !important;
   }
 
-  /* Oculta botão de collapse no mobile — não faz sentido em overlay */
+  /* No mobile, botão vira "fechar sidebar" — ícone trocado via JS */
   .sidebar-toggle {
-    display: none !important;
+    display: flex !important;
+    width: auto !important;
+    padding: 10px 16px !important;
+    border-radius: 8px !important;
+    color: var(--text-secondary) !important;
+    font-size: 1.1rem !important;
   }
 
   .auralis-mobile-topbar {
