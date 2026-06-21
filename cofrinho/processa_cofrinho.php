@@ -214,7 +214,7 @@ if ($acao === 'retirar') {
         ]);
         header("Location: {$voltar}?sucesso=retirada_realizada#cofrinhos");
     } catch (PDOException $e) {
-        header("Location: {$voltar}?erro=banco#cofrinhos");
+        header("Location: {$voltar}?erro=banco&detail=" . urlencode($e->getMessage()) . "#cofrinhos");
     }
     exit;
 }
@@ -275,7 +275,7 @@ if ($acao === 'reajustar') {
         ]);
         header("Location: {$voltar}?sucesso=reajuste_feito#cofrinhos");
     } catch (PDOException $e) {
-        header("Location: {$voltar}?erro=banco#cofrinhos");
+        header("Location: {$voltar}?erro=banco&detail=" . urlencode($e->getMessage()) . "#cofrinhos");
     }
     exit;
 }

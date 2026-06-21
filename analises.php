@@ -510,6 +510,16 @@ require_once 'geral/header.php';
             </div>
         <?php endif; ?>
 
+        <?php if (isset($_GET['erro'])): ?>
+            <div class="alert rounded-4 border-0 mb-3 py-2 px-3 small fw-semibold" style="background:rgba(220,38,38,0.15);color:#fca5a5;">
+                <i class="bi bi-exclamation-triangle me-2"></i>Erro ao processar:
+                <?= htmlspecialchars($_GET['erro']) ?>
+                <?php if (!empty($_GET['detail'])): ?>
+                    <br><code style="font-size:0.78rem;opacity:0.8;"><?= htmlspecialchars($_GET['detail']) ?></code>
+                <?php endif; ?>
+            </div>
+        <?php endif; ?>
+
         <?php if (empty($cofrinhos)): ?>
             <div class="card bg-body-tertiary border-secondary-subtle rounded-4 shadow-sm">
                 <div class="card-body text-center py-5">
