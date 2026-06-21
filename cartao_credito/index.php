@@ -127,12 +127,15 @@ cartao_verificarFechamentos($pdo, $uid);
 $cartoes = cartao_listarAtivos($pdo, $uid);
 
 // Detecta cartões bloqueados e em trial
-$_planoCC   = strtolower($_SESSION['plano'] ?? 'free');
-$_testeCC   = function_exists('obterHorasRestantesTeste') ? (obterHorasRestantesTeste() > 0) : false;
-$_limitesCC = limitesDoPlano();
+$_planoCC       = strtolower($_SESSION['plano'] ?? 'free');
+$_testeCC       = function_exists('obterHorasRestantesTeste') ? (obterHorasRestantesTeste() > 0) : false;
+$_limitesCC     = limitesDoPlano();
+$_upgradeSlugCC = ['free' => 'pro', 'pro' => 'vip'][$_planoCC] ?? 'vip';
+$_nomePlanoCC   = strtoupper($_planoCC);
+$_nomeUpgradeCC = strtoupper($_upgradeSlugCC);
 $cartoes_bloqueados_ids = [];
 $cartoes_trial_ids      = [];
-if ($_planoCC === 'free' && $_limitesCC['cartoes'] !== PHP_INT_MAX) {
+if ($_limitesCC['cartoes'] !== PHP_INT_MAX) {
     for ($i = $_limitesCC['cartoes']; $i < count($cartoes); $i++) {
         $id = $cartoes[$i]['IDCartao'];
         if ($_testeCC) {
@@ -188,7 +191,7 @@ require_once '../geral/header.php';
             <?php else: ?>
                 <span class="d-inline-flex align-items-center gap-1 px-3 py-1 rounded-pill fw-semibold"
                       style="background:rgba(124,58,237,0.15);color:#a78bfa;border:1px solid rgba(124,58,237,0.35);font-size:0.8rem;">
-                    <i class="bi bi-lock-fill"></i> Limite atingido &mdash; PRO
+                    <i class="bi bi-lock-fill"></i> Limite atingido &mdash; <?= $_nomeUpgradeCC ?>
                 </span>
             <?php endif; ?>
         </div>
@@ -207,10 +210,10 @@ require_once '../geral/header.php';
             <div>
                 <strong class="text-light">Cartões bloqueados</strong>
                 <p class="mb-1 text-secondary" style="font-size:0.85rem;">
-                    Você tem <?= count($cartoes_bloqueados_ids) ?> cartão(ões) além do limite do plano Free (<?= $_limitesCC['cartoes'] ?> no total). Eles ficam visíveis mas não podem ser usados em novas transações.
+                    Você tem <?= count($cartoes_bloqueados_ids) ?> cartão(ões) além do limite do plano <?= $_nomePlanoCC ?> (<?= $_limitesCC['cartoes'] ?> no total). Eles ficam visíveis mas não podem ser usados em novas transações.
                 </p>
-                <a href="\planos.php?upgrade=pro" class="btn btn-sm rounded-pill fw-semibold" style="background:var(--color-pending-bg);color:var(--color-pending-text);border:1px solid var(--color-today-bg);font-size:0.8rem;">
-                    <i class="bi bi-star-fill me-1"></i> Assinar PRO — até <?= limitesDoPlano('pro')['cartoes'] ?> cartões
+                <a href="/planos.php?upgrade=<?= $_upgradeSlugCC ?>" class="btn btn-sm rounded-pill fw-semibold" style="background:var(--color-pending-bg);color:var(--color-pending-text);border:1px solid var(--color-today-bg);font-size:0.8rem;">
+                    <i class="bi bi-star-fill me-1"></i> Assinar <?= $_nomeUpgradeCC ?> — até <?= limitesDoPlano($_upgradeSlugCC)['cartoes'] ?> cartões
                 </a>
             </div>
         </div>
@@ -351,7 +354,7 @@ require_once '../geral/header.php';
         </div>
         <?php else: ?>
         <div class="col-12 col-md-6 col-lg-4">
-            <a href="/planos.php?upgrade=pro" class="text-decoration-none">
+            <a href="/planos.php?upgrade=<?= $_upgradeSlugCC ?>" class="text-decoration-none">
                 <div class="card h-100 rounded-4 d-flex align-items-center justify-content-center transition-hover"
                      style="min-height:220px;background:var(--color-card-bg);border:1px dashed var(--color-card-border);">
                     <div class="card-body text-center d-flex flex-column align-items-center justify-content-center p-4">
@@ -359,8 +362,8 @@ require_once '../geral/header.php';
                              style="width:50px;height:50px;background:var(--color-card-bg);">
                             <i class="bi bi-lock-fill fs-3" style="color:var(--color-card-text);"></i>
                         </div>
-                        <h6 class="fw-semibold mb-1" style="color:var(--color-card-text);">Limite do plano Free</h6>
-                        <p class="text-secondary mb-0" style="font-size:0.75rem;">Assine o PRO para até <?= $_limitesCC['cartoes'] ?> cartão(ões)</p>
+                        <h6 class="fw-semibold mb-1" style="color:var(--color-card-text);">Limite do plano <?= $_nomePlanoCC ?></h6>
+                        <p class="text-secondary mb-0" style="font-size:0.75rem;">Assine o <?= $_nomeUpgradeCC ?> para até <?= limitesDoPlano($_upgradeSlugCC)['cartoes'] ?> cartão(ões)</p>
                     </div>
                 </div>
             </a>
