@@ -313,10 +313,24 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'])) {
 }
 
 // --- LÓGICA DO FILTRO DE CARTEIRA ---
+$_carteiraIds = array_column($carteiras, 'IDCarteira');
 if (isset($_GET['carteira'])) {
     $carteira_selecionada = $_GET['carteira'];
+    // Valida e persiste na sessão
+    if (in_array($carteira_selecionada, $_carteiraIds)) {
+        $_SESSION['ultima_carteira'] = $carteira_selecionada;
+    } else {
+        $carteira_selecionada = ($totalCarteiras > 0) ? $carteiras[0]['IDCarteira'] : null;
+    }
 } else {
-    $carteira_selecionada = ($totalCarteiras > 0) ? $carteiras[0]['IDCarteira'] : null;
+    // Restaura da sessão (mesma lógica do localStorage: lembra a última carteira usada)
+    $fromSession = $_SESSION['ultima_carteira'] ?? null;
+    if ($fromSession && in_array($fromSession, $_carteiraIds)) {
+        $carteira_selecionada = $fromSession;
+    } else {
+        $carteira_selecionada = ($totalCarteiras > 0) ? $carteiras[0]['IDCarteira'] : null;
+        if ($carteira_selecionada) $_SESSION['ultima_carteira'] = $carteira_selecionada;
+    }
 }
 
 $nome_carteira_atual = 'Carteira';

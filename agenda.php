@@ -231,7 +231,18 @@ try {
 }
 
 $_agendaTemAcessoComp = function_exists('recursoDisponivelParaPlano') ? recursoDisponivelParaPlano('comprovantes') : false;
-$carteira_selecionada = $_GET['carteira'] ?? 'todas';
+$_carteiraIdsAg = array_column($carteiras, 'IDCarteira');
+if (isset($_GET['carteira'])) {
+    $carteira_selecionada = $_GET['carteira'];
+    // Persiste apenas se for uma carteira específica (não "todas")
+    if ($carteira_selecionada !== 'todas' && in_array($carteira_selecionada, $_carteiraIdsAg)) {
+        $_SESSION['ultima_carteira'] = $carteira_selecionada;
+    }
+} else {
+    // Restaura da sessão; padrão é "todas" se não houver histórico
+    $fromSession = $_SESSION['ultima_carteira'] ?? null;
+    $carteira_selecionada = ($fromSession && in_array($fromSession, $_carteiraIdsAg)) ? $fromSession : 'todas';
+}
 $nome_carteira_atual  = 'Todas as Carteiras';
 if ($carteira_selecionada !== 'todas') {
     foreach ($carteiras as $c) {

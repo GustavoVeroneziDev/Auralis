@@ -52,11 +52,23 @@ try {
 } catch (PDOException $e) {
 }
 
-// Descobre qual carteira está selecionada na URL (ou pega a primeira por padrão)
+// Descobre qual carteira está selecionada na URL (ou restaura da sessão)
+$_carteiraIdsAn = array_column($carteiras, 'IDCarteira');
 if (isset($_GET['carteira'])) {
     $carteira_selecionada = $_GET['carteira'];
+    if (in_array($carteira_selecionada, $_carteiraIdsAn)) {
+        $_SESSION['ultima_carteira'] = $carteira_selecionada;
+    } else {
+        $carteira_selecionada = (count($carteiras) > 0) ? $carteiras[0]['IDCarteira'] : null;
+    }
 } else {
-    $carteira_selecionada = (count($carteiras) > 0) ? $carteiras[0]['IDCarteira'] : null;
+    $fromSession = $_SESSION['ultima_carteira'] ?? null;
+    if ($fromSession && in_array($fromSession, $_carteiraIdsAn)) {
+        $carteira_selecionada = $fromSession;
+    } else {
+        $carteira_selecionada = (count($carteiras) > 0) ? $carteiras[0]['IDCarteira'] : null;
+        if ($carteira_selecionada) $_SESSION['ultima_carteira'] = $carteira_selecionada;
+    }
 }
 
 // Pega o nome da carteira atual para exibir no botão
