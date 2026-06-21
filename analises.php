@@ -636,10 +636,6 @@ require_once 'geral/header.php';
                                     </button>
                                     <ul class="dropdown-menu dropdown-menu-end shadow" style="background:var(--bg-card);border-color:var(--bs-border-color);min-width:175px;">
                                         <li><button class="dropdown-item d-flex align-items-center gap-2 py-2"
-                                                    onclick="abrirDepositar('<?= $cofId ?>','<?= $cofNome ?>')">
-                                            <i class="bi bi-arrow-down-circle text-success"></i> Depositar
-                                        </button></li>
-                                        <li><button class="dropdown-item d-flex align-items-center gap-2 py-2"
                                                     onclick="abrirRetirar('<?= $cofId ?>','<?= $cofNome ?>')">
                                             <i class="bi bi-arrow-up-circle text-warning"></i> Retirar valor
                                         </button></li>
@@ -650,11 +646,11 @@ require_once 'geral/header.php';
                                         <li><hr class="dropdown-divider border-secondary-subtle my-1"></li>
                                         <li><button class="dropdown-item d-flex align-items-center gap-2 py-2"
                                                     onclick="abrirEditar('<?= $cofId ?>','<?= $cofNome ?>','<?= $cofCor ?>','<?= htmlspecialchars($cof['Icone']) ?>',<?= $metaJSON ?>,'<?= htmlspecialchars($cof['DataLimite'] ?? '') ?>')">
-                                            <i class="bi bi-pencil text-secondary"></i> Editar
+                                            <i class="bi bi-pencil text-secondary"></i> Editar cofrinho
                                         </button></li>
                                         <li><button class="dropdown-item d-flex align-items-center gap-2 py-2 text-danger"
                                                     onclick="abrirExcluir('<?= $cofId ?>','<?= $cofNome ?>')">
-                                            <i class="bi bi-trash3"></i> Excluir
+                                            <i class="bi bi-trash3"></i> Excluir cofrinho
                                         </button></li>
                                     </ul>
                                 </div>
@@ -1401,6 +1397,39 @@ require_once 'geral/header.php';
     </div>
 </div>
 
+<!-- ── Modal: Editar Registro do Cofrinho ────────────────────────────── -->
+<div class="modal fade" id="modalEditarRegistro" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered" style="max-width:360px;">
+        <div class="modal-content border-secondary-subtle shadow-lg rounded-4" style="background:var(--bg-card);">
+            <div class="modal-header border-bottom border-secondary-subtle p-4">
+                <h6 class="modal-title text-light fw-bold"><i class="bi bi-pencil me-2" style="color:#f59e0b;"></i> Editar movimentação</h6>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body p-4">
+                <input type="hidden" id="editReg_id">
+                <div class="mb-3">
+                    <label class="form-label text-secondary small fw-semibold">Valor (R$) *</label>
+                    <input type="number" id="editReg_val" class="form-control rounded-3 border-secondary-subtle"
+                           style="background:var(--bg-hover);color:var(--text-main);font-size:1.2rem;font-weight:700;"
+                           placeholder="0,00" min="0.01" step="0.01" required>
+                </div>
+                <div class="mb-1">
+                    <label class="form-label text-secondary small fw-semibold">Descrição <span class="opacity-50">— opcional</span></label>
+                    <input type="text" id="editReg_desc" class="form-control rounded-3 border-secondary-subtle"
+                           style="background:var(--bg-hover);color:var(--text-main);" maxlength="200">
+                </div>
+            </div>
+            <div class="modal-footer border-top border-secondary-subtle p-3">
+                <button type="button" class="btn btn-outline-secondary rounded-pill px-3" data-bs-dismiss="modal">Cancelar</button>
+                <button type="button" id="editRegSalvarBtn" class="btn fw-semibold rounded-pill px-4"
+                        style="background:rgba(245,158,11,0.15);color:#f59e0b;border:1px solid rgba(245,158,11,0.4);">
+                    <i class="bi bi-check-lg me-1"></i> Salvar
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+
 <style>
 .cofrinho-icone-opt input:checked + span,
 .cofrinho-icone-opt span:hover {
@@ -1460,7 +1489,10 @@ function abrirHistorico(id, nome, cor, valAtual, valMeta, icone, histJSON, dataL
             var data   = new Date(t.MomentoRegistro).toLocaleDateString('pt-BR');
             var desc   = t.Descricao || (isDeposito ? 'Depósito' : 'Retirada');
             var val    = parseFloat(t.Valor).toLocaleString('pt-BR', {minimumFractionDigits:2, maximumFractionDigits:2});
-            html += '<div class="list-group-item border-0 border-bottom border-secondary-subtle py-3 px-4"' +
+            var rid    = t.IDRegistro;
+            var valorRaw = parseFloat(t.Valor);
+            html += '<div class="cof-hist-item list-group-item border-0 border-bottom border-secondary-subtle py-2 px-4"' +
+                    ' data-rid="' + rid + '" data-valor="' + valorRaw + '" data-tipo="' + t.TipoRegistro + '" data-desc="' + desc.replace(/"/g,'&quot;') + '"' +
                     ' style="background:transparent;">' +
                     '<div class="d-flex align-items-center gap-3">' +
                     '<span class="rounded-circle d-flex align-items-center justify-content-center flex-shrink-0"' +
@@ -1468,11 +1500,46 @@ function abrirHistorico(id, nome, cor, valAtual, valMeta, icone, histJSON, dataL
                     '<i class="bi ' + icone2 + '" style="color:' + cor2 + ';font-size:1rem;"></i></span>' +
                     '<div class="flex-grow-1 min-w-0"><div class="text-light fw-semibold small text-truncate">' + desc + '</div>' +
                     '<div class="text-secondary" style="font-size:0.72rem;">' + data + '</div></div>' +
-                    '<span class="fw-bold" style="color:' + cor2 + ';font-size:0.92rem;">' + sinal + ' R$ ' + val + '</span>' +
+                    '<div class="d-flex align-items-center gap-1 flex-shrink-0">' +
+                    '<span class="fw-bold me-1" style="color:' + cor2 + ';font-size:0.92rem;">' + sinal + ' R$ ' + val + '</span>' +
+                    '<button class="btn btn-sm p-1 cof-hist-edit-btn" title="Editar registro" style="color:#888;line-height:1;opacity:0;transition:opacity .15s;"><i class="bi bi-pencil" style="font-size:0.78rem;"></i></button>' +
+                    '<button class="btn btn-sm p-1 cof-hist-del-btn" title="Excluir registro" style="color:#f87171;line-height:1;opacity:0;transition:opacity .15s;"><i class="bi bi-trash3" style="font-size:0.78rem;"></i></button>' +
+                    '</div>' +
                     '</div></div>';
         });
         html += '</div>';
         lista.innerHTML = html;
+
+        // Hover: mostra botões ao passar o mouse
+        lista.querySelectorAll('.cof-hist-item').forEach(function(row) {
+            row.addEventListener('mouseenter', function() {
+                row.querySelectorAll('.cof-hist-edit-btn,.cof-hist-del-btn').forEach(function(b){ b.style.opacity='1'; });
+            });
+            row.addEventListener('mouseleave', function() {
+                row.querySelectorAll('.cof-hist-edit-btn,.cof-hist-del-btn').forEach(function(b){ b.style.opacity='0'; });
+            });
+            // Excluir registro
+            row.querySelector('.cof-hist-del-btn').addEventListener('click', function(e) {
+                e.stopPropagation();
+                if (!confirm('Excluir este registro?\n\nO saldo do cofrinho será ajustado automaticamente.')) return;
+                var rid = row.dataset.rid;
+                var form = new FormData();
+                form.append('acao','excluir_registro'); form.append('id_registro', rid);
+                fetch('cofrinho/processa_cofrinho.php', { method:'POST', body: new URLSearchParams({ acao:'excluir_registro', id_registro: rid }) })
+                .then(function(r){ return r.json(); })
+                .then(function(d){
+                    if (d.ok) { row.remove(); } else { alert('Erro: ' + (d.erro||'desconhecido')); }
+                }).catch(function(){ alert('Erro de conexão.'); });
+            });
+            // Editar registro
+            row.querySelector('.cof-hist-edit-btn').addEventListener('click', function(e) {
+                e.stopPropagation();
+                _get('editReg_id').value   = row.dataset.rid;
+                _get('editReg_val').value  = row.dataset.valor;
+                _get('editReg_desc').value = row.dataset.desc;
+                _modal('modalEditarRegistro').show();
+            });
+        });
     }
 
     // Botões de ação do modal
@@ -1559,6 +1626,43 @@ function abrirExcluir(id, nome) {
     _get('excluir_titulo').textContent = 'Excluir o cofrinho "' + nome + '"?';
     _modal('modalExcluir').show();
 }
+
+// ── Salvar edição de registro individual ─────────────────────────
+document.addEventListener('DOMContentLoaded', function() {
+    var btn = _get('editRegSalvarBtn');
+    if (!btn) return;
+    btn.addEventListener('click', function() {
+        var rid   = _get('editReg_id').value;
+        var valor = parseFloat(_get('editReg_val').value);
+        var desc  = _get('editReg_desc').value.trim();
+        if (!rid || isNaN(valor) || valor <= 0) { alert('Informe um valor válido.'); return; }
+        btn.disabled = true;
+        fetch('cofrinho/processa_cofrinho.php', {
+            method: 'POST',
+            body: new URLSearchParams({ acao: 'editar_registro', id_registro: rid, valor: valor, descricao: desc })
+        }).then(function(r){ return r.json(); })
+        .then(function(d){
+            btn.disabled = false;
+            if (d.ok) {
+                bootstrap.Modal.getInstance(_get('modalEditarRegistro')).hide();
+                // Atualiza a linha na lista sem recarregar
+                var row = document.querySelector('.cof-hist-item[data-rid="' + rid + '"]');
+                if (row) {
+                    var tipo = row.dataset.tipo;
+                    var isD  = tipo === 'cofrinho';
+                    var cor2 = isD ? '#16a34a' : '#f59e0b';
+                    var sinal = isD ? '+' : '-';
+                    row.dataset.valor = valor;
+                    row.dataset.desc  = desc;
+                    var valFmt = valor.toLocaleString('pt-BR', {minimumFractionDigits:2, maximumFractionDigits:2});
+                    row.querySelector('.text-light.fw-semibold').textContent = desc || (isD ? 'Depósito' : 'Retirada');
+                    row.querySelector('.fw-bold').textContent = sinal + ' R$ ' + valFmt;
+                    row.querySelector('.fw-bold').style.color = cor2;
+                }
+            } else { alert('Erro: ' + (d.erro||'desconhecido')); }
+        }).catch(function(){ btn.disabled = false; alert('Erro de conexão.'); });
+    });
+});
 </script>
 
 <?php require_once 'geral/footer.php'; ?>

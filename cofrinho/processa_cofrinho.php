@@ -315,5 +315,39 @@ if ($acao === 'excluir') {
     exit;
 }
 
+// ── Excluir registro individual do cofrinho ─────────────────────────────────
+if ($acao === 'excluir_registro') {
+    header('Content-Type: application/json; charset=utf-8');
+    $idReg = trim($_POST['id_registro'] ?? '');
+    if (empty($idReg)) { echo json_encode(['ok'=>false,'erro'=>'ID inválido']); exit; }
+    try {
+        // Garante que o registro pertence a um cofrinho do usuário
+        $stmtV = $pdo->prepare("SELECT IDRegistro FROM Registro WHERE IDRegistro=:id AND FKUsuario=:uid AND TipoRegistro IN ('cofrinho','cofrinho_retirada')");
+        $stmtV->execute([':id'=>$idReg, ':uid'=>$uid]);
+        if (!$stmtV->fetch()) { echo json_encode(['ok'=>false,'erro'=>'Registro não encontrado']); exit; }
+        $pdo->prepare("DELETE FROM Registro WHERE IDRegistro=:id AND FKUsuario=:uid")->execute([':id'=>$idReg,':uid'=>$uid]);
+        echo json_encode(['ok'=>true]);
+    } catch (PDOException $e) { echo json_encode(['ok'=>false,'erro'=>$e->getMessage()]); }
+    exit;
+}
+
+// ── Editar registro individual do cofrinho ───────────────────────────────────
+if ($acao === 'editar_registro') {
+    header('Content-Type: application/json; charset=utf-8');
+    $idReg    = trim($_POST['id_registro'] ?? '');
+    $valor    = round((float)($_POST['valor'] ?? 0), 2);
+    $descricao= trim($_POST['descricao'] ?? '') ?: null;
+    if (empty($idReg) || $valor <= 0) { echo json_encode(['ok'=>false,'erro'=>'Dados inválidos']); exit; }
+    try {
+        $stmtV = $pdo->prepare("SELECT IDRegistro FROM Registro WHERE IDRegistro=:id AND FKUsuario=:uid AND TipoRegistro IN ('cofrinho','cofrinho_retirada')");
+        $stmtV->execute([':id'=>$idReg, ':uid'=>$uid]);
+        if (!$stmtV->fetch()) { echo json_encode(['ok'=>false,'erro'=>'Registro não encontrado']); exit; }
+        $pdo->prepare("UPDATE Registro SET Valor=:v, Descricao=:d WHERE IDRegistro=:id AND FKUsuario=:uid")
+            ->execute([':v'=>$valor,':d'=>$descricao,':id'=>$idReg,':uid'=>$uid]);
+        echo json_encode(['ok'=>true]);
+    } catch (PDOException $e) { echo json_encode(['ok'=>false,'erro'=>$e->getMessage()]); }
+    exit;
+}
+
 header("Location: {$voltar}#cofrinhos");
 exit;
