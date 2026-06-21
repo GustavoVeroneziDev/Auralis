@@ -910,34 +910,6 @@ input[type="number"] {
     margin-left: 0 !important;
   }
 
-  /* No mobile, ignora estado colapsado — sidebar sempre em largura total */
-  .auralis-sidebar.sidebar-collapsed {
-    width: 240px !important;
-  }
-  .auralis-sidebar.sidebar-collapsed .sidebar-label,
-  .auralis-sidebar.sidebar-collapsed .sidebar-badge {
-    opacity: 1 !important;
-    pointer-events: auto !important;
-    max-width: 200px !important;
-  }
-  .auralis-sidebar.sidebar-collapsed .sidebar-logo-text {
-    opacity: 1 !important;
-    pointer-events: auto !important;
-    max-width: 120px !important;
-  }
-  .auralis-sidebar.sidebar-collapsed .sidebar-item {
-    justify-content: flex-start !important;
-    padding: 9px 12px !important;
-  }
-  .auralis-sidebar.sidebar-collapsed .sidebar-logo {
-    justify-content: flex-start !important;
-    padding: 14px 16px 12px !important;
-  }
-  .auralis-sidebar.sidebar-collapsed .sidebar-user-btn {
-    justify-content: flex-start !important;
-    padding: 8px 12px !important;
-  }
-
   /* Oculta botão de collapse no mobile — não faz sentido em overlay */
   .sidebar-toggle {
     display: none !important;

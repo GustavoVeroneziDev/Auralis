@@ -269,11 +269,11 @@ $_carteiraParam = (!empty($_SESSION['ultima_carteira']))
         </div>
     </aside>
 
-    <!-- Aplica estado colapsado antes do primeiro paint -->
+    <!-- Aplica estado colapsado antes do primeiro paint (apenas desktop) -->
     <script>
     (function(){
         var s = document.getElementById('auralis-sidebar');
-        if (s && localStorage.getItem('auralis_sidebar') === 'collapsed') {
+        if (s && localStorage.getItem('auralis_sidebar') === 'collapsed' && window.innerWidth >= 992) {
             s.classList.add('sidebar-collapsed');
         }
     })();
