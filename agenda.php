@@ -54,6 +54,31 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && ($_POST['action'] ?? '') === 'exclu
     exit;
 }
 
+// Exclusão múltipla via seleção
+if ($_SERVER['REQUEST_METHOD'] === 'POST' && ($_POST['action'] ?? '') === 'excluir_multiplos') {
+    ob_clean();
+    header('Content-Type: application/json; charset=utf-8');
+    $ids = json_decode($_POST['ids'] ?? '[]', true);
+    if (!is_array($ids) || empty($ids)) {
+        echo json_encode(['ok' => false, 'erro' => 'Nenhum ID fornecido']);
+        exit;
+    }
+    $ids = array_values(array_filter($ids, fn($id) => preg_match('/^[0-9a-f\-]{36}$/i', trim($id))));
+    if (empty($ids)) {
+        echo json_encode(['ok' => false, 'erro' => 'IDs inválidos']);
+        exit;
+    }
+    try {
+        $ph   = implode(',', array_fill(0, count($ids), '?'));
+        $stmt = $pdo->prepare("DELETE FROM Registro WHERE IDRegistro IN ($ph) AND FKUsuario = ?");
+        $stmt->execute(array_merge($ids, [$usuario_id]));
+        echo json_encode(['ok' => true, 'deletados' => $stmt->rowCount()]);
+    } catch (PDOException $e) {
+        echo json_encode(['ok' => false, 'erro' => $e->getMessage()]);
+    }
+    exit;
+}
+
 // Detalhe de fatura de cartão para o modal da agenda
 if (isset($_GET['ajax']) && $_GET['acao'] === 'fatura_detalhe') {
     ob_clean();
@@ -907,9 +932,18 @@ require_once 'geral/header.php';
         document.getElementById('modalDiaBtnReceita').href = `nova_transacao.php?tipo=receita&data=${dataStr}&voltar=agenda.php`;
         document.getElementById('modalDiaBtnDespesa').href = `nova_transacao.php?tipo=despesa&data=${dataStr}&voltar=agenda.php`;
 
+        // Reset de seleção ao abrir novo dia
+        _agendaSelIds.clear();
+        _agendaSelMode = false;
+        const _fNorm = document.getElementById('modalDiaFooterNormal');
+        const _fSel  = document.getElementById('modalDiaFooterSel');
+        if (_fNorm) _fNorm.style.display = '';
+        if (_fSel)  _fSel.style.display  = 'none';
+
         const body = document.getElementById('modalDiaBody');
         if (!transacoesDoDia || transacoesDoDia.length === 0) {
             body.innerHTML = `<div class="text-center text-secondary py-5" style="font-size:0.88rem;">Nenhuma transação registrada neste dia.</div>`;
+            body.onclick = null; body.oncontextmenu = null;
         } else {
             const incomeColor = cssVar('--color-income-text') || '#6ee7c7';
             const expenseColor = cssVar('--color-expense-text') || '#f87171';
@@ -922,22 +956,21 @@ require_once 'geral/header.php';
                 const statusBadge = t.status === 'efetivado' ?
                     `<span class="badge rounded-pill" style="background:var(--color-income-bg);color:${incomeColor};border:1px solid var(--color-income-border);font-size:0.65rem;white-space:nowrap;">Efetivado</span>` :
                     `<span class="badge rounded-pill" style="background:var(--color-pending-bg);color:${pendingColor};border:1px solid var(--color-today-bg);font-size:0.65rem;white-space:nowrap;">Pendente</span>`;
-
                 const btnComp = (_temAcessoCompAgenda && t.tem_comprovante > 0) ?
-                    `<button onclick="event.stopPropagation();abrirComprovantes('${t.id}')" class="btn btn-sm btn-outline-info rounded-pill px-2 py-0 mt-1" title="Ver comprovante"><i class="bi bi-eye"></i></button>` :
-                    '';
+                    `<button onclick="event.stopPropagation();abrirComprovantes('${t.id}')" class="btn btn-sm btn-outline-info rounded-pill px-2 py-0 mt-1" title="Ver comprovante"><i class="bi bi-eye"></i></button>` : '';
                 const isCC = !!t.fatura_id;
-                const clickDia = isCC ?
-                    `abrirModalDiaCC('${t.fatura_id}','${t.cartao_id}')` :
-                    `window.location.href='nova_transacao.php?voltar=agenda.php&editar=${encodeURIComponent(t.id)}'`;
                 const iconeEsq = isCC ?
                     `<i class="bi bi-credit-card-2-front" style="color:${cardColor};font-size:1.3rem;flex-shrink:0;"></i>` :
                     `<i class="bi bi-arrow-${isRec ? 'up' : 'down'}-short" style="color:${corVal};font-size:1.5rem;flex-shrink:0;"></i>`;
-                return `<div class="d-flex align-items-center gap-3 px-4 py-3 border-bottom border-secondary-subtle"
-                             style="cursor:pointer;transition:background .12s ease;"
-                             onmouseover="this.style.background='rgba(255,255,255,0.03)'"
-                             onmouseout="this.style.background=''"
-                             onclick="${clickDia}">
+                const tituloAttr = t.titulo.replace(/"/g, '&quot;').replace(/'/g, '&#39;');
+                return `<div class="dia-item d-flex align-items-center gap-3 px-4 py-3 border-bottom border-secondary-subtle"
+                             data-id="${t.id}" data-is-cc="${isCC?'1':'0'}"
+                             data-fatura="${t.fatura_id||''}" data-cartao="${t.cartao_id||''}"
+                             data-titulo="${tituloAttr}"
+                             style="cursor:pointer;transition:background .12s ease;user-select:none;">
+                    <div class="dia-sel-chk flex-shrink-0" style="display:none;width:22px;text-align:center;">
+                        <i class="bi bi-circle" style="font-size:0.92rem;color:#888;"></i>
+                    </div>
                     ${iconeEsq}
                     <div style="min-width:0;flex:1;">
                         <div class="text-light fw-semibold text-truncate" style="font-size:0.88rem;">${esc(t.titulo)}</div>
@@ -950,6 +983,35 @@ require_once 'geral/header.php';
                     </div>
                 </div>`;
             }).join('');
+
+            // Delegação de eventos nos itens
+            body.onclick = function(e) {
+                const item = e.target.closest('.dia-item');
+                if (!item) return;
+                if (e.target.closest('button')) return; // comprovante btn
+                e.stopPropagation();
+                const isCC = item.dataset.isCC === '1';
+                if (_agendaSelMode) {
+                    if (!isCC) _agendaToggleSel(item.dataset.id, item);
+                    return;
+                }
+                if (isCC) abrirModalDiaCC(item.dataset.fatura, item.dataset.cartao);
+                else window.location.href = `nova_transacao.php?voltar=agenda.php&editar=${encodeURIComponent(item.dataset.id)}`;
+            };
+            body.oncontextmenu = function(e) {
+                const item = e.target.closest('.dia-item');
+                if (!item || item.dataset.isCC === '1') return;
+                e.preventDefault(); e.stopPropagation();
+                window._mostrarMenuModalDia(e.clientX, e.clientY, item);
+            };
+            body.onmouseover = function(e) {
+                const item = e.target.closest('.dia-item');
+                if (item && !item.classList.contains('dia-item-sel')) item.style.background = 'rgba(255,255,255,0.03)';
+            };
+            body.onmouseout = function(e) {
+                const item = e.target.closest('.dia-item');
+                if (item && !item.classList.contains('dia-item-sel')) item.style.background = '';
+            };
         }
 
         new bootstrap.Modal(document.getElementById('modalDia')).show();
@@ -1120,6 +1182,144 @@ require_once 'geral/header.php';
         };
     })();
 
+    // ── Seleção múltipla de itens no modal de dia ─────────────────────────
+    let _agendaSelMode = false;
+    const _agendaSelIds = new Set();
+
+    function _agendaEntrarSel() {
+        _agendaSelMode = true;
+        document.querySelectorAll('#modalDiaBody .dia-sel-chk').forEach(el => el.style.display = '');
+        document.getElementById('modalDiaFooterNormal').style.display = 'none';
+        document.getElementById('modalDiaFooterSel').style.display = 'flex';
+        _agendaAtualizarBarra();
+    }
+
+    function _agendaSairSel() {
+        _agendaSelMode = false;
+        _agendaSelIds.clear();
+        document.querySelectorAll('#modalDiaBody .dia-sel-chk').forEach(el => el.style.display = 'none');
+        document.querySelectorAll('#modalDiaBody .dia-item-sel').forEach(el => {
+            el.classList.remove('dia-item-sel');
+            el.style.background = '';
+            const chk = el.querySelector('.dia-sel-chk i');
+            if (chk) { chk.className = 'bi bi-circle'; chk.style.color = '#888'; }
+        });
+        const fNorm = document.getElementById('modalDiaFooterNormal');
+        const fSel  = document.getElementById('modalDiaFooterSel');
+        if (fNorm) fNorm.style.display = '';
+        if (fSel)  fSel.style.display  = 'none';
+    }
+
+    function _agendaToggleSel(id, item) {
+        if (_agendaSelIds.has(id)) {
+            _agendaSelIds.delete(id);
+            item.classList.remove('dia-item-sel');
+            item.style.background = '';
+            const chk = item.querySelector('.dia-sel-chk i');
+            if (chk) { chk.className = 'bi bi-circle'; chk.style.color = '#888'; }
+        } else {
+            _agendaSelIds.add(id);
+            item.classList.add('dia-item-sel');
+            item.style.background = 'rgba(245,158,11,0.08)';
+            const chk = item.querySelector('.dia-sel-chk i');
+            if (chk) { chk.className = 'bi bi-check-circle-fill'; chk.style.color = '#f59e0b'; }
+        }
+        _agendaAtualizarBarra();
+    }
+
+    function _agendaAtualizarBarra() {
+        const n = _agendaSelIds.size;
+        const countEl = document.getElementById('agendaSelCount');
+        const btnEl   = document.getElementById('agendaSelExcluir');
+        if (countEl) countEl.textContent = `${n} selecionado${n !== 1 ? 's' : ''}`;
+        if (btnEl)   btnEl.disabled = n === 0;
+    }
+
+    function _agendaExcluirSelecionados() {
+        const ids = [..._agendaSelIds];
+        if (!ids.length) return;
+        if (!confirm(`Excluir ${ids.length} transaç${ids.length > 1 ? 'ões' : 'ão'}?\n\nEsta ação é irreversível.`)) return;
+        fetch('agenda.php', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+            body: `action=excluir_multiplos&ids=${encodeURIComponent(JSON.stringify(ids))}`
+        }).then(r => r.json()).then(d => {
+            if (d.ok) {
+                _agendaSairSel();
+                bootstrap.Modal.getInstance(document.getElementById('modalDia'))?.hide();
+                window.carregarMes(anoAtual, mesAtual);
+            } else alert('Erro ao excluir: ' + (d.erro || ''));
+        }).catch(() => alert('Erro de conexão.'));
+    }
+
+    // Reset ao fechar o modal
+    document.getElementById('modalDia').addEventListener('hidden.bs.modal', _agendaSairSel);
+
+    // ── Context menu dos itens do modal de dia ────────────────────────────
+    (function() {
+        const menuM = document.createElement('div');
+        menuM.id = 'ctx-modal-dia';
+        menuM.style.cssText = 'position:fixed;z-index:10000;display:none;background:var(--bg-card-analysis);border:1px solid var(--border-color-analysis);border-radius:10px;box-shadow:0 8px 28px rgba(0,0,0,.35);min-width:185px;overflow:hidden;';
+        menuM.innerHTML = `
+            <div id="ctx-m-sel"    class="ctx-item"><i class="bi bi-check-circle" style="color:#f59e0b;"></i> Selecionar</div>
+            <div id="ctx-m-edit"   class="ctx-item"><i class="bi bi-pencil-square" style="color:#f5c542;"></i> Editar</div>
+            <div class="ctx-sep"></div>
+            <div id="ctx-m-del"    class="ctx-item ctx-danger"><i class="bi bi-trash3"></i> Excluir</div>
+            <div id="ctx-m-delsel" class="ctx-item ctx-danger" style="display:none;">
+                <i class="bi bi-trash3-fill"></i> <span id="ctx-m-delsel-lbl">Excluir selecionados</span>
+            </div>`;
+        document.body.appendChild(menuM);
+
+        function fecharM() { menuM.style.display = 'none'; }
+        document.addEventListener('click', fecharM);
+        document.addEventListener('keydown', e => e.key === 'Escape' && fecharM());
+        menuM.addEventListener('click', e => e.stopPropagation());
+
+        window._mostrarMenuModalDia = function(x, y, item) {
+            const id = item.dataset.id;
+            const titulo = item.dataset.titulo;
+
+            document.getElementById('ctx-m-sel').onclick = () => {
+                fecharM();
+                if (!_agendaSelMode) _agendaEntrarSel();
+                _agendaToggleSel(id, item);
+            };
+            document.getElementById('ctx-m-edit').onclick = () => {
+                fecharM();
+                window.location.href = `nova_transacao.php?voltar=agenda.php&editar=${encodeURIComponent(id)}`;
+            };
+            document.getElementById('ctx-m-del').onclick = () => {
+                fecharM();
+                const desc = titulo.length > 40 ? titulo.slice(0, 40) + '…' : titulo;
+                if (!confirm(`Excluir "${desc}"?\n\nEsta ação é irreversível.`)) return;
+                fetch('agenda.php', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+                    body: `action=excluir_rapido&registro_id=${encodeURIComponent(id)}`
+                }).then(r => r.json()).then(d => {
+                    if (d.ok) { _agendaSairSel(); window.carregarMes(anoAtual, mesAtual); bootstrap.Modal.getInstance(document.getElementById('modalDia'))?.hide(); }
+                    else alert('Erro ao excluir.');
+                }).catch(() => alert('Erro de conexão.'));
+            };
+
+            const delSelBtn = document.getElementById('ctx-m-delsel');
+            const n = _agendaSelIds.size;
+            if (n > 0) {
+                delSelBtn.style.display = '';
+                document.getElementById('ctx-m-delsel-lbl').textContent = `Excluir ${n} selecionado${n > 1 ? 's' : ''}`;
+                delSelBtn.onclick = () => { fecharM(); _agendaExcluirSelecionados(); };
+            } else {
+                delSelBtn.style.display = 'none';
+            }
+
+            menuM.style.display = 'block';
+            const mw = menuM.offsetWidth, mh = menuM.offsetHeight;
+            const vw = window.innerWidth, vh = window.innerHeight;
+            menuM.style.left = (x + mw > vw ? x - mw : x) + 'px';
+            menuM.style.top  = (y + mh > vh ? y - mh : y) + 'px';
+        };
+    })();
+
     // ── Modal de Fatura de Cartão ─────────────────────────────────────────
     async function abrirModalFaturaCC(faturaId, cartaoId) {
         const modalEl = document.getElementById('modalFaturaCC');
@@ -1266,17 +1466,30 @@ require_once 'geral/header.php';
                 <button type="button" class="btn-close ms-auto flex-shrink-0 mt-1" data-bs-dismiss="modal"></button>
             </div>
             <div class="modal-body p-0" id="modalDiaBody"></div>
-            <div class="modal-footer border-top border-secondary-subtle px-4 gap-2 justify-content-start flex-wrap">
-                <a id="modalDiaBtnReceita" href="#" class="btn btn-sm rounded-pill fw-semibold"
-                    style="background:rgba(6,214,160,0.15);color:#6ee7c7;border:1px solid rgba(6,214,160,0.4);">
-                    <i class="bi bi-arrow-up-short me-1"></i> Nova Receita
-                </a>
-                <a id="modalDiaBtnDespesa" href="#" class="btn btn-sm rounded-pill fw-semibold"
-                    style="background:rgba(230,57,70,0.15);color:#f87171;border:1px solid rgba(230,57,70,0.4);">
-                    <i class="bi bi-arrow-down-short me-1"></i> Nova Despesa
-                </a>
-                <button type="button" class="btn btn-link text-secondary text-decoration-none ms-auto p-0"
-                    data-bs-dismiss="modal" style="font-size:0.82rem;">Fechar</button>
+            <div class="modal-footer border-top border-secondary-subtle px-4 py-3">
+                <div id="modalDiaFooterNormal" class="d-flex gap-2 flex-wrap w-100 align-items-center">
+                    <a id="modalDiaBtnReceita" href="#" class="btn btn-sm rounded-pill fw-semibold"
+                        style="background:rgba(6,214,160,0.15);color:#6ee7c7;border:1px solid rgba(6,214,160,0.4);">
+                        <i class="bi bi-arrow-up-short me-1"></i> Nova Receita
+                    </a>
+                    <a id="modalDiaBtnDespesa" href="#" class="btn btn-sm rounded-pill fw-semibold"
+                        style="background:rgba(230,57,70,0.15);color:#f87171;border:1px solid rgba(230,57,70,0.4);">
+                        <i class="bi bi-arrow-down-short me-1"></i> Nova Despesa
+                    </a>
+                    <button type="button" class="btn btn-link text-secondary text-decoration-none ms-auto p-0"
+                        data-bs-dismiss="modal" style="font-size:0.82rem;">Fechar</button>
+                </div>
+                <div id="modalDiaFooterSel" class="w-100 align-items-center gap-2" style="display:none;">
+                    <span id="agendaSelCount" class="text-secondary small fw-semibold">0 selecionados</span>
+                    <button id="agendaSelExcluir" onclick="_agendaExcluirSelecionados()"
+                            class="btn btn-sm btn-danger rounded-pill ms-auto" disabled>
+                        <i class="bi bi-trash3 me-1"></i> Excluir selecionados
+                    </button>
+                    <button onclick="_agendaSairSel()"
+                            class="btn btn-sm btn-outline-secondary rounded-pill">
+                        Cancelar
+                    </button>
+                </div>
             </div>
         </div>
     </div>
