@@ -189,6 +189,11 @@ $_carteiraParam = (!empty($_SESSION['ultima_carteira']))
                 <i class="bi bi-credit-card-2-front"></i>
                 <span class="sidebar-label">Cartões</span>
             </a>
+            <a href="/ajuda.php" target="_blank" rel="noopener"
+               class="sidebar-item">
+                <i class="bi bi-question-circle"></i>
+                <span class="sidebar-label">Ajuda</span>
+            </a>
             <?php if ($_ehFreeRestrito): ?>
             <a href="/planos.php"
                class="sidebar-item <?= $paginaAtual === 'planos.php' ? 'active' : '' ?>">
@@ -394,6 +399,11 @@ $_carteiraParam = (!empty($_SESSION['ultima_carteira']))
                         <li class="nav-item">
                             <a class="nav-link custom-link py-3 py-lg-2 <?= strpos($_SERVER['PHP_SELF'], '/cartao_credito/') !== false ? 'text-warning active' : '' ?>" href="/cartao_credito/index.php">
                                 <i class="bi bi-credit-card-2-front me-2"></i> Cartões
+                            </a>
+                        </li>
+                        <li class="nav-item">
+                            <a class="nav-link custom-link py-3 py-lg-2" href="/ajuda.php" target="_blank" rel="noopener">
+                                <i class="bi bi-question-circle me-2"></i> Ajuda
                             </a>
                         </li>
                         <?php if ($_ehFreeRestrito): ?>
