@@ -336,7 +336,7 @@ if ($carteira_selecionada) {
         $sqlSaldo = "
                 SELECT
                     COALESCE(SUM(CASE WHEN TipoRegistro = 'receita' THEN Valor ELSE 0 END), 0) as total_rec_hist,
-                    COALESCE(SUM(CASE WHEN TipoRegistro = 'despesa' THEN Valor ELSE 0 END), 0) as total_des_hist
+                    COALESCE(SUM(CASE WHEN TipoRegistro IN ('despesa','cofrinho') THEN Valor ELSE 0 END), 0) as total_des_hist
                 FROM Registro
                 WHERE FKCarteira = :carteira_id
                   AND FKUsuario = :usuario_id
@@ -444,6 +444,24 @@ try {
     if (!empty($idsPreview)) {
         $transacoes = array_values(array_filter($transacoes, fn($t) => !in_array($t['IDRegistro'], $idsPreview)));
     }
+} catch (PDOException $e) {
+}
+
+// ── Cofrinhos: resumo para mini-card ────────────────────────────────────
+$totalCofrinhos = 0.0;
+$qtdCofrinhos   = 0;
+try {
+    $stmtCof = $pdo->prepare("
+        SELECT COUNT(co.IDCofrinho) as qtd,
+               COALESCE(SUM(r.Valor), 0) as total
+        FROM Cofrinho co
+        LEFT JOIN Registro r ON r.FKCofrinho = co.IDCofrinho AND r.TipoRegistro = 'cofrinho'
+        WHERE co.FKUsuario = :uid AND co.Ativo = 1
+    ");
+    $stmtCof->execute([':uid' => $usuario_id]);
+    $resCof         = $stmtCof->fetch(PDO::FETCH_ASSOC);
+    $totalCofrinhos = (float) ($resCof['total'] ?? 0);
+    $qtdCofrinhos   = (int)   ($resCof['qtd']   ?? 0);
 } catch (PDOException $e) {
 }
 
@@ -707,6 +725,28 @@ require_once 'geral/header.php';
                 </div>
             </div>
         </div>
+
+        <!-- ── Mini-card Cofrinhos ────────────────────────────────────────── -->
+        <?php if ($qtdCofrinhos > 0): ?>
+        <div class="card bg-body-tertiary border-secondary-subtle shadow-sm rounded-4 mb-3">
+            <div class="card-body py-3 px-3 d-flex align-items-center gap-3">
+                <div class="rounded-3 flex-shrink-0 d-flex align-items-center justify-content-center" style="width:40px;height:40px;background:rgba(245,158,11,0.12);">
+                    <i class="bi bi-piggy-bank" style="color:#f59e0b;font-size:1.2rem;"></i>
+                </div>
+                <div class="flex-grow-1 min-w-0">
+                    <div class="text-secondary small fw-semibold">Cofrinhos</div>
+                    <div class="fw-bold text-light" style="font-size:1rem;">
+                        R$ <?= number_format($totalCofrinhos, 2, ',', '.') ?>
+                        <span class="text-secondary fw-normal small ms-1"><?= $qtdCofrinhos ?> ativo<?= $qtdCofrinhos > 1 ? 's' : '' ?></span>
+                    </div>
+                </div>
+                <a href="analises.php?carteira=<?= urlencode($carteira_selecionada ?? '') ?>#cofrinhos"
+                   class="btn btn-sm btn-outline-secondary rounded-pill flex-shrink-0" style="font-size:0.78rem;">
+                    Ver tudo
+                </a>
+            </div>
+        </div>
+        <?php endif; ?>
 
         <!-- ── Barra de Gastos Esperados ──────────────────────────────────── -->
         <?php if ($despesasPendentes > 0 || $receitasPendentes > 0): ?>

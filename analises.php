@@ -92,6 +92,7 @@ if ($carteira_selecionada) {
                 WHERE r.FKUsuario = :uid
                   AND r.FKCarteira = :carteira_id
                   AND r.StatusRegistro = 'efetivado'
+                  AND r.TipoRegistro IN ('receita','despesa')
                   AND MONTH(r.MomentoRegistro) = :mes
                   AND YEAR(r.MomentoRegistro) = :ano
                 ORDER BY r.MomentoRegistro DESC
@@ -150,6 +151,7 @@ if ($carteira_selecionada) {
                 WHERE r.FKUsuario   = :uid
                   AND r.FKCarteira  = :carteira_id
                   AND r.StatusRegistro = 'efetivado'
+                  AND r.TipoRegistro IN ('receita','despesa')
                   AND MONTH(r.MomentoRegistro) = :mes
                   AND YEAR(r.MomentoRegistro)  = :ano
             ";
@@ -170,6 +172,26 @@ if ($carteira_selecionada) {
         }
     } catch (PDOException $e) {
     }
+}
+
+// ── Cofrinhos do usuário ──────────────────────────────────────────────
+$cofrinhos = [];
+try {
+    $stmtCof = $pdo->prepare("
+        SELECT co.IDCofrinho, co.Nome, co.Icone, co.Cor, co.ValorMeta, co.DataLimite, co.DataCriacao,
+               ca.TipoCarteira as NomeCarteira,
+               COALESCE(SUM(r.Valor), 0) as ValorAtual
+        FROM Cofrinho co
+        LEFT JOIN Carteira ca ON ca.IDCarteira = co.FKCarteira
+        LEFT JOIN Registro r  ON r.FKCofrinho  = co.IDCofrinho AND r.TipoRegistro = 'cofrinho'
+        WHERE co.FKUsuario = :uid AND co.Ativo = 1
+        GROUP BY co.IDCofrinho, co.Nome, co.Icone, co.Cor, co.ValorMeta, co.DataLimite, co.DataCriacao,
+                 ca.TipoCarteira
+        ORDER BY co.DataCriacao ASC
+    ");
+    $stmtCof->execute([':uid' => $usuario_id]);
+    $cofrinhos = $stmtCof->fetchAll(PDO::FETCH_ASSOC);
+} catch (PDOException $e) {
 }
 
 // ── Helper: badge de variação ─────────────────────────────────────────
@@ -427,6 +449,173 @@ require_once 'geral/header.php';
             <p class="text-secondary">Parece que a carteira "<?php echo htmlspecialchars($nome_carteira_atual); ?>" não tem transações efetivadas em <?php echo $nome_mes ?>.</p>
         </div>
     <?php endif; ?>
+
+    <!-- ══════════════════════════════════════════════════════════════════════ -->
+    <!-- ── Seção Cofrinhos & Metas ─────────────────────────────────────── -->
+    <!-- ══════════════════════════════════════════════════════════════════════ -->
+    <div id="cofrinhos" class="mt-5 pt-2">
+        <div class="d-flex align-items-center justify-content-between mb-4">
+            <div class="d-flex align-items-center gap-2">
+                <i class="bi bi-piggy-bank fs-4" style="color:#f59e0b;"></i>
+                <h5 class="text-light fw-bold mb-0">Cofrinhos &amp; Metas</h5>
+            </div>
+            <button class="btn btn-sm rounded-pill fw-semibold"
+                    style="background:rgba(245,158,11,0.12);color:#f59e0b;border:1px solid rgba(245,158,11,0.3);"
+                    data-bs-toggle="modal" data-bs-target="#modalCriarCofrinho">
+                <i class="bi bi-plus-lg me-1"></i> Novo cofrinho
+            </button>
+        </div>
+
+        <?php if (isset($_GET['sucesso']) && in_array($_GET['sucesso'], ['cofrinho_criado','deposito_realizado','cofrinho_encerrado'])): ?>
+            <?php
+                $msgSucesso = match($_GET['sucesso']) {
+                    'cofrinho_criado'     => 'Cofrinho criado com sucesso!',
+                    'deposito_realizado'  => 'Depósito realizado com sucesso!',
+                    'cofrinho_encerrado'  => 'Cofrinho encerrado.',
+                    default               => '',
+                };
+            ?>
+            <div class="alert alert-success rounded-4 border-0 mb-3 py-2 px-3 small fw-semibold">
+                <i class="bi bi-check-circle me-2"></i><?= htmlspecialchars($msgSucesso) ?>
+            </div>
+        <?php endif; ?>
+
+        <?php if (empty($cofrinhos)): ?>
+            <!-- Estado vazio -->
+            <div class="card bg-body-tertiary border-secondary-subtle rounded-4 shadow-sm">
+                <div class="card-body text-center py-5">
+                    <i class="bi bi-piggy-bank text-secondary opacity-25 mb-3" style="font-size:3.5rem;"></i>
+                    <h6 class="text-light fw-bold mb-1">Nenhum cofrinho ainda</h6>
+                    <p class="text-secondary small mb-3">Crie seu primeiro cofrinho para começar a guardar dinheiro com metas.</p>
+                    <button class="btn btn-sm rounded-pill fw-semibold px-4"
+                            style="background:rgba(245,158,11,0.12);color:#f59e0b;border:1px solid rgba(245,158,11,0.3);"
+                            data-bs-toggle="modal" data-bs-target="#modalCriarCofrinho">
+                        <i class="bi bi-plus-lg me-1"></i> Criar primeiro cofrinho
+                    </button>
+                </div>
+            </div>
+        <?php else: ?>
+            <div class="row row-cols-1 row-cols-md-2 row-cols-lg-3 g-3">
+                <?php foreach ($cofrinhos as $cof): ?>
+                    <?php
+                        $valAtual = (float) $cof['ValorAtual'];
+                        $valMeta  = $cof['ValorMeta'] !== null ? (float) $cof['ValorMeta'] : null;
+                        $pct      = ($valMeta && $valMeta > 0) ? min(100, round(($valAtual / $valMeta) * 100, 1)) : null;
+                        $diasRestantes = null;
+                        if ($cof['DataLimite']) {
+                            $hoje = new DateTime();
+                            $fim  = new DateTime($cof['DataLimite']);
+                            $diasRestantes = (int) $hoje->diff($fim)->days * ($fim >= $hoje ? 1 : -1);
+                        }
+                    ?>
+                    <div class="col">
+                        <div class="card bg-body-tertiary border-secondary-subtle shadow-sm rounded-4 h-100 overflow-hidden">
+                            <!-- Header colorido -->
+                            <div class="d-flex align-items-center gap-3 px-4 py-3"
+                                 style="background: linear-gradient(135deg, <?= htmlspecialchars($cof['Cor']) ?>22, <?= htmlspecialchars($cof['Cor']) ?>44); border-bottom: 1px solid <?= htmlspecialchars($cof['Cor']) ?>33;">
+                                <div class="rounded-3 d-flex align-items-center justify-content-center flex-shrink-0"
+                                     style="width:44px;height:44px;background:<?= htmlspecialchars($cof['Cor']) ?>33;">
+                                    <i class="bi <?= htmlspecialchars($cof['Icone']) ?>" style="color:<?= htmlspecialchars($cof['Cor']) ?>;font-size:1.4rem;"></i>
+                                </div>
+                                <div class="flex-grow-1 min-w-0">
+                                    <div class="fw-bold text-light text-truncate" style="font-size:1rem;"><?= htmlspecialchars($cof['Nome']) ?></div>
+                                    <div class="text-secondary small text-truncate">
+                                        <i class="bi bi-wallet2 me-1" style="font-size:0.7rem;"></i><?= htmlspecialchars($cof['NomeCarteira'] ?? '—') ?>
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="card-body px-4 pb-4 pt-3">
+                                <!-- Valor e meta -->
+                                <div class="d-flex align-items-baseline gap-1 mb-2">
+                                    <span class="fw-bold text-light" style="font-size:1.35rem;">R$ <?= number_format($valAtual, 2, ',', '.') ?></span>
+                                    <?php if ($valMeta !== null): ?>
+                                        <span class="text-secondary small">/ R$ <?= number_format($valMeta, 2, ',', '.') ?></span>
+                                    <?php else: ?>
+                                        <span class="text-secondary small">guardado</span>
+                                    <?php endif; ?>
+                                </div>
+
+                                <!-- Barra de progresso -->
+                                <?php if ($pct !== null): ?>
+                                    <div class="mb-2">
+                                        <div class="progress rounded-pill" style="height:8px;background:rgba(255,255,255,0.07);">
+                                            <div class="progress-bar rounded-pill"
+                                                 style="width:<?= $pct ?>%;background:<?= htmlspecialchars($cof['Cor']) ?>;"
+                                                 role="progressbar" aria-valuenow="<?= $pct ?>" aria-valuemin="0" aria-valuemax="100">
+                                            </div>
+                                        </div>
+                                        <div class="d-flex justify-content-between mt-1">
+                                            <span class="text-secondary" style="font-size:0.72rem;"><?= $pct ?>% concluído</span>
+                                            <?php if ($pct >= 100): ?>
+                                                <span class="fw-semibold" style="font-size:0.72rem;color:<?= htmlspecialchars($cof['Cor']) ?>;">
+                                                    <i class="bi bi-check-circle-fill me-1"></i>Meta atingida!
+                                                </span>
+                                            <?php endif; ?>
+                                        </div>
+                                    </div>
+                                <?php else: ?>
+                                    <div class="mb-2">
+                                        <span class="badge rounded-pill text-secondary border border-secondary-subtle" style="font-size:0.7rem;">Sem meta definida</span>
+                                    </div>
+                                <?php endif; ?>
+
+                                <!-- Data limite -->
+                                <?php if ($diasRestantes !== null): ?>
+                                    <div class="small mb-3 <?= $diasRestantes < 0 ? 'text-danger' : 'text-secondary' ?>">
+                                        <i class="bi bi-calendar3 me-1"></i>
+                                        <?php if ($diasRestantes < 0): ?>
+                                            Prazo encerrado há <?= abs($diasRestantes) ?> dia<?= abs($diasRestantes) > 1 ? 's' : '' ?>
+                                        <?php elseif ($diasRestantes === 0): ?>
+                                            Prazo: hoje!
+                                        <?php else: ?>
+                                            <?= $diasRestantes ?> dia<?= $diasRestantes > 1 ? 's' : '' ?> restante<?= $diasRestantes > 1 ? 's' : '' ?>
+                                            <span class="text-secondary opacity-50 ms-1">(<?= date('d/m/Y', strtotime($cof['DataLimite'])) ?>)</span>
+                                        <?php endif; ?>
+                                    </div>
+                                <?php else: ?>
+                                    <div class="mb-3"></div>
+                                <?php endif; ?>
+
+                                <!-- Ações -->
+                                <div class="d-flex gap-2">
+                                    <button class="btn btn-sm flex-grow-1 fw-semibold rounded-pill"
+                                            style="background:<?= htmlspecialchars($cof['Cor']) ?>22;color:<?= htmlspecialchars($cof['Cor']) ?>;border:1px solid <?= htmlspecialchars($cof['Cor']) ?>44;"
+                                            onclick="abrirModalDepositar('<?= htmlspecialchars($cof['IDCofrinho']) ?>', '<?= htmlspecialchars(addslashes($cof['Nome'])) ?>')">
+                                        <i class="bi bi-plus-lg me-1"></i> Depositar
+                                    </button>
+                                    <button class="btn btn-sm btn-outline-secondary rounded-pill px-2"
+                                            title="Encerrar cofrinho"
+                                            onclick="encerrarCofrinho('<?= htmlspecialchars($cof['IDCofrinho']) ?>', '<?= htmlspecialchars(addslashes($cof['Nome'])) ?>')">
+                                        <i class="bi bi-trash3"></i>
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                <?php endforeach; ?>
+
+                <!-- Card fantasma: novo cofrinho -->
+                <div class="col">
+                    <div class="card rounded-4 h-100 d-flex align-items-center justify-content-center"
+                         style="background:transparent;border:2px dashed var(--bs-border-color);cursor:pointer;min-height:200px;"
+                         data-bs-toggle="modal" data-bs-target="#modalCriarCofrinho">
+                        <div class="text-center py-4 px-3">
+                            <div class="rounded-circle d-flex align-items-center justify-content-center mx-auto mb-3"
+                                 style="width:52px;height:52px;background:rgba(245,158,11,0.1);border:2px dashed rgba(245,158,11,0.35);">
+                                <i class="bi bi-plus-lg" style="color:#f59e0b;font-size:1.3rem;"></i>
+                            </div>
+                            <div class="fw-semibold text-secondary small">Novo cofrinho</div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        <?php endif; ?>
+    </div>
+
+    <!-- Form oculto para encerrar cofrinho -->
+    <form id="formEncerrarCofrinho" method="POST" action="cofrinho/processa_cofrinho.php?acao=encerrar" style="display:none;">
+        <input type="hidden" name="id_cofrinho" id="encerrar_id_cofrinho">
+    </form>
 
 </main>
 
@@ -755,6 +944,191 @@ require_once 'geral/header.php';
         htmlLista += '</div>';
         containerLista.innerHTML = htmlLista;
     }
+</script>
+
+<!-- ══════════════════════════════════════════════════════════════════════ -->
+<!-- ── Modal: Criar Cofrinho ──────────────────────────────────────── -->
+<!-- ══════════════════════════════════════════════════════════════════════ -->
+<div class="modal fade" id="modalCriarCofrinho" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered" style="max-width:480px;">
+        <div class="modal-content border-secondary-subtle shadow-lg rounded-4" style="background:var(--bg-card);">
+            <div class="modal-header border-bottom border-secondary-subtle p-4">
+                <h6 class="modal-title text-light fw-bold">
+                    <i class="bi bi-piggy-bank me-2" style="color:#f59e0b;"></i> Novo Cofrinho
+                </h6>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+            </div>
+            <form method="POST" action="cofrinho/processa_cofrinho.php?acao=criar">
+                <div class="modal-body p-4">
+                    <!-- Nome -->
+                    <div class="mb-3">
+                        <label class="form-label text-secondary small fw-semibold">Nome do cofrinho *</label>
+                        <input type="text" name="nome" class="form-control rounded-3 border-secondary-subtle"
+                               style="background:var(--bg-hover);color:var(--text-main);"
+                               placeholder="Ex: Casa própria, Viagem..." required maxlength="100">
+                    </div>
+
+                    <!-- Ícone -->
+                    <div class="mb-3">
+                        <label class="form-label text-secondary small fw-semibold">Ícone</label>
+                        <div class="d-flex flex-wrap gap-2" id="icone-picker">
+                            <?php
+                            $icones = [
+                                'bi-piggy-bank' => 'Porquinho',
+                                'bi-house'      => 'Casa',
+                                'bi-car-front'  => 'Carro',
+                                'bi-airplane'   => 'Viagem',
+                                'bi-heart'      => 'Saúde',
+                                'bi-stars'      => 'Sonho',
+                                'bi-trophy'     => 'Meta',
+                                'bi-gift'       => 'Presente',
+                            ];
+                            foreach ($icones as $slug => $label):
+                            ?>
+                            <label class="cofrinho-icone-opt" title="<?= $label ?>">
+                                <input type="radio" name="icone" value="<?= $slug ?>" <?= $slug === 'bi-piggy-bank' ? 'checked' : '' ?> style="display:none;">
+                                <span class="d-flex align-items-center justify-content-center rounded-3"
+                                      style="width:44px;height:44px;cursor:pointer;border:2px solid transparent;background:rgba(255,255,255,0.05);transition:all .15s;">
+                                    <i class="bi <?= $slug ?>" style="font-size:1.3rem;"></i>
+                                </span>
+                            </label>
+                            <?php endforeach; ?>
+                        </div>
+                    </div>
+
+                    <!-- Cor -->
+                    <div class="mb-3">
+                        <label class="form-label text-secondary small fw-semibold">Cor</label>
+                        <div class="d-flex flex-wrap gap-2" id="cor-picker">
+                            <?php
+                            $cores = [
+                                '#f59e0b' => 'Âmbar',
+                                '#7c3aed' => 'Roxo',
+                                '#2563eb' => 'Azul',
+                                '#16a34a' => 'Verde',
+                                '#dc2626' => 'Vermelho',
+                                '#0891b2' => 'Ciano',
+                                '#374151' => 'Cinza',
+                            ];
+                            foreach ($cores as $hex => $nome):
+                            ?>
+                            <label class="cofrinho-cor-opt" title="<?= $nome ?>">
+                                <input type="radio" name="cor" value="<?= $hex ?>" <?= $hex === '#f59e0b' ? 'checked' : '' ?> style="display:none;">
+                                <span class="d-flex align-items-center justify-content-center rounded-circle"
+                                      style="width:32px;height:32px;cursor:pointer;background:<?= $hex ?>;border:3px solid transparent;transition:all .15s;"></span>
+                            </label>
+                            <?php endforeach; ?>
+                        </div>
+                    </div>
+
+                    <!-- Carteira -->
+                    <div class="mb-3">
+                        <label class="form-label text-secondary small fw-semibold">Carteira vinculada *</label>
+                        <select name="carteira" class="form-select rounded-3 border-secondary-subtle"
+                                style="background:var(--bg-hover);color:var(--text-main);" required>
+                            <?php foreach ($carteiras as $cart): ?>
+                                <option value="<?= htmlspecialchars($cart['IDCarteira']) ?>">
+                                    <?= htmlspecialchars($cart['TipoCarteira']) ?>
+                                </option>
+                            <?php endforeach; ?>
+                        </select>
+                    </div>
+
+                    <!-- Meta (opcional) -->
+                    <div class="mb-3">
+                        <label class="form-label text-secondary small fw-semibold">Meta (R$) <span class="opacity-50">— opcional</span></label>
+                        <input type="number" name="meta" class="form-control rounded-3 border-secondary-subtle"
+                               style="background:var(--bg-hover);color:var(--text-main);"
+                               placeholder="0,00" min="0.01" step="0.01">
+                    </div>
+
+                    <!-- Data limite (opcional) -->
+                    <div class="mb-1">
+                        <label class="form-label text-secondary small fw-semibold">Data limite <span class="opacity-50">— opcional</span></label>
+                        <input type="date" name="data_limite" class="form-control rounded-3 border-secondary-subtle"
+                               style="background:var(--bg-hover);color:var(--text-main);">
+                    </div>
+                </div>
+                <div class="modal-footer border-top border-secondary-subtle p-3">
+                    <button type="button" class="btn btn-outline-secondary rounded-pill px-3" data-bs-dismiss="modal">Cancelar</button>
+                    <button type="submit" class="btn fw-semibold rounded-pill px-4"
+                            style="background:rgba(245,158,11,0.15);color:#f59e0b;border:1px solid rgba(245,158,11,0.4);">
+                        <i class="bi bi-piggy-bank me-1"></i> Criar cofrinho
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+<!-- ══════════════════════════════════════════════════════════════════════ -->
+<!-- ── Modal: Depositar ────────────────────────────────────────────── -->
+<!-- ══════════════════════════════════════════════════════════════════════ -->
+<div class="modal fade" id="modalDepositar" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered" style="max-width:380px;">
+        <div class="modal-content border-secondary-subtle shadow-lg rounded-4" style="background:var(--bg-card);">
+            <div class="modal-header border-bottom border-secondary-subtle p-4">
+                <h6 class="modal-title text-light fw-bold" id="modalDepositarTitulo">
+                    <i class="bi bi-arrow-down-circle me-2" style="color:#f59e0b;"></i> Depositar
+                </h6>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+            </div>
+            <form method="POST" action="cofrinho/processa_cofrinho.php?acao=depositar">
+                <input type="hidden" name="id_cofrinho" id="depositar_id_cofrinho">
+                <div class="modal-body p-4">
+                    <label class="form-label text-secondary small fw-semibold">Valor do depósito (R$) *</label>
+                    <input type="number" name="valor" id="depositar_valor"
+                           class="form-control form-control-lg rounded-3 border-secondary-subtle"
+                           style="background:var(--bg-hover);color:var(--text-main);font-size:1.4rem;font-weight:700;"
+                           placeholder="0,00" min="0.01" step="0.01" required autofocus>
+                    <div class="text-secondary small mt-2">
+                        <i class="bi bi-info-circle me-1"></i>O valor será debitado do saldo da carteira vinculada.
+                    </div>
+                </div>
+                <div class="modal-footer border-top border-secondary-subtle p-3">
+                    <button type="button" class="btn btn-outline-secondary rounded-pill px-3" data-bs-dismiss="modal">Cancelar</button>
+                    <button type="submit" class="btn fw-semibold rounded-pill px-4"
+                            style="background:rgba(245,158,11,0.15);color:#f59e0b;border:1px solid rgba(245,158,11,0.4);">
+                        <i class="bi bi-check-lg me-1"></i> Confirmar depósito
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+<style>
+/* ── Cofrinhos ── */
+.cofrinho-icone-opt input:checked + span,
+.cofrinho-icone-opt span:hover {
+    border-color: #f59e0b !important;
+    background: rgba(245,158,11,0.15) !important;
+}
+.cofrinho-cor-opt input:checked + span {
+    border-color: #fff !important;
+    box-shadow: 0 0 0 2px rgba(255,255,255,0.4);
+}
+.cofrinho-cor-opt span:hover {
+    transform: scale(1.15);
+}
+</style>
+
+<script>
+function abrirModalDepositar(id, nome) {
+    document.getElementById('depositar_id_cofrinho').value = id;
+    document.getElementById('modalDepositarTitulo').innerHTML =
+        '<i class="bi bi-arrow-down-circle me-2" style="color:#f59e0b;"></i> Depositar em <strong>' + nome + '</strong>';
+    document.getElementById('depositar_valor').value = '';
+    var modal = new bootstrap.Modal(document.getElementById('modalDepositar'));
+    modal.show();
+    setTimeout(() => document.getElementById('depositar_valor').focus(), 400);
+}
+
+function encerrarCofrinho(id, nome) {
+    if (!confirm('Encerrar o cofrinho "' + nome + '"?\n\nO histórico de depósitos será mantido, mas o cofrinho não aparecerá mais na lista.')) return;
+    document.getElementById('encerrar_id_cofrinho').value = id;
+    document.getElementById('formEncerrarCofrinho').submit();
+}
 </script>
 
 <?php require_once 'geral/footer.php'; ?>
