@@ -99,8 +99,10 @@ try {
     // SQL Inteligente: Já calcula o saldo exato de cada carteira direto no banco
     $sqlCarteiras = "
         SELECT c.IDCarteira, c.TipoCarteira,
-               COALESCE(SUM(CASE WHEN r.TipoRegistro = 'receita' THEN r.Valor ELSE 0 END), 0) -
-               COALESCE(SUM(CASE WHEN r.TipoRegistro = 'despesa' THEN r.Valor ELSE 0 END), 0) as SaldoAtual
+               COALESCE(SUM(CASE WHEN r.TipoRegistro = 'receita'           THEN  r.Valor ELSE 0 END), 0) +
+               COALESCE(SUM(CASE WHEN r.TipoRegistro = 'cofrinho_retirada' THEN  r.Valor ELSE 0 END), 0) -
+               COALESCE(SUM(CASE WHEN r.TipoRegistro = 'despesa'           THEN  r.Valor ELSE 0 END), 0) -
+               COALESCE(SUM(CASE WHEN r.TipoRegistro = 'cofrinho'          THEN  r.Valor ELSE 0 END), 0) as SaldoAtual
         FROM Carteira c
         LEFT JOIN Registro r ON c.IDCarteira = r.FKCarteira AND r.StatusRegistro = 'efetivado'
         WHERE c.FKUsuarioDono = :uid
@@ -116,12 +118,15 @@ try {
 
 // Determina carteiras bloqueadas e carteiras "trial" (além do limite, mas dentro do período de teste)
 require_once '../config/funcoes.php';
-$_planoLC   = strtolower($_SESSION['plano'] ?? 'free');
-$_testeLC   = function_exists('obterHorasRestantesTeste') ? (obterHorasRestantesTeste() > 0) : false;
-$_limitesLC = limitesDoPlano();
+$_planoLC        = strtolower($_SESSION['plano'] ?? 'free');
+$_testeLC        = function_exists('obterHorasRestantesTeste') ? (obterHorasRestantesTeste() > 0) : false;
+$_limitesLC      = limitesDoPlano();
+$_upgradeSlugLC  = ['free' => 'pro', 'pro' => 'vip'][$_planoLC] ?? 'vip';
+$_nomePlanoLC    = strtoupper($_planoLC);
+$_nomeUpgradeLC  = strtoupper($_upgradeSlugLC);
 $carteiras_bloqueadas_ids = [];
 $carteiras_trial_ids      = [];
-if ($_planoLC === 'free' && $_limitesLC['carteiras'] !== PHP_INT_MAX) {
+if ($_limitesLC['carteiras'] !== PHP_INT_MAX) {
     for ($i = $_limitesLC['carteiras']; $i < count($carteiras); $i++) {
         $id = $carteiras[$i]['IDCarteira'];
         if ($_testeLC) {
@@ -151,8 +156,8 @@ require_once '../geral/header.php';
                     <i class="bi bi-plus-circle me-2"></i> Nova Carteira
                 </button>
             <?php else: ?>
-                <a href="/planos.php?upgrade=pro" class="btn btn-sm rounded-pill fw-semibold d-flex align-items-center gap-1" style="background:var(--color-card-bg);color:var(--color-card-text);border:1px solid var(--color-card-border);">
-                    <i class="bi bi-lock-fill"></i> Limite atingido — <strong>PRO</strong>
+                <a href="/planos.php?upgrade=<?= $_upgradeSlugLC ?>" class="btn btn-sm rounded-pill fw-semibold d-flex align-items-center gap-1" style="background:var(--color-card-bg);color:var(--color-card-text);border:1px solid var(--color-card-border);">
+                    <i class="bi bi-lock-fill"></i> Limite atingido — <strong><?= $_nomeUpgradeLC ?></strong>
                 </a>
             <?php endif; ?>
         </div>
@@ -167,7 +172,7 @@ require_once '../geral/header.php';
             <i class="bi bi-exclamation-triangle-fill"></i>
             <span><?= htmlspecialchars($erro) ?></span>
             <?php if ($_GET['erro'] === 'limite_plano'): ?>
-                &nbsp;<a href="/planos.php?upgrade=pro" class="fw-bold" style="color:#f87171;">Assinar PRO &rarr;</a>
+                &nbsp;<a href="/planos.php?upgrade=<?= $_upgradeSlugLC ?>" class="fw-bold" style="color:#f87171;">Assinar <?= $_nomeUpgradeLC ?> &rarr;</a>
             <?php endif; ?>
         </div>
     <?php endif; ?>
@@ -178,10 +183,10 @@ require_once '../geral/header.php';
             <div>
                 <strong class="text-light">Carteiras bloqueadas</strong>
                 <p class="mb-1 text-secondary" style="font-size:0.85rem;">
-                    Você tem <?= count($carteiras_bloqueadas_ids) ?> carteira(s) além do limite do plano Free (<?= $_limitesLC['carteiras'] ?> no total). Elas estão bloqueadas para novas transações, mas você ainda pode mesclar ou excluir.
+                    Você tem <?= count($carteiras_bloqueadas_ids) ?> carteira(s) além do limite do plano <?= $_nomePlanoLC ?> (<?= $_limitesLC['carteiras'] ?> no total). Elas estão bloqueadas para novas transações, mas você ainda pode mesclar ou excluir.
                 </p>
-                <a href="/planos.php?upgrade=pro" class="btn btn-sm rounded-pill fw-semibold" style="background:var(--color-pending-bg);color:var(--color-pending-text);border:1px solid var(--color-today-bg);font-size:0.8rem;">
-                    <i class="bi bi-star-fill me-1"></i> Assinar PRO — até <?= limitesDoPlano('pro')['carteiras'] ?> carteiras
+                <a href="/planos.php?upgrade=<?= $_upgradeSlugLC ?>" class="btn btn-sm rounded-pill fw-semibold" style="background:var(--color-pending-bg);color:var(--color-pending-text);border:1px solid var(--color-today-bg);font-size:0.8rem;">
+                    <i class="bi bi-star-fill me-1"></i> Assinar <?= $_nomeUpgradeLC ?> — até <?= exibirLimite(limitesDoPlano($_upgradeSlugLC)['carteiras']) ?> carteiras
                 </a>
             </div>
         </div>
@@ -273,14 +278,14 @@ require_once '../geral/header.php';
             </div>
         <?php else: ?>
             <div class="col-md-6 col-lg-4">
-                <a href="/planos.php?upgrade=pro" class="text-decoration-none">
+                <a href="/planos.php?upgrade=<?= $_upgradeSlugLC ?>" class="text-decoration-none">
                     <div class="card h-100 rounded-4 d-flex align-items-center justify-content-center transition-hover" style="min-height:180px;background:var(--color-card-bg);border:1px dashed var(--color-card-border);">
                         <div class="card-body text-center d-flex flex-column align-items-center justify-content-center p-4">
                             <div class="rounded-circle d-flex align-items-center justify-content-center mb-3" style="width:50px;height:50px;background:var(--color-card-bg);">
                                 <i class="bi bi-lock-fill fs-3" style="color:var(--color-card-text);"></i>
                             </div>
-                            <h6 class="fw-semibold mb-1" style="color:var(--color-card-text);">Limite do plano Free</h6>
-                            <p class="text-secondary mb-0" style="font-size:0.75rem;">Assine o PRO para até <?= limitesDoPlano('pro')['carteiras'] ?> carteiras</p>
+                            <h6 class="fw-semibold mb-1" style="color:var(--color-card-text);">Limite do plano <?= $_nomePlanoLC ?></h6>
+                            <p class="text-secondary mb-0" style="font-size:0.75rem;">Assine o <?= $_nomeUpgradeLC ?> para até <?= exibirLimite(limitesDoPlano($_upgradeSlugLC)['carteiras']) ?> carteiras</p>
                         </div>
                     </div>
                 </a>

@@ -46,10 +46,13 @@ if ($id_editar) {
 $tipo_sugerido = $_POST['tipo_registro'] ?? ($transacao_edit ? $transacao_edit['TipoRegistro'] : ($_GET['tipo'] ?? 'despesa'));
 
 // Limites do plano — busca TUDO e marca quais estão acima do limite para renderizar bloqueados
-$_limitesNT  = limitesDoPlano();
-$_planoNT    = strtolower($_SESSION['plano'] ?? 'free');
-$_testeNT    = function_exists('obterHorasRestantesTeste') ? (obterHorasRestantesTeste() > 0) : false;
-$_freeRestNT = ($_planoNT === 'free' && !$_testeNT && !$id_editar);
+$_limitesNT     = limitesDoPlano();
+$_planoNT       = strtolower($_SESSION['plano'] ?? 'free');
+$_testeNT       = function_exists('obterHorasRestantesTeste') ? (obterHorasRestantesTeste() > 0) : false;
+$_freeRestNT    = ($_planoNT === 'free' && !$_testeNT && !$id_editar);
+$_upgradeSlugNT = ['free' => 'pro', 'pro' => 'vip'][$_planoNT] ?? 'vip';
+$_nomePlanoNT   = strtoupper($_planoNT);
+$_nomeUpgradeNT = strtoupper($_upgradeSlugNT);
 
 try {
     $sqlCarteiras = "
@@ -256,14 +259,14 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     elseif (empty($dataRegistro)) $erro = "Selecione a data do registro.";
     elseif (!in_array($statusRegistro, ['pendente', 'efetivado'])) $erro = "Status inválido.";
     elseif (empty($carteiraId)) $erro = "Selecione uma carteira.";
-    elseif (!empty($_cartsBloqNT) && in_array($carteiraId, $_cartsBloqNT)) $erro = "Esta carteira está bloqueada no plano Free. Assine o PRO para usá-la.";
+    elseif (!empty($_cartsBloqNT) && in_array($carteiraId, $_cartsBloqNT)) $erro = "Esta carteira está bloqueada no plano {$_nomePlanoNT}. Assine o {$_nomeUpgradeNT} para usá-la.";
     elseif ($recorrente && ($diaVencimento < 1 || $diaVencimento > 31)) $erro = "Dia de vencimento inválido (1 a 31).";
     elseif ($parcelado && intval($_POST['num_parcelas'] ?? 0) === 1) $erro = "O número de parcelas não pode ser 1. Se não quiser parcelar, desative a opção de parcelamento.";
     elseif ($parcelado && $recorrente) $erro = "Uma transação não pode ser parcelada E recorrente ao mesmo tempo.";
     elseif ($parcelado && !isset($_POST['id_editar']) && !$_testeNT) {
         $_limParcNT = limitesDoPlano()['parcelas_max'];
         if ($numParcelas > $_limParcNT) {
-            $erro = "Seu plano permite parcelar em até {$_limParcNT}x. Assine o PRO para parcelar em até " . limitesDoPlano('pro')['parcelas_max'] . "x.";
+            $erro = "Seu plano permite parcelar em até {$_limParcNT}x. Assine o {$_nomeUpgradeNT} para parcelar em até " . exibirLimite(limitesDoPlano($_upgradeSlugNT)['parcelas_max']) . "x.";
         }
     }
 

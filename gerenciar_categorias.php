@@ -42,7 +42,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action']) && $_POST['
             $stmtContCat = $pdo->prepare("SELECT COUNT(*) FROM Categoria WHERE FKUsuario = :uid");
             $stmtContCat->execute([':uid' => $usuario_id]);
             if ((int)$stmtContCat->fetchColumn() >= $_limitesCat['categorias']) {
-                $erro = "Você atingiu o limite de {$_limitesCat['categorias']} categorias do plano Free. Assine o PRO para categorias ilimitadas.";
+                $_planoParaMsg   = strtoupper(strtolower($_SESSION['plano'] ?? 'free'));
+                $_upgradeParaMsg = strtoupper(['free' => 'pro', 'pro' => 'vip'][strtolower($_SESSION['plano'] ?? 'free')] ?? 'vip');
+                $erro = "Você atingiu o limite de {$_limitesCat['categorias']} categorias do plano {$_planoParaMsg}. Assine o {$_upgradeParaMsg} para categorias ilimitadas.";
             }
         }
     }
@@ -136,10 +138,13 @@ try {
     $todas = $stmtBusca->fetchAll();
 
     // Detecta categorias bloqueadas e categorias "trial" (além do limite mas em período de teste)
-    $_planoGC   = strtolower($_SESSION['plano'] ?? 'free');
-    $_testeGC   = function_exists('obterHorasRestantesTeste') ? (obterHorasRestantesTeste() > 0) : false;
-    $_limitesGC = limitesDoPlano();
-    if ($_planoGC === 'free' && $_limitesGC['categorias'] !== PHP_INT_MAX) {
+    $_planoGC       = strtolower($_SESSION['plano'] ?? 'free');
+    $_testeGC       = function_exists('obterHorasRestantesTeste') ? (obterHorasRestantesTeste() > 0) : false;
+    $_limitesGC     = limitesDoPlano();
+    $_upgradeSlugGC = ['free' => 'pro', 'pro' => 'vip'][$_planoGC] ?? 'vip';
+    $_nomePlanoGC   = strtoupper($_planoGC);
+    $_nomeUpgradeGC = strtoupper($_upgradeSlugGC);
+    if ($_limitesGC['categorias'] !== PHP_INT_MAX) {
         $todasOrdenadas = array_values($todas);
         for ($i = $_limitesGC['categorias']; $i < count($todasOrdenadas); $i++) {
             $id = $todasOrdenadas[$i]['IDCategoria'];
@@ -225,7 +230,7 @@ $listaIcones = [
         <div class="alert d-flex align-items-center gap-2 rounded-3 shadow-sm border-0 fw-semibold mb-3" style="background:var(--color-expense-bg);color:var(--color-expense-text);border:1px solid var(--color-expense-border) !important;">
             <i class="bi bi-exclamation-triangle-fill"></i> <span><?= $erro ?></span>
             <?php if (!empty($_limitesGC) && strpos($erro, 'limite') !== false): ?>
-                &nbsp;<a href="/planos.php?upgrade=pro" class="fw-bold" style="color:#f87171;">Assinar PRO &rarr;</a>
+                &nbsp;<a href="/planos.php?upgrade=<?= $_upgradeSlugGC ?>" class="fw-bold" style="color:#f87171;">Assinar <?= $_nomeUpgradeGC ?> &rarr;</a>
             <?php endif; ?>
         </div>
     <?php endif; ?>
@@ -236,10 +241,10 @@ $listaIcones = [
             <div>
                 <strong class="text-light">Categorias bloqueadas</strong>
                 <p class="mb-1 text-secondary" style="font-size:0.85rem;">
-                    Você tem <?= count($categorias_bloqueadas_ids) ?> categoria(s) além do limite do plano Free (<?= $_limitesGC['categorias'] ?> no total). Elas estão bloqueadas para uso em novas transações, mas você ainda pode editar, mesclar ou excluir.
+                    Você tem <?= count($categorias_bloqueadas_ids) ?> categoria(s) além do limite do plano <?= $_nomePlanoGC ?> (<?= $_limitesGC['categorias'] ?> no total). Elas estão bloqueadas para uso em novas transações, mas você ainda pode editar, mesclar ou excluir.
                 </p>
-                <a href="/planos.php?upgrade=pro" class="btn btn-sm rounded-pill fw-semibold" style="background:var(--color-pending-bg);color:var(--color-pending-text);border:1px solid var(--color-pending-text);font-size:0.8rem;opacity:0.8;">
-                    <i class="bi bi-star-fill me-1"></i> Assinar PRO — categorias ilimitadas
+                <a href="/planos.php?upgrade=<?= $_upgradeSlugGC ?>" class="btn btn-sm rounded-pill fw-semibold" style="background:var(--color-pending-bg);color:var(--color-pending-text);border:1px solid var(--color-pending-text);font-size:0.8rem;opacity:0.8;">
+                    <i class="bi bi-star-fill me-1"></i> Assinar <?= $_nomeUpgradeGC ?> — categorias ilimitadas
                 </a>
             </div>
         </div>
@@ -256,15 +261,15 @@ $listaIcones = [
                     <h5 class="text-light fw-bold mb-4 d-flex align-items-center gap-2">
                         <i class="bi bi-plus-circle text-primary" style="color: var(--primary-gold-analysis) !important;"></i> Nova Categoria
                         <?php if (!$_podeCriarCat): ?>
-                            <span style="background:var(--color-card-bg);color:var(--color-card-text);border:1px solid var(--color-card-border);border-radius:999px;padding:1px 6px;font-size:0.6rem;font-weight:700;" class="ms-auto"><i class="bi bi-lock-fill" style="font-size:0.55rem;"></i> PRO</span>
+                            <span style="background:var(--color-card-bg);color:var(--color-card-text);border:1px solid var(--color-card-border);border-radius:999px;padding:1px 6px;font-size:0.6rem;font-weight:700;" class="ms-auto"><i class="bi bi-lock-fill" style="font-size:0.55rem;"></i> <?= $_nomeUpgradeGC ?></span>
                         <?php endif; ?>
                     </h5>
                     <?php if (!$_podeCriarCat): ?>
                         <div class="text-center py-4">
                             <i class="bi bi-lock-fill mb-3 d-block" style="font-size:2rem;color:var(--color-card-text);"></i>
-                            <p class="text-secondary mb-3" style="font-size:0.875rem;">Você atingiu o limite de <strong><?= $_limitesGC['categorias'] ?> categorias</strong> do plano Free.</p>
-                            <a href="/planos.php?upgrade=pro" class="btn rounded-pill fw-bold w-100" style="background:var(--color-card-text);color:#fff;border:none;">
-                                <i class="bi bi-star-fill me-1"></i> Assinar PRO
+                            <p class="text-secondary mb-3" style="font-size:0.875rem;">Você atingiu o limite de <strong><?= $_limitesGC['categorias'] ?> categorias</strong> do plano <?= $_nomePlanoGC ?>.</p>
+                            <a href="/planos.php?upgrade=<?= $_upgradeSlugGC ?>" class="btn rounded-pill fw-bold w-100" style="background:var(--color-card-text);color:#fff;border:none;">
+                                <i class="bi bi-star-fill me-1"></i> Assinar <?= $_nomeUpgradeGC ?>
                             </a>
                             <p class="text-secondary mt-2 mb-0" style="font-size:0.75rem;">Ou exclua uma categoria existente para liberar espaço.</p>
                         </div>
