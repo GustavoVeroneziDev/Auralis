@@ -227,9 +227,25 @@ if (window._pendingToast) auralisToast(window._pendingToast);
 
     if (!sidebar) return;
 
-    // Desktop: collapse/expand
+    // Mobile: open/close
+    function openSidebar() {
+        sidebar.classList.add('mobile-open');
+        overlay.classList.add('active');
+    }
+    function closeSidebar() {
+        sidebar.classList.remove('mobile-open');
+        overlay.classList.remove('active');
+    }
+    if (mToggle) mToggle.addEventListener('click', openSidebar);
+    if (overlay) overlay.addEventListener('click', closeSidebar);
+
+    // Desktop: collapse/expand — no mobile fecha a sidebar em vez de colapsar
     if (toggle) {
         toggle.addEventListener('click', function() {
+            if (window.innerWidth < 992) {
+                closeSidebar();
+                return;
+            }
             var collapsed = sidebar.classList.toggle('sidebar-collapsed');
             localStorage.setItem(KEY, collapsed ? 'collapsed' : 'expanded');
             toggle.querySelector('i').className = collapsed
@@ -242,18 +258,6 @@ if (window._pendingToast) auralisToast(window._pendingToast);
             if (icon) icon.className = 'bi bi-layout-sidebar';
         }
     }
-
-    // Mobile: open/close
-    function openSidebar() {
-        sidebar.classList.add('mobile-open');
-        overlay.classList.add('active');
-    }
-    function closeSidebar() {
-        sidebar.classList.remove('mobile-open');
-        overlay.classList.remove('active');
-    }
-    if (mToggle) mToggle.addEventListener('click', openSidebar);
-    if (overlay) overlay.addEventListener('click', closeSidebar);
 })();
 </script>
 <?php endif; ?>
