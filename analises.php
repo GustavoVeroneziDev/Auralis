@@ -179,19 +179,47 @@ $cofrinhos = [];
 try {
     $stmtCof = $pdo->prepare("
         SELECT co.IDCofrinho, co.Nome, co.Icone, co.Cor, co.ValorMeta, co.DataLimite, co.DataCriacao,
+               co.FKCarteira,
                ca.TipoCarteira as NomeCarteira,
-               COALESCE(SUM(r.Valor), 0) as ValorAtual
+               COALESCE(SUM(CASE WHEN r.TipoRegistro='cofrinho'          THEN  r.Valor
+                                 WHEN r.TipoRegistro='cofrinho_retirada' THEN -r.Valor
+                                 ELSE 0 END), 0) as ValorAtual
         FROM Cofrinho co
         LEFT JOIN Carteira ca ON ca.IDCarteira = co.FKCarteira
-        LEFT JOIN Registro r  ON r.FKCofrinho  = co.IDCofrinho AND r.TipoRegistro = 'cofrinho'
+        LEFT JOIN Registro r  ON r.FKCofrinho  = co.IDCofrinho
+                              AND r.TipoRegistro IN ('cofrinho','cofrinho_retirada')
         WHERE co.FKUsuario = :uid AND co.Ativo = 1
         GROUP BY co.IDCofrinho, co.Nome, co.Icone, co.Cor, co.ValorMeta, co.DataLimite, co.DataCriacao,
-                 ca.TipoCarteira
+                 co.FKCarteira, ca.TipoCarteira
         ORDER BY co.DataCriacao ASC
     ");
     $stmtCof->execute([':uid' => $usuario_id]);
     $cofrinhos = $stmtCof->fetchAll(PDO::FETCH_ASSOC);
 } catch (PDOException $e) {
+}
+
+// ── Histórico de transações por cofrinho ──────────────────────────────
+$historicoCofrinhos = [];
+if (!empty($cofrinhos)) {
+    try {
+        $ids = implode(',', array_fill(0, count($cofrinhos), '?'));
+        $stmtHist = $pdo->prepare("
+            SELECT FKCofrinho, TipoRegistro, Valor, Descricao, MomentoRegistro
+            FROM Registro
+            WHERE FKCofrinho IN ({$ids})
+              AND FKUsuario = ?
+              AND TipoRegistro IN ('cofrinho','cofrinho_retirada')
+            ORDER BY MomentoRegistro DESC
+            LIMIT 200
+        ");
+        $params = array_column($cofrinhos, 'IDCofrinho');
+        $params[] = $usuario_id;
+        $stmtHist->execute($params);
+        foreach ($stmtHist->fetchAll(PDO::FETCH_ASSOC) as $row) {
+            $historicoCofrinhos[$row['FKCofrinho']][] = $row;
+        }
+    } catch (PDOException $e) {
+    }
 }
 
 // ── Helper: badge de variação ─────────────────────────────────────────
@@ -466,27 +494,28 @@ require_once 'geral/header.php';
             </button>
         </div>
 
-        <?php if (isset($_GET['sucesso']) && in_array($_GET['sucesso'], ['cofrinho_criado','deposito_realizado','cofrinho_encerrado'])): ?>
-            <?php
-                $msgSucesso = match($_GET['sucesso']) {
-                    'cofrinho_criado'     => 'Cofrinho criado com sucesso!',
-                    'deposito_realizado'  => 'Depósito realizado com sucesso!',
-                    'cofrinho_encerrado'  => 'Cofrinho encerrado.',
-                    default               => '',
-                };
-            ?>
+        <?php
+        $sucessosValidos = ['cofrinho_criado','cofrinho_editado','deposito_realizado','retirada_realizada','reajuste_feito','cofrinho_excluido'];
+        $msgsSucesso = [
+            'cofrinho_criado'    => 'Cofrinho criado com sucesso!',
+            'cofrinho_editado'   => 'Cofrinho atualizado!',
+            'deposito_realizado' => 'Depósito realizado com sucesso!',
+            'retirada_realizada' => 'Retirada realizada com sucesso!',
+            'reajuste_feito'     => 'Saldo reajustado com sucesso!',
+            'cofrinho_excluido'  => 'Cofrinho excluído.',
+        ];
+        if (isset($_GET['sucesso']) && isset($msgsSucesso[$_GET['sucesso']])): ?>
             <div class="alert alert-success rounded-4 border-0 mb-3 py-2 px-3 small fw-semibold">
-                <i class="bi bi-check-circle me-2"></i><?= htmlspecialchars($msgSucesso) ?>
+                <i class="bi bi-check-circle me-2"></i><?= htmlspecialchars($msgsSucesso[$_GET['sucesso']]) ?>
             </div>
         <?php endif; ?>
 
         <?php if (empty($cofrinhos)): ?>
-            <!-- Estado vazio -->
             <div class="card bg-body-tertiary border-secondary-subtle rounded-4 shadow-sm">
                 <div class="card-body text-center py-5">
                     <i class="bi bi-piggy-bank text-secondary opacity-25 mb-3" style="font-size:3.5rem;"></i>
                     <h6 class="text-light fw-bold mb-1">Nenhum cofrinho ainda</h6>
-                    <p class="text-secondary small mb-3">Crie seu primeiro cofrinho para começar a guardar dinheiro com metas.</p>
+                    <p class="text-secondary small mb-3">Crie seu primeiro cofrinho para guardar dinheiro com metas.</p>
                     <button class="btn btn-sm rounded-pill fw-semibold px-4"
                             style="background:rgba(245,158,11,0.12);color:#f59e0b;border:1px solid rgba(245,158,11,0.3);"
                             data-bs-toggle="modal" data-bs-target="#modalCriarCofrinho">
@@ -496,102 +525,133 @@ require_once 'geral/header.php';
             </div>
         <?php else: ?>
             <div class="row row-cols-1 row-cols-md-2 row-cols-lg-3 g-3">
-                <?php foreach ($cofrinhos as $cof): ?>
-                    <?php
-                        $valAtual = (float) $cof['ValorAtual'];
-                        $valMeta  = $cof['ValorMeta'] !== null ? (float) $cof['ValorMeta'] : null;
-                        $pct      = ($valMeta && $valMeta > 0) ? min(100, round(($valAtual / $valMeta) * 100, 1)) : null;
-                        $diasRestantes = null;
-                        if ($cof['DataLimite']) {
-                            $hoje = new DateTime();
-                            $fim  = new DateTime($cof['DataLimite']);
-                            $diasRestantes = (int) $hoje->diff($fim)->days * ($fim >= $hoje ? 1 : -1);
-                        }
-                    ?>
-                    <div class="col">
-                        <div class="card bg-body-tertiary border-secondary-subtle shadow-sm rounded-4 h-100 overflow-hidden">
-                            <!-- Header colorido -->
-                            <div class="d-flex align-items-center gap-3 px-4 py-3"
-                                 style="background: linear-gradient(135deg, <?= htmlspecialchars($cof['Cor']) ?>22, <?= htmlspecialchars($cof['Cor']) ?>44); border-bottom: 1px solid <?= htmlspecialchars($cof['Cor']) ?>33;">
-                                <div class="rounded-3 d-flex align-items-center justify-content-center flex-shrink-0"
-                                     style="width:44px;height:44px;background:<?= htmlspecialchars($cof['Cor']) ?>33;">
-                                    <i class="bi <?= htmlspecialchars($cof['Icone']) ?>" style="color:<?= htmlspecialchars($cof['Cor']) ?>;font-size:1.4rem;"></i>
-                                </div>
-                                <div class="flex-grow-1 min-w-0">
-                                    <div class="fw-bold text-light text-truncate" style="font-size:1rem;"><?= htmlspecialchars($cof['Nome']) ?></div>
-                                    <div class="text-secondary small text-truncate">
-                                        <i class="bi bi-wallet2 me-1" style="font-size:0.7rem;"></i><?= htmlspecialchars($cof['NomeCarteira'] ?? '—') ?>
-                                    </div>
+                <?php foreach ($cofrinhos as $cof):
+                    $valAtual = (float) $cof['ValorAtual'];
+                    $valMeta  = $cof['ValorMeta'] !== null ? (float) $cof['ValorMeta'] : null;
+                    $pct      = ($valMeta && $valMeta > 0) ? min(100, round(($valAtual / $valMeta) * 100, 1)) : null;
+                    $diasRestantes = null;
+                    if ($cof['DataLimite']) {
+                        $hoje2 = new DateTime();
+                        $fim2  = new DateTime($cof['DataLimite']);
+                        $diasRestantes = (int) $hoje2->diff($fim2)->days * ($fim2 >= $hoje2 ? 1 : -1);
+                    }
+                    $cofId   = htmlspecialchars($cof['IDCofrinho']);
+                    $cofNome = htmlspecialchars(addslashes($cof['Nome']));
+                    $cofCor  = htmlspecialchars($cof['Cor']);
+                    $histJSON = htmlspecialchars(json_encode($historicoCofrinhos[$cof['IDCofrinho']] ?? []), ENT_QUOTES);
+                    $metaJSON = $valMeta !== null ? number_format($valMeta, 2, '.', '') : 'null';
+                ?>
+                <div class="col">
+                    <div class="card bg-body-tertiary border-secondary-subtle shadow-sm rounded-4 h-100 overflow-hidden"
+                         style="transition:border-color .15s;">
+                        <!-- Header clicável → histórico -->
+                        <div class="d-flex align-items-center gap-3 px-4 py-3 cofrinho-header-click"
+                             style="background:linear-gradient(135deg,<?= $cofCor ?>22,<?= $cofCor ?>44);
+                                    border-bottom:1px solid <?= $cofCor ?>33;cursor:pointer;"
+                             onclick="abrirHistorico('<?= $cofId ?>','<?= $cofNome ?>','<?= $cofCor ?>',<?= $valAtual ?>,<?= $metaJSON ?>,'<?= htmlspecialchars($cof['Icone']) ?>','<?= $histJSON ?>')">
+                            <div class="rounded-3 d-flex align-items-center justify-content-center flex-shrink-0"
+                                 style="width:44px;height:44px;background:<?= $cofCor ?>33;">
+                                <i class="bi <?= htmlspecialchars($cof['Icone']) ?>" style="color:<?= $cofCor ?>;font-size:1.4rem;"></i>
+                            </div>
+                            <div class="flex-grow-1 min-w-0">
+                                <div class="fw-bold text-light text-truncate" style="font-size:1rem;"><?= htmlspecialchars($cof['Nome']) ?></div>
+                                <div class="text-secondary small text-truncate">
+                                    <i class="bi bi-wallet2 me-1" style="font-size:0.7rem;"></i><?= htmlspecialchars($cof['NomeCarteira'] ?? '—') ?>
                                 </div>
                             </div>
-                            <div class="card-body px-4 pb-4 pt-3">
-                                <!-- Valor e meta -->
-                                <div class="d-flex align-items-baseline gap-1 mb-2">
-                                    <span class="fw-bold text-light" style="font-size:1.35rem;">R$ <?= number_format($valAtual, 2, ',', '.') ?></span>
-                                    <?php if ($valMeta !== null): ?>
-                                        <span class="text-secondary small">/ R$ <?= number_format($valMeta, 2, ',', '.') ?></span>
-                                    <?php else: ?>
-                                        <span class="text-secondary small">guardado</span>
-                                    <?php endif; ?>
-                                </div>
+                            <i class="bi bi-chevron-right text-secondary opacity-50 flex-shrink-0" style="font-size:0.8rem;"></i>
+                        </div>
 
-                                <!-- Barra de progresso -->
-                                <?php if ($pct !== null): ?>
-                                    <div class="mb-2">
-                                        <div class="progress rounded-pill" style="height:8px;background:rgba(255,255,255,0.07);">
-                                            <div class="progress-bar rounded-pill"
-                                                 style="width:<?= $pct ?>%;background:<?= htmlspecialchars($cof['Cor']) ?>;"
-                                                 role="progressbar" aria-valuenow="<?= $pct ?>" aria-valuemin="0" aria-valuemax="100">
-                                            </div>
-                                        </div>
-                                        <div class="d-flex justify-content-between mt-1">
-                                            <span class="text-secondary" style="font-size:0.72rem;"><?= $pct ?>% concluído</span>
-                                            <?php if ($pct >= 100): ?>
-                                                <span class="fw-semibold" style="font-size:0.72rem;color:<?= htmlspecialchars($cof['Cor']) ?>;">
-                                                    <i class="bi bi-check-circle-fill me-1"></i>Meta atingida!
-                                                </span>
-                                            <?php endif; ?>
-                                        </div>
-                                    </div>
+                        <div class="card-body px-4 pb-4 pt-3">
+                            <!-- Valor -->
+                            <div class="d-flex align-items-baseline gap-1 mb-2">
+                                <span class="fw-bold text-light" style="font-size:1.35rem;">R$ <?= number_format($valAtual, 2, ',', '.') ?></span>
+                                <?php if ($valMeta !== null): ?>
+                                    <span class="text-secondary small">/ R$ <?= number_format($valMeta, 2, ',', '.') ?></span>
                                 <?php else: ?>
-                                    <div class="mb-2">
-                                        <span class="badge rounded-pill text-secondary border border-secondary-subtle" style="font-size:0.7rem;">Sem meta definida</span>
-                                    </div>
+                                    <span class="text-secondary small">guardado</span>
                                 <?php endif; ?>
+                            </div>
 
-                                <!-- Data limite -->
-                                <?php if ($diasRestantes !== null): ?>
-                                    <div class="small mb-3 <?= $diasRestantes < 0 ? 'text-danger' : 'text-secondary' ?>">
-                                        <i class="bi bi-calendar3 me-1"></i>
-                                        <?php if ($diasRestantes < 0): ?>
-                                            Prazo encerrado há <?= abs($diasRestantes) ?> dia<?= abs($diasRestantes) > 1 ? 's' : '' ?>
-                                        <?php elseif ($diasRestantes === 0): ?>
-                                            Prazo: hoje!
-                                        <?php else: ?>
-                                            <?= $diasRestantes ?> dia<?= $diasRestantes > 1 ? 's' : '' ?> restante<?= $diasRestantes > 1 ? 's' : '' ?>
-                                            <span class="text-secondary opacity-50 ms-1">(<?= date('d/m/Y', strtotime($cof['DataLimite'])) ?>)</span>
+                            <!-- Barra de progresso -->
+                            <?php if ($pct !== null): ?>
+                                <div class="mb-2">
+                                    <div class="progress rounded-pill" style="height:8px;background:rgba(255,255,255,0.07);">
+                                        <div class="progress-bar rounded-pill"
+                                             style="width:<?= $pct ?>%;background:<?= $cofCor ?>;"
+                                             role="progressbar" aria-valuenow="<?= $pct ?>" aria-valuemin="0" aria-valuemax="100"></div>
+                                    </div>
+                                    <div class="d-flex justify-content-between mt-1">
+                                        <span class="text-secondary" style="font-size:0.72rem;"><?= $pct ?>% concluído</span>
+                                        <?php if ($pct >= 100): ?>
+                                            <span class="fw-semibold" style="font-size:0.72rem;color:<?= $cofCor ?>;"><i class="bi bi-check-circle-fill me-1"></i>Meta atingida!</span>
                                         <?php endif; ?>
                                     </div>
-                                <?php else: ?>
-                                    <div class="mb-3"></div>
-                                <?php endif; ?>
+                                </div>
+                            <?php else: ?>
+                                <div class="mb-2">
+                                    <span class="badge rounded-pill text-secondary border border-secondary-subtle" style="font-size:0.7rem;">Sem meta definida</span>
+                                </div>
+                            <?php endif; ?>
 
-                                <!-- Ações -->
-                                <div class="d-flex gap-2">
-                                    <button class="btn btn-sm flex-grow-1 fw-semibold rounded-pill"
-                                            style="background:<?= htmlspecialchars($cof['Cor']) ?>22;color:<?= htmlspecialchars($cof['Cor']) ?>;border:1px solid <?= htmlspecialchars($cof['Cor']) ?>44;"
-                                            onclick="abrirModalDepositar('<?= htmlspecialchars($cof['IDCofrinho']) ?>', '<?= htmlspecialchars(addslashes($cof['Nome'])) ?>')">
-                                        <i class="bi bi-plus-lg me-1"></i> Depositar
-                                    </button>
+                            <!-- Data limite -->
+                            <?php if ($diasRestantes !== null): ?>
+                                <div class="small mb-3 <?= $diasRestantes < 0 ? 'text-danger' : 'text-secondary' ?>">
+                                    <i class="bi bi-calendar3 me-1"></i>
+                                    <?php if ($diasRestantes < 0): ?>
+                                        Prazo encerrado há <?= abs($diasRestantes) ?> dia<?= abs($diasRestantes) > 1 ? 's' : '' ?>
+                                    <?php elseif ($diasRestantes === 0): ?>
+                                        Prazo: hoje!
+                                    <?php else: ?>
+                                        <?= $diasRestantes ?> dia<?= $diasRestantes > 1 ? 's' : '' ?> restante<?= $diasRestantes > 1 ? 's' : '' ?>
+                                        <span class="opacity-50 ms-1">(<?= date('d/m/Y', strtotime($cof['DataLimite'])) ?>)</span>
+                                    <?php endif; ?>
+                                </div>
+                            <?php else: ?>
+                                <div class="mb-3"></div>
+                            <?php endif; ?>
+
+                            <!-- Ações -->
+                            <div class="d-flex gap-2">
+                                <button class="btn btn-sm flex-grow-1 fw-semibold rounded-pill"
+                                        style="background:<?= $cofCor ?>22;color:<?= $cofCor ?>;border:1px solid <?= $cofCor ?>44;"
+                                        onclick="abrirDepositar('<?= $cofId ?>','<?= $cofNome ?>')">
+                                    <i class="bi bi-plus-lg me-1"></i> Depositar
+                                </button>
+                                <!-- Dropdown de ações -->
+                                <div class="dropdown">
                                     <button class="btn btn-sm btn-outline-secondary rounded-pill px-2"
-                                            title="Encerrar cofrinho"
-                                            onclick="encerrarCofrinho('<?= htmlspecialchars($cof['IDCofrinho']) ?>', '<?= htmlspecialchars(addslashes($cof['Nome'])) ?>')">
-                                        <i class="bi bi-trash3"></i>
+                                            type="button" data-bs-toggle="dropdown" title="Mais ações">
+                                        <i class="bi bi-three-dots"></i>
                                     </button>
+                                    <ul class="dropdown-menu dropdown-menu-end shadow" style="background:var(--bg-card);border-color:var(--bs-border-color);min-width:175px;">
+                                        <li><button class="dropdown-item d-flex align-items-center gap-2 py-2"
+                                                    onclick="abrirDepositar('<?= $cofId ?>','<?= $cofNome ?>')">
+                                            <i class="bi bi-arrow-down-circle text-success"></i> Depositar
+                                        </button></li>
+                                        <li><button class="dropdown-item d-flex align-items-center gap-2 py-2"
+                                                    onclick="abrirRetirar('<?= $cofId ?>','<?= $cofNome ?>')">
+                                            <i class="bi bi-arrow-up-circle text-warning"></i> Retirar valor
+                                        </button></li>
+                                        <li><button class="dropdown-item d-flex align-items-center gap-2 py-2"
+                                                    onclick="abrirReajustar('<?= $cofId ?>','<?= $cofNome ?>',<?= $valAtual ?>)">
+                                            <i class="bi bi-sliders text-info"></i> Reajustar saldo
+                                        </button></li>
+                                        <li><hr class="dropdown-divider border-secondary-subtle my-1"></li>
+                                        <li><button class="dropdown-item d-flex align-items-center gap-2 py-2"
+                                                    onclick="abrirEditar('<?= $cofId ?>','<?= $cofNome ?>','<?= $cofCor ?>','<?= htmlspecialchars($cof['Icone']) ?>',<?= $metaJSON ?>,'<?= htmlspecialchars($cof['DataLimite'] ?? '') ?>')">
+                                            <i class="bi bi-pencil text-secondary"></i> Editar
+                                        </button></li>
+                                        <li><button class="dropdown-item d-flex align-items-center gap-2 py-2 text-danger"
+                                                    onclick="abrirExcluir('<?= $cofId ?>','<?= $cofNome ?>')">
+                                            <i class="bi bi-trash3"></i> Excluir
+                                        </button></li>
+                                    </ul>
                                 </div>
                             </div>
                         </div>
                     </div>
+                </div>
                 <?php endforeach; ?>
 
                 <!-- Card fantasma: novo cofrinho -->
@@ -612,9 +672,10 @@ require_once 'geral/header.php';
         <?php endif; ?>
     </div>
 
-    <!-- Form oculto para encerrar cofrinho -->
-    <form id="formEncerrarCofrinho" method="POST" action="cofrinho/processa_cofrinho.php?acao=encerrar" style="display:none;">
-        <input type="hidden" name="id_cofrinho" id="encerrar_id_cofrinho">
+    <!-- Forms ocultos -->
+    <form id="formAcaoCofrinho" method="POST" action="cofrinho/processa_cofrinho.php" style="display:none;">
+        <input type="hidden" name="acao"        id="form_acao">
+        <input type="hidden" name="id_cofrinho" id="form_id">
     </form>
 
 </main>
@@ -947,7 +1008,72 @@ require_once 'geral/header.php';
 </script>
 
 <!-- ══════════════════════════════════════════════════════════════════════ -->
-<!-- ── Modal: Criar Cofrinho ──────────────────────────────────────── -->
+<!-- ── Modais de Cofrinho ──────────────────────────────────────────── -->
+<!-- ══════════════════════════════════════════════════════════════════════ -->
+
+<!-- ── Modal: Histórico ──────────────────────────────────────────────── -->
+<div class="modal fade" id="modalHistorico" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered modal-dialog-scrollable" style="max-width:500px;">
+        <div class="modal-content border-secondary-subtle shadow-lg rounded-4" style="background:var(--bg-card);">
+            <div class="modal-header border-bottom border-secondary-subtle p-0" id="modalHistoricoHeader" style="border-radius:inherit inherit 0 0;">
+                <div class="d-flex align-items-center gap-3 p-4 w-100">
+                    <div class="rounded-3 d-flex align-items-center justify-content-center flex-shrink-0" id="histIconeBox" style="width:44px;height:44px;">
+                        <i class="bi bi-piggy-bank fs-4" id="histIcone"></i>
+                    </div>
+                    <div class="flex-grow-1 min-w-0">
+                        <h6 class="modal-title text-light fw-bold mb-0" id="histNome">Cofrinho</h6>
+                        <div class="text-secondary small" id="histSaldo"></div>
+                    </div>
+                    <button type="button" class="btn-close btn-close-white flex-shrink-0" data-bs-dismiss="modal"></button>
+                </div>
+            </div>
+            <div class="modal-body p-0">
+                <!-- Barra de progresso se tiver meta -->
+                <div id="histProgressoWrap" class="px-4 pt-3 pb-2" style="display:none;">
+                    <div class="progress rounded-pill mb-1" style="height:8px;background:rgba(255,255,255,0.07);">
+                        <div class="progress-bar rounded-pill" id="histProgressoBar" style="width:0%;"></div>
+                    </div>
+                    <div class="d-flex justify-content-between">
+                        <span class="text-secondary" style="font-size:0.72rem;" id="histPct"></span>
+                        <span class="text-secondary" style="font-size:0.72rem;" id="histMeta"></span>
+                    </div>
+                </div>
+                <!-- Botões de ação rápida -->
+                <div class="d-flex gap-2 px-4 py-3 border-bottom border-secondary-subtle">
+                    <button class="btn btn-sm rounded-pill flex-grow-1 fw-semibold" id="histBtnDepositar"
+                            style="background:rgba(22,163,74,0.12);color:#16a34a;border:1px solid rgba(22,163,74,0.3);">
+                        <i class="bi bi-arrow-down-circle me-1"></i> Depositar
+                    </button>
+                    <button class="btn btn-sm rounded-pill flex-grow-1 fw-semibold" id="histBtnRetirar"
+                            style="background:rgba(245,158,11,0.12);color:#f59e0b;border:1px solid rgba(245,158,11,0.3);">
+                        <i class="bi bi-arrow-up-circle me-1"></i> Retirar
+                    </button>
+                    <button class="btn btn-sm btn-outline-secondary rounded-pill px-3" id="histBtnEditar" title="Editar">
+                        <i class="bi bi-pencil"></i>
+                    </button>
+                </div>
+                <!-- Lista de transações -->
+                <div id="histLista" style="max-height:320px;overflow-y:auto;">
+                    <div class="text-center text-secondary py-5 small">
+                        <i class="bi bi-clock-history fs-2 d-block mb-2 opacity-25"></i>
+                        Nenhuma movimentação ainda.
+                    </div>
+                </div>
+            </div>
+            <div class="modal-footer border-top border-secondary-subtle p-3">
+                <button class="btn btn-sm btn-outline-danger rounded-pill px-3" id="histBtnExcluir">
+                    <i class="bi bi-trash3 me-1"></i> Excluir cofrinho
+                </button>
+                <button class="btn btn-sm rounded-pill px-3" id="histBtnReajustar"
+                        style="background:rgba(8,145,178,0.12);color:#0891b2;border:1px solid rgba(8,145,178,0.3);">
+                    <i class="bi bi-sliders me-1"></i> Reajustar saldo
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- ── Modal: Criar Cofrinho ──────────────────────────────────────────── -->
 <!-- ══════════════════════════════════════════════════════════════════════ -->
 <div class="modal fade" id="modalCriarCofrinho" tabindex="-1" aria-hidden="true">
     <div class="modal-dialog modal-dialog-centered" style="max-width:480px;">
@@ -1097,8 +1223,211 @@ require_once 'geral/header.php';
     </div>
 </div>
 
+<!-- ── Modal: Editar Cofrinho ─────────────────────────────────────────── -->
+<div class="modal fade" id="modalEditarCofrinho" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered" style="max-width:480px;">
+        <div class="modal-content border-secondary-subtle shadow-lg rounded-4" style="background:var(--bg-card);">
+            <div class="modal-header border-bottom border-secondary-subtle p-4">
+                <h6 class="modal-title text-light fw-bold"><i class="bi bi-pencil me-2" style="color:#f59e0b;"></i> Editar Cofrinho</h6>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+            </div>
+            <form method="POST" action="cofrinho/processa_cofrinho.php?acao=editar">
+                <input type="hidden" name="id_cofrinho" id="editar_id">
+                <div class="modal-body p-4">
+                    <div class="mb-3">
+                        <label class="form-label text-secondary small fw-semibold">Nome *</label>
+                        <input type="text" name="nome" id="editar_nome" class="form-control rounded-3 border-secondary-subtle"
+                               style="background:var(--bg-hover);color:var(--text-main);" required maxlength="100">
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label text-secondary small fw-semibold">Ícone</label>
+                        <div class="d-flex flex-wrap gap-2" id="editar-icone-picker">
+                            <?php foreach ($icones as $slug => $label): ?>
+                            <label class="cofrinho-icone-opt" title="<?= $label ?>">
+                                <input type="radio" name="icone" value="<?= $slug ?>" style="display:none;">
+                                <span class="d-flex align-items-center justify-content-center rounded-3"
+                                      style="width:44px;height:44px;cursor:pointer;border:2px solid transparent;background:rgba(255,255,255,0.05);transition:all .15s;">
+                                    <i class="bi <?= $slug ?>" style="font-size:1.3rem;"></i>
+                                </span>
+                            </label>
+                            <?php endforeach; ?>
+                        </div>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label text-secondary small fw-semibold">Cor</label>
+                        <div class="d-flex flex-wrap gap-2" id="editar-cor-picker">
+                            <?php foreach ($cores as $hex => $nome): ?>
+                            <label class="cofrinho-cor-opt" title="<?= $nome ?>">
+                                <input type="radio" name="cor" value="<?= $hex ?>" style="display:none;">
+                                <span class="d-flex align-items-center justify-content-center rounded-circle"
+                                      style="width:32px;height:32px;cursor:pointer;background:<?= $hex ?>;border:3px solid transparent;transition:all .15s;"></span>
+                            </label>
+                            <?php endforeach; ?>
+                        </div>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label text-secondary small fw-semibold">Meta (R$) <span class="opacity-50">— opcional</span></label>
+                        <input type="number" name="meta" id="editar_meta" class="form-control rounded-3 border-secondary-subtle"
+                               style="background:var(--bg-hover);color:var(--text-main);" placeholder="0,00" min="0.01" step="0.01">
+                    </div>
+                    <div class="mb-1">
+                        <label class="form-label text-secondary small fw-semibold">Data limite <span class="opacity-50">— opcional</span></label>
+                        <input type="date" name="data_limite" id="editar_data_limite" class="form-control rounded-3 border-secondary-subtle"
+                               style="background:var(--bg-hover);color:var(--text-main);">
+                    </div>
+                </div>
+                <div class="modal-footer border-top border-secondary-subtle p-3">
+                    <button type="button" class="btn btn-outline-secondary rounded-pill px-3" data-bs-dismiss="modal">Cancelar</button>
+                    <button type="submit" class="btn fw-semibold rounded-pill px-4"
+                            style="background:rgba(245,158,11,0.15);color:#f59e0b;border:1px solid rgba(245,158,11,0.4);">
+                        <i class="bi bi-check-lg me-1"></i> Salvar
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+<!-- ── Modal: Depositar ───────────────────────────────────────────────── -->
+<div class="modal fade" id="modalDepositar" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered" style="max-width:380px;">
+        <div class="modal-content border-secondary-subtle shadow-lg rounded-4" style="background:var(--bg-card);">
+            <div class="modal-header border-bottom border-secondary-subtle p-4">
+                <h6 class="modal-title text-light fw-bold" id="modalDepositarTitulo">
+                    <i class="bi bi-arrow-down-circle me-2 text-success"></i> Depositar
+                </h6>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+            </div>
+            <form method="POST" action="cofrinho/processa_cofrinho.php?acao=depositar">
+                <input type="hidden" name="id_cofrinho" id="dep_id">
+                <div class="modal-body p-4">
+                    <label class="form-label text-secondary small fw-semibold">Valor (R$) *</label>
+                    <input type="number" name="valor" id="dep_valor"
+                           class="form-control form-control-lg rounded-3 border-secondary-subtle"
+                           style="background:var(--bg-hover);color:var(--text-main);font-size:1.4rem;font-weight:700;"
+                           placeholder="0,00" min="0.01" step="0.01" required>
+                    <label class="form-label text-secondary small fw-semibold mt-3">Descrição <span class="opacity-50">— opcional</span></label>
+                    <input type="text" name="descricao" class="form-control rounded-3 border-secondary-subtle"
+                           style="background:var(--bg-hover);color:var(--text-main);" placeholder="Ex: Salário, economias...">
+                    <div class="text-secondary small mt-2">
+                        <i class="bi bi-info-circle me-1"></i>O valor será debitado do saldo da carteira vinculada.
+                    </div>
+                </div>
+                <div class="modal-footer border-top border-secondary-subtle p-3">
+                    <button type="button" class="btn btn-outline-secondary rounded-pill px-3" data-bs-dismiss="modal">Cancelar</button>
+                    <button type="submit" class="btn fw-semibold rounded-pill px-4"
+                            style="background:rgba(22,163,74,0.15);color:#16a34a;border:1px solid rgba(22,163,74,0.4);">
+                        <i class="bi bi-check-lg me-1"></i> Confirmar depósito
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+<!-- ── Modal: Retirar ─────────────────────────────────────────────────── -->
+<div class="modal fade" id="modalRetirar" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered" style="max-width:380px;">
+        <div class="modal-content border-secondary-subtle shadow-lg rounded-4" style="background:var(--bg-card);">
+            <div class="modal-header border-bottom border-secondary-subtle p-4">
+                <h6 class="modal-title text-light fw-bold" id="modalRetirarTitulo">
+                    <i class="bi bi-arrow-up-circle me-2" style="color:#f59e0b;"></i> Retirar valor
+                </h6>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+            </div>
+            <form method="POST" action="cofrinho/processa_cofrinho.php?acao=retirar">
+                <input type="hidden" name="id_cofrinho" id="ret_id">
+                <div class="modal-body p-4">
+                    <label class="form-label text-secondary small fw-semibold">Valor a retirar (R$) *</label>
+                    <input type="number" name="valor" id="ret_valor"
+                           class="form-control form-control-lg rounded-3 border-secondary-subtle"
+                           style="background:var(--bg-hover);color:var(--text-main);font-size:1.4rem;font-weight:700;"
+                           placeholder="0,00" min="0.01" step="0.01" required>
+                    <label class="form-label text-secondary small fw-semibold mt-3">Descrição <span class="opacity-50">— opcional</span></label>
+                    <input type="text" name="descricao" class="form-control rounded-3 border-secondary-subtle"
+                           style="background:var(--bg-hover);color:var(--text-main);" placeholder="Ex: Emergência, compra...">
+                    <div class="text-secondary small mt-2">
+                        <i class="bi bi-info-circle me-1"></i>O valor será devolvido ao saldo da carteira vinculada.
+                    </div>
+                </div>
+                <div class="modal-footer border-top border-secondary-subtle p-3">
+                    <button type="button" class="btn btn-outline-secondary rounded-pill px-3" data-bs-dismiss="modal">Cancelar</button>
+                    <button type="submit" class="btn fw-semibold rounded-pill px-4"
+                            style="background:rgba(245,158,11,0.15);color:#f59e0b;border:1px solid rgba(245,158,11,0.4);">
+                        <i class="bi bi-check-lg me-1"></i> Confirmar retirada
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+<!-- ── Modal: Reajustar ───────────────────────────────────────────────── -->
+<div class="modal fade" id="modalReajustar" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered" style="max-width:380px;">
+        <div class="modal-content border-secondary-subtle shadow-lg rounded-4" style="background:var(--bg-card);">
+            <div class="modal-header border-bottom border-secondary-subtle p-4">
+                <h6 class="modal-title text-light fw-bold" id="modalReajustarTitulo">
+                    <i class="bi bi-sliders me-2 text-info"></i> Reajustar saldo
+                </h6>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+            </div>
+            <form method="POST" action="cofrinho/processa_cofrinho.php?acao=reajustar">
+                <input type="hidden" name="id_cofrinho" id="reaj_id">
+                <input type="hidden" name="valor_atual" id="reaj_valor_atual">
+                <div class="modal-body p-4">
+                    <div class="mb-3 p-3 rounded-3" style="background:rgba(255,255,255,0.04);border:1px solid var(--bs-border-color);">
+                        <div class="text-secondary small">Saldo atual</div>
+                        <div class="fw-bold text-light" id="reaj_saldo_display" style="font-size:1.1rem;"></div>
+                    </div>
+                    <label class="form-label text-secondary small fw-semibold">Novo saldo desejado (R$) *</label>
+                    <input type="number" name="novo_valor" id="reaj_novo_valor"
+                           class="form-control form-control-lg rounded-3 border-secondary-subtle"
+                           style="background:var(--bg-hover);color:var(--text-main);font-size:1.4rem;font-weight:700;"
+                           placeholder="0,00" min="0" step="0.01" required>
+                    <div class="text-secondary small mt-2">
+                        <i class="bi bi-info-circle me-1"></i>A diferença será lançada como depósito ou retirada automática.
+                    </div>
+                </div>
+                <div class="modal-footer border-top border-secondary-subtle p-3">
+                    <button type="button" class="btn btn-outline-secondary rounded-pill px-3" data-bs-dismiss="modal">Cancelar</button>
+                    <button type="submit" class="btn fw-semibold rounded-pill px-4"
+                            style="background:rgba(8,145,178,0.15);color:#0891b2;border:1px solid rgba(8,145,178,0.4);">
+                        <i class="bi bi-check-lg me-1"></i> Aplicar reajuste
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+<!-- ── Modal: Excluir ─────────────────────────────────────────────────── -->
+<div class="modal fade" id="modalExcluir" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered" style="max-width:380px;">
+        <div class="modal-content border-secondary-subtle shadow-lg rounded-4" style="background:var(--bg-card);">
+            <div class="modal-header border-bottom border-secondary-subtle p-4">
+                <h6 class="modal-title text-light fw-bold"><i class="bi bi-trash3 me-2 text-danger"></i> Excluir cofrinho</h6>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+            </div>
+            <form method="POST" action="cofrinho/processa_cofrinho.php?acao=excluir">
+                <input type="hidden" name="id_cofrinho" id="excluir_id">
+                <div class="modal-body p-4 text-center">
+                    <i class="bi bi-exclamation-triangle text-danger" style="font-size:2.5rem;"></i>
+                    <p class="text-light fw-semibold mt-3 mb-1" id="excluir_titulo">Excluir este cofrinho?</p>
+                    <p class="text-secondary small">Esta ação é permanente. Todas as movimentações serão apagadas e o saldo retorna à carteira apenas via retirada prévia.</p>
+                </div>
+                <div class="modal-footer border-top border-secondary-subtle p-3">
+                    <button type="button" class="btn btn-outline-secondary rounded-pill px-3" data-bs-dismiss="modal">Cancelar</button>
+                    <button type="submit" class="btn btn-danger rounded-pill px-4 fw-semibold">
+                        <i class="bi bi-trash3 me-1"></i> Confirmar exclusão
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
 <style>
-/* ── Cofrinhos ── */
 .cofrinho-icone-opt input:checked + span,
 .cofrinho-icone-opt span:hover {
     border-color: #f59e0b !important;
@@ -1108,26 +1437,153 @@ require_once 'geral/header.php';
     border-color: #fff !important;
     box-shadow: 0 0 0 2px rgba(255,255,255,0.4);
 }
-.cofrinho-cor-opt span:hover {
-    transform: scale(1.15);
-}
+.cofrinho-cor-opt span:hover { transform: scale(1.15); }
+.cofrinho-header-click:hover { filter: brightness(1.08); }
 </style>
 
 <script>
-function abrirModalDepositar(id, nome) {
-    document.getElementById('depositar_id_cofrinho').value = id;
-    document.getElementById('modalDepositarTitulo').innerHTML =
-        '<i class="bi bi-arrow-down-circle me-2" style="color:#f59e0b;"></i> Depositar em <strong>' + nome + '</strong>';
-    document.getElementById('depositar_valor').value = '';
-    var modal = new bootstrap.Modal(document.getElementById('modalDepositar'));
-    modal.show();
-    setTimeout(() => document.getElementById('depositar_valor').focus(), 400);
+// ── Estado do cofrinho atual no histórico ──────────────────────────
+var _cofAtual = {};
+
+function _modal(id) { return new bootstrap.Modal(document.getElementById(id)); }
+function _get(id)   { return document.getElementById(id); }
+
+// ── Histórico (clique no header do card) ──────────────────────────
+function abrirHistorico(id, nome, cor, valAtual, valMeta, icone, histJSON) {
+    _cofAtual = { id, nome, cor, valAtual, valMeta, icone };
+    var hist = typeof histJSON === 'string' ? JSON.parse(histJSON) : histJSON;
+
+    // Header
+    _get('histIconeBox').style.background = cor + '33';
+    _get('histIcone').className = 'bi ' + icone;
+    _get('histIcone').style.color = cor;
+    _get('histNome').textContent = nome;
+    _get('histSaldo').textContent = 'R$ ' + valAtual.toLocaleString('pt-BR', {minimumFractionDigits:2, maximumFractionDigits:2}) + ' guardado';
+
+    // Progresso
+    if (valMeta !== null && valMeta > 0) {
+        var pct = Math.min(100, Math.round((valAtual / valMeta) * 1000) / 10);
+        _get('histProgressoWrap').style.display = '';
+        _get('histProgressoBar').style.width  = pct + '%';
+        _get('histProgressoBar').style.background = cor;
+        _get('histPct').textContent  = pct + '% concluído';
+        _get('histMeta').textContent = 'Meta: R$ ' + valMeta.toLocaleString('pt-BR', {minimumFractionDigits:2, maximumFractionDigits:2});
+    } else {
+        _get('histProgressoWrap').style.display = 'none';
+    }
+
+    // Lista de movimentações
+    var lista = _get('histLista');
+    if (!hist || hist.length === 0) {
+        lista.innerHTML = '<div class="text-center text-secondary py-5 small"><i class="bi bi-clock-history fs-2 d-block mb-2 opacity-25"></i>Nenhuma movimentação ainda.</div>';
+    } else {
+        var html = '<div class="list-group list-group-flush">';
+        hist.forEach(function(t) {
+            var isDeposito = t.TipoRegistro === 'cofrinho';
+            var sinal  = isDeposito ? '+' : '-';
+            var cor2   = isDeposito ? '#16a34a' : '#f59e0b';
+            var icone2 = isDeposito ? 'bi-arrow-down-circle' : 'bi-arrow-up-circle';
+            var data   = new Date(t.MomentoRegistro).toLocaleDateString('pt-BR');
+            var desc   = t.Descricao || (isDeposito ? 'Depósito' : 'Retirada');
+            var val    = parseFloat(t.Valor).toLocaleString('pt-BR', {minimumFractionDigits:2, maximumFractionDigits:2});
+            html += '<div class="list-group-item border-0 border-bottom border-secondary-subtle py-3 px-4"' +
+                    ' style="background:transparent;">' +
+                    '<div class="d-flex align-items-center gap-3">' +
+                    '<span class="rounded-circle d-flex align-items-center justify-content-center flex-shrink-0"' +
+                    ' style="width:34px;height:34px;background:' + cor2 + '18;">' +
+                    '<i class="bi ' + icone2 + '" style="color:' + cor2 + ';font-size:1rem;"></i></span>' +
+                    '<div class="flex-grow-1 min-w-0"><div class="text-light fw-semibold small text-truncate">' + desc + '</div>' +
+                    '<div class="text-secondary" style="font-size:0.72rem;">' + data + '</div></div>' +
+                    '<span class="fw-bold" style="color:' + cor2 + ';font-size:0.92rem;">' + sinal + ' R$ ' + val + '</span>' +
+                    '</div></div>';
+        });
+        html += '</div>';
+        lista.innerHTML = html;
+    }
+
+    // Botões de ação do modal
+    _get('histBtnDepositar').onclick = function() {
+        bootstrap.Modal.getInstance(_get('modalHistorico')).hide();
+        setTimeout(function() { abrirDepositar(id, nome); }, 200);
+    };
+    _get('histBtnRetirar').onclick = function() {
+        bootstrap.Modal.getInstance(_get('modalHistorico')).hide();
+        setTimeout(function() { abrirRetirar(id, nome); }, 200);
+    };
+    _get('histBtnEditar').onclick = function() {
+        bootstrap.Modal.getInstance(_get('modalHistorico')).hide();
+        // editar com os dados atuais — buscamos do card via atributos
+        // fallback: abrir modal de edição com id (campos vazios, usuário preenche)
+        setTimeout(function() { _get('editar_id').value = id; _get('editar_nome').value = nome; _modal('modalEditarCofrinho').show(); }, 200);
+    };
+    _get('histBtnExcluir').onclick  = function() {
+        bootstrap.Modal.getInstance(_get('modalHistorico')).hide();
+        setTimeout(function() { abrirExcluir(id, nome); }, 200);
+    };
+    _get('histBtnReajustar').onclick = function() {
+        bootstrap.Modal.getInstance(_get('modalHistorico')).hide();
+        setTimeout(function() { abrirReajustar(id, nome, valAtual); }, 200);
+    };
+
+    _modal('modalHistorico').show();
 }
 
-function encerrarCofrinho(id, nome) {
-    if (!confirm('Encerrar o cofrinho "' + nome + '"?\n\nO histórico de depósitos será mantido, mas o cofrinho não aparecerá mais na lista.')) return;
-    document.getElementById('encerrar_id_cofrinho').value = id;
-    document.getElementById('formEncerrarCofrinho').submit();
+// ── Depositar ─────────────────────────────────────────────────────
+function abrirDepositar(id, nome) {
+    _get('dep_id').value = id;
+    _get('dep_valor').value = '';
+    _get('modalDepositarTitulo').innerHTML =
+        '<i class="bi bi-arrow-down-circle me-2 text-success"></i> Depositar em <strong>' + nome + '</strong>';
+    _modal('modalDepositar').show();
+    setTimeout(function() { _get('dep_valor').focus(); }, 400);
+}
+
+// ── Retirar ───────────────────────────────────────────────────────
+function abrirRetirar(id, nome) {
+    _get('ret_id').value = id;
+    _get('ret_valor').value = '';
+    _get('modalRetirarTitulo').innerHTML =
+        '<i class="bi bi-arrow-up-circle me-2" style="color:#f59e0b;"></i> Retirar de <strong>' + nome + '</strong>';
+    _modal('modalRetirar').show();
+    setTimeout(function() { _get('ret_valor').focus(); }, 400);
+}
+
+// ── Reajustar ─────────────────────────────────────────────────────
+function abrirReajustar(id, nome, valAtual) {
+    _get('reaj_id').value = id;
+    _get('reaj_valor_atual').value = valAtual;
+    _get('reaj_novo_valor').value = '';
+    _get('modalReajustarTitulo').innerHTML =
+        '<i class="bi bi-sliders me-2 text-info"></i> Reajustar: <strong>' + nome + '</strong>';
+    _get('reaj_saldo_display').textContent = 'R$ ' + parseFloat(valAtual).toLocaleString('pt-BR', {minimumFractionDigits:2, maximumFractionDigits:2});
+    _modal('modalReajustar').show();
+    setTimeout(function() { _get('reaj_novo_valor').focus(); }, 400);
+}
+
+// ── Editar ────────────────────────────────────────────────────────
+function abrirEditar(id, nome, cor, icone, meta, dataLimite) {
+    _get('editar_id').value = id;
+    _get('editar_nome').value = nome;
+    _get('editar_meta').value = meta !== null ? meta : '';
+    _get('editar_data_limite').value = dataLimite || '';
+
+    // Marca ícone correto
+    document.querySelectorAll('#editar-icone-picker input[type=radio]').forEach(function(r) {
+        r.checked = (r.value === icone);
+    });
+    // Marca cor correta
+    document.querySelectorAll('#editar-cor-picker input[type=radio]').forEach(function(r) {
+        r.checked = (r.value === cor);
+    });
+
+    _modal('modalEditarCofrinho').show();
+}
+
+// ── Excluir ───────────────────────────────────────────────────────
+function abrirExcluir(id, nome) {
+    _get('excluir_id').value = id;
+    _get('excluir_titulo').textContent = 'Excluir o cofrinho "' + nome + '"?';
+    _modal('modalExcluir').show();
 }
 </script>
 

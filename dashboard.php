@@ -335,8 +335,10 @@ if ($carteira_selecionada) {
     try {
         $sqlSaldo = "
                 SELECT
-                    COALESCE(SUM(CASE WHEN TipoRegistro = 'receita' THEN Valor ELSE 0 END), 0) as total_rec_hist,
-                    COALESCE(SUM(CASE WHEN TipoRegistro IN ('despesa','cofrinho') THEN Valor ELSE 0 END), 0) as total_des_hist
+                    COALESCE(SUM(CASE WHEN TipoRegistro = 'receita'           THEN Valor ELSE 0 END), 0) as total_rec_hist,
+                    COALESCE(SUM(CASE WHEN TipoRegistro = 'despesa'           THEN Valor ELSE 0 END), 0) as total_des_hist,
+                    COALESCE(SUM(CASE WHEN TipoRegistro = 'cofrinho'          THEN Valor ELSE 0 END), 0) as total_cof_dep,
+                    COALESCE(SUM(CASE WHEN TipoRegistro = 'cofrinho_retirada' THEN Valor ELSE 0 END), 0) as total_cof_ret
                 FROM Registro
                 WHERE FKCarteira = :carteira_id
                   AND FKUsuario = :usuario_id
@@ -347,7 +349,10 @@ if ($carteira_selecionada) {
         $resultSaldo = $stmtSaldo->fetch();
 
         if ($resultSaldo) {
-            $saldoAtual = (float) $resultSaldo['total_rec_hist'] - (float) $resultSaldo['total_des_hist'];
+            $saldoAtual = (float) $resultSaldo['total_rec_hist']
+                        + (float) $resultSaldo['total_cof_ret']
+                        - (float) $resultSaldo['total_des_hist']
+                        - (float) $resultSaldo['total_cof_dep'];
         }
 
         // CORREÇÃO: EXTRACT trocado por MONTH() e YEAR()
@@ -388,6 +393,7 @@ if ($carteira_selecionada) {
                 LEFT JOIN Categoria c ON r.FKCategoria = c.IDCategoria
                 WHERE r.FKCarteira = :carteira_id
                   AND r.FKUsuario = :usuario_id
+                  AND r.TipoRegistro NOT IN ('cofrinho','cofrinho_retirada')
                   AND MONTH(r.MomentoRegistro) = :mes
                   AND YEAR(r.MomentoRegistro) = :ano
                 ORDER BY r.MomentoRegistro DESC, r.IDRegistro DESC
@@ -453,9 +459,12 @@ $qtdCofrinhos   = 0;
 try {
     $stmtCof = $pdo->prepare("
         SELECT COUNT(co.IDCofrinho) as qtd,
-               COALESCE(SUM(r.Valor), 0) as total
+               COALESCE(SUM(CASE WHEN r.TipoRegistro='cofrinho'          THEN  r.Valor
+                                 WHEN r.TipoRegistro='cofrinho_retirada' THEN -r.Valor
+                                 ELSE 0 END), 0) as total
         FROM Cofrinho co
-        LEFT JOIN Registro r ON r.FKCofrinho = co.IDCofrinho AND r.TipoRegistro = 'cofrinho'
+        LEFT JOIN Registro r ON r.FKCofrinho = co.IDCofrinho
+                             AND r.TipoRegistro IN ('cofrinho','cofrinho_retirada')
         WHERE co.FKUsuario = :uid AND co.Ativo = 1
     ");
     $stmtCof->execute([':uid' => $usuario_id]);
