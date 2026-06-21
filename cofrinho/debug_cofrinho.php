@@ -31,6 +31,26 @@ try {
     $erros[] = 'Erro ao verificar coluna: ' . $e->getMessage();
 }
 
+// ── 1b. Verifica e corrige o ENUM TipoRegistro ──────────────────────────────
+try {
+    $chkEnum = $pdo->query("SELECT COLUMN_TYPE FROM INFORMATION_SCHEMA.COLUMNS WHERE TABLE_SCHEMA=DATABASE() AND TABLE_NAME='Registro' AND COLUMN_NAME='TipoRegistro'");
+    $enumType = (string)$chkEnum->fetchColumn();
+    if (strpos($enumType, 'cofrinho') === false) {
+        $infos[] = "❌ TipoRegistro ENUM não inclui 'cofrinho'/'cofrinho_retirada' — ESTE É O BUG! Tipo atual: {$enumType}";
+        // Tenta corrigir automaticamente
+        try {
+            $pdo->exec("ALTER TABLE Registro MODIFY COLUMN TipoRegistro ENUM('receita','despesa','cofrinho','cofrinho_retirada') NOT NULL DEFAULT 'despesa'");
+            $infos[] = "✅ ENUM TipoRegistro corrigido automaticamente! Agora inclui 'cofrinho' e 'cofrinho_retirada'.";
+        } catch (PDOException $e2) {
+            $erros[] = 'Falha ao corrigir ENUM: ' . $e2->getMessage();
+        }
+    } else {
+        $infos[] = "✅ TipoRegistro ENUM correto: {$enumType}";
+    }
+} catch (PDOException $e) {
+    $erros[] = 'Erro ao verificar ENUM: ' . $e->getMessage();
+}
+
 // ── 2. Lista colunas da tabela Registro ─────────────────────────────────────
 $colunasRegistro = [];
 try {
