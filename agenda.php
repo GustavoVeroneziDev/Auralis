@@ -1252,8 +1252,11 @@ require_once 'geral/header.php';
         }).catch(() => alert('Erro de conexão.'));
     }
 
-    // Reset ao fechar o modal
-    document.getElementById('modalDia').addEventListener('hidden.bs.modal', _agendaSairSel);
+    // Reset ao fechar o modal (DOMContentLoaded pois o HTML do modal vem após o script)
+    document.addEventListener('DOMContentLoaded', function() {
+        const el = document.getElementById('modalDia');
+        if (el) el.addEventListener('hidden.bs.modal', _agendaSairSel);
+    });
 
     // ── Context menu dos itens do modal de dia ────────────────────────────
     (function() {
