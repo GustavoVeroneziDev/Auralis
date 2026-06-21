@@ -8,6 +8,14 @@ if (!isset($_SESSION['usuario_id'])) {
 require_once '../config/conexao.php';
 require_once '../config/funcoes.php';
 
+// Garante que a coluna FKCofrinho existe (compatibilidade com MySQL 5.x que não suporta IF NOT EXISTS em ADD COLUMN)
+try {
+    $chk = $pdo->query("SELECT COUNT(*) FROM INFORMATION_SCHEMA.COLUMNS WHERE TABLE_SCHEMA=DATABASE() AND TABLE_NAME='Registro' AND COLUMN_NAME='FKCofrinho'");
+    if ((int)$chk->fetchColumn() === 0) {
+        $pdo->exec("ALTER TABLE Registro ADD COLUMN FKCofrinho VARCHAR(36) NULL DEFAULT NULL");
+    }
+} catch (PDOException $e) {}
+
 $uid  = $_SESSION['usuario_id'];
 $acao = $_POST['acao'] ?? $_GET['acao'] ?? '';
 

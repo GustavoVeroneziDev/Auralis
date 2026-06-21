@@ -548,7 +548,7 @@ require_once 'geral/header.php';
                         <div class="d-flex align-items-center gap-3 px-4 py-3 cofrinho-header-click"
                              style="background:linear-gradient(135deg,<?= $cofCor ?>22,<?= $cofCor ?>44);
                                     border-bottom:1px solid <?= $cofCor ?>33;cursor:pointer;"
-                             onclick="abrirHistorico('<?= $cofId ?>','<?= $cofNome ?>','<?= $cofCor ?>',<?= $valAtual ?>,<?= $metaJSON ?>,'<?= htmlspecialchars($cof['Icone']) ?>','<?= $histJSON ?>')">
+                             onclick="abrirHistorico('<?= $cofId ?>','<?= $cofNome ?>','<?= $cofCor ?>',<?= $valAtual ?>,<?= $metaJSON ?>,'<?= htmlspecialchars($cof['Icone']) ?>','<?= $histJSON ?>','<?= htmlspecialchars($cof['DataLimite'] ?? '') ?>')">
                             <div class="rounded-3 d-flex align-items-center justify-content-center flex-shrink-0"
                                  style="width:44px;height:44px;background:<?= $cofCor ?>33;">
                                 <i class="bi <?= htmlspecialchars($cof['Icone']) ?>" style="color:<?= $cofCor ?>;font-size:1.4rem;"></i>
@@ -1449,8 +1449,8 @@ function _modal(id) { return new bootstrap.Modal(document.getElementById(id)); }
 function _get(id)   { return document.getElementById(id); }
 
 // ── Histórico (clique no header do card) ──────────────────────────
-function abrirHistorico(id, nome, cor, valAtual, valMeta, icone, histJSON) {
-    _cofAtual = { id, nome, cor, valAtual, valMeta, icone };
+function abrirHistorico(id, nome, cor, valAtual, valMeta, icone, histJSON, dataLimite) {
+    _cofAtual = { id: id, nome: nome, cor: cor, valAtual: valAtual, valMeta: valMeta, icone: icone, dataLimite: dataLimite || '' };
     var hist = typeof histJSON === 'string' ? JSON.parse(histJSON) : histJSON;
 
     // Header
@@ -1512,9 +1512,9 @@ function abrirHistorico(id, nome, cor, valAtual, valMeta, icone, histJSON) {
     };
     _get('histBtnEditar').onclick = function() {
         bootstrap.Modal.getInstance(_get('modalHistorico')).hide();
-        // editar com os dados atuais — buscamos do card via atributos
-        // fallback: abrir modal de edição com id (campos vazios, usuário preenche)
-        setTimeout(function() { _get('editar_id').value = id; _get('editar_nome').value = nome; _modal('modalEditarCofrinho').show(); }, 200);
+        setTimeout(function() {
+            abrirEditar(_cofAtual.id, _cofAtual.nome, _cofAtual.cor, _cofAtual.icone, _cofAtual.valMeta, _cofAtual.dataLimite);
+        }, 200);
     };
     _get('histBtnExcluir').onclick  = function() {
         bootstrap.Modal.getInstance(_get('modalHistorico')).hide();
