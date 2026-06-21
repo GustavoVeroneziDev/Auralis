@@ -453,24 +453,27 @@ try {
 } catch (PDOException $e) {
 }
 
-// ── Cofrinhos: resumo para mini-card ────────────────────────────────────
-$totalCofrinhos = 0.0;
-$qtdCofrinhos   = 0;
+// ── Cofrinhos: lista individual para cards no dashboard ─────────────────
+$listaCofrinhosDash = [];
+$totalCofrinhos     = 0.0;
+$qtdCofrinhos       = 0;
 try {
     $stmtCof = $pdo->prepare("
-        SELECT COUNT(co.IDCofrinho) as qtd,
+        SELECT co.IDCofrinho, co.Nome, co.Icone, co.Cor, co.ValorMeta, co.DataLimite,
                COALESCE(SUM(CASE WHEN r.TipoRegistro='cofrinho'          THEN  r.Valor
                                  WHEN r.TipoRegistro='cofrinho_retirada' THEN -r.Valor
-                                 ELSE 0 END), 0) as total
+                                 ELSE 0 END), 0) as ValorAtual
         FROM Cofrinho co
         LEFT JOIN Registro r ON r.FKCofrinho = co.IDCofrinho
                              AND r.TipoRegistro IN ('cofrinho','cofrinho_retirada')
         WHERE co.FKUsuario = :uid AND co.Ativo = 1
+        GROUP BY co.IDCofrinho, co.Nome, co.Icone, co.Cor, co.ValorMeta, co.DataLimite
+        ORDER BY co.DataCriacao ASC
     ");
     $stmtCof->execute([':uid' => $usuario_id]);
-    $resCof         = $stmtCof->fetch(PDO::FETCH_ASSOC);
-    $totalCofrinhos = (float) ($resCof['total'] ?? 0);
-    $qtdCofrinhos   = (int)   ($resCof['qtd']   ?? 0);
+    $listaCofrinhosDash = $stmtCof->fetchAll(PDO::FETCH_ASSOC);
+    $qtdCofrinhos       = count($listaCofrinhosDash);
+    $totalCofrinhos     = array_sum(array_column($listaCofrinhosDash, 'ValorAtual'));
 } catch (PDOException $e) {
 }
 
@@ -735,25 +738,83 @@ require_once 'geral/header.php';
             </div>
         </div>
 
-        <!-- ── Mini-card Cofrinhos ────────────────────────────────────────── -->
+        <!-- ── Seção Cofrinhos & Metas ───────────────────────────────────── -->
         <?php if ($qtdCofrinhos > 0): ?>
-        <div class="card bg-body-tertiary border-secondary-subtle shadow-sm rounded-4 mb-3">
-            <div class="card-body py-3 px-3 d-flex align-items-center gap-3">
-                <div class="rounded-3 flex-shrink-0 d-flex align-items-center justify-content-center" style="width:40px;height:40px;background:rgba(245,158,11,0.12);">
-                    <i class="bi bi-piggy-bank" style="color:#f59e0b;font-size:1.2rem;"></i>
-                </div>
-                <div class="flex-grow-1 min-w-0">
-                    <div class="text-secondary small fw-semibold">Cofrinhos</div>
-                    <div class="fw-bold text-light" style="font-size:1rem;">
-                        R$ <?= number_format($totalCofrinhos, 2, ',', '.') ?>
-                        <span class="text-secondary fw-normal small ms-1"><?= $qtdCofrinhos ?> ativo<?= $qtdCofrinhos > 1 ? 's' : '' ?></span>
-                    </div>
-                </div>
+        <div class="d-flex align-items-center justify-content-between mb-3 mt-2">
+            <h4 class="fw-bold text-light mb-0" style="font-size:1.05rem;">
+                <i class="bi bi-piggy-bank me-2" style="color:#f59e0b;"></i>
+                Cofrinhos <span class="text-secondary fw-normal small ms-1"><?= $qtdCofrinhos ?> ativo<?= $qtdCofrinhos > 1 ? 's' : '' ?></span>
+            </h4>
+            <a href="analises.php?carteira=<?= urlencode($carteira_selecionada ?? '') ?>#cofrinhos"
+               class="btn btn-sm btn-outline-secondary rounded-pill px-3 d-flex align-items-center gap-1" style="font-size:0.8rem;">
+                Ver tudo
+            </a>
+        </div>
+        <div class="row g-3 mb-4">
+            <?php foreach ($listaCofrinhosDash as $cof):
+                $cor      = htmlspecialchars($cof['Cor'] ?? '#f59e0b');
+                $icone    = htmlspecialchars($cof['Icone'] ?? 'bi-piggy-bank');
+                $valAtual = (float) $cof['ValorAtual'];
+                $valMeta  = $cof['ValorMeta'] !== null ? (float) $cof['ValorMeta'] : null;
+                $pct      = ($valMeta !== null && $valMeta > 0)
+                            ? min(100, round(($valAtual / $valMeta) * 100, 1))
+                            : null;
+            ?>
+            <div class="col-12 col-sm-6 col-xl-4">
                 <a href="analises.php?carteira=<?= urlencode($carteira_selecionada ?? '') ?>#cofrinhos"
-                   class="btn btn-sm btn-outline-secondary rounded-pill flex-shrink-0" style="font-size:0.78rem;">
-                    Ver tudo
+                   class="text-decoration-none d-block h-100">
+                    <div class="h-100 rounded-4 shadow-sm"
+                         style="background:var(--bg-card);border:1px solid var(--bs-border-color);border-left:3px solid <?= $cor ?> !important;transition:all .18s;">
+                        <div class="p-3">
+                            <!-- Cabeçalho -->
+                            <div class="d-flex align-items-start justify-content-between mb-3">
+                                <div class="d-flex align-items-center gap-2">
+                                    <div class="d-flex align-items-center justify-content-center rounded-3 flex-shrink-0"
+                                         style="width:36px;height:36px;background:<?= $cor ?>22;">
+                                        <i class="bi <?= $icone ?>" style="color:<?= $cor ?>;font-size:1rem;"></i>
+                                    </div>
+                                    <div>
+                                        <div class="fw-bold text-light lh-1" style="font-size:0.9rem;"><?= htmlspecialchars($cof['Nome']) ?></div>
+                                        <?php if ($valMeta !== null): ?>
+                                        <div class="text-secondary mt-1" style="font-size:0.7rem;">Meta: R$ <?= number_format($valMeta, 2, ',', '.') ?></div>
+                                        <?php else: ?>
+                                        <div class="text-secondary mt-1" style="font-size:0.7rem;">Sem meta</div>
+                                        <?php endif; ?>
+                                    </div>
+                                </div>
+                                <?php if ($pct !== null): ?>
+                                <span class="flex-shrink-0" style="display:inline-flex;align-items:center;background:<?= $cor ?>18;color:<?= $cor ?>;border:1px solid <?= $cor ?>33;border-radius:999px;padding:2px 8px;font-size:0.62rem;font-weight:700;">
+                                    <?= $pct ?>%
+                                </span>
+                                <?php endif; ?>
+                            </div>
+
+                            <!-- Valor e barra -->
+                            <div class="mb-2">
+                                <div class="fw-bold text-light" style="font-size:1.05rem;">
+                                    R$ <?= number_format($valAtual, 2, ',', '.') ?>
+                                </div>
+                                <?php if ($pct !== null): ?>
+                                <div class="mt-2">
+                                    <div class="progress rounded-pill" style="height:5px;background:rgba(255,255,255,0.07);">
+                                        <div class="progress-bar rounded-pill" role="progressbar"
+                                             style="width:<?= $pct ?>%;background:<?= $cor ?>;"
+                                             aria-valuenow="<?= $pct ?>" aria-valuemin="0" aria-valuemax="100"></div>
+                                    </div>
+                                </div>
+                                <?php endif; ?>
+                            </div>
+
+                            <!-- Rodapé -->
+                            <div class="mt-2 pt-2 d-flex align-items-center gap-1" style="border-top:1px solid var(--bs-border-color);color:var(--text-muted);font-size:0.72rem;">
+                                <i class="bi bi-arrow-right-circle" style="font-size:0.75rem;"></i>
+                                Ver cofrinho
+                            </div>
+                        </div>
+                    </div>
                 </a>
             </div>
+            <?php endforeach; ?>
         </div>
         <?php endif; ?>
 
