@@ -740,19 +740,56 @@ require_once 'geral/header.php';
             </div>
         </div>
 
+        <!-- ── Barra de Gastos Esperados (pendentes) ─────────────────────── -->
+        <?php if ($despesasPendentes > 0 || $receitasPendentes > 0): ?>
+            <div class="card bg-body-tertiary border-secondary-subtle rounded-4 shadow-sm mb-4">
+                <div class="card-body py-3 px-3">
+                    <div class="d-flex flex-wrap align-items-center justify-content-between gap-3">
+                        <div class="d-flex align-items-center gap-2">
+                            <i class="bi bi-hourglass-split text-warning"></i>
+                            <span class="fw-semibold text-light" style="font-size:0.875rem;">Aguardando confirmação em <?php echo $nome_mes ?></span>
+                        </div>
+                        <div class="d-flex flex-wrap gap-3">
+                            <?php if ($receitasPendentes > 0): ?>
+                                <div class="d-flex align-items-center gap-2">
+                                    <span class="text-secondary small">A receber:</span>
+                                    <span class="fw-bold text-success" style="font-size:0.9rem;">R$ <?php echo number_format($receitasPendentes, 2, ',', '.') ?></span>
+                                </div>
+                            <?php endif; ?>
+                            <?php if ($despesasPendentes > 0): ?>
+                                <div class="d-flex align-items-center gap-2">
+                                    <span class="text-secondary small">A pagar:</span>
+                                    <span class="fw-bold text-danger" style="font-size:0.9rem;">R$ <?php echo number_format($despesasPendentes, 2, ',', '.') ?></span>
+                                </div>
+                            <?php endif; ?>
+                            <?php $projecaoSaldo = $saldoAtual + $receitasPendentes - $despesasPendentes; ?>
+                            <div class="d-flex align-items-center gap-2 border-start border-secondary-subtle ps-3">
+                                <span class="text-secondary small">Saldo projetado:</span>
+                                <span class="fw-bold <?php echo $projecaoSaldo >= 0 ? 'text-light' : 'text-danger' ?>" style="font-size:0.9rem;">
+                                    R$ <?php echo number_format($projecaoSaldo, 2, ',', '.') ?>
+                                </span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        <?php endif; ?>
+
         <!-- ── Seção Cofrinhos & Metas ───────────────────────────────────── -->
         <?php if ($qtdCofrinhos > 0): ?>
             <div class="d-flex align-items-center justify-content-between mb-3 mt-2">
-                <h4 class="fw-bold text-light mb-0" style="font-size:1.05rem;">
-                    <i class="bi bi-piggy-bank me-2" style="color:#f59e0b;"></i>
-                    Cofrinhos
-                </h4>
+                <button class="d-flex align-items-center gap-2 btn p-0 border-0 bg-transparent" onclick="toggleSection('cofrinhos')">
+                    <i class="bi bi-piggy-bank" style="color:#f59e0b;font-size:1rem;"></i>
+                    <span class="fw-bold text-light" style="font-size:1.05rem;">Cofrinhos</span>
+                    <span class="text-secondary fw-normal small"><?= $qtdCofrinhos ?> ativo<?= $qtdCofrinhos > 1 ? 's' : '' ?></span>
+                    <i class="bi bi-chevron-up text-secondary ms-1" id="chev-cofrinhos" style="font-size:0.75rem;transition:transform .2s;"></i>
+                </button>
                 <a href="analises.php?carteira=<?= urlencode($carteira_selecionada ?? '') ?>#cofrinhos"
                     class="btn btn-sm btn-outline-secondary rounded-pill px-3 d-flex align-items-center gap-1" style="font-size:0.8rem;">
                     Ver tudo
                 </a>
             </div>
-            <div class="row g-3 mb-4">
+            <div id="sec-cofrinhos" class="row g-3 mb-4">
                 <?php foreach ($listaCofrinhosDash as $cof):
                     $cor      = htmlspecialchars($cof['Cor'] ?? '#f59e0b');
                     $icone    = htmlspecialchars($cof['Icone'] ?? 'bi-piggy-bank');
@@ -820,56 +857,21 @@ require_once 'geral/header.php';
             </div>
         <?php endif; ?>
 
-        <!-- ── Barra de Gastos Esperados ──────────────────────────────────── -->
-        <?php if ($despesasPendentes > 0 || $receitasPendentes > 0): ?>
-            <div class="card bg-body-tertiary border-secondary-subtle rounded-4 shadow-sm mb-4">
-                <div class="card-body py-3 px-3">
-                    <div class="d-flex flex-wrap align-items-center justify-content-between gap-3">
-                        <div class="d-flex align-items-center gap-2">
-                            <i class="bi bi-hourglass-split text-warning"></i>
-                            <span class="fw-semibold text-light" style="font-size:0.875rem;">Aguardando confirmação em <?php echo $nome_mes ?></span>
-                        </div>
-                        <div class="d-flex flex-wrap gap-3">
-                            <?php if ($receitasPendentes > 0): ?>
-                                <div class="d-flex align-items-center gap-2">
-                                    <span class="text-secondary small">A receber:</span>
-                                    <span class="fw-bold text-success" style="font-size:0.9rem;">R$ <?php echo number_format($receitasPendentes, 2, ',', '.') ?></span>
-                                </div>
-                            <?php endif; ?>
-                            <?php if ($despesasPendentes > 0): ?>
-                                <div class="d-flex align-items-center gap-2">
-                                    <span class="text-secondary small">A pagar:</span>
-                                    <span class="fw-bold text-danger" style="font-size:0.9rem;">R$ <?php echo number_format($despesasPendentes, 2, ',', '.') ?></span>
-                                </div>
-                            <?php endif; ?>
-                            <?php
-                            $projecaoSaldo = $saldoAtual + $receitasPendentes - $despesasPendentes;
-                            ?>
-                            <div class="d-flex align-items-center gap-2 border-start border-secondary-subtle ps-3">
-                                <span class="text-secondary small">Saldo projetado:</span>
-                                <span class="fw-bold <?php echo $projecaoSaldo >= 0 ? 'text-light' : 'text-danger' ?>" style="font-size:0.9rem;">
-                                    R$ <?php echo number_format($projecaoSaldo, 2, ',', '.') ?>
-                                </span>
-                            </div>
-                        </div>
-                    </div>
-                </div>
-            </div>
-        <?php endif; ?>
-
         <?php if (!empty($faturasAbertasDash)): ?>
             <!-- ── Seção de Cartões de Crédito ───────────────────────────────── -->
             <div class="d-flex align-items-center justify-content-between mb-3 mt-4">
-                <h4 class="fw-bold text-light mb-0">
-                    <i class="bi bi-credit-card-2-front me-2" style="color: var(--primary-gold-analysis);"></i>
-                    Cartões de Crédito
-                </h4>
+                <button class="d-flex align-items-center gap-2 btn p-0 border-0 bg-transparent" onclick="toggleSection('cartoes')">
+                    <i class="bi bi-credit-card-2-front" style="color:var(--primary-gold-analysis);font-size:1rem;"></i>
+                    <span class="fw-bold text-light" style="font-size:1.05rem;">Cartões de Crédito</span>
+                    <span class="text-secondary fw-normal small"><?= count($faturasAbertasDash) ?> aberto<?= count($faturasAbertasDash) > 1 ? 's' : '' ?></span>
+                    <i class="bi bi-chevron-up text-secondary ms-1" id="chev-cartoes" style="font-size:0.75rem;transition:transform .2s;"></i>
+                </button>
                 <a href="cartao_credito/index.php" class="btn btn-sm btn-outline-secondary rounded-pill px-3 d-flex align-items-center gap-1" style="font-size:0.8rem;">
                     <i class="bi bi-gear"></i> <span class="d-none d-sm-inline">Gerenciar</span>
                 </a>
             </div>
 
-            <div class="row g-3 mb-4">
+            <div id="sec-cartoes" class="row g-3 mb-4">
                 <?php foreach ($faturasAbertasDash as $fat):
                     $corCartao  = htmlspecialchars($fat['Cor'] ?? '#7c3aed');
                     $dataFech   = (!empty($fat['DataFechamento']) && $fat['DataFechamento'] !== '0000-00-00')
@@ -1635,6 +1637,29 @@ require_once 'geral/header.php';
                 body.innerHTML = '<p class="text-danger text-center py-3">Erro ao carregar comprovantes.</p>';
             });
     }
+
+    function toggleSection(key) {
+        var sec  = document.getElementById('sec-' + key);
+        var chev = document.getElementById('chev-' + key);
+        if (!sec) return;
+        var collapsed = sec.style.display === 'none';
+        sec.style.display  = collapsed ? '' : 'none';
+        chev.style.transform = collapsed ? '' : 'rotate(180deg)';
+        try { localStorage.setItem('dash_sec_' + key, collapsed ? '1' : '0'); } catch(e) {}
+    }
+
+    (function() {
+        ['cofrinhos','cartoes'].forEach(function(key) {
+            var saved = null;
+            try { saved = localStorage.getItem('dash_sec_' + key); } catch(e) {}
+            if (saved === '0') {
+                var sec  = document.getElementById('sec-' + key);
+                var chev = document.getElementById('chev-' + key);
+                if (sec)  sec.style.display = 'none';
+                if (chev) chev.style.transform = 'rotate(180deg)';
+            }
+        });
+    })();
 </script>
 
 <?php require_once 'geral/footer.php'; ?>
