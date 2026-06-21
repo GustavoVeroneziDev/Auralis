@@ -350,9 +350,9 @@ if ($carteira_selecionada) {
 
         if ($resultSaldo) {
             $saldoAtual = (float) $resultSaldo['total_rec_hist']
-                        + (float) $resultSaldo['total_cof_ret']
-                        - (float) $resultSaldo['total_des_hist']
-                        - (float) $resultSaldo['total_cof_dep'];
+                + (float) $resultSaldo['total_cof_ret']
+                - (float) $resultSaldo['total_des_hist']
+                - (float) $resultSaldo['total_cof_dep'];
         }
 
         // CORREÇÃO: EXTRACT trocado por MONTH() e YEAR()
@@ -600,7 +600,9 @@ require_once 'geral/header.php';
             }
         }
         if ($msg): ?>
-            <script>window._pendingToast = <?php echo json_encode($msg) ?>;</script>
+            <script>
+                window._pendingToast = <?php echo json_encode($msg) ?>;
+            </script>
         <?php endif; ?>
 
         <div class="mb-3 border-bottom border-secondary-subtle pb-3">
@@ -740,82 +742,82 @@ require_once 'geral/header.php';
 
         <!-- ── Seção Cofrinhos & Metas ───────────────────────────────────── -->
         <?php if ($qtdCofrinhos > 0): ?>
-        <div class="d-flex align-items-center justify-content-between mb-3 mt-2">
-            <h4 class="fw-bold text-light mb-0" style="font-size:1.05rem;">
-                <i class="bi bi-piggy-bank me-2" style="color:#f59e0b;"></i>
-                Cofrinhos <span class="text-secondary fw-normal small ms-1"><?= $qtdCofrinhos ?> ativo<?= $qtdCofrinhos > 1 ? 's' : '' ?></span>
-            </h4>
-            <a href="analises.php?carteira=<?= urlencode($carteira_selecionada ?? '') ?>#cofrinhos"
-               class="btn btn-sm btn-outline-secondary rounded-pill px-3 d-flex align-items-center gap-1" style="font-size:0.8rem;">
-                Ver tudo
-            </a>
-        </div>
-        <div class="row g-3 mb-4">
-            <?php foreach ($listaCofrinhosDash as $cof):
-                $cor      = htmlspecialchars($cof['Cor'] ?? '#f59e0b');
-                $icone    = htmlspecialchars($cof['Icone'] ?? 'bi-piggy-bank');
-                $valAtual = (float) $cof['ValorAtual'];
-                $valMeta  = $cof['ValorMeta'] !== null ? (float) $cof['ValorMeta'] : null;
-                $pct      = ($valMeta !== null && $valMeta > 0)
-                            ? min(100, round(($valAtual / $valMeta) * 100, 1))
-                            : null;
-            ?>
-            <div class="col-12 col-sm-6 col-xl-4">
+            <div class="d-flex align-items-center justify-content-between mb-3 mt-2">
+                <h4 class="fw-bold text-light mb-0" style="font-size:1.05rem;">
+                    <i class="bi bi-piggy-bank me-2" style="color:#f59e0b;"></i>
+                    Cofrinhos
+                </h4>
                 <a href="analises.php?carteira=<?= urlencode($carteira_selecionada ?? '') ?>#cofrinhos"
-                   class="text-decoration-none d-block h-100">
-                    <div class="h-100 rounded-4 shadow-sm"
-                         style="background:var(--bg-card);border:1px solid var(--bs-border-color);border-left:3px solid <?= $cor ?> !important;transition:all .18s;">
-                        <div class="p-3">
-                            <!-- Cabeçalho -->
-                            <div class="d-flex align-items-start justify-content-between mb-3">
-                                <div class="d-flex align-items-center gap-2">
-                                    <div class="d-flex align-items-center justify-content-center rounded-3 flex-shrink-0"
-                                         style="width:36px;height:36px;background:<?= $cor ?>22;">
-                                        <i class="bi <?= $icone ?>" style="color:<?= $cor ?>;font-size:1rem;"></i>
-                                    </div>
-                                    <div>
-                                        <div class="fw-bold text-light lh-1" style="font-size:0.9rem;"><?= htmlspecialchars($cof['Nome']) ?></div>
-                                        <?php if ($valMeta !== null): ?>
-                                        <div class="text-secondary mt-1" style="font-size:0.7rem;">Meta: R$ <?= number_format($valMeta, 2, ',', '.') ?></div>
-                                        <?php else: ?>
-                                        <div class="text-secondary mt-1" style="font-size:0.7rem;">Sem meta</div>
-                                        <?php endif; ?>
-                                    </div>
-                                </div>
-                                <?php if ($pct !== null): ?>
-                                <span class="flex-shrink-0" style="display:inline-flex;align-items:center;background:<?= $cor ?>18;color:<?= $cor ?>;border:1px solid <?= $cor ?>33;border-radius:999px;padding:2px 8px;font-size:0.62rem;font-weight:700;">
-                                    <?= $pct ?>%
-                                </span>
-                                <?php endif; ?>
-                            </div>
-
-                            <!-- Valor e barra -->
-                            <div class="mb-2">
-                                <div class="fw-bold text-light" style="font-size:1.05rem;">
-                                    R$ <?= number_format($valAtual, 2, ',', '.') ?>
-                                </div>
-                                <?php if ($pct !== null): ?>
-                                <div class="mt-2">
-                                    <div class="progress rounded-pill" style="height:5px;background:rgba(255,255,255,0.07);">
-                                        <div class="progress-bar rounded-pill" role="progressbar"
-                                             style="width:<?= $pct ?>%;background:<?= $cor ?>;"
-                                             aria-valuenow="<?= $pct ?>" aria-valuemin="0" aria-valuemax="100"></div>
-                                    </div>
-                                </div>
-                                <?php endif; ?>
-                            </div>
-
-                            <!-- Rodapé -->
-                            <div class="mt-2 pt-2 d-flex align-items-center gap-1" style="border-top:1px solid var(--bs-border-color);color:var(--text-muted);font-size:0.72rem;">
-                                <i class="bi bi-arrow-right-circle" style="font-size:0.75rem;"></i>
-                                Ver cofrinho
-                            </div>
-                        </div>
-                    </div>
+                    class="btn btn-sm btn-outline-secondary rounded-pill px-3 d-flex align-items-center gap-1" style="font-size:0.8rem;">
+                    Ver tudo
                 </a>
             </div>
-            <?php endforeach; ?>
-        </div>
+            <div class="row g-3 mb-4">
+                <?php foreach ($listaCofrinhosDash as $cof):
+                    $cor      = htmlspecialchars($cof['Cor'] ?? '#f59e0b');
+                    $icone    = htmlspecialchars($cof['Icone'] ?? 'bi-piggy-bank');
+                    $valAtual = (float) $cof['ValorAtual'];
+                    $valMeta  = $cof['ValorMeta'] !== null ? (float) $cof['ValorMeta'] : null;
+                    $pct      = ($valMeta !== null && $valMeta > 0)
+                        ? min(100, round(($valAtual / $valMeta) * 100, 1))
+                        : null;
+                ?>
+                    <div class="col-12 col-sm-6 col-xl-4">
+                        <a href="analises.php?carteira=<?= urlencode($carteira_selecionada ?? '') ?>#cofrinhos"
+                            class="text-decoration-none d-block h-100">
+                            <div class="h-100 rounded-4 shadow-sm"
+                                style="background:var(--bg-card);border:1px solid var(--bs-border-color);border-left:3px solid <?= $cor ?> !important;transition:all .18s;">
+                                <div class="p-3">
+                                    <!-- Cabeçalho -->
+                                    <div class="d-flex align-items-start justify-content-between mb-3">
+                                        <div class="d-flex align-items-center gap-2">
+                                            <div class="d-flex align-items-center justify-content-center rounded-3 flex-shrink-0"
+                                                style="width:36px;height:36px;background:<?= $cor ?>22;">
+                                                <i class="bi <?= $icone ?>" style="color:<?= $cor ?>;font-size:1rem;"></i>
+                                            </div>
+                                            <div>
+                                                <div class="fw-bold text-light lh-1" style="font-size:0.9rem;"><?= htmlspecialchars($cof['Nome']) ?></div>
+                                                <?php if ($valMeta !== null): ?>
+                                                    <div class="text-secondary mt-1" style="font-size:0.7rem;">Meta: R$ <?= number_format($valMeta, 2, ',', '.') ?></div>
+                                                <?php else: ?>
+                                                    <div class="text-secondary mt-1" style="font-size:0.7rem;">Sem meta</div>
+                                                <?php endif; ?>
+                                            </div>
+                                        </div>
+                                        <?php if ($pct !== null): ?>
+                                            <span class="flex-shrink-0" style="display:inline-flex;align-items:center;background:<?= $cor ?>18;color:<?= $cor ?>;border:1px solid <?= $cor ?>33;border-radius:999px;padding:2px 8px;font-size:0.62rem;font-weight:700;">
+                                                <?= $pct ?>%
+                                            </span>
+                                        <?php endif; ?>
+                                    </div>
+
+                                    <!-- Valor e barra -->
+                                    <div class="mb-2">
+                                        <div class="fw-bold text-light" style="font-size:1.05rem;">
+                                            R$ <?= number_format($valAtual, 2, ',', '.') ?>
+                                        </div>
+                                        <?php if ($pct !== null): ?>
+                                            <div class="mt-2">
+                                                <div class="progress rounded-pill" style="height:5px;background:rgba(255,255,255,0.07);">
+                                                    <div class="progress-bar rounded-pill" role="progressbar"
+                                                        style="width:<?= $pct ?>%;background:<?= $cor ?>;"
+                                                        aria-valuenow="<?= $pct ?>" aria-valuemin="0" aria-valuemax="100"></div>
+                                                </div>
+                                            </div>
+                                        <?php endif; ?>
+                                    </div>
+
+                                    <!-- Rodapé -->
+                                    <div class="mt-2 pt-2 d-flex align-items-center gap-1" style="border-top:1px solid var(--bs-border-color);color:var(--text-muted);font-size:0.72rem;">
+                                        <i class="bi bi-arrow-right-circle" style="font-size:0.75rem;"></i>
+                                        Ver cofrinho
+                                    </div>
+                                </div>
+                            </div>
+                        </a>
+                    </div>
+                <?php endforeach; ?>
+            </div>
         <?php endif; ?>
 
         <!-- ── Barra de Gastos Esperados ──────────────────────────────────── -->
