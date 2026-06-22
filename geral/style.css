@@ -70,6 +70,9 @@ body {
   font-family: "Inter", sans-serif;
   font-size: var(--fs-body);
   background-color: var(--bg-dark);
+  background-image: var(--bg-texture, none);
+  background-attachment: fixed;
+  background-size: cover;
   color: var(--text-main);
   overflow-x: hidden;
   -webkit-font-smoothing: antialiased;

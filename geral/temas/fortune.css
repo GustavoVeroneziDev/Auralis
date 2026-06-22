@@ -61,4 +61,10 @@
   --color-today-bg: rgba(212, 175, 55, 0.2);
   --color-today-text: #f5e642;
   --table-row-hover: rgba(212, 175, 55, 0.14);
+
+  /* Textura de fundo — brilho dourado rico em dois focos */
+  --bg-texture:
+    radial-gradient(ellipse 65% 45% at 85% 5%,  rgba(212, 175, 55, 0.16) 0%, transparent 60%),
+    radial-gradient(ellipse 45% 35% at 10% 95%, rgba(212, 175, 55, 0.12) 0%, transparent 55%),
+    radial-gradient(ellipse 25% 20% at 50% 50%, rgba(240, 200, 80, 0.06) 0%, transparent 45%);
 }

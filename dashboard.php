@@ -731,11 +731,11 @@ require_once 'geral/header.php';
         <div class="row g-3 mb-3">
             <!-- Saldo -->
             <div class="col-12 col-md-4">
-                <div class="card bg-body-tertiary border-secondary-subtle shadow-sm h-100 rounded-4">
+                <div class="card h-100 rounded-4 shadow-sm" style="background:var(--bg-card);border:1px solid var(--card-border-color);">
                     <div class="card-body">
                         <div class="d-flex justify-content-between align-items-start mb-2">
                             <p class="text-secondary fw-semibold mb-0 small text-truncate me-2">Saldo: <?php echo htmlspecialchars($nome_carteira_atual); ?></p>
-                            <div class="bg-primary bg-opacity-10 p-2 rounded-3 flex-shrink-0">
+                            <div class="p-2 rounded-3 flex-shrink-0" style="background:rgba(var(--bs-primary-rgb),0.12);">
                                 <i class="bi bi-wallet2" style="color: var(--primary-gold-analysis) !important;"></i>
                             </div>
                         </div>
@@ -751,15 +751,15 @@ require_once 'geral/header.php';
             </div>
             <!-- Receitas -->
             <div class="col-6 col-md-4">
-                <div class="card bg-body-tertiary border-secondary-subtle shadow-sm h-100 rounded-4">
+                <div class="card h-100 rounded-4 shadow-sm" style="background:var(--color-income-bg);border:1px solid var(--color-income-border);">
                     <div class="card-body">
                         <div class="d-flex justify-content-between align-items-start mb-2">
-                            <p class="text-secondary fw-semibold mb-0 small">Receitas (<?php echo $nome_mes ?>)</p>
-                            <div class="bg-success bg-opacity-10 p-2 rounded-3 flex-shrink-0 d-none d-sm-flex">
-                                <i class="bi bi-graph-up-arrow text-success"></i>
+                            <p class="fw-semibold mb-0 small" style="color:var(--color-income-text);">Receitas (<?php echo $nome_mes ?>)</p>
+                            <div class="p-2 rounded-3 flex-shrink-0 d-none d-sm-flex" style="background:rgba(6,214,160,0.15);">
+                                <i class="bi bi-graph-up-arrow" style="color:var(--color-income-text);"></i>
                             </div>
                         </div>
-                        <div class="fw-bold text-success mb-1" style="font-size: var(--fs-card-val);">R$ <?php echo number_format($receitasMes ?? 0, 2, ',', '.') ?></div>
+                        <div class="fw-bold mb-1" style="font-size:var(--fs-card-val);color:var(--color-income-text);">R$ <?php echo number_format($receitasMes ?? 0, 2, ',', '.') ?></div>
                         <div class="mt-2 d-flex align-items-center flex-wrap gap-1">
                             <?php echo badgeVar($receitasMes, $receitasMesAnt, false); ?>
                         </div>
@@ -768,15 +768,15 @@ require_once 'geral/header.php';
             </div>
             <!-- Despesas -->
             <div class="col-6 col-md-4">
-                <div class="card bg-body-tertiary border-secondary-subtle shadow-sm h-100 rounded-4">
+                <div class="card h-100 rounded-4 shadow-sm" style="background:var(--color-expense-bg);border:1px solid var(--color-expense-border);">
                     <div class="card-body">
                         <div class="d-flex justify-content-between align-items-start mb-2">
-                            <p class="text-secondary fw-semibold mb-0 small">Despesas (<?php echo $nome_mes ?>)</p>
-                            <div class="bg-danger bg-opacity-10 p-2 rounded-3 flex-shrink-0 d-none d-sm-flex">
-                                <i class="bi bi-graph-down-arrow text-danger"></i>
+                            <p class="fw-semibold mb-0 small" style="color:var(--color-expense-text);">Despesas (<?php echo $nome_mes ?>)</p>
+                            <div class="p-2 rounded-3 flex-shrink-0 d-none d-sm-flex" style="background:rgba(230,57,70,0.15);">
+                                <i class="bi bi-graph-down-arrow" style="color:var(--color-expense-text);"></i>
                             </div>
                         </div>
-                        <div class="fw-bold text-danger mb-1" style="font-size: var(--fs-card-val);">R$ <?php echo number_format($despesasMes ?? 0, 2, ',', '.') ?></div>
+                        <div class="fw-bold mb-1" style="font-size:var(--fs-card-val);color:var(--color-expense-text);">R$ <?php echo number_format($despesasMes ?? 0, 2, ',', '.') ?></div>
                         <div class="mt-2 d-flex align-items-center flex-wrap gap-1">
                             <?php echo badgeVar($despesasMes, $despesasMesAnt, true); ?>
                         </div>

@@ -62,4 +62,11 @@
   --color-today-bg: rgba(56, 188, 216, 0.2);
   --color-today-text: #6dd5ec;
   --table-row-hover: rgba(56, 188, 216, 0.1);
+
+  /* Textura de fundo — aurora boreal varrendo o topo */
+  --bg-texture:
+    radial-gradient(ellipse 110% 35% at 50% -5%, rgba(56, 188, 216, 0.18) 0%, transparent 60%),
+    radial-gradient(ellipse 55%  30% at 15% 35%, rgba(168, 85, 247, 0.14) 0%, transparent 50%),
+    radial-gradient(ellipse 45%  25% at 85% 60%, rgba(56, 188, 216, 0.10) 0%, transparent 45%),
+    radial-gradient(ellipse 25%  18% at 70% 10%, rgba(103, 232, 249, 0.08) 0%, transparent 40%);
 }
