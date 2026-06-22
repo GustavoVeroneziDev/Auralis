@@ -99,10 +99,12 @@ try {
     // SQL Inteligente: Já calcula o saldo exato de cada carteira direto no banco
     $sqlCarteiras = "
         SELECT c.IDCarteira, c.TipoCarteira,
-               COALESCE(SUM(CASE WHEN r.TipoRegistro = 'receita'           THEN  r.Valor ELSE 0 END), 0) +
-               COALESCE(SUM(CASE WHEN r.TipoRegistro = 'cofrinho_retirada' THEN  r.Valor ELSE 0 END), 0) -
-               COALESCE(SUM(CASE WHEN r.TipoRegistro = 'despesa'           THEN  r.Valor ELSE 0 END), 0) -
-               COALESCE(SUM(CASE WHEN r.TipoRegistro = 'cofrinho'          THEN  r.Valor ELSE 0 END), 0) as SaldoAtual
+               COALESCE(SUM(CASE WHEN r.TipoRegistro = 'receita'               THEN  r.Valor ELSE 0 END), 0) +
+               COALESCE(SUM(CASE WHEN r.TipoRegistro = 'cofrinho_retirada'     THEN  r.Valor ELSE 0 END), 0) +
+               COALESCE(SUM(CASE WHEN r.TipoRegistro = 'transferencia_entrada' THEN  r.Valor ELSE 0 END), 0) -
+               COALESCE(SUM(CASE WHEN r.TipoRegistro = 'despesa'               THEN  r.Valor ELSE 0 END), 0) -
+               COALESCE(SUM(CASE WHEN r.TipoRegistro = 'cofrinho'              THEN  r.Valor ELSE 0 END), 0) -
+               COALESCE(SUM(CASE WHEN r.TipoRegistro = 'transferencia_saida'   THEN  r.Valor ELSE 0 END), 0) as SaldoAtual
         FROM Carteira c
         LEFT JOIN Registro r ON c.IDCarteira = r.FKCarteira AND r.StatusRegistro = 'efetivado'
         WHERE c.FKUsuarioDono = :uid

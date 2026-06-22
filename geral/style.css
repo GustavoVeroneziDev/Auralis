@@ -70,6 +70,9 @@ body {
   font-family: "Inter", sans-serif;
   font-size: var(--fs-body);
   background-color: var(--bg-dark);
+  background-image: var(--bg-texture, none);
+  background-attachment: fixed;
+  background-size: cover;
   color: var(--text-main);
   overflow-x: hidden;
   -webkit-font-smoothing: antialiased;
@@ -908,6 +911,16 @@ input[type="number"] {
   .auralis-content,
   #auralis-sidebar.sidebar-collapsed ~ .auralis-content {
     margin-left: 0 !important;
+  }
+
+  /* No mobile, botão vira "fechar sidebar" — ícone trocado via JS */
+  .sidebar-toggle {
+    display: flex !important;
+    width: auto !important;
+    padding: 10px 16px !important;
+    border-radius: 8px !important;
+    color: var(--text-secondary) !important;
+    font-size: 1.1rem !important;
   }
 
   .auralis-mobile-topbar {

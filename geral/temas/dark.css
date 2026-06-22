@@ -61,4 +61,9 @@
   --color-today-bg: rgba(255, 184, 0, 0.22);
   --color-today-text: #f5e2a0;
   --table-row-hover: rgba(212, 175, 55, 0.1);
+
+  /* Textura de fundo — reflexo dourado sutil no canto */
+  --bg-texture:
+    radial-gradient(ellipse 55% 40% at 100% 0%, rgba(212, 175, 55, 0.06) 0%, transparent 60%),
+    radial-gradient(ellipse 30% 25% at 0% 100%, rgba(212, 175, 55, 0.04) 0%, transparent 55%);
 }

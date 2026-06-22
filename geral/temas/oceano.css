@@ -62,4 +62,11 @@
   --color-today-bg: rgba(224, 108, 67, 0.22);
   --color-today-text: #f09a78;
   --table-row-hover: rgba(224, 108, 67, 0.12);
+
+  /* Textura de fundo — profundeza do oceano com correntes azuis */
+  --bg-texture:
+    radial-gradient(ellipse 90% 50% at -5% 50%,  rgba(59, 130, 246, 0.15) 0%, transparent 60%),
+    radial-gradient(ellipse 60% 40% at 105% 30%, rgba(14, 165, 233, 0.12) 0%, transparent 55%),
+    radial-gradient(ellipse 40% 30% at 50% 0%,   rgba(56, 189, 248, 0.08) 0%, transparent 50%),
+    linear-gradient(180deg, rgba(13, 18, 48, 0) 50%, rgba(14, 165, 233, 0.06) 100%);
 }

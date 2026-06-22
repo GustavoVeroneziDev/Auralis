@@ -61,6 +61,11 @@ if (isset($_SESSION['usuario_id'])) {
         $iconePlanoSidebar = '';
     }
 }
+
+// ── Carteira persistida: link base para pages com seletor ────────────
+$_carteiraParam = (!empty($_SESSION['ultima_carteira']))
+    ? '?carteira=' . urlencode($_SESSION['ultima_carteira'])
+    : '';
 ?>
 <!DOCTYPE html>
 <html lang="pt-BR" data-bs-theme="<?= htmlspecialchars($_bsModeHtml) ?>">
@@ -89,6 +94,14 @@ if (isset($_SESSION['usuario_id'])) {
             document.addEventListener('DOMContentLoaded', function() {
                 document.documentElement.scrollTop = parseInt(y, 10);
             }, {once: true});
+        }
+    })();
+    </script>
+    <script>
+    (function(){
+        var c = new URLSearchParams(location.search).get('carteira');
+        if (c && c !== 'todas') {
+            try { localStorage.setItem('auralis_carteira', c); } catch(e) {}
         }
     })();
     </script>
@@ -130,7 +143,7 @@ if (isset($_SESSION['usuario_id'])) {
 
         <!-- Logo -->
         <div class="sidebar-logo">
-            <a href="/dashboard.php">
+            <a href="/dashboard.php<?= htmlspecialchars($_carteiraParam) ?>">
                 <img src="/geral/img/LogoAuralisSemEscudo.png" alt="Auralis">
                 <span class="sidebar-logo-text sidebar-label">
                     <span style="color:gold;">Aura</span><span style="color:var(--text-main);">lis</span>
@@ -140,7 +153,7 @@ if (isset($_SESSION['usuario_id'])) {
 
         <!-- Nav items -->
         <nav class="sidebar-nav">
-            <a href="/dashboard.php"
+            <a href="/dashboard.php<?= htmlspecialchars($_carteiraParam) ?>"
                class="sidebar-item <?= $paginaAtual === 'dashboard.php' ? 'active' : '' ?>">
                 <i class="bi bi-speedometer2"></i>
                 <span class="sidebar-label">Dashboard</span>
@@ -150,7 +163,7 @@ if (isset($_SESSION['usuario_id'])) {
                 <i class="bi bi-list-task"></i>
                 <span class="sidebar-label">Categorias</span>
             </a>
-            <a href="/analises.php"
+            <a href="/analises.php<?= htmlspecialchars($_carteiraParam) ?>"
                class="sidebar-item <?= $paginaAtual === 'analises.php' ? 'active' : '' ?>">
                 <i class="bi bi-graph-up-arrow"></i>
                 <span class="sidebar-label">Análises</span>
@@ -210,7 +223,7 @@ if (isset($_SESSION['usuario_id'])) {
                     </span>
                 </button>
                 <ul class="dropdown-menu shadow-lg border border-secondary-subtle mb-1"
-                    style="background:var(--bg-card);min-width:200px;">
+                    style="background:var(--bg-card);min-width:250px;">
                     <li class="px-3 py-2 border-bottom border-secondary-subtle">
                         <small class="text-secondary d-block mb-1"><?= htmlspecialchars($_SESSION['usuario_nome'] ?? '') ?></small>
                         <a href="/planos.php" class="text-decoration-none" style="font-size:0.7rem;">
@@ -227,6 +240,18 @@ if (isset($_SESSION['usuario_id'])) {
                         <a class="dropdown-item d-flex align-items-center py-2 transition-hover"
                            href="/configuracoes.php" style="color:var(--text-main);">
                             <i class="bi bi-gear me-2" style="color:gold;"></i> Configurações
+                        </a>
+                    </li>
+                    <li>
+                        <a class="dropdown-item d-flex align-items-center py-2 transition-hover"
+                           href="/ajuda.php" target="_blank" rel="noopener" style="color:var(--text-main);">
+                            <i class="bi bi-mortarboard me-2" style="color:gold;"></i> Tutoriais
+                        </a>
+                    </li>
+                    <li>
+                        <a class="dropdown-item d-flex align-items-center py-2 transition-hover"
+                           href="/contato.php" style="color:var(--text-main);">
+                            <i class="bi bi-headset me-2" style="color:gold;"></i> Contato & Suporte
                         </a>
                     </li>
                     <li class="btn-instalar-app" style="display:none;">
@@ -251,11 +276,11 @@ if (isset($_SESSION['usuario_id'])) {
         </div>
     </aside>
 
-    <!-- Aplica estado colapsado antes do primeiro paint -->
+    <!-- Aplica estado colapsado antes do primeiro paint (apenas desktop) -->
     <script>
     (function(){
         var s = document.getElementById('auralis-sidebar');
-        if (s && localStorage.getItem('auralis_sidebar') === 'collapsed') {
+        if (s && localStorage.getItem('auralis_sidebar') === 'collapsed' && window.innerWidth >= 992) {
             s.classList.add('sidebar-collapsed');
         }
     })();
@@ -272,7 +297,7 @@ if (isset($_SESSION['usuario_id'])) {
                     style="color:var(--text-main);background:none;border:none;">
                 <i class="bi bi-list" style="font-size:1.7rem;"></i>
             </button>
-            <a href="/dashboard.php" class="d-flex align-items-center text-decoration-none"
+            <a href="/dashboard.php<?= htmlspecialchars($_carteiraParam) ?>" class="d-flex align-items-center text-decoration-none"
                style="font-family:'Aquire';font-size:1.1rem;">
                 <img src="/geral/img/LogoAuralisSemEscudo.png" alt="" style="height:24px;" class="me-1">
                 <span style="color:gold;">Aura</span><span style="color:var(--text-main);">lis</span>
@@ -336,7 +361,7 @@ if (isset($_SESSION['usuario_id'])) {
     <nav class="navbar navbar-expand-lg border-bottom border-secondary-subtle sticky-top shadow-sm py-2">
         <div class="container-fluid px-3 px-xl-5" style="max-width:1500px;">
 
-            <a class="navbar-brand d-flex align-items-center" href="<?= isset($_SESSION['usuario_id']) ? '/dashboard.php' : '/geral/index.php' ?>"
+            <a class="navbar-brand d-flex align-items-center" href="<?= isset($_SESSION['usuario_id']) ? '/dashboard.php' . htmlspecialchars($_carteiraParam) : '/geral/index.php' ?>"
                style="font-family:'Aquire',sans-serif;font-weight:700;font-size:1.6rem;letter-spacing:0.04em;text-decoration:none;">
                 <img src="/geral/img/LogoAuralisSemEscudo.png" alt="Logo Auralis" class="me-2" style="height:36px;width:auto;object-fit:contain;">
                 <span style="color:gold;">Aura</span><span style="color:var(--text-main);font-weight:700;">lis</span>
@@ -352,7 +377,7 @@ if (isset($_SESSION['usuario_id'])) {
                 <ul class="navbar-nav mx-auto mb-3 mb-lg-0 fw-medium gap-1 gap-lg-3 text-start text-lg-center px-3 px-lg-0">
                     <?php if (isset($_SESSION['usuario_id'])): ?>
                         <li class="nav-item">
-                            <a class="nav-link custom-link py-3 py-lg-2 <?= $paginaAtual === 'dashboard.php' ? 'text-warning active' : '' ?>" href="/dashboard.php">
+                            <a class="nav-link custom-link py-3 py-lg-2 <?= $paginaAtual === 'dashboard.php' ? 'text-warning active' : '' ?>" href="/dashboard.php<?= htmlspecialchars($_carteiraParam) ?>">
                                 <i class="bi bi-speedometer2 me-2"></i> Dashboard
                             </a>
                         </li>
@@ -362,7 +387,7 @@ if (isset($_SESSION['usuario_id'])) {
                             </a>
                         </li>
                         <li class="nav-item">
-                            <a class="nav-link custom-link py-3 py-lg-2 d-flex align-items-center gap-1 <?= $paginaAtual === 'analises.php' ? 'text-warning active' : '' ?>" href="/analises.php">
+                            <a class="nav-link custom-link py-3 py-lg-2 d-flex align-items-center gap-1 <?= $paginaAtual === 'analises.php' ? 'text-warning active' : '' ?>" href="/analises.php<?= htmlspecialchars($_carteiraParam) ?>">
                                 <i class="bi bi-graph-up-arrow me-2"></i> Análises
                                 <?php if (_navBadgeRecurso('analises', $_emTrial)): ?><?= _navBadgeTag('analises') ?><?php endif; ?>
                             </a>
@@ -426,7 +451,7 @@ if (isset($_SESSION['usuario_id'])) {
                                 </span>
                                 <i class="bi bi-person-circle" style="color:<?= $corTop ?>;font-size:1.75rem;"></i>
                             </a>
-                            <ul class="dropdown-menu dropdown-menu-lg-end shadow-lg border border-secondary-subtle mt-2 bg-dark w-100 w-lg-auto">
+                            <ul class="dropdown-menu dropdown-menu-end shadow-lg border border-secondary-subtle mt-2 bg-dark w-100 w-lg-auto" style="min-width:230px;">
                                 <li class="px-3 py-2 border-bottom border-secondary-subtle">
                                     <div class="d-flex align-items-center justify-content-between gap-3">
                                         <small class="text-secondary"><?= htmlspecialchars($_SESSION['usuario_nome'] ?? '') ?></small>
@@ -441,6 +466,8 @@ if (isset($_SESSION['usuario_id'])) {
                                     <?php endif; ?>
                                 </li>
                                 <li><a class="dropdown-item text-light d-flex align-items-center py-2" href="/configuracoes.php"><i class="bi bi-gear me-2" style="color:gold;"></i> Configurações</a></li>
+                                <li><a class="dropdown-item text-light d-flex align-items-center py-2" href="/ajuda.php" target="_blank" rel="noopener"><i class="bi bi-mortarboard me-2" style="color:gold;"></i> Tutoriais</a></li>
+                                <li><a class="dropdown-item text-light d-flex align-items-center py-2" href="/contato.php"><i class="bi bi-headset me-2" style="color:gold;"></i> Contato & Suporte</a></li>
                                 <li class="btn-instalar-app" style="display:none;"><a class="dropdown-item text-light d-flex align-items-center py-2" href="#" onclick="auralisInstalar();return false;"><i class="bi bi-download me-2" style="color:gold;"></i> Instalar como App</a></li>
                                 <li><hr class="dropdown-divider border-secondary-subtle"></li>
                                 <li><a class="dropdown-item d-flex align-items-center py-2 text-danger" href="/usuario/logout.php"><i class="bi bi-box-arrow-right me-2"></i> Sair</a></li>
