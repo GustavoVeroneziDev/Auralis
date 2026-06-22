@@ -223,7 +223,7 @@ $_carteiraParam = (!empty($_SESSION['ultima_carteira']))
                     </span>
                 </button>
                 <ul class="dropdown-menu shadow-lg border border-secondary-subtle mb-1"
-                    style="background:var(--bg-card);min-width:220px;white-space:nowrap;">
+                    style="background:var(--bg-card);min-width:250px;">
                     <li class="px-3 py-2 border-bottom border-secondary-subtle">
                         <small class="text-secondary d-block mb-1"><?= htmlspecialchars($_SESSION['usuario_nome'] ?? '') ?></small>
                         <a href="/planos.php" class="text-decoration-none" style="font-size:0.7rem;">
