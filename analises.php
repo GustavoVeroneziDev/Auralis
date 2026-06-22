@@ -360,17 +360,17 @@ require_once 'geral/header.php';
 
     <div class="row g-4 mb-5">
         <div class="col-md-6">
-            <div class="card bg-body-tertiary border-secondary-subtle shadow-sm h-100 rounded-4">
+            <div class="card h-100 rounded-4 shadow-sm" style="background:var(--color-expense-bg);border:1px solid var(--color-expense-border);">
                 <div class="card-body p-4 d-flex align-items-center">
-                    <div class="bg-danger bg-opacity-10 rounded-circle me-3 analise-icon flex-shrink-0 d-flex justify-content-center align-items-center" style="width: 70px; height: 70px;">
-                        <i class="bi bi-fire text-danger fs-1 mb-0"></i>
+                    <div class="rounded-circle me-3 analise-icon flex-shrink-0 d-flex justify-content-center align-items-center" style="width:70px;height:70px;background:rgba(230,57,70,0.18);">
+                        <i class="bi bi-fire fs-1 mb-0" style="color:var(--color-expense-text);"></i>
                     </div>
                     <div>
-                        <p class="text-secondary small mb-1 text-uppercase fw-bold tracking-wide">Maior Fuga de Capital (Gastos)</p>
+                        <p class="small mb-1 text-uppercase fw-bold tracking-wide" style="color:var(--color-expense-text);opacity:0.75;">Maior Fuga de Capital (Gastos)</p>
                         <?php if ($maiorGastoCat): ?>
                             <h4 class="fw-bold text-light mb-1"><?php echo htmlspecialchars($maiorGastoCat) ?></h4>
                             <div class="d-flex align-items-center gap-2 flex-wrap">
-                                <span class="text-danger fw-semibold fs-5">R$ <?php echo number_format($maiorGastoValor, 2, ',', '.') ?></span>
+                                <span class="fw-semibold fs-5" style="color:var(--color-expense-text);">R$ <?php echo number_format($maiorGastoValor, 2, ',', '.') ?></span>
                                 <?php echo analisesBadgeVar($maiorGastoValor, $gastosPorCategoriaAnt[$maiorGastoCat] ?? 0, true); ?>
                             </div>
                             <?php if (isset($gastosPorCategoriaAnt[$maiorGastoCat])): ?>
@@ -385,17 +385,17 @@ require_once 'geral/header.php';
         </div>
 
         <div class="col-md-6">
-            <div class="card bg-body-tertiary border-secondary-subtle shadow-sm h-100 rounded-4">
+            <div class="card h-100 rounded-4 shadow-sm" style="background:var(--color-income-bg);border:1px solid var(--color-income-border);">
                 <div class="card-body p-4 d-flex align-items-center">
-                    <div class="bg-success bg-opacity-10 rounded-circle me-3 analise-icon flex-shrink-0 d-flex justify-content-center align-items-center" style="width: 70px; height: 70px;">
-                        <i class="bi bi-trophy text-success fs-1 mb-0"></i>
+                    <div class="rounded-circle me-3 analise-icon flex-shrink-0 d-flex justify-content-center align-items-center" style="width:70px;height:70px;background:rgba(6,214,160,0.18);">
+                        <i class="bi bi-trophy fs-1 mb-0" style="color:var(--color-income-text);"></i>
                     </div>
                     <div>
-                        <p class="text-secondary small mb-1 text-uppercase fw-bold tracking-wide">Principal Motor de Renda</p>
+                        <p class="small mb-1 text-uppercase fw-bold tracking-wide" style="color:var(--color-income-text);opacity:0.75;">Principal Motor de Renda</p>
                         <?php if ($maiorReceitaCat): ?>
                             <h4 class="fw-bold text-light mb-1"><?php echo htmlspecialchars($maiorReceitaCat) ?></h4>
                             <div class="d-flex align-items-center gap-2 flex-wrap">
-                                <span class="text-success fw-semibold fs-5">R$ <?php echo number_format($maiorReceitaValor, 2, ',', '.') ?></span>
+                                <span class="fw-semibold fs-5" style="color:var(--color-income-text);">R$ <?php echo number_format($maiorReceitaValor, 2, ',', '.') ?></span>
                                 <?php echo analisesBadgeVar($maiorReceitaValor, $receitasPorCategoriaAnt[$maiorReceitaCat] ?? 0, false); ?>
                             </div>
                             <?php if (isset($receitasPorCategoriaAnt[$maiorReceitaCat])): ?>
