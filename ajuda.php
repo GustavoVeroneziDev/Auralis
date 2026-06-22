@@ -33,8 +33,8 @@ require_once 'geral/header.php';
     <!-- Cabeçalho da página -->
     <div class="mb-4">
         <div class="d-flex align-items-center gap-2 mb-1">
-            <i class="bi bi-question-circle" style="color:var(--primary-gold-analysis);font-size:1.1rem;"></i>
-            <h4 class="fw-bold text-light mb-0">Central de Ajuda</h4>
+            <i class="bi bi-mortarboard" style="color:var(--primary-gold-analysis);font-size:1.1rem;"></i>
+            <h4 class="fw-bold text-light mb-0">Tutoriais</h4>
         </div>
         <p class="text-secondary small mb-0">Guias práticos para tirar o máximo do Auralis.</p>
     </div>

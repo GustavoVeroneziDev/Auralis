@@ -189,16 +189,6 @@ $_carteiraParam = (!empty($_SESSION['ultima_carteira']))
                 <i class="bi bi-credit-card-2-front"></i>
                 <span class="sidebar-label">Cartões</span>
             </a>
-            <a href="/ajuda.php" target="_blank" rel="noopener"
-               class="sidebar-item">
-                <i class="bi bi-question-circle"></i>
-                <span class="sidebar-label">Ajuda</span>
-            </a>
-            <a href="/contato.php"
-               class="sidebar-item <?= $paginaAtual === 'contato.php' ? 'active' : '' ?>">
-                <i class="bi bi-headset"></i>
-                <span class="sidebar-label">Contato</span>
-            </a>
             <?php if ($_ehFreeRestrito): ?>
             <a href="/planos.php"
                class="sidebar-item <?= $paginaAtual === 'planos.php' ? 'active' : '' ?>">
@@ -250,6 +240,18 @@ $_carteiraParam = (!empty($_SESSION['ultima_carteira']))
                         <a class="dropdown-item d-flex align-items-center py-2 transition-hover"
                            href="/configuracoes.php" style="color:var(--text-main);">
                             <i class="bi bi-gear me-2" style="color:gold;"></i> Configurações
+                        </a>
+                    </li>
+                    <li>
+                        <a class="dropdown-item d-flex align-items-center py-2 transition-hover"
+                           href="/ajuda.php" target="_blank" rel="noopener" style="color:var(--text-main);">
+                            <i class="bi bi-mortarboard me-2" style="color:gold;"></i> Tutoriais
+                        </a>
+                    </li>
+                    <li>
+                        <a class="dropdown-item d-flex align-items-center py-2 transition-hover"
+                           href="/contato.php" style="color:var(--text-main);">
+                            <i class="bi bi-headset me-2" style="color:gold;"></i> Contato & Suporte
                         </a>
                     </li>
                     <li class="btn-instalar-app" style="display:none;">
@@ -406,16 +408,6 @@ $_carteiraParam = (!empty($_SESSION['ultima_carteira']))
                                 <i class="bi bi-credit-card-2-front me-2"></i> Cartões
                             </a>
                         </li>
-                        <li class="nav-item">
-                            <a class="nav-link custom-link py-3 py-lg-2" href="/ajuda.php" target="_blank" rel="noopener">
-                                <i class="bi bi-question-circle me-2"></i> Ajuda
-                            </a>
-                        </li>
-                        <li class="nav-item">
-                            <a class="nav-link custom-link py-3 py-lg-2 <?= $paginaAtual === 'contato.php' ? 'text-warning active' : '' ?>" href="/contato.php">
-                                <i class="bi bi-headset me-2"></i> Contato
-                            </a>
-                        </li>
                         <?php if ($_ehFreeRestrito): ?>
                         <li class="nav-item">
                             <a class="nav-link custom-link py-3 py-lg-2 <?= $paginaAtual === 'planos.php' ? 'text-warning active' : '' ?>" href="/planos.php">
@@ -474,6 +466,8 @@ $_carteiraParam = (!empty($_SESSION['ultima_carteira']))
                                     <?php endif; ?>
                                 </li>
                                 <li><a class="dropdown-item text-light d-flex align-items-center py-2" href="/configuracoes.php"><i class="bi bi-gear me-2" style="color:gold;"></i> Configurações</a></li>
+                                <li><a class="dropdown-item text-light d-flex align-items-center py-2" href="/ajuda.php" target="_blank" rel="noopener"><i class="bi bi-mortarboard me-2" style="color:gold;"></i> Tutoriais</a></li>
+                                <li><a class="dropdown-item text-light d-flex align-items-center py-2" href="/contato.php"><i class="bi bi-headset me-2" style="color:gold;"></i> Contato & Suporte</a></li>
                                 <li class="btn-instalar-app" style="display:none;"><a class="dropdown-item text-light d-flex align-items-center py-2" href="#" onclick="auralisInstalar();return false;"><i class="bi bi-download me-2" style="color:gold;"></i> Instalar como App</a></li>
                                 <li><hr class="dropdown-divider border-secondary-subtle"></li>
                                 <li><a class="dropdown-item d-flex align-items-center py-2 text-danger" href="/usuario/logout.php"><i class="bi bi-box-arrow-right me-2"></i> Sair</a></li>
