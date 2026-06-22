@@ -144,6 +144,9 @@ if (!function_exists('verificarExpiracao')) {
         if (($_SESSION['plano'] ?? 'free') === 'free') return;
         if (isset($_SESSION['expiracao_verificada'])) return;
 
+        // Admin/supremo: plano atribuído manualmente, sem assinatura obrigatória
+        if (in_array(strtolower($_SESSION['nivel_acesso'] ?? ''), ['admin', 'supremo'])) return;
+
         $_SESSION['expiracao_verificada'] = true;
 
         try {
