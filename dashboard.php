@@ -829,10 +829,6 @@ require_once 'geral/header.php';
                     <span class="text-secondary fw-normal small"><?= $qtdCofrinhos ?> ativo<?= $qtdCofrinhos > 1 ? 's' : '' ?></span>
                     <i class="bi bi-chevron-up text-secondary ms-1" id="chev-cofrinhos" style="font-size:0.75rem;transition:transform .2s;"></i>
                 </button>
-                <a href="analises.php?carteira=<?= urlencode($carteira_selecionada ?? '') ?>#cofrinhos"
-                    class="btn btn-sm btn-outline-secondary rounded-pill px-3 d-flex align-items-center gap-1" style="font-size:0.8rem;">
-                    Ver tudo
-                </a>
             </div>
             <div id="sec-cofrinhos" class="row g-3 mb-4">
                 <?php foreach ($listaCofrinhosDash as $cof):
@@ -911,9 +907,6 @@ require_once 'geral/header.php';
                     <span class="text-secondary fw-normal small"><?= count($faturasAbertasDash) ?> aberto<?= count($faturasAbertasDash) > 1 ? 's' : '' ?></span>
                     <i class="bi bi-chevron-up text-secondary ms-1" id="chev-cartoes" style="font-size:0.75rem;transition:transform .2s;"></i>
                 </button>
-                <a href="cartao_credito/index.php" class="btn btn-sm btn-outline-secondary rounded-pill px-3 d-flex align-items-center gap-1" style="font-size:0.8rem;">
-                    <i class="bi bi-gear"></i> <span class="d-none d-sm-inline">Gerenciar</span>
-                </a>
             </div>
 
             <div id="sec-cartoes" class="row g-3 mb-4">
