@@ -451,7 +451,7 @@ $_carteiraParam = (!empty($_SESSION['ultima_carteira']))
                                 </span>
                                 <i class="bi bi-person-circle" style="color:<?= $corTop ?>;font-size:1.75rem;"></i>
                             </a>
-                            <ul class="dropdown-menu dropdown-menu-lg-end shadow-lg border border-secondary-subtle mt-2 bg-dark w-100 w-lg-auto">
+                            <ul class="dropdown-menu dropdown-menu-end shadow-lg border border-secondary-subtle mt-2 bg-dark w-100 w-lg-auto" style="min-width:230px;">
                                 <li class="px-3 py-2 border-bottom border-secondary-subtle">
                                     <div class="d-flex align-items-center justify-content-between gap-3">
                                         <small class="text-secondary"><?= htmlspecialchars($_SESSION['usuario_nome'] ?? '') ?></small>
