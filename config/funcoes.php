@@ -445,6 +445,27 @@ if (!function_exists('concederConquista')) {
     }
 }
 
+// ── Helper MP: cancela assinatura no Mercado Pago via API ────────────────
+if (!function_exists('mpCancelarNoMP')) {
+    function mpCancelarNoMP($gwId)
+    {
+        if (empty($gwId)) return;
+        $ch = curl_init("https://api.mercadopago.com/preapproval/{$gwId}");
+        curl_setopt_array($ch, [
+            CURLOPT_RETURNTRANSFER => true,
+            CURLOPT_CUSTOMREQUEST  => 'PUT',
+            CURLOPT_POSTFIELDS     => json_encode(['status' => 'cancelled']),
+            CURLOPT_HTTPHEADER     => [
+                'Authorization: Bearer ' . MP_ACCESS_TOKEN,
+                'Content-Type: application/json',
+            ],
+            CURLOPT_TIMEOUT => 10,
+        ]);
+        curl_exec($ch);
+        curl_close($ch);
+    }
+}
+
 // ── Helper MP: ativa plano no banco a partir de dados da assinatura ───────
 if (!function_exists('mpAtivarPlano')) {
     function mpAtivarPlano($pdo, $emailComprador, $planId, $gwId, $valorPago = 0)
@@ -454,20 +475,53 @@ if (!function_exists('mpAtivarPlano')) {
 
         $config = $planos[$planId];
 
+        // 1. Localiza o usuário pelo e-mail
         $stmtU = $pdo->prepare("SELECT IDUsuario FROM Usuario WHERE Email = :email LIMIT 1");
         $stmtU->execute([':email' => strtolower(trim($emailComprador))]);
         $usuario = $stmtU->fetch();
         if (!$usuario) return false;
+        $uid = $usuario['IDUsuario'];
 
-        $uid           = $usuario['IDUsuario'];
-        $dataInicio    = (new DateTime())->format('Y-m-d H:i:s');
-        $dataExpiracao = (new DateTime())->modify("+{$config['dias']} days")->format('Y-m-d H:i:s');
+        // 2. Idempotência: se este gwId já está ativo, retorna o plano sem duplicar
+        $stmtIdem = $pdo->prepare("SELECT Plano FROM Assinatura WHERE IDAssinaturaGW = :gw AND Status = 'ativa' LIMIT 1");
+        $stmtIdem->execute([':gw' => $gwId]);
+        $jaAtiva = $stmtIdem->fetchColumn();
+        if ($jaAtiva) return $jaAtiva;
+
+        // 3. Busca assinaturas ativas anteriores para crédito de dias e cancelamento no MP
+        $stmtAntigas = $pdo->prepare("
+            SELECT IDAssinaturaGW, DataExpiracao
+            FROM Assinatura
+            WHERE FKUsuario = :uid AND Status = 'ativa'
+        ");
+        $stmtAntigas->execute([':uid' => $uid]);
+        $assinaturasAntigas = $stmtAntigas->fetchAll();
+
+        // 4. Calcula dias restantes para aplicar como crédito na nova assinatura
+        //    Ex: tinha 15 dias de PRO → VIP dura 32 + 15 = 47 dias. Paga só o VIP.
+        $agora       = new DateTime();
+        $diasCredito = 0;
+        foreach ($assinaturasAntigas as $antiga) {
+            if (!empty($antiga['DataExpiracao'])) {
+                $exp  = new DateTime($antiga['DataExpiracao']);
+                $diff = $agora->diff($exp);
+                if ($diff->invert === 0 && $diff->days > 0) {
+                    $diasCredito += $diff->days;
+                }
+            }
+        }
+
+        $dataInicio    = $agora->format('Y-m-d H:i:s');
+        $totalDias     = $config['dias'] + $diasCredito;
+        $dataExpiracao = (new DateTime())->modify("+{$totalDias} days")->format('Y-m-d H:i:s');
 
         $pdo->beginTransaction();
         try {
-            $pdo->prepare("UPDATE Assinatura SET Status = 'cancelada' WHERE FKUsuario = :uid AND Plano = :plano AND Status = 'ativa'")
-                ->execute([':uid' => $uid, ':plano' => $config['plano']]);
+            // 5. Cancela TODAS as assinaturas ativas no banco (qualquer plano)
+            $pdo->prepare("UPDATE Assinatura SET Status = 'cancelada' WHERE FKUsuario = :uid AND Status = 'ativa'")
+                ->execute([':uid' => $uid]);
 
+            // 6. Insere a nova assinatura
             $novoId = function_exists('gerarUuid') ? gerarUuid() : bin2hex(random_bytes(16));
             $pdo->prepare("
                 INSERT INTO Assinatura
@@ -475,21 +529,31 @@ if (!function_exists('mpAtivarPlano')) {
                      DataInicio, DataExpiracao, IDAssinaturaGW, EmailGateway, FontePagamento)
                 VALUES (:id, :uid, :plano, 'ativa', :ciclo, :valor, :inicio, :exp, :gwid, :email, 'mercadopago')
             ")->execute([
-                ':id'    => $novoId,
-                ':uid'   => $uid,
-                ':plano' => $config['plano'],
-                ':ciclo' => $config['ciclo'],
-                ':valor' => $valorPago,
+                ':id'     => $novoId,
+                ':uid'    => $uid,
+                ':plano'  => $config['plano'],
+                ':ciclo'  => $config['ciclo'],
+                ':valor'  => $valorPago,
                 ':inicio' => $dataInicio,
-                ':exp'   => $dataExpiracao,
-                ':gwid'  => $gwId,
-                ':email' => strtolower(trim($emailComprador)),
+                ':exp'    => $dataExpiracao,
+                ':gwid'   => $gwId,
+                ':email'  => strtolower(trim($emailComprador)),
             ]);
 
+            // 7. Atualiza o plano no registro do usuário
             $pdo->prepare("UPDATE Usuario SET Plano = :plano WHERE IDUsuario = :uid")
                 ->execute([':plano' => $config['plano'], ':uid' => $uid]);
 
             $pdo->commit();
+
+            // 8. Cancela as assinaturas antigas no Mercado Pago (fora da transação BD
+            //    para que uma falha de rede não desfaça a ativação já confirmada)
+            foreach ($assinaturasAntigas as $antiga) {
+                if (!empty($antiga['IDAssinaturaGW'])) {
+                    mpCancelarNoMP($antiga['IDAssinaturaGW']);
+                }
+            }
+
             return $config['plano'];
         } catch (PDOException $e) {
             $pdo->rollBack();
