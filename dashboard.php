@@ -1003,6 +1003,23 @@ require_once 'geral/header.php';
             </div>
         </div>
 
+        <div class="no-print mb-3 d-flex flex-wrap gap-2 align-items-center">
+            <div class="flex-grow-1 position-relative" style="min-width:200px;max-width:360px;">
+                <i class="bi bi-search position-absolute" style="left:12px;top:50%;transform:translateY(-50%);color:var(--text-muted);font-size:0.8rem;pointer-events:none;"></i>
+                <input type="text" id="buscaInput" placeholder="Buscar por descrição, valor, categoria…"
+                       class="form-control form-control-sm shadow-none"
+                       style="background:var(--bg-card);border:1px solid var(--card-border-color);color:var(--text-main);padding-left:34px;border-radius:20px;font-size:0.82rem;">
+            </div>
+            <div class="d-flex gap-1 flex-wrap">
+                <button class="btn btn-sm busca-pill active" data-filtro="tudo">Tudo</button>
+                <button class="btn btn-sm busca-pill" data-filtro="receita">Receitas</button>
+                <button class="btn btn-sm busca-pill" data-filtro="despesa">Despesas</button>
+                <button class="btn btn-sm busca-pill" data-filtro="transferencia">Transferências</button>
+                <button class="btn btn-sm busca-pill" data-filtro="pendente">Pendentes</button>
+                <button class="btn btn-sm busca-pill" data-filtro="efetivado">Efetivados</button>
+            </div>
+        </div>
+
         <div class="table-responsive rounded-4 border border-secondary-subtle shadow-sm mb-5">
             <table class="table table-dark table-hover align-middle mb-0 auralis-table">
                 <thead class="table-active border-secondary-subtle text-secondary small text-uppercase">
@@ -1015,6 +1032,12 @@ require_once 'geral/header.php';
                     </tr>
                 </thead>
                 <tbody class="border-top-0">
+                    <tr id="buscaVazio" style="display:none;">
+                        <td colspan="5" class="text-center text-secondary py-5">
+                            <i class="bi bi-search fs-3 d-block mb-2 opacity-50"></i>
+                            Nenhuma transação encontrada para essa busca.
+                        </td>
+                    </tr>
                     <?php foreach ($transacoes as $index => $t):
                         $isTransfSaida  = ($t['TipoRegistro'] === 'transferencia_saida');
                         $isTransfEntr   = ($t['TipoRegistro'] === 'transferencia_entrada');
@@ -1036,7 +1059,14 @@ require_once 'geral/header.php';
                         $isPendente      = ($t['StatusRegistro'] === 'pendente');
                         $textoAcaoStatus = $isTransfer ? 'Confirmar' : ($isDespesa ? 'Marcar como Pago' : 'Marcar como Recebido');
                     ?>
-                        <tr data-bs-toggle="collapse" data-bs-target="#<?php echo $rowId ?>" class="cursor-pointer transition-hover" style="cursor: pointer;">
+                        <tr data-bs-toggle="collapse" data-bs-target="#<?php echo $rowId ?>"
+                            class="cursor-pointer transition-hover tr-transacao"
+                            style="cursor:pointer;"
+                            data-desc="<?= strtolower(htmlspecialchars($t['Descricao'])) ?>"
+                            data-cat="<?= strtolower(htmlspecialchars($t['NomeCategoria'] ?? '')) ?>"
+                            data-valor="<?= number_format((float)$t['Valor'], 2, ',', '.') ?>"
+                            data-status="<?= htmlspecialchars($t['StatusRegistro']) ?>"
+                            data-tipo="<?= htmlspecialchars($t['TipoRegistro']) ?>">
 
                             <td class="ps-3 ps-md-4 py-3 border-secondary-subtle">
                                 <div class="d-flex align-items-center gap-2">
@@ -1905,6 +1935,78 @@ require_once 'geral/header.php';
             }
         });
     })();
+</script>
+
+<style>
+.busca-pill {
+    background: var(--bg-card);
+    border: 1px solid var(--card-border-color);
+    color: var(--text-muted);
+    border-radius: 20px;
+    font-size: 0.75rem;
+    padding: 3px 12px;
+    transition: background .15s, color .15s, border-color .15s;
+}
+.busca-pill:hover { background: var(--bg-hover); color: var(--text-main); }
+.busca-pill.active {
+    background: var(--accent);
+    border-color: var(--accent);
+    color: #000;
+    font-weight: 600;
+}
+</style>
+<script>
+(function () {
+    var input      = document.getElementById('buscaInput');
+    var pills      = document.querySelectorAll('.busca-pill');
+    var emptyRow   = document.getElementById('buscaVazio');
+    var filtroAtivo = 'tudo';
+
+    function filtrar() {
+        var texto = input ? input.value.toLowerCase().trim() : '';
+        var rows  = document.querySelectorAll('tr.tr-transacao');
+        var visiveis = 0;
+
+        rows.forEach(function (tr) {
+            var desc   = tr.dataset.desc   || '';
+            var cat    = tr.dataset.cat    || '';
+            var valor  = tr.dataset.valor  || '';
+            var status = tr.dataset.status || '';
+            var tipo   = tr.dataset.tipo   || '';
+
+            var matchTexto = !texto ||
+                desc.indexOf(texto) !== -1 ||
+                cat.indexOf(texto)  !== -1 ||
+                valor.indexOf(texto) !== -1;
+
+            var matchFiltro = true;
+            if      (filtroAtivo === 'receita')       matchFiltro = tipo === 'receita';
+            else if (filtroAtivo === 'despesa')       matchFiltro = tipo === 'despesa';
+            else if (filtroAtivo === 'transferencia') matchFiltro = tipo.indexOf('transferencia') === 0;
+            else if (filtroAtivo === 'pendente')      matchFiltro = status === 'pendente';
+            else if (filtroAtivo === 'efetivado')     matchFiltro = status === 'efetivado';
+
+            var visivel = matchTexto && matchFiltro;
+            tr.style.display = visivel ? '' : 'none';
+            var det = tr.nextElementSibling;
+            if (det) det.style.display = visivel ? '' : 'none';
+            if (visivel) visiveis++;
+        });
+
+        if (emptyRow) emptyRow.style.display = visiveis === 0 ? '' : 'none';
+    }
+
+    if (input) input.addEventListener('input', filtrar);
+
+    pills.forEach(function (pill) {
+        pill.addEventListener('click', function () {
+            pills.forEach(function (p) { p.classList.remove('active'); });
+            this.classList.add('active');
+            filtroAtivo = this.dataset.filtro;
+            filtrar();
+        });
+    });
+})();
 </script>
 
 <?php require_once 'geral/footer.php'; ?>
