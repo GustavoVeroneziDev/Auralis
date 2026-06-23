@@ -1,4 +1,4 @@
-// Auralis Service Worker — v1.0
+// Auralis Service Worker — v1.1
 // Minimalista: só existe para habilitar o PWA install prompt.
 // Não faz cache agressivo para não interferir com atualizações do sistema.
 
@@ -12,8 +12,11 @@ self.addEventListener('activate', (event) => {
     event.waitUntil(clients.claim());
 });
 
-// Fetch: passa tudo direto para a rede (sem cache).
-// Quando quiser adicionar cache offline, é aqui que implementa.
+// Fetch: navegações vão direto ao servidor (evita erros de promise rejeitado).
+// Requisições de assets passam pela rede com fallback gracioso.
 self.addEventListener('fetch', (event) => {
-    event.respondWith(fetch(event.request));
+    if (event.request.mode === 'navigate') return;
+    event.respondWith(
+        fetch(event.request).catch(() => new Response('', { status: 503, statusText: 'Offline' }))
+    );
 });
