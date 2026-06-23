@@ -1024,7 +1024,7 @@ require_once 'geral/header.php';
 
         <div class="table-responsive rounded-4 border border-secondary-subtle shadow-sm mb-5">
             <table class="table table-dark table-hover align-middle mb-0 auralis-table">
-                <thead class="table-active border-secondary-subtle text-secondary small text-uppercase">
+                <thead class="border-secondary-subtle small text-uppercase">
                     <tr>
                         <th class="ps-3 ps-md-4 py-3 border-0">Descrição</th>
                         <th class="py-3 border-0 d-none d-md-table-cell">Categoria</th>
@@ -1074,7 +1074,7 @@ require_once 'geral/header.php';
                                 <div class="d-flex align-items-center gap-2">
                                     <?php echo $iconeTipo ?>
                                     <div>
-                                        <span class="text-light fw-semibold">
+                                        <span class="fw-semibold" style="color:var(--text-main);">
                                             <?php if ($t['Recorrente'] == 1): ?>
                                                 <i class="bi bi-arrow-repeat me-1" style="color: var(--primary-gold-analysis);" title="Conta Recorrente"></i>
                                             <?php endif; ?>
@@ -1122,7 +1122,7 @@ require_once 'geral/header.php';
                                 <?php if ($isPendente): ?>
                                     <span class="badge bg-warning text-dark px-2 py-1 rounded-pill fw-semibold shadow-sm"><i class="bi bi-clock-history me-1"></i> Pendente</span>
                                 <?php else: ?>
-                                    <span class="badge bg-secondary bg-opacity-25 text-light px-2 py-1 rounded-pill"><i class="bi bi-check2-circle me-1"></i> Efetivado</span>
+                                    <span class="badge bg-secondary bg-opacity-25 px-2 py-1 rounded-pill" style="color:var(--text-main);"><i class="bi bi-check2-circle me-1"></i> Efetivado</span>
                                 <?php endif; ?>
                             </td>
 
@@ -1140,19 +1140,19 @@ require_once 'geral/header.php';
                                             <?php if ($isTransfer): ?>
                                                 <div>
                                                     <span class="d-block text-secondary small text-uppercase mb-1"><?php echo $isTransfSaida ? 'Destino' : 'Origem' ?></span>
-                                                    <span class="text-light fs-6" style="color:#60a5fa!important;">
+                                                    <span class="fs-6" style="color:#60a5fa;">
                                                         <?php echo htmlspecialchars($t['NomeCarteiraTransferencia'] ?? '—') ?>
                                                     </span>
                                                 </div>
                                                 <div>
                                                     <span class="d-block text-secondary small text-uppercase mb-1">Data</span>
-                                                    <span class="text-light fs-6"><?php echo $dataFormatada ?></span>
+                                                    <span class="fs-6" style="color:var(--text-main);"><?php echo $dataFormatada ?></span>
                                                 </div>
                                             <?php else: ?>
                                                 <?php $labelData = $isDespesa ? 'Vencimento' : 'Recebimento'; ?>
                                                 <div>
                                                     <span class="d-block text-secondary small text-uppercase mb-1"><?php echo $labelData ?></span>
-                                                    <span class="text-light fs-6">
+                                                    <span class="fs-6" style="color:var(--text-main);">
                                                         <?php echo (! empty($t['DataVencimento']) && strtotime($t['DataVencimento'])) ? date('d/m/Y', strtotime($t['DataVencimento'])) : '<span class="text-muted">Não definido</span>' ?>
                                                     </span>
                                                 </div>
@@ -1160,12 +1160,12 @@ require_once 'geral/header.php';
                                                 <?php if ($t['Recorrente'] == 1): ?>
                                                     <div>
                                                         <span class="d-block text-secondary small text-uppercase mb-1">Recorrência</span>
-                                                        <span class="text-light fs-6">Sim (Dia <?php echo htmlspecialchars($t['DiaVencimento']); ?>)</span>
+                                                        <span class="fs-6" style="color:var(--text-main);">Sim (Dia <?php echo htmlspecialchars($t['DiaVencimento']); ?>)</span>
                                                     </div>
                                                 <?php elseif (!empty($t['TotalParcelas']) && $t['TotalParcelas'] > 1): ?>
                                                     <div>
                                                         <span class="d-block text-secondary small text-uppercase mb-1">Parcelado</span>
-                                                        <span class="text-light fs-6">Parcela <?php echo $t['ParcelaAtual']; ?> de <?php echo $t['TotalParcelas']; ?></span>
+                                                        <span class="fs-6" style="color:var(--text-main);">Parcela <?php echo $t['ParcelaAtual']; ?> de <?php echo $t['TotalParcelas']; ?></span>
                                                     </div>
                                                 <?php endif; ?>
                                             <?php endif; ?>

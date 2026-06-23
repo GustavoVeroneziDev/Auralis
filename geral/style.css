@@ -225,18 +225,37 @@ h1 span {
 /* --------------------------------------------------------------------------
    8. TABELA
    -------------------------------------------------------------------------- */
+
+/* Sobrescreve as BS-vars do table-dark usando as vars do tema ativo */
 .auralis-table {
   font-size: var(--fs-body);
+  --bs-table-color:       var(--text-main);
+  --bs-table-bg:          var(--bg-card);
+  --bs-table-border-color: var(--bs-border-color);
+  --bs-table-hover-color: var(--text-main);
+  --bs-table-hover-bg:    var(--bg-hover);
+  --bs-table-active-bg:   var(--bg-hover);
+  --bs-table-active-color: var(--text-main);
+  background-color: var(--bg-card) !important;
+  color: var(--text-main) !important;
 }
 
 .auralis-table th {
   font-size: var(--fs-label);
+  color: var(--text-muted) !important;
+  background-color: var(--bg-hover) !important;
 }
 
 .auralis-table td,
 .auralis-table th {
   padding-inline: clamp(0.5rem, 2vw, 1rem) !important;
   padding-block: 0.75rem !important;
+  border-color: var(--bs-border-color) !important;
+}
+
+/* Painel de expansão de linha */
+.bg-charcoal-analysis {
+  background-color: var(--bg-charcoal-analysis) !important;
 }
 
 /* --------------------------------------------------------------------------
