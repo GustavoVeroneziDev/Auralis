@@ -746,6 +746,15 @@ require_once 'geral/header.php';
                                 <i class="bi bi-pencil-square"></i>
                             </button>
                         </div>
+                        <?php
+                            $projecaoSaldo = ($saldoAtual ?? 0) + ($receitasPendentes ?? 0) - ($despesasPendentes ?? 0);
+                            if (($receitasPendentes ?? 0) > 0 || ($despesasPendentes ?? 0) > 0):
+                        ?>
+                        <div class="mt-2 pt-2 border-top border-secondary-subtle">
+                            <span class="text-secondary" style="font-size:0.72rem;">Projetado: </span>
+                            <span class="fw-semibold <?= $projecaoSaldo >= 0 ? 'text-light' : 'text-danger' ?>" style="font-size:0.72rem;">R$ <?= number_format($projecaoSaldo, 2, ',', '.') ?></span>
+                        </div>
+                        <?php endif; ?>
                     </div>
                 </div>
             </div>
@@ -763,6 +772,12 @@ require_once 'geral/header.php';
                         <div class="mt-2 d-flex align-items-center flex-wrap gap-1">
                             <?php echo badgeVar($receitasMes, $receitasMesAnt, false); ?>
                         </div>
+                        <?php if (($receitasPendentes ?? 0) > 0): ?>
+                        <div class="mt-2 pt-2 border-top border-secondary-subtle d-flex align-items-center gap-1">
+                            <i class="bi bi-hourglass-split" style="font-size:0.7rem;color:var(--color-income-text);opacity:.7;"></i>
+                            <span style="font-size:0.72rem;color:var(--color-income-text);opacity:.85;">A receber: <strong>R$ <?= number_format($receitasPendentes, 2, ',', '.') ?></strong></span>
+                        </div>
+                        <?php endif; ?>
                     </div>
                 </div>
             </div>
@@ -780,45 +795,16 @@ require_once 'geral/header.php';
                         <div class="mt-2 d-flex align-items-center flex-wrap gap-1">
                             <?php echo badgeVar($despesasMes, $despesasMesAnt, true); ?>
                         </div>
+                        <?php if (($despesasPendentes ?? 0) > 0): ?>
+                        <div class="mt-2 pt-2 border-top border-secondary-subtle d-flex align-items-center gap-1">
+                            <i class="bi bi-hourglass-split" style="font-size:0.7rem;color:var(--color-expense-text);opacity:.7;"></i>
+                            <span style="font-size:0.72rem;color:var(--color-expense-text);opacity:.85;">A pagar: <strong>R$ <?= number_format($despesasPendentes, 2, ',', '.') ?></strong></span>
+                        </div>
+                        <?php endif; ?>
                     </div>
                 </div>
             </div>
         </div>
-
-        <!-- ── Barra de Gastos Esperados (pendentes) ─────────────────────── -->
-        <?php if ($despesasPendentes > 0 || $receitasPendentes > 0): ?>
-            <div class="card bg-body-tertiary border-secondary-subtle rounded-4 shadow-sm mb-4">
-                <div class="card-body py-3 px-3">
-                    <div class="d-flex flex-wrap align-items-center justify-content-between gap-3">
-                        <div class="d-flex align-items-center gap-2">
-                            <i class="bi bi-hourglass-split text-warning"></i>
-                            <span class="fw-semibold text-light" style="font-size:0.875rem;">Aguardando confirmação em <?php echo $nome_mes ?></span>
-                        </div>
-                        <div class="d-flex flex-wrap gap-3">
-                            <?php if ($receitasPendentes > 0): ?>
-                                <div class="d-flex align-items-center gap-2">
-                                    <span class="text-secondary small">A receber:</span>
-                                    <span class="fw-bold text-success" style="font-size:0.9rem;">R$ <?php echo number_format($receitasPendentes, 2, ',', '.') ?></span>
-                                </div>
-                            <?php endif; ?>
-                            <?php if ($despesasPendentes > 0): ?>
-                                <div class="d-flex align-items-center gap-2">
-                                    <span class="text-secondary small">A pagar:</span>
-                                    <span class="fw-bold text-danger" style="font-size:0.9rem;">R$ <?php echo number_format($despesasPendentes, 2, ',', '.') ?></span>
-                                </div>
-                            <?php endif; ?>
-                            <?php $projecaoSaldo = $saldoAtual + $receitasPendentes - $despesasPendentes; ?>
-                            <div class="d-flex align-items-center gap-2 border-start border-secondary-subtle ps-3">
-                                <span class="text-secondary small">Saldo projetado:</span>
-                                <span class="fw-bold <?php echo $projecaoSaldo >= 0 ? 'text-light' : 'text-danger' ?>" style="font-size:0.9rem;">
-                                    R$ <?php echo number_format($projecaoSaldo, 2, ',', '.') ?>
-                                </span>
-                            </div>
-                        </div>
-                    </div>
-                </div>
-            </div>
-        <?php endif; ?>
 
         <!-- ── Seção Cofrinhos & Metas ───────────────────────────────────── -->
         <?php if ($qtdCofrinhos > 0): ?>
