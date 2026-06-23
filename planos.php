@@ -125,16 +125,17 @@ function _itensLimite($row)
     if ($row['categorias'] == -1)  $itens[] = ['ok', 'Categorias ilimitadas'];
     else                           $itens[] = ['ok', "Até {$row['categorias']} categorias"];
     $pmax = $row['parcelas_max'] ?? 3;
-    if ($pmax == -1)     $itens[] = ['ok', 'Parcelamento ilimitado'];
-    elseif ($pmax <= 3)  $itens[] = ['ok', "Parcelamento em até {$pmax}x"];
-    else                 $itens[] = ['ok', "Parcelamento em até {$pmax}x (com juros)"];
+    if ($pmax == -1)     $itens[] = ['ok', 'Lançamentos parcelados ilimitados'];
+    elseif ($pmax <= 3)  $itens[] = ['ok', "Registre compras parceladas em até {$pmax}x"];
+    else                 $itens[] = ['ok', "Registre compras parceladas em até {$pmax}x"];
     return $itens;
 }
 
+// Exportação já vem do config_recursos — nenhum extra necessário aqui
 $_extras_plano = [
-    'free' => [['no', 'Exportação de dados']],
-    'pro'  => [['ok', 'Exportação CSV (em breve)']],
-    'vip'  => [['ok', 'Exportação CSV (em breve)']],
+    'free' => [],
+    'pro'  => [],
+    'vip'  => [],
 ];
 
 $_temas_plano = [
