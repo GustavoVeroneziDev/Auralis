@@ -21,7 +21,7 @@ $erro = null;
 $_urlVoltar = (function ($raw) {
     if (empty($raw)) return 'dashboard.php';
     $base = basename(strtok($raw, '?'));
-    return in_array($base, ['dashboard.php', 'agenda.php']) ? $raw : 'dashboard.php';
+    return in_array($base, ['dashboard.php', 'agenda.php', 'analises.php']) ? $raw : 'dashboard.php';
 })($_POST['voltar'] ?? $_GET['voltar'] ?? '');
 
 // --- VERIFICA SE É MODO DE EDIÇÃO ---
