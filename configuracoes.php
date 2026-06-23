@@ -143,9 +143,13 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                         ->execute([':chave' => $chave, ':v' => $valor, ':uid' => $usuario_id]);
                 }
             }
+            $isAjax = !empty($_SERVER['HTTP_X_REQUESTED_WITH']) && strtolower($_SERVER['HTTP_X_REQUESTED_WITH']) === 'xmlhttprequest';
+            if ($isAjax) { header('Content-Type: application/json'); echo json_encode(['ok' => true]); exit; }
             $mensagem = 'Preferências do dashboard salvas!';
             $tipo_mensagem = 'success';
         } catch (PDOException $e) {
+            $isAjax = !empty($_SERVER['HTTP_X_REQUESTED_WITH']) && strtolower($_SERVER['HTTP_X_REQUESTED_WITH']) === 'xmlhttprequest';
+            if ($isAjax) { header('Content-Type: application/json'); echo json_encode(['ok' => false]); exit; }
             $mensagem = 'Erro ao salvar preferências.';
             $tipo_mensagem = 'danger';
         }
@@ -634,7 +638,7 @@ require_once 'geral/header.php';
                 </div>
                 <div class="card-body p-4">
                     <p class="text-secondary small mb-4">Escolha quais informações aparecem no painel principal.</p>
-                    <form method="POST">
+                    <form method="POST" id="formPrefDash">
                         <input type="hidden" name="action" value="salvar_pref_dashboard">
                         <div class="d-flex flex-column gap-1">
                             <?php
@@ -656,7 +660,7 @@ require_once 'geral/header.php';
                                 <div class="form-check form-switch mb-0 ms-3">
                                     <input class="form-check-input" type="checkbox"
                                            name="dash_<?= $key ?>" id="dash_<?= $key ?>"
-                                           <?= $checked ?> onchange="this.form.submit()">
+                                           <?= $checked ?> onchange="salvarPrefDash(this)">
                                 </div>
                             </div>
                             <?php endforeach; ?>
@@ -719,6 +723,20 @@ require_once 'geral/header.php';
         </div>
     </div>
 </div>
+
+<script>
+function salvarPrefDash(el) {
+    var fd = new FormData(el.form);
+    fetch('configuracoes.php', {
+        method: 'POST',
+        headers: { 'X-Requested-With': 'XMLHttpRequest' },
+        body: fd
+    })
+    .then(function(r) { return r.json(); })
+    .then(function(d) { if (typeof auralisToast === 'function') auralisToast(d.ok ? 'Preferências salvas!' : 'Erro ao salvar.'); })
+    .catch(function() { el.checked = !el.checked; });
+}
+</script>
 
 <script>
     // Validação Front-End da Nova Senha
