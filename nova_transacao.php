@@ -327,7 +327,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 if (isset($_POST['editar_futuros']) && $grupoAtual) {
                     $sqlFuturos = "
                         UPDATE Registro SET
-                            Valor = :valor, Descricao = :descricao, 
+                            Valor = :valor, Descricao = :descricao,
                             FKCarteira = :carteira, FKCategoria = :categoria
                         WHERE GrupoParcela = :grupo
                           AND FKUsuario = :usuario
@@ -344,8 +344,38 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                         ':categoria' => $categoriaId,
                         ':grupo'     => $grupoAtual,
                         ':usuario'   => $usuario_id,
-                        ':id_editar' => $_POST['id_editar'], // Correção: Variável adicionada
+                        ':id_editar' => $_POST['id_editar'],
                         ':data_base' => $dataAtual
+                    ]);
+                }
+
+                // ── PROPAGAÇÃO PARCELADO (PRÓXIMAS PARCELAS PENDENTES) ───────
+                $parcelaAtualEdit = $transacao_edit['ParcelaAtual'] ?? null;
+                if (($_POST['editar_parcelas'] ?? 'apenas') === 'proximas'
+                    && $grupoAtual
+                    && $parcelaAtualEdit !== null
+                ) {
+                    $sqlProximas = "
+                        UPDATE Registro SET
+                            Valor = :valor, Descricao = :descricao,
+                            FKCarteira = :carteira, FKCategoria = :categoria
+                        WHERE GrupoParcela = :grupo
+                          AND FKUsuario = :usuario
+                          AND IDRegistro != :id_editar
+                          AND ParcelaAtual > :parcela_atual
+                          AND StatusRegistro = 'pendente'
+                          AND TotalParcelas IS NOT NULL
+                    ";
+                    $stmtP = $pdo->prepare($sqlProximas);
+                    $stmtP->execute([
+                        ':valor'         => $valor,
+                        ':descricao'     => $descricao,
+                        ':carteira'      => $carteiraId,
+                        ':categoria'     => $categoriaId,
+                        ':grupo'         => $grupoAtual,
+                        ':usuario'       => $usuario_id,
+                        ':id_editar'     => $_POST['id_editar'],
+                        ':parcela_atual' => $parcelaAtualEdit,
                     ]);
                 }
                 processarComprovantes($pdo, $_POST['id_editar'], $usuario_id);
@@ -825,6 +855,34 @@ require_once 'geral/header.php';
                                                         <label class="form-check-label text-light fs-7 fw-semibold" for="editar_futuros">
                                                             Aplicar alterações em <strong>todos os meses futuros pendentes</strong>
                                                         </label>
+                                                    </div>
+                                                </div>
+                                            <?php endif; ?>
+
+                                            <?php if ($is_parcela && !empty($transacao_edit['GrupoParcela'])): ?>
+                                                <div class="p-3 rounded-3 border border-border-color" style="background:rgba(255,255,255,.03);">
+                                                    <div class="d-flex align-items-center gap-2 mb-3">
+                                                        <i class="bi bi-credit-card-2-front" style="color:var(--accent);"></i>
+                                                        <span class="text-light fw-semibold fs-7">
+                                                            Parcela <?= (int)$transacao_edit['ParcelaAtual'] ?>/<?= (int)$transacao_edit['TotalParcelas'] ?>
+                                                            — o que deseja alterar?
+                                                        </span>
+                                                    </div>
+                                                    <div class="d-flex flex-column gap-2">
+                                                        <div class="form-check">
+                                                            <input class="form-check-input" type="radio"
+                                                                   name="editar_parcelas" id="editar_apenas_esta" value="apenas" checked>
+                                                            <label class="form-check-label text-light fs-7" for="editar_apenas_esta">
+                                                                Alterar <strong>apenas esta parcela</strong>
+                                                            </label>
+                                                        </div>
+                                                        <div class="form-check">
+                                                            <input class="form-check-input" type="radio"
+                                                                   name="editar_parcelas" id="editar_proximas_parcelas" value="proximas">
+                                                            <label class="form-check-label text-light fs-7" for="editar_proximas_parcelas">
+                                                                Alterar <strong>esta e todas as próximas parcelas pendentes</strong>
+                                                            </label>
+                                                        </div>
                                                     </div>
                                                 </div>
                                             <?php endif; ?>
