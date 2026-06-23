@@ -96,7 +96,8 @@ if ($carteira_selecionada) {
     try {
         $sql = "
                 SELECT
-                    r.Valor, r.Descricao, r.TipoRegistro, r.MomentoRegistro,
+                    r.IDRegistro, r.Valor, r.Descricao, r.TipoRegistro,
+                    r.MomentoRegistro, r.StatusRegistro,
                     COALESCE(c.NomeCategoria, 'Sem Categoria') as Categoria,
                     COALESCE(c.IconeCategoria, 'bi-tag') as Icone
                 FROM Registro r
@@ -698,6 +699,29 @@ require_once 'geral/header.php';
 
 </main>
 
+<!-- Context menu dos itens do Detalhamento -->
+<div id="analiseContextMenu"
+     style="display:none;position:fixed;z-index:9999;min-width:170px;
+            background:var(--bg-card);border:1px solid var(--card-border-color);
+            border-radius:10px;box-shadow:0 8px 24px rgba(0,0,0,.4);overflow:hidden;">
+    <div onclick="ctxEditar()"
+         style="padding:10px 16px;cursor:pointer;display:flex;align-items:center;gap:10px;font-size:.875rem;color:var(--text-main);"
+         onmouseenter="this.style.background='rgba(255,255,255,.07)'" onmouseleave="this.style.background=''">
+        <i class="bi bi-pencil-square" style="color:var(--accent);"></i> Editar
+    </div>
+    <div onclick="ctxNaoEfetivar()"
+         style="padding:10px 16px;cursor:pointer;display:flex;align-items:center;gap:10px;font-size:.875rem;color:var(--text-main);"
+         onmouseenter="this.style.background='rgba(255,255,255,.07)'" onmouseleave="this.style.background=''">
+        <i class="bi bi-clock-history" style="color:#f59e0b;"></i> Não efetivar
+    </div>
+    <div style="height:1px;background:var(--card-border-color);margin:2px 0;"></div>
+    <div onclick="ctxExcluir()"
+         style="padding:10px 16px;cursor:pointer;display:flex;align-items:center;gap:10px;font-size:.875rem;color:#f87171;"
+         onmouseenter="this.style.background='rgba(239,68,68,.08)'" onmouseleave="this.style.background=''">
+        <i class="bi bi-trash3"></i> Excluir
+    </div>
+</div>
+
 <style>
     .bg-card-analysis {
         background-color: var(--bg-card-analysis);
@@ -1007,9 +1031,17 @@ require_once 'geral/header.php';
             const valorFormatado = fmt(t.Valor);
             const corValor = tipo === 'despesa' ? 'text-danger' : 'text-success';
             const sinalValor = tipo === 'despesa' ? '-' : '+';
+            const editUrl = `nova_transacao.php?editar=${encodeURIComponent(t.IDRegistro)}&voltar=${encodeURIComponent(location.href)}`;
 
             htmlLista += `
-                <div class="list-group-item bg-transparent border-secondary-subtle px-4 py-3 d-flex justify-content-between align-items-center">
+                <div class="analise-item list-group-item bg-transparent border-secondary-subtle px-4 py-3 d-flex justify-content-between align-items-center"
+                     data-id="${t.IDRegistro}"
+                     data-edit-url="${editUrl}"
+                     style="cursor:pointer;transition:background .15s;"
+                     onmouseenter="this.style.background='rgba(255,255,255,.04)'"
+                     onmouseleave="this.style.background=''"
+                     onclick="location.href=this.dataset.editUrl"
+                     oncontextmenu="abrirContextMenu(event, this)">
                     <div class="d-flex align-items-center">
                         <i class="bi ${t.Icone} text-secondary fs-4 me-3"></i>
                         <div>
@@ -1022,6 +1054,56 @@ require_once 'geral/header.php';
         });
         htmlLista += '</div>';
         containerLista.innerHTML = htmlLista;
+    }
+
+    // ── Context menu dos itens do detalhamento ────────────────────────────
+    let _ctxTarget = null;
+
+    function abrirContextMenu(e, el) {
+        e.preventDefault();
+        e.stopPropagation();
+        _ctxTarget = el;
+        const menu = document.getElementById('analiseContextMenu');
+        menu.style.display = 'block';
+        const x = Math.min(e.clientX, window.innerWidth  - menu.offsetWidth  - 8);
+        const y = Math.min(e.clientY, window.innerHeight - menu.offsetHeight - 8);
+        menu.style.left = x + 'px';
+        menu.style.top  = y + 'px';
+    }
+
+    document.addEventListener('click', () => {
+        const menu = document.getElementById('analiseContextMenu');
+        if (menu) menu.style.display = 'none';
+        _ctxTarget = null;
+    });
+
+    function ctxEditar() {
+        if (_ctxTarget) location.href = _ctxTarget.dataset.editUrl;
+    }
+
+    function ctxExcluir() {
+        if (!_ctxTarget) return;
+        const id = _ctxTarget.dataset.id;
+        if (!confirm('Excluir este lançamento? Esta ação não pode ser desfeita.')) return;
+        fetch('/geral/acao_registro.php', {
+            method: 'POST',
+            headers: {'Content-Type': 'application/x-www-form-urlencoded'},
+            body: `acao=excluir&id=${encodeURIComponent(id)}`
+        }).then(r => r.json()).then(d => {
+            if (d.ok) { _ctxTarget.remove(); auralisToast('Lançamento excluído.'); }
+        });
+    }
+
+    function ctxNaoEfetivar() {
+        if (!_ctxTarget) return;
+        const id = _ctxTarget.dataset.id;
+        fetch('/geral/acao_registro.php', {
+            method: 'POST',
+            headers: {'Content-Type': 'application/x-www-form-urlencoded'},
+            body: `acao=nao_efetivar&id=${encodeURIComponent(id)}`
+        }).then(r => r.json()).then(d => {
+            if (d.ok) { _ctxTarget.remove(); auralisToast('Lançamento marcado como pendente.'); }
+        });
     }
 </script>
 
