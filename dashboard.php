@@ -740,21 +740,20 @@ require_once 'geral/header.php';
                             </div>
                         </div>
                         <div class="fw-bold text-light mb-1" style="font-size: var(--fs-card-val);">R$ <?php echo number_format($saldoAtual ?? 0, 2, ',', '.') ?></div>
-                        <div class="d-flex justify-content-between align-items-center mt-2">
-                            <small class="text-secondary">Total disponível hoje</small>
+                        <?php $projecaoSaldo = ($saldoAtual ?? 0) + ($receitasPendentes ?? 0) - ($despesasPendentes ?? 0); ?>
+                        <div class="d-flex justify-content-between align-items-start mt-2">
+                            <div>
+                                <small class="text-secondary d-block">Total disponível hoje</small>
+                                <?php if (($receitasPendentes ?? 0) > 0 || ($despesasPendentes ?? 0) > 0): ?>
+                                <span style="font-size:0.7rem;color:var(--text-muted);">Projetado:
+                                    <strong class="<?= $projecaoSaldo >= 0 ? 'text-light' : 'text-danger' ?>">R$ <?= number_format($projecaoSaldo, 2, ',', '.') ?></strong>
+                                </span>
+                                <?php endif; ?>
+                            </div>
                             <button class="btn btn-sm btn-link text-secondary p-0 transition-hover" data-bs-toggle="modal" data-bs-target="#modalAjusteSaldo" title="Ajustar Saldo Real">
                                 <i class="bi bi-pencil-square"></i>
                             </button>
                         </div>
-                        <?php
-                            $projecaoSaldo = ($saldoAtual ?? 0) + ($receitasPendentes ?? 0) - ($despesasPendentes ?? 0);
-                            if (($receitasPendentes ?? 0) > 0 || ($despesasPendentes ?? 0) > 0):
-                        ?>
-                        <div class="mt-2 pt-2 border-top border-secondary-subtle">
-                            <span class="text-secondary" style="font-size:0.72rem;">Projetado: </span>
-                            <span class="fw-semibold <?= $projecaoSaldo >= 0 ? 'text-light' : 'text-danger' ?>" style="font-size:0.72rem;">R$ <?= number_format($projecaoSaldo, 2, ',', '.') ?></span>
-                        </div>
-                        <?php endif; ?>
                     </div>
                 </div>
             </div>
@@ -773,9 +772,12 @@ require_once 'geral/header.php';
                             <?php echo badgeVar($receitasMes, $receitasMesAnt, false); ?>
                         </div>
                         <?php if (($receitasPendentes ?? 0) > 0): ?>
-                        <div class="mt-2 pt-2 border-top border-secondary-subtle d-flex align-items-center gap-1">
-                            <i class="bi bi-hourglass-split" style="font-size:0.7rem;color:var(--color-income-text);opacity:.7;"></i>
-                            <span style="font-size:0.72rem;color:var(--color-income-text);opacity:.85;">A receber: <strong>R$ <?= number_format($receitasPendentes, 2, ',', '.') ?></strong></span>
+                        <div class="mt-2 pt-2 border-top border-secondary-subtle">
+                            <div class="d-flex align-items-center gap-1">
+                                <i class="bi bi-hourglass-split" style="font-size:0.7rem;color:var(--color-income-text);opacity:.7;"></i>
+                                <span style="font-size:0.72rem;color:var(--color-income-text);opacity:.85;">A receber: <strong>R$ <?= number_format($receitasPendentes, 2, ',', '.') ?></strong></span>
+                            </div>
+                            <small class="text-secondary" style="font-size:0.68rem;">Pendente de confirmação</small>
                         </div>
                         <?php endif; ?>
                     </div>
@@ -796,9 +798,12 @@ require_once 'geral/header.php';
                             <?php echo badgeVar($despesasMes, $despesasMesAnt, true); ?>
                         </div>
                         <?php if (($despesasPendentes ?? 0) > 0): ?>
-                        <div class="mt-2 pt-2 border-top border-secondary-subtle d-flex align-items-center gap-1">
-                            <i class="bi bi-hourglass-split" style="font-size:0.7rem;color:var(--color-expense-text);opacity:.7;"></i>
-                            <span style="font-size:0.72rem;color:var(--color-expense-text);opacity:.85;">A pagar: <strong>R$ <?= number_format($despesasPendentes, 2, ',', '.') ?></strong></span>
+                        <div class="mt-2 pt-2 border-top border-secondary-subtle">
+                            <div class="d-flex align-items-center gap-1">
+                                <i class="bi bi-hourglass-split" style="font-size:0.7rem;color:var(--color-expense-text);opacity:.7;"></i>
+                                <span style="font-size:0.72rem;color:var(--color-expense-text);opacity:.85;">A pagar: <strong>R$ <?= number_format($despesasPendentes, 2, ',', '.') ?></strong></span>
+                            </div>
+                            <small class="text-secondary" style="font-size:0.68rem;">Pendente de confirmação</small>
                         </div>
                         <?php endif; ?>
                     </div>
