@@ -91,6 +91,17 @@ try {
 }
 // ==============================================================================
 
+// ── Preferências do Dashboard ─────────────────────────────────────────────
+$dashPrefs = ['cofrinhos' => true, 'cartoes' => true, 'receita_pendente' => true, 'despesa_pendente' => true, 'saldo_projetado' => true];
+try {
+    $stmtPrefs = $pdo->prepare("SELECT Chave, Valor FROM ConfiguracaoSistema WHERE FKUsuario = :uid AND Chave LIKE 'dash_%'");
+    $stmtPrefs->execute([':uid' => $usuario_id]);
+    foreach ($stmtPrefs->fetchAll() as $row) {
+        $key = substr($row['Chave'], 5);
+        if (isset($dashPrefs[$key])) $dashPrefs[$key] = ($row['Valor'] === '1');
+    }
+} catch (PDOException $e) {}
+
 // --- VERIFICA SE É O PRIMEIRO ACESSO ---
 $is_primeiro_acesso = false;
 try {
@@ -744,7 +755,7 @@ require_once 'geral/header.php';
                         <div class="d-flex justify-content-between align-items-start mt-2">
                             <div>
                                 <small class="text-secondary d-block">Total disponível hoje</small>
-                                <?php if (($receitasPendentes ?? 0) > 0 || ($despesasPendentes ?? 0) > 0): ?>
+                                <?php if ($dashPrefs['saldo_projetado'] && (($receitasPendentes ?? 0) > 0 || ($despesasPendentes ?? 0) > 0)): ?>
                                 <span style="font-size:0.7rem;color:var(--text-muted);">Projetado:
                                     <strong class="<?= $projecaoSaldo >= 0 ? 'text-light' : 'text-danger' ?>">R$ <?= number_format($projecaoSaldo, 2, ',', '.') ?></strong>
                                 </span>
@@ -771,7 +782,7 @@ require_once 'geral/header.php';
                         <div class="mt-2 d-flex align-items-center flex-wrap gap-1">
                             <?php echo badgeVar($receitasMes, $receitasMesAnt, false); ?>
                         </div>
-                        <?php if (($receitasPendentes ?? 0) > 0): ?>
+                        <?php if ($dashPrefs['receita_pendente'] && ($receitasPendentes ?? 0) > 0): ?>
                         <div class="mt-2 pt-2 border-top border-secondary-subtle">
                             <div class="d-flex align-items-center gap-1">
                                 <i class="bi bi-hourglass-split" style="font-size:0.7rem;color:var(--color-income-text);opacity:.7;"></i>
@@ -797,7 +808,7 @@ require_once 'geral/header.php';
                         <div class="mt-2 d-flex align-items-center flex-wrap gap-1">
                             <?php echo badgeVar($despesasMes, $despesasMesAnt, true); ?>
                         </div>
-                        <?php if (($despesasPendentes ?? 0) > 0): ?>
+                        <?php if ($dashPrefs['despesa_pendente'] && ($despesasPendentes ?? 0) > 0): ?>
                         <div class="mt-2 pt-2 border-top border-secondary-subtle">
                             <div class="d-flex align-items-center gap-1">
                                 <i class="bi bi-hourglass-split" style="font-size:0.7rem;color:var(--color-expense-text);opacity:.7;"></i>
@@ -812,7 +823,7 @@ require_once 'geral/header.php';
         </div>
 
         <!-- ── Seção Cofrinhos & Metas ───────────────────────────────────── -->
-        <?php if ($qtdCofrinhos > 0): ?>
+        <?php if ($dashPrefs['cofrinhos'] && $qtdCofrinhos > 0): ?>
             <div class="d-flex align-items-center justify-content-between mb-3 mt-2">
                 <button class="d-flex align-items-center gap-2 btn p-0 border-0 bg-transparent" onclick="toggleSection('cofrinhos')">
                     <i class="bi bi-piggy-bank" style="color:#f59e0b;font-size:1rem;"></i>
@@ -889,7 +900,7 @@ require_once 'geral/header.php';
             </div>
         <?php endif; ?>
 
-        <?php if (!empty($faturasAbertasDash)): ?>
+        <?php if ($dashPrefs['cartoes'] && !empty($faturasAbertasDash)): ?>
             <!-- ── Seção de Cartões de Crédito ───────────────────────────────── -->
             <div class="d-flex align-items-center justify-content-between mb-3 mt-4">
                 <button class="d-flex align-items-center gap-2 btn p-0 border-0 bg-transparent" onclick="toggleSection('cartoes')">

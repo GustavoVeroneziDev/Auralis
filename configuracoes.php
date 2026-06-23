@@ -126,6 +126,35 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         }
     }
 
+    // AÇÃO 6: PREFERÊNCIAS DO DASHBOARD
+    if (isset($_POST['action']) && $_POST['action'] === 'salvar_pref_dashboard') {
+        $campos = ['cofrinhos', 'cartoes', 'receita_pendente', 'despesa_pendente', 'saldo_projetado'];
+        try {
+            foreach ($campos as $campo) {
+                $valor = isset($_POST["dash_$campo"]) ? '1' : '0';
+                $chave = "dash_$campo";
+                $stmtChk = $pdo->prepare("SELECT COUNT(*) FROM ConfiguracaoSistema WHERE Chave = :chave AND FKUsuario = :uid");
+                $stmtChk->execute([':chave' => $chave, ':uid' => $usuario_id]);
+                if ($stmtChk->fetchColumn() > 0) {
+                    $pdo->prepare("UPDATE ConfiguracaoSistema SET Valor = :v WHERE Chave = :chave AND FKUsuario = :uid")
+                        ->execute([':v' => $valor, ':chave' => $chave, ':uid' => $usuario_id]);
+                } else {
+                    $pdo->prepare("INSERT INTO ConfiguracaoSistema (Chave, Valor, FKUsuario) VALUES (:chave, :v, :uid)")
+                        ->execute([':chave' => $chave, ':v' => $valor, ':uid' => $usuario_id]);
+                }
+            }
+            $isAjax = !empty($_SERVER['HTTP_X_REQUESTED_WITH']) && strtolower($_SERVER['HTTP_X_REQUESTED_WITH']) === 'xmlhttprequest';
+            if ($isAjax) { header('Content-Type: application/json'); echo json_encode(['ok' => true]); exit; }
+            $mensagem = 'Preferências do dashboard salvas!';
+            $tipo_mensagem = 'success';
+        } catch (PDOException $e) {
+            $isAjax = !empty($_SERVER['HTTP_X_REQUESTED_WITH']) && strtolower($_SERVER['HTTP_X_REQUESTED_WITH']) === 'xmlhttprequest';
+            if ($isAjax) { header('Content-Type: application/json'); echo json_encode(['ok' => false]); exit; }
+            $mensagem = 'Erro ao salvar preferências.';
+            $tipo_mensagem = 'danger';
+        }
+    }
+
     // AÇÃO 5: EXCLUIR CONTA (A ZONA DE PERIGO)
     if (isset($_POST['action']) && $_POST['action'] === 'delete_account') {
         $senha_confirmacao = $_POST['senha_confirmacao'] ?? '';
@@ -201,6 +230,17 @@ try {
 } catch (PDOException $e) {
     die("Erro ao carregar dados do usuário.");
 }
+
+// ── Preferências do Dashboard ────────────────────────────────────────────────
+$dashPrefsCfg = ['cofrinhos' => '1', 'cartoes' => '1', 'receita_pendente' => '1', 'despesa_pendente' => '1', 'saldo_projetado' => '1'];
+try {
+    $stmtDP = $pdo->prepare("SELECT Chave, Valor FROM ConfiguracaoSistema WHERE FKUsuario = :uid AND Chave LIKE 'dash_%'");
+    $stmtDP->execute([':uid' => $usuario_id]);
+    foreach ($stmtDP->fetchAll() as $row) {
+        $key = substr($row['Chave'], 5);
+        if (isset($dashPrefsCfg[$key])) $dashPrefsCfg[$key] = $row['Valor'];
+    }
+} catch (PDOException $e) {}
 
 require_once 'geral/header.php';
 ?>
@@ -588,6 +628,48 @@ require_once 'geral/header.php';
             </div>
         </div>
 
+        <!-- PREFERÊNCIAS DO DASHBOARD -->
+        <div class="col-12 mt-2">
+            <div class="card border-secondary-subtle shadow-sm rounded-4" style="background:var(--bg-card);">
+                <div class="card-header border-bottom border-secondary-subtle bg-transparent p-4">
+                    <h5 class="fw-bold text-light mb-0">
+                        <i class="bi bi-layout-three-columns me-2" style="color:var(--accent);"></i> Preferências do Dashboard
+                    </h5>
+                </div>
+                <div class="card-body p-4">
+                    <p class="text-secondary small mb-4">Escolha quais informações aparecem no painel principal.</p>
+                    <form method="POST" id="formPrefDash">
+                        <input type="hidden" name="action" value="salvar_pref_dashboard">
+                        <div class="d-flex flex-column gap-1">
+                            <?php
+                            $itensDash = [
+                                'cofrinhos'        => ['Cofrinhos & Metas',   'Exibe o resumo dos cofrinhos ativos'],
+                                'cartoes'          => ['Cartões de Crédito',  'Exibe faturas e cartões em aberto'],
+                                'receita_pendente' => ['Receita pendente',    'Mostra "A receber" no card de receitas'],
+                                'despesa_pendente' => ['Despesa pendente',    'Mostra "A pagar" no card de despesas'],
+                                'saldo_projetado'  => ['Saldo projetado',     'Mostra estimativa de saldo incluindo pendentes'],
+                            ];
+                            foreach ($itensDash as $key => [$label, $desc]):
+                                $checked = ($dashPrefsCfg[$key] ?? '1') === '1' ? 'checked' : '';
+                            ?>
+                            <div class="d-flex justify-content-between align-items-center py-3 border-bottom border-secondary-subtle">
+                                <div>
+                                    <div class="fw-semibold text-light" style="font-size:0.9rem;"><?= $label ?></div>
+                                    <div class="text-secondary" style="font-size:0.78rem;"><?= $desc ?></div>
+                                </div>
+                                <div class="form-check form-switch mb-0 ms-3">
+                                    <input class="form-check-input" type="checkbox"
+                                           name="dash_<?= $key ?>" id="dash_<?= $key ?>"
+                                           <?= $checked ?> onchange="salvarPrefDash(this)">
+                                </div>
+                            </div>
+                            <?php endforeach; ?>
+                        </div>
+                    </form>
+                </div>
+            </div>
+        </div>
+
         <!-- ZONA DE RISCO -->
         <div class="col-12 mt-2">
             <div class="card border-danger border-opacity-25 bg-transparent shadow-sm rounded-4">
@@ -641,6 +723,20 @@ require_once 'geral/header.php';
         </div>
     </div>
 </div>
+
+<script>
+function salvarPrefDash(el) {
+    var fd = new FormData(el.form);
+    fetch('configuracoes.php', {
+        method: 'POST',
+        headers: { 'X-Requested-With': 'XMLHttpRequest' },
+        body: fd
+    })
+    .then(function(r) { return r.json(); })
+    .then(function(d) { if (typeof auralisToast === 'function') auralisToast(d.ok ? 'Preferências salvas!' : 'Erro ao salvar.'); })
+    .catch(function() { el.checked = !el.checked; });
+}
+</script>
 
 <script>
     // Validação Front-End da Nova Senha
