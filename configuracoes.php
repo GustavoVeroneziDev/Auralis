@@ -516,6 +516,78 @@ require_once 'geral/header.php';
             </div>
         </div>
 
+        <!-- INSTALAR COMO APP -->
+        <div class="col-12 mt-2">
+            <div class="card border-secondary-subtle shadow-sm rounded-4" style="background:var(--bg-card);">
+                <div class="card-header border-bottom border-secondary-subtle bg-transparent p-4">
+                    <h5 class="fw-bold mb-0">
+                        <i class="bi bi-phone-fill me-2" style="color:var(--accent);"></i> Instalar como Aplicativo
+                    </h5>
+                </div>
+                <div class="card-body p-4">
+
+                    <!-- Já instalado -->
+                    <div id="pwaInstalled" style="display:none;">
+                        <div class="d-flex align-items-center gap-3">
+                            <div class="rounded-circle d-flex align-items-center justify-content-center flex-shrink-0"
+                                 style="width:48px;height:48px;background:rgba(16,185,129,0.12);border:1px solid rgba(16,185,129,0.3);">
+                                <i class="bi bi-check-circle-fill" style="color:#10b981;font-size:1.3rem;"></i>
+                            </div>
+                            <div>
+                                <div class="fw-semibold text-light">Auralis já está instalado</div>
+                                <div class="text-secondary small">Você está acessando via aplicativo instalado.</div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Prompt disponível → instalar direto -->
+                    <div id="pwaCanInstall" style="display:none;">
+                        <div class="fw-semibold text-light mb-1">Acesse o Auralis como um app nativo</div>
+                        <div class="text-secondary small mb-3">Abra direto da área de trabalho ou tela inicial, sem precisar abrir o navegador.</div>
+                        <button class="btn fw-bold text-dark rounded-pill px-4 py-2"
+                                style="background:linear-gradient(135deg,#FFB800,#D4AF37);font-size:0.9rem;"
+                                onclick="auralisInstalar(); setTimeout(atualizarCardInstalar, 800);">
+                            <i class="bi bi-download me-2"></i> Instalar Agora
+                        </button>
+                    </div>
+
+                    <!-- Sem prompt → instruções manuais por browser -->
+                    <div id="pwaManual" style="display:none;">
+                        <div class="fw-semibold text-light mb-3">Como instalar manualmente</div>
+                        <div id="pwaManualIOS" style="display:none;" class="text-secondary small lh-lg">
+                            <div class="d-flex align-items-center gap-2 mb-1">
+                                <span class="d-inline-flex align-items-center justify-content-center rounded-circle flex-shrink-0 fw-bold text-dark"
+                                      style="width:20px;height:20px;background:var(--accent);font-size:0.7rem;">1</span>
+                                Toque em <i class="bi bi-box-arrow-up mx-1"></i><strong>Compartilhar</strong> na barra do Safari
+                            </div>
+                            <div class="d-flex align-items-center gap-2">
+                                <span class="d-inline-flex align-items-center justify-content-center rounded-circle flex-shrink-0 fw-bold text-dark"
+                                      style="width:20px;height:20px;background:var(--accent);font-size:0.7rem;">2</span>
+                                Selecione <strong>"Adicionar à Tela de Início"</strong>
+                            </div>
+                        </div>
+                        <div id="pwaManualChrome" style="display:none;" class="text-secondary small lh-lg">
+                            <div class="d-flex align-items-center gap-2 mb-1">
+                                <span class="d-inline-flex align-items-center justify-content-center rounded-circle flex-shrink-0 fw-bold text-dark"
+                                      style="width:20px;height:20px;background:var(--accent);font-size:0.7rem;">1</span>
+                                Clique no menu <i class="bi bi-three-dots-vertical mx-1"></i> no canto superior do navegador
+                            </div>
+                            <div class="d-flex align-items-center gap-2">
+                                <span class="d-inline-flex align-items-center justify-content-center rounded-circle flex-shrink-0 fw-bold text-dark"
+                                      style="width:20px;height:20px;background:var(--accent);font-size:0.7rem;">2</span>
+                                Selecione <strong>"Instalar página como aplicativo"</strong> ou <strong>"Adicionar à tela inicial"</strong>
+                            </div>
+                        </div>
+                        <p class="text-secondary small mt-3 mb-0" style="opacity:.65;">
+                            <i class="bi bi-info-circle me-1"></i>
+                            Se a opção não aparecer, abra o site em uma nova aba e aguarde alguns instantes.
+                        </p>
+                    </div>
+
+                </div>
+            </div>
+        </div>
+
         <!-- ZONA DE RISCO -->
         <div class="col-12 mt-2">
             <div class="card border-danger border-opacity-25 bg-transparent shadow-sm rounded-4">
@@ -591,6 +663,43 @@ require_once 'geral/header.php';
             inputConfirmaSenha.classList.remove('is-invalid');
         });
     }
+</script>
+
+<script>
+function atualizarCardInstalar() {
+    var standalone = window.matchMedia('(display-mode: standalone)').matches || window.navigator.standalone === true;
+    var isIOS      = /iPad|iPhone|iPod/.test(navigator.userAgent) && !window.MSStream;
+
+    var elInstalled   = document.getElementById('pwaInstalled');
+    var elCanInstall  = document.getElementById('pwaCanInstall');
+    var elManual      = document.getElementById('pwaManual');
+    if (!elInstalled) return;
+
+    elInstalled.style.display  = 'none';
+    elCanInstall.style.display = 'none';
+    elManual.style.display     = 'none';
+
+    if (standalone) {
+        elInstalled.style.display = '';
+    } else if (window.auralisInstallPrompt || isIOS) {
+        elCanInstall.style.display = '';
+    } else {
+        elManual.style.display = '';
+        var elIOS    = document.getElementById('pwaManualIOS');
+        var elChrome = document.getElementById('pwaManualChrome');
+        if (isIOS) { if (elIOS) elIOS.style.display = ''; }
+        else        { if (elChrome) elChrome.style.display = ''; }
+    }
+}
+
+// Atualiza quando o prompt for capturado pelo footer
+window.addEventListener('beforeinstallprompt', function() {
+    setTimeout(atualizarCardInstalar, 100);
+});
+// Avalia estado inicial após footer carregar
+document.addEventListener('DOMContentLoaded', function() {
+    setTimeout(atualizarCardInstalar, 600);
+});
 </script>
 
 <?php require_once 'geral/footer.php'; ?>
