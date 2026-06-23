@@ -866,6 +866,10 @@ input[type="number"] {
   padding: 8px;
 }
 
+.auralis-sidebar.sidebar-collapsed .sidebar-user-btn::after {
+  display: none;
+}
+
 .sidebar-toggle {
   display: flex;
   align-items: center;

@@ -1022,7 +1022,7 @@ require_once 'geral/header.php';
             </div>
         </div>
 
-        <div class="table-responsive rounded-4 border border-secondary-subtle shadow-sm mb-5">
+        <div class="table-responsive rounded-4 shadow-sm mb-5" style="border:1px solid var(--card-border-color);">
             <table class="table table-dark table-hover align-middle mb-0 auralis-table">
                 <thead class="border-secondary-subtle small text-uppercase">
                     <tr>

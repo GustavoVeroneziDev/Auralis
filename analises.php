@@ -414,7 +414,7 @@ require_once 'geral/header.php';
     <?php if ($totalDespesas > 0): ?>
         <div class="row g-4 mb-5">
             <div class="col-lg-6">
-                <div class="card border-secondary-subtle shadow-sm rounded-4 h-100" style="background:var(--bg-card);">
+                <div class="card shadow-sm rounded-4 h-100" style="background:var(--bg-card);border:1px solid var(--card-border-color);">
                     <div class="card-header border-bottom border-secondary-subtle bg-transparent p-4">
                         <h5 class="text-light fw-bold mb-0">Distribuição de Despesas</h5>
                     </div>
@@ -431,7 +431,7 @@ require_once 'geral/header.php';
             </div>
 
             <div class="col-lg-6">
-                <div class="card border-secondary-subtle shadow-sm rounded-4 h-100" style="background:var(--bg-card);">
+                <div class="card shadow-sm rounded-4 h-100" style="background:var(--bg-card);border:1px solid var(--card-border-color);">
                     <div class="card-header border-bottom border-secondary-subtle bg-transparent p-4 d-flex justify-content-between align-items-center">
                         <h5 class="text-light fw-bold mb-0">Detalhamento</h5>
                         <span class="badge bg-secondary text-dark" id="badge-categoria-despesa">Geral</span>
@@ -450,7 +450,7 @@ require_once 'geral/header.php';
     <?php if ($totalReceitas > 0): ?>
         <div class="row g-4 mb-5">
             <div class="col-lg-6">
-                <div class="card border-secondary-subtle shadow-sm rounded-4 h-100" style="background:var(--bg-card);">
+                <div class="card shadow-sm rounded-4 h-100" style="background:var(--bg-card);border:1px solid var(--card-border-color);">
                     <div class="card-header border-bottom border-secondary-subtle bg-transparent p-4">
                         <h5 class="text-light fw-bold mb-0">Distribuição de Receitas</h5>
                     </div>
@@ -467,7 +467,7 @@ require_once 'geral/header.php';
             </div>
 
             <div class="col-lg-6">
-                <div class="card border-secondary-subtle shadow-sm rounded-4 h-100" style="background:var(--bg-card);">
+                <div class="card shadow-sm rounded-4 h-100" style="background:var(--bg-card);border:1px solid var(--card-border-color);">
                     <div class="card-header border-bottom border-secondary-subtle bg-transparent p-4 d-flex justify-content-between align-items-center">
                         <h5 class="text-light fw-bold mb-0">Detalhamento</h5>
                         <span class="badge bg-secondary text-dark" id="badge-categoria-receita">Geral</span>
