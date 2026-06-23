@@ -727,6 +727,15 @@ require_once 'geral/header.php';
         background-color: var(--bg-card-analysis);
     }
 
+    .analise-item {
+        transition: background .15s, border-left-color .15s;
+        border-left: 3px solid transparent !important;
+    }
+    .analise-item:hover {
+        background: rgba(255,255,255,.05) !important;
+        border-left-color: var(--accent) !important;
+    }
+
     .tracking-wide {
         letter-spacing: 0.05em;
     }
@@ -1037,9 +1046,7 @@ require_once 'geral/header.php';
                 <div class="analise-item list-group-item bg-transparent border-secondary-subtle px-4 py-3 d-flex justify-content-between align-items-center"
                      data-id="${t.IDRegistro}"
                      data-edit-url="${editUrl}"
-                     style="cursor:pointer;transition:background .15s;"
-                     onmouseenter="this.style.background='rgba(255,255,255,.04)'"
-                     onmouseleave="this.style.background=''"
+                     style="cursor:pointer;"
                      onclick="location.href=this.dataset.editUrl"
                      oncontextmenu="abrirContextMenu(event, this)">
                     <div class="d-flex align-items-center">
