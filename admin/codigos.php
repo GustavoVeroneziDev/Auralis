@@ -122,6 +122,12 @@ require_once '../geral/header.php';
                 <i class="bi bi-gift-fill me-1"></i> Códigos de Ativação
             </a>
         </li>
+        <li class="nav-item">
+            <a href="/admin/notificacoes.php" class="nav-link rounded-pill"
+               style="background:rgba(255,255,255,.05);color:#9ca3af;font-size:0.85rem;">
+                <i class="bi bi-bell-fill me-1"></i> Notificações
+            </a>
+        </li>
     </ul>
 
     <!-- Alertas -->
