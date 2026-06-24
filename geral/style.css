@@ -463,6 +463,287 @@ input[type="number"] {
   }
 }
 
+/* ==========================================================================
+   NOTIFICATION WIDGET
+   ========================================================================== */
+
+/* ── Bell FAB ── */
+#notif-container {
+  position: fixed;
+  bottom: 1.5rem;
+  right: 1.5rem;
+  z-index: 1060;
+}
+
+#notif-bell {
+  width: 50px;
+  height: 50px;
+  border-radius: 50%;
+  background: var(--bg-card);
+  border: 1px solid var(--card-border-color);
+  color: var(--text-main);
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  box-shadow: 0 4px 20px rgba(0,0,0,0.45);
+  position: relative;
+  transition: transform 0.18s, box-shadow 0.18s;
+  font-size: 1.2rem;
+}
+
+#notif-bell:hover {
+  transform: scale(1.08);
+  box-shadow: 0 6px 28px rgba(0,0,0,0.6);
+}
+
+#notif-badge {
+  position: absolute;
+  top: 2px;
+  right: 2px;
+  background: #E63946;
+  color: #fff;
+  font-size: 0.6rem;
+  font-weight: 700;
+  border-radius: 999px;
+  padding: 1px 5px;
+  min-width: 17px;
+  text-align: center;
+  line-height: 1.5;
+  border: 2px solid var(--bg-card);
+  pointer-events: none;
+}
+
+/* ── Panel ── */
+#notif-panel {
+  position: absolute;
+  bottom: calc(100% + 0.75rem);
+  right: 0;
+  width: 370px;
+  max-width: calc(100vw - 2rem);
+  max-height: 500px;
+  background: var(--bg-card);
+  border: 1px solid var(--card-border-color);
+  border-radius: 16px;
+  box-shadow: 0 12px 40px rgba(0,0,0,0.55);
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+}
+
+/* Panel header */
+.notif-panel-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0.875rem 1rem;
+  border-bottom: 1px solid var(--card-border-color);
+  flex-shrink: 0;
+  gap: 0.5rem;
+}
+
+.notif-panel-title {
+  font-weight: 700;
+  color: var(--text-main);
+  font-size: 0.95rem;
+  display: flex;
+  align-items: center;
+  gap: 0.25rem;
+}
+
+.notif-count-pill {
+  background: #E6394620;
+  color: #E63946;
+  border: 1px solid #E6394640;
+  border-radius: 999px;
+  font-size: 0.65rem;
+  font-weight: 700;
+  padding: 1px 8px;
+  margin-left: 4px;
+}
+
+.notif-panel-head > button {
+  background: none;
+  border: none;
+  cursor: pointer;
+  color: var(--text-muted);
+  font-size: 1.1rem;
+  line-height: 1;
+  padding: 4px;
+  border-radius: 6px;
+  transition: color 0.12s, background 0.12s;
+  flex-shrink: 0;
+}
+.notif-panel-head > button:hover { background: var(--bg-hover); color: var(--text-main); }
+
+/* Notification list */
+#notif-list {
+  overflow-y: auto;
+  flex: 1;
+}
+
+/* Empty state */
+.notif-empty {
+  padding: 2.5rem 1rem;
+  text-align: center;
+  color: var(--text-muted);
+}
+.notif-empty i { font-size: 2rem; display: block; margin-bottom: 0.75rem; opacity: 0.5; }
+.notif-empty p { font-size: 0.85rem; margin: 0; }
+
+/* ── Individual item ── */
+.notif-item {
+  border-bottom: 1px solid var(--card-border-color);
+  transition: background 0.12s;
+}
+.notif-item:last-child { border-bottom: none; }
+
+.notif-item.nao-lida { background: color-mix(in srgb, var(--accent) 5%, var(--bg-card)); }
+
+.notif-item-header {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  width: 100%;
+  padding: 0.75rem 1rem;
+  background: none;
+  border: none;
+  cursor: pointer;
+  text-align: left;
+  transition: background 0.12s;
+}
+.notif-item-header:hover { background: var(--bg-hover); }
+
+.notif-envelope {
+  font-size: 1rem;
+  flex-shrink: 0;
+  transition: color 0.18s;
+}
+.notif-item.nao-lida .notif-envelope { color: var(--accent); }
+.notif-item.lida      .notif-envelope { color: var(--text-muted); }
+
+.notif-item-meta {
+  flex: 1;
+  min-width: 0;
+}
+.notif-item-title {
+  display: block;
+  font-size: 0.87rem;
+  font-weight: 600;
+  color: var(--text-main);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.notif-item-date {
+  display: block;
+  font-size: 0.72rem;
+  color: var(--text-muted);
+  margin-top: 2px;
+}
+
+.notif-chevron {
+  font-size: 0.72rem;
+  color: var(--text-muted);
+  flex-shrink: 0;
+  transition: transform 0.2s;
+}
+
+/* Expanded body */
+.notif-item-body {
+  padding: 0 1rem 1rem;
+}
+
+.notif-item-content {
+  font-size: 0.85rem;
+  color: var(--text-main);
+  line-height: 1.6;
+  margin-bottom: 0.75rem;
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+
+/* ── Survey ── */
+.notif-survey-form { margin-top: 0.5rem; }
+
+.notif-survey-items { display: flex; flex-direction: column; gap: 1rem; }
+
+.notif-survey-item {
+  border-top: 1px solid var(--card-border-color);
+  padding-top: 0.75rem;
+}
+
+.notif-survey-q {
+  font-size: 0.83rem;
+  font-weight: 600;
+  color: var(--text-main);
+  margin-bottom: 0.5rem;
+}
+
+.notif-survey-opt {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  font-size: 0.82rem;
+  color: var(--text-main);
+  cursor: pointer;
+  padding: 4px 0;
+}
+.notif-survey-opt input { flex-shrink: 0; accent-color: var(--accent); }
+
+.notif-survey-text {
+  width: 100%;
+  background: var(--bg-hover);
+  border: 1px solid var(--card-border-color);
+  border-radius: 8px;
+  color: var(--text-main);
+  font-size: 0.82rem;
+  padding: 0.5rem 0.75rem;
+  resize: vertical;
+}
+
+.notif-survey-submit {
+  margin-top: 0.75rem;
+  background: var(--accent);
+  color: #000;
+  border: none;
+  border-radius: 999px;
+  padding: 6px 18px;
+  font-size: 0.82rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: opacity 0.15s;
+  width: 100%;
+}
+.notif-survey-submit:hover:not(:disabled) { opacity: 0.85; }
+.notif-survey-submit:disabled { opacity: 0.6; cursor: default; }
+
+.notif-survey-done {
+  font-size: 0.82rem;
+  color: #4ade80;
+  padding: 0.5rem 0;
+  display: flex;
+  align-items: center;
+}
+
+/* ── Mobile adjustments ── */
+@media (max-width: 575.98px) {
+  #notif-panel {
+    position: fixed;
+    bottom: 0;
+    left: 0;
+    right: 0;
+    width: 100%;
+    max-width: 100%;
+    max-height: 75vh;
+    border-radius: 20px 20px 0 0;
+  }
+  #notif-container {
+    bottom: 1rem;
+    right: 1rem;
+  }
+}
+
 /* --------------------------------------------------------------------------
    MOBILE PEQUENO (≤ 479px)
    -------------------------------------------------------------------------- */
