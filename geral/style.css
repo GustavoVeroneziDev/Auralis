@@ -530,6 +530,8 @@ input[type="number"] {
   display: flex;
   flex-direction: column;
 }
+/* display:flex above beats UA's [hidden]{display:none} — force it */
+#notif-panel[hidden] { display: none !important; }
 
 /* Panel header */
 .notif-panel-head {

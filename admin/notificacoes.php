@@ -877,7 +877,7 @@ document.querySelectorAll('.btn-ver-respostas').forEach(function(btn) {
                 if (itens.length > 0) {
                     itens.forEach(function(item, ii) {
                         var pergunta = escHtml(item.pergunta || 'Pergunta ' + (ii + 1));
-                        var chave = String(ii);
+                        var chave = 'q' + ii;
                         var val = resp.respostas[chave];
                         var valHtml = '';
 
