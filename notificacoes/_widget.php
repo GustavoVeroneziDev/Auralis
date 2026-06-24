@@ -40,13 +40,15 @@ $_nw_unread = 0;
 foreach ($_nw_items as $ni) { if (!$ni['Lida']) $_nw_unread++; }
 
 // Relative date helper
-function _nw_reldate($dt) {
-    $diff = time() - strtotime($dt);
-    if ($diff < 60)        return 'agora mesmo';
-    if ($diff < 3600)      return 'há ' . floor($diff/60) . ' min';
-    if ($diff < 86400)     return 'há ' . floor($diff/3600) . ' h';
-    if ($diff < 604800)    return 'há ' . floor($diff/86400) . ' dia' . (floor($diff/86400)>1?'s':'');
-    return date('d/m/Y', strtotime($dt));
+if (!function_exists('_nw_reldate')) {
+    function _nw_reldate($dt) {
+        $diff = time() - strtotime($dt);
+        if ($diff < 60)        return 'agora mesmo';
+        if ($diff < 3600)      return 'há ' . floor($diff/60) . ' min';
+        if ($diff < 86400)     return 'há ' . floor($diff/3600) . ' h';
+        if ($diff < 604800)    return 'há ' . floor($diff/86400) . ' dia' . (floor($diff/86400)>1?'s':'');
+        return date('d/m/Y', strtotime($dt));
+    }
 }
 ?>
 <!-- ═══════════════ NOTIFICATION WIDGET ═══════════════ -->

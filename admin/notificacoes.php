@@ -570,43 +570,77 @@ function renderSurveyItems() {
 
     surveyData.forEach(function(item, idx) {
         var div = document.createElement('div');
-        div.className = 'survey-item-card rounded-3 p-3';
+        div.className = 'survey-item-card rounded-3 p-3 mb-2';
         div.style.cssText = 'background:var(--bg-card);border:1px solid var(--card-border-color);';
 
-        var typeLabel = item.tipo === 'radio' ? 'Múltipla escolha' :
-                        item.tipo === 'checkbox' ? 'Caixa de seleção' : 'Texto livre';
-        var typeIcon  = item.tipo === 'radio' ? 'bi-record-circle' :
-                        item.tipo === 'checkbox' ? 'bi-check-square' : 'bi-textarea-t';
+        function typeBtn(tipo, label, icon, activeStyle) {
+            var isActive = item.tipo === tipo;
+            return '<button type="button" class="btn btn-sm rounded-pill survey-type-btn me-1 mb-1"'
+                + ' data-idx="' + idx + '" data-type="' + tipo + '"'
+                + ' style="' + (isActive
+                    ? activeStyle + 'border:none;'
+                    : 'background:var(--bg-hover);color:var(--text-muted);border:1px solid var(--card-border-color);')
+                + 'font-size:0.75rem;">'
+                + '<i class="bi ' + icon + ' me-1"></i>' + label + '</button>';
+        }
+
+        var typeBtns = '<div class="mb-2 d-flex flex-wrap align-items-center">'
+            + typeBtn('radio',    'Múltipla escolha', 'bi-record-circle', 'background:var(--accent);color:#000;')
+            + typeBtn('checkbox', 'Caixa de seleção', 'bi-check-square',  'background:#7c3aed;color:#fff;')
+            + typeBtn('texto',    'Texto livre',      'bi-textarea-t',    'background:#374151;color:#e5e7eb;')
+            + '<button type="button" class="btn btn-sm rounded-2 survey-remove-item ms-auto"'
+            + ' data-idx="' + idx + '" title="Remover item"'
+            + ' style="background:transparent;color:var(--text-muted);border:1px solid var(--card-border-color);">'
+            + '<i class="bi bi-trash"></i></button></div>';
 
         var optsHtml = '';
         if (item.tipo !== 'texto') {
             var opts = item.opcoes || [''];
-            optsHtml = '<div class="mt-2"><label class="mb-1" style="font-size:0.75rem;color:var(--text-muted);">Opções:</label>';
+            var rowIcon = item.tipo === 'radio' ? 'bi-circle' : 'bi-square';
+            optsHtml = '<div class="mt-2"><label class="mb-1" style="font-size:0.72rem;color:var(--text-muted);text-transform:uppercase;font-weight:600;">Opções de resposta:</label>';
             opts.forEach(function(opt, oi) {
-                optsHtml += '<div class="d-flex gap-2 mb-1 align-items-center survey-opt-row">'
-                    + '<input type="text" class="form-control form-control-sm rounded-2 survey-opt-input" '
+                optsHtml += '<div class="d-flex gap-2 mb-1 align-items-center">'
+                    + '<i class="bi ' + rowIcon + ' flex-shrink-0" style="color:var(--text-muted);font-size:0.8rem;"></i>'
+                    + '<input type="text" class="form-control form-control-sm rounded-2 survey-opt-input flex-grow-1" '
                     + '       value="' + opt.replace(/"/g, '&quot;') + '" placeholder="Opção ' + (oi+1) + '"'
                     + '       style="background:var(--bg-hover);border-color:var(--card-border-color);color:var(--text-main);font-size:0.82rem;"'
                     + '       data-idx="' + idx + '" data-oi="' + oi + '">'
-                    + '<button type="button" class="btn btn-sm btn-outline-danger rounded-2 survey-remove-opt" '
-                    + '        data-idx="' + idx + '" data-oi="' + oi + '" title="Remover opção">'
-                    + '  <i class="bi bi-dash"></i></button></div>';
+                    + '<button type="button" class="btn btn-sm btn-link p-1 survey-remove-opt flex-shrink-0"'
+                    + '        data-idx="' + idx + '" data-oi="' + oi + '" title="Remover" style="color:var(--text-muted);">'
+                    + '  <i class="bi bi-x-lg"></i></button></div>';
             });
-            optsHtml += '<button type="button" class="btn btn-sm btn-outline-secondary rounded-2 mt-1 survey-add-opt" data-idx="' + idx + '">'
+            optsHtml += '<button type="button" class="btn btn-sm rounded-2 mt-1 survey-add-opt" data-idx="' + idx + '"'
+                      + ' style="background:var(--bg-hover);color:var(--text-muted);border:1px solid var(--card-border-color);font-size:0.78rem;">'
                       + '<i class="bi bi-plus me-1"></i>Adicionar opção</button></div>';
+        } else {
+            optsHtml = '<div class="mt-1 ps-1" style="font-size:0.78rem;color:var(--text-muted);">'
+                + '<i class="bi bi-info-circle me-1"></i>O usuário digitará livremente.</div>';
         }
 
-        div.innerHTML = '<div class="d-flex align-items-center justify-content-between mb-2">'
-            + '  <span style="font-size:0.75rem;color:var(--accent);font-weight:600;">'
-            + '    <i class="bi ' + typeIcon + ' me-1"></i>' + typeLabel + '</span>'
-            + '  <button type="button" class="btn btn-sm btn-outline-danger rounded-2 survey-remove-item" data-idx="' + idx + '">'
-            + '    <i class="bi bi-trash"></i></button></div>'
+        div.innerHTML = typeBtns
             + '<input type="text" class="form-control form-control-sm rounded-2 survey-q-input" '
             + '       value="' + (item.pergunta || '').replace(/"/g, '&quot;') + '" placeholder="Digite a pergunta..." '
             + '       data-idx="' + idx + '"'
             + '       style="background:var(--bg-hover);border-color:var(--card-border-color);color:var(--text-main);">'
             + optsHtml;
         container.appendChild(div);
+    });
+
+    // Type switcher
+    container.querySelectorAll('.survey-type-btn').forEach(function(el) {
+        el.addEventListener('click', function() {
+            var idx = parseInt(this.dataset.idx);
+            var newType = this.dataset.type;
+            if (surveyData[idx].tipo === newType) return;
+            surveyData[idx].tipo = newType;
+            if (newType === 'texto') {
+                delete surveyData[idx].opcoes;
+            } else if (!surveyData[idx].opcoes || surveyData[idx].opcoes.length === 0) {
+                surveyData[idx].opcoes = ['', ''];
+            }
+            renderSurveyItems();
+            syncSurveyJson();
+        });
     });
 
     // Bind survey events

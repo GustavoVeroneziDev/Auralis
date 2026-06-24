@@ -291,7 +291,7 @@ if (window._pendingToast) auralisToast(window._pendingToast);
 <?php endif; ?>
 
 <?php if (isset($_SESSION['usuario_id']) && isset($pdo)): ?>
-<?php include_once $_SERVER['DOCUMENT_ROOT'] . '/notificacoes/_widget.php'; ?>
+<?php include_once __DIR__ . '/../notificacoes/_widget.php'; ?>
 <?php endif; ?>
 </body>
 
