@@ -18,6 +18,50 @@ $isAjax  = !empty($_SERVER['HTTP_X_REQUESTED_WITH'])
            && strtolower($_SERVER['HTTP_X_REQUESTED_WITH']) === 'xmlhttprequest';
 
 // ==============================================================================
+// GET: buscar respostas de uma notificação (AJAX)
+// ==============================================================================
+if ($_SERVER['REQUEST_METHOD'] === 'GET' && isset($_GET['action']) && $_GET['action'] === 'respostas') {
+    header('Content-Type: application/json');
+    $nid = trim($_GET['id'] ?? '');
+    if (empty($nid)) { echo json_encode(['ok' => false]); exit; }
+    try {
+        $notif = $pdo->prepare("SELECT Titulo, ItensPesquisa FROM Notificacao WHERE IDNotificacao = :id");
+        $notif->execute([':id' => $nid]);
+        $notifRow = $notif->fetch(PDO::FETCH_ASSOC);
+        if (!$notifRow) { echo json_encode(['ok' => false]); exit; }
+
+        $stmt = $pdo->prepare("
+            SELECT nr.IDNotificacaoResposta, nr.Resposta, nr.DataResposta,
+                   u.Nome, u.Email, u.Plano
+            FROM NotificacaoResposta nr
+            JOIN Usuario u ON u.IDUsuario = nr.FKUsuario
+            WHERE nr.FKNotificacao = :nid
+            ORDER BY nr.DataResposta DESC
+        ");
+        $stmt->execute([':nid' => $nid]);
+        $rows = $stmt->fetchAll(PDO::FETCH_ASSOC);
+
+        echo json_encode([
+            'ok'      => true,
+            'titulo'  => $notifRow['Titulo'],
+            'itens'   => json_decode($notifRow['ItensPesquisa'] ?? '[]', true) ?: [],
+            'respostas' => array_map(function($r) {
+                return [
+                    'nome'        => $r['Nome'],
+                    'email'       => $r['Email'],
+                    'plano'       => $r['Plano'],
+                    'data'        => $r['DataResposta'],
+                    'respostas'   => json_decode($r['Resposta'], true) ?: [],
+                ];
+            }, $rows),
+        ]);
+    } catch (PDOException $e) {
+        echo json_encode(['ok' => false]);
+    }
+    exit;
+}
+
+// ==============================================================================
 // POST ACTIONS
 // ==============================================================================
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
@@ -315,6 +359,15 @@ require_once '../geral/header.php';
                     <?php endif; ?>
                 </td>
                 <td class="py-3 pe-4 text-end">
+                    <?php if ($n['TipoInteracao'] === 'pesquisa' && $n['TotalRespostas'] > 0): ?>
+                    <button type="button"
+                            class="btn btn-sm rounded-pill me-1 btn-ver-respostas"
+                            data-id="<?= htmlspecialchars($n['IDNotificacao']) ?>"
+                            title="Ver <?= (int)$n['TotalRespostas'] ?> resposta(s)"
+                            style="background:#7c3aed20;color:#a78bfa;border:1px solid #7c3aed40;font-size:0.8rem;">
+                        <i class="bi bi-bar-chart-fill me-1"></i><?= (int)$n['TotalRespostas'] ?>
+                    </button>
+                    <?php endif; ?>
                     <button type="button"
                             class="btn btn-sm btn-outline-secondary rounded-pill me-1 btn-editar-notif"
                             data-notif='<?= htmlspecialchars(json_encode([
@@ -348,6 +401,27 @@ require_once '../geral/header.php';
     <?php endif; ?>
     </div>
 </main>
+
+<!-- ══════════════════════════════════════════════════════════
+     MODAL: VER RESPOSTAS
+     ══════════════════════════════════════════════════════════ -->
+<div class="modal fade" id="modalRespostas" tabindex="-1" aria-hidden="true">
+<div class="modal-dialog modal-xl modal-dialog-centered modal-dialog-scrollable">
+<div class="modal-content rounded-4 border-0 shadow-lg" style="background:var(--bg-card);">
+    <div class="modal-header border-bottom border-secondary-subtle p-4">
+        <h5 class="modal-title fw-bold" id="modalRespTitulo" style="color:var(--text-main);">
+            <i class="bi bi-bar-chart-fill me-2" style="color:#a78bfa;"></i>Respostas
+        </h5>
+        <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+    </div>
+    <div class="modal-body p-4" id="modalRespBody">
+        <div class="text-center py-5 text-secondary">
+            <div class="spinner-border spinner-border-sm me-2"></div>Carregando...
+        </div>
+    </div>
+</div>
+</div>
+</div>
 
 <!-- ══════════════════════════════════════════════════════════
      MODAL: CRIAR / EDITAR NOTIFICAÇÃO
@@ -744,4 +818,101 @@ document.querySelectorAll('.btn-editar-notif').forEach(function(btn) {
         modal.show();
     });
 });
+
+// ── Modal: ver respostas ──────────────────────────────
+var modalRespEl  = document.getElementById('modalRespostas');
+var modalRespBS  = new bootstrap.Modal(modalRespEl);
+var modalRespBody = document.getElementById('modalRespBody');
+
+document.querySelectorAll('.btn-ver-respostas').forEach(function(btn) {
+    btn.addEventListener('click', function() {
+        var nid = this.dataset.id;
+        modalRespBody.innerHTML = '<div class="text-center py-5 text-secondary"><div class="spinner-border spinner-border-sm me-2"></div>Carregando...</div>';
+        document.getElementById('modalRespTitulo').innerHTML = '<i class="bi bi-bar-chart-fill me-2" style="color:#a78bfa;"></i>Respostas';
+        modalRespBS.show();
+
+        fetch('notificacoes.php?action=respostas&id=' + encodeURIComponent(nid), {
+            headers: {'X-Requested-With': 'XMLHttpRequest'}
+        })
+        .then(function(r) { return r.json(); })
+        .then(function(data) {
+            if (!data.ok) {
+                modalRespBody.innerHTML = '<div class="alert alert-danger rounded-3">Erro ao carregar respostas.</div>';
+                return;
+            }
+            document.getElementById('modalRespTitulo').innerHTML =
+                '<i class="bi bi-bar-chart-fill me-2" style="color:#a78bfa;"></i>'
+                + escHtml(data.titulo) + ' <span class="badge rounded-pill ms-2" style="background:#7c3aed20;color:#a78bfa;border:1px solid #7c3aed40;font-size:0.7rem;">'
+                + data.respostas.length + ' resp.</span>';
+
+            var itens = data.itens || [];
+
+            var planBadge = function(p) {
+                var map = {free: '#374151:#9ca3af', pro: '#7c3aed20:#a78bfa', vip: '#d4af3720:#d4af37'};
+                var s = (map[p] || '#37415120:#9ca3af').split(':');
+                return '<span class="badge rounded-pill ms-1" style="background:' + s[0] + ';color:' + s[1] + ';font-size:0.65rem;">' + (p || '?').toUpperCase() + '</span>';
+            };
+
+            if (data.respostas.length === 0) {
+                modalRespBody.innerHTML = '<div class="text-center py-5 text-secondary"><i class="bi bi-inbox fs-2 d-block mb-2 opacity-50"></i>Nenhuma resposta ainda.</div>';
+                return;
+            }
+
+            var html = '<div class="d-flex flex-column gap-3">';
+            data.respostas.forEach(function(resp, ri) {
+                var dt = new Date(resp.data.replace(' ', 'T'));
+                var dtStr = dt.toLocaleDateString('pt-BR') + ' às ' + dt.toLocaleTimeString('pt-BR', {hour:'2-digit', minute:'2-digit'});
+
+                html += '<div class="rounded-3 p-3" style="background:var(--bg-hover);border:1px solid var(--card-border-color);">';
+                // User header
+                html += '<div class="d-flex align-items-start justify-content-between mb-3 gap-2 flex-wrap">'
+                    + '<div>'
+                    + '<div class="fw-semibold" style="color:var(--text-main);">' + escHtml(resp.nome) + planBadge(resp.plano) + '</div>'
+                    + '<div style="font-size:0.75rem;color:var(--text-muted);">' + escHtml(resp.email) + '</div>'
+                    + '</div>'
+                    + '<div style="font-size:0.72rem;color:var(--text-muted);flex-shrink:0;"><i class="bi bi-clock me-1"></i>' + dtStr + '</div>'
+                    + '</div>';
+
+                // Answers
+                if (itens.length > 0) {
+                    itens.forEach(function(item, ii) {
+                        var pergunta = escHtml(item.pergunta || 'Pergunta ' + (ii + 1));
+                        var chave = String(ii);
+                        var val = resp.respostas[chave];
+                        var valHtml = '';
+
+                        if (val === undefined || val === null || val === '') {
+                            valHtml = '<span style="color:var(--text-muted);font-style:italic;">Sem resposta</span>';
+                        } else if (Array.isArray(val)) {
+                            valHtml = val.map(function(v) {
+                                return '<span class="badge rounded-pill me-1" style="background:var(--accent);color:#000;font-size:0.72rem;">' + escHtml(v) + '</span>';
+                            }).join('');
+                        } else {
+                            valHtml = '<span style="color:var(--text-main);">' + escHtml(String(val)) + '</span>';
+                        }
+
+                        html += '<div class="mb-2">'
+                            + '<div style="font-size:0.72rem;color:var(--text-muted);text-transform:uppercase;font-weight:600;margin-bottom:2px;">' + pergunta + '</div>'
+                            + '<div style="font-size:0.88rem;">' + valHtml + '</div>'
+                            + '</div>';
+                    });
+                } else {
+                    // Fallback: raw JSON
+                    html += '<pre style="font-size:0.75rem;color:var(--text-muted);white-space:pre-wrap;">' + escHtml(JSON.stringify(resp.respostas, null, 2)) + '</pre>';
+                }
+
+                html += '</div>';
+            });
+            html += '</div>';
+            modalRespBody.innerHTML = html;
+        })
+        .catch(function() {
+            modalRespBody.innerHTML = '<div class="alert alert-danger rounded-3">Erro de conexão.</div>';
+        });
+    });
+});
+
+function escHtml(s) {
+    return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+}
 </script>
