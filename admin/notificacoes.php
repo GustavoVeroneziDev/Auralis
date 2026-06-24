@@ -603,8 +603,8 @@ var rowP     = document.getElementById('rowPesquisa');
 var rowAtivo = document.getElementById('rowAtivo');
 
 function toggleRows() {
-    rowU.classList.toggle('d-none', destSel.value !== 'selecionado');
-    rowP.classList.toggle('d-none', tipoSel.value !== 'pesquisa');
+    if (destSel.value === 'selecionado') { rowU.classList.remove('d-none'); } else { rowU.classList.add('d-none'); }
+    if (tipoSel.value === 'pesquisa')    { rowP.classList.remove('d-none'); } else { rowP.classList.add('d-none'); }
 }
 destSel.addEventListener('change', toggleRows);
 tipoSel.addEventListener('change', toggleRows);
@@ -629,61 +629,92 @@ document.getElementById('userList').addEventListener('change', function() {
 
 // ── Survey builder ─────────────────────────────────────
 var surveyData = [];
+var _sC = document.getElementById('surveyItems');
+var _sE = document.getElementById('surveyEmpty');
+
+// Delegated click listener — lives on static parent, survives all DOM rebuilds
+_sC.addEventListener('click', function(e) {
+    var btn = e.target.closest('[data-action]');
+    if (!btn) return;
+    var action = btn.dataset.action;
+    var idx = parseInt(btn.dataset.idx);
+    if (action === 'type-switch') {
+        var nt = btn.dataset.type;
+        if (surveyData[idx].tipo === nt) return;
+        surveyData[idx].tipo = nt;
+        if (nt === 'texto') { delete surveyData[idx].opcoes; }
+        else if (!surveyData[idx].opcoes || !surveyData[idx].opcoes.length) { surveyData[idx].opcoes = ['', '']; }
+        renderSurveyItems(); syncSurveyJson();
+    } else if (action === 'add-opt') {
+        surveyData[idx].opcoes.push('');
+        renderSurveyItems(); syncSurveyJson();
+    } else if (action === 'remove-opt') {
+        surveyData[idx].opcoes.splice(parseInt(btn.dataset.oi), 1);
+        renderSurveyItems(); syncSurveyJson();
+    } else if (action === 'remove-item') {
+        surveyData.splice(idx, 1);
+        renderSurveyItems(); syncSurveyJson();
+    }
+});
+_sC.addEventListener('input', function(e) {
+    var el = e.target;
+    if (el.matches('.survey-q-input')) {
+        surveyData[parseInt(el.dataset.idx)].pergunta = el.value; syncSurveyJson();
+    } else if (el.matches('.survey-opt-input')) {
+        surveyData[parseInt(el.dataset.idx)].opcoes[parseInt(el.dataset.oi)] = el.value; syncSurveyJson();
+    }
+});
 
 function renderSurveyItems() {
-    var container = document.getElementById('surveyItems');
-    var empty     = document.getElementById('surveyEmpty');
     if (surveyData.length === 0) {
-        container.innerHTML = '';
-        container.appendChild(empty);
-        empty.style.display = '';
+        _sC.innerHTML = '';
+        _sC.appendChild(_sE);
+        _sE.style.display = '';
         return;
     }
-    empty.style.display = 'none';
-    container.innerHTML = '';
+    _sE.style.display = 'none';
+    _sC.innerHTML = '';
 
     surveyData.forEach(function(item, idx) {
         var div = document.createElement('div');
         div.className = 'survey-item-card rounded-3 p-3 mb-2';
         div.style.cssText = 'background:var(--bg-card);border:1px solid var(--card-border-color);';
 
-        function typeBtn(tipo, label, icon, activeStyle) {
-            var isActive = item.tipo === tipo;
-            return '<button type="button" class="btn btn-sm rounded-pill survey-type-btn me-1 mb-1"'
-                + ' data-idx="' + idx + '" data-type="' + tipo + '"'
-                + ' style="' + (isActive
-                    ? activeStyle + 'border:none;'
-                    : 'background:var(--bg-hover);color:var(--text-muted);border:1px solid var(--card-border-color);')
-                + 'font-size:0.75rem;">'
-                + '<i class="bi ' + icon + ' me-1"></i>' + label + '</button>';
+        function tb(tipo, label, icon, activeStyle) {
+            var active = item.tipo === tipo;
+            return '<button type="button" class="btn btn-sm rounded-pill me-1 mb-1"'
+                + ' data-action="type-switch" data-idx="' + idx + '" data-type="' + tipo + '"'
+                + ' style="' + (active ? activeStyle + 'border:none;' : 'background:var(--bg-hover);color:var(--text-muted);border:1px solid var(--card-border-color);')
+                + 'font-size:0.75rem;"><i class="bi ' + icon + ' me-1"></i>' + label + '</button>';
         }
 
         var typeBtns = '<div class="mb-2 d-flex flex-wrap align-items-center">'
-            + typeBtn('radio',    'Múltipla escolha', 'bi-record-circle', 'background:var(--accent);color:#000;')
-            + typeBtn('checkbox', 'Caixa de seleção', 'bi-check-square',  'background:#7c3aed;color:#fff;')
-            + typeBtn('texto',    'Texto livre',      'bi-textarea-t',    'background:#374151;color:#e5e7eb;')
-            + '<button type="button" class="btn btn-sm rounded-2 survey-remove-item ms-auto"'
-            + ' data-idx="' + idx + '" title="Remover item"'
+            + tb('radio',    'Múltipla escolha', 'bi-record-circle', 'background:var(--accent);color:#000;')
+            + tb('checkbox', 'Caixa de seleção', 'bi-check-square',  'background:#7c3aed;color:#fff;')
+            + tb('texto',    'Texto livre',      'bi-textarea-t',    'background:#374151;color:#e5e7eb;')
+            + '<button type="button" class="btn btn-sm rounded-2 ms-auto"'
+            + ' data-action="remove-item" data-idx="' + idx + '" title="Remover item"'
             + ' style="background:transparent;color:var(--text-muted);border:1px solid var(--card-border-color);">'
             + '<i class="bi bi-trash"></i></button></div>';
 
         var optsHtml = '';
         if (item.tipo !== 'texto') {
             var opts = item.opcoes || [''];
-            var rowIcon = item.tipo === 'radio' ? 'bi-circle' : 'bi-square';
+            var ri = item.tipo === 'radio' ? 'bi-circle' : 'bi-square';
             optsHtml = '<div class="mt-2"><label class="mb-1" style="font-size:0.72rem;color:var(--text-muted);text-transform:uppercase;font-weight:600;">Opções de resposta:</label>';
             opts.forEach(function(opt, oi) {
                 optsHtml += '<div class="d-flex gap-2 mb-1 align-items-center">'
-                    + '<i class="bi ' + rowIcon + ' flex-shrink-0" style="color:var(--text-muted);font-size:0.8rem;"></i>'
-                    + '<input type="text" class="form-control form-control-sm rounded-2 survey-opt-input flex-grow-1" '
+                    + '<i class="bi ' + ri + ' flex-shrink-0" style="color:var(--text-muted);font-size:0.8rem;"></i>'
+                    + '<input type="text" class="form-control form-control-sm rounded-2 survey-opt-input flex-grow-1"'
                     + '       value="' + opt.replace(/"/g, '&quot;') + '" placeholder="Opção ' + (oi+1) + '"'
                     + '       style="background:var(--bg-hover);border-color:var(--card-border-color);color:var(--text-main);font-size:0.82rem;"'
                     + '       data-idx="' + idx + '" data-oi="' + oi + '">'
-                    + '<button type="button" class="btn btn-sm btn-link p-1 survey-remove-opt flex-shrink-0"'
-                    + '        data-idx="' + idx + '" data-oi="' + oi + '" title="Remover" style="color:var(--text-muted);">'
+                    + '<button type="button" class="btn btn-sm btn-link p-1 flex-shrink-0"'
+                    + '        data-action="remove-opt" data-idx="' + idx + '" data-oi="' + oi + '" title="Remover" style="color:var(--text-muted);">'
                     + '  <i class="bi bi-x-lg"></i></button></div>';
             });
-            optsHtml += '<button type="button" class="btn btn-sm rounded-2 mt-1 survey-add-opt" data-idx="' + idx + '"'
+            optsHtml += '<button type="button" class="btn btn-sm rounded-2 mt-1"'
+                      + ' data-action="add-opt" data-idx="' + idx + '"'
                       + ' style="background:var(--bg-hover);color:var(--text-muted);border:1px solid var(--card-border-color);font-size:0.78rem;">'
                       + '<i class="bi bi-plus me-1"></i>Adicionar opção</button></div>';
         } else {
@@ -692,57 +723,13 @@ function renderSurveyItems() {
         }
 
         div.innerHTML = typeBtns
-            + '<input type="text" class="form-control form-control-sm rounded-2 survey-q-input" '
-            + '       value="' + (item.pergunta || '').replace(/"/g, '&quot;') + '" placeholder="Digite a pergunta..." '
+            + '<input type="text" class="form-control form-control-sm rounded-2 survey-q-input"'
+            + '       value="' + (item.pergunta || '').replace(/"/g, '&quot;') + '" placeholder="Digite a pergunta..."'
             + '       data-idx="' + idx + '"'
             + '       style="background:var(--bg-hover);border-color:var(--card-border-color);color:var(--text-main);">'
             + optsHtml;
-        container.appendChild(div);
-    });
-
-    // Type switcher
-    container.querySelectorAll('.survey-type-btn').forEach(function(el) {
-        el.addEventListener('click', function() {
-            var idx = parseInt(this.dataset.idx);
-            var newType = this.dataset.type;
-            if (surveyData[idx].tipo === newType) return;
-            surveyData[idx].tipo = newType;
-            if (newType === 'texto') {
-                delete surveyData[idx].opcoes;
-            } else if (!surveyData[idx].opcoes || surveyData[idx].opcoes.length === 0) {
-                surveyData[idx].opcoes = ['', ''];
-            }
-            renderSurveyItems();
-            syncSurveyJson();
-        });
-    });
-
-    // Bind survey events
-    container.querySelectorAll('.survey-q-input').forEach(function(el) {
-        el.addEventListener('input', function() { surveyData[this.dataset.idx].pergunta = this.value; syncSurveyJson(); });
-    });
-    container.querySelectorAll('.survey-opt-input').forEach(function(el) {
-        el.addEventListener('input', function() {
-            surveyData[this.dataset.idx].opcoes[this.dataset.oi] = this.value; syncSurveyJson();
-        });
-    });
-    container.querySelectorAll('.survey-remove-opt').forEach(function(el) {
-        el.addEventListener('click', function() {
-            surveyData[this.dataset.idx].opcoes.splice(parseInt(this.dataset.oi), 1);
-            renderSurveyItems(); syncSurveyJson();
-        });
-    });
-    container.querySelectorAll('.survey-add-opt').forEach(function(el) {
-        el.addEventListener('click', function() {
-            surveyData[this.dataset.idx].opcoes.push('');
-            renderSurveyItems(); syncSurveyJson();
-        });
-    });
-    container.querySelectorAll('.survey-remove-item').forEach(function(el) {
-        el.addEventListener('click', function() {
-            surveyData.splice(parseInt(this.dataset.idx), 1);
-            renderSurveyItems(); syncSurveyJson();
-        });
+        _sC.appendChild(div);
+        // No event binding here — delegated listeners on _sC handle everything
     });
 }
 
