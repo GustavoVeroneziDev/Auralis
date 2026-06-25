@@ -117,7 +117,7 @@ if (!function_exists('limitesDoPlano')) {
                         'carteiras'      => $row['carteiras']      == -1 ? PHP_INT_MAX : (int)$row['carteiras'],
                         'cartoes'        => isset($row['cartoes']) ? ($row['cartoes'] == -1 ? PHP_INT_MAX : (int)$row['cartoes']) : PHP_INT_MAX,
                         'categorias'     => $row['categorias']     == -1 ? PHP_INT_MAX : (int)$row['categorias'],
-                        'parcelas_max'   => (int)$row['parcelas_max'],
+                        'parcelas_max'   => $row['parcelas_max'] == -1 ? PHP_INT_MAX : (int)$row['parcelas_max'],
                         'horas_teste'    => (int)$row['horas_teste'],
                     ];
                     return $cache[$plano];
