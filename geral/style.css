@@ -564,19 +564,28 @@ input[type="number"] {
   margin-left: 4px;
 }
 
-.notif-panel-head > button {
+.notif-head-actions {
+  display: flex;
+  align-items: center;
+  gap: 0.15rem;
+  flex-shrink: 0;
+}
+.notif-head-actions button {
   background: none;
   border: none;
   cursor: pointer;
   color: var(--text-muted);
-  font-size: 1.1rem;
+  font-size: 1rem;
   line-height: 1;
-  padding: 4px;
+  padding: 5px;
   border-radius: 6px;
   transition: color 0.12s, background 0.12s;
-  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
 }
-.notif-panel-head > button:hover { background: var(--bg-hover); color: var(--text-main); }
+.notif-head-actions button:hover { background: var(--bg-hover); color: var(--text-main); }
+#notif-toggle-hist.notif-hist-ativo { color: var(--accent) !important; }
 
 /* Notification list */
 #notif-list {
@@ -596,11 +605,47 @@ input[type="number"] {
 /* ── Individual item ── */
 .notif-item {
   border-bottom: 1px solid var(--card-border-color);
-  transition: background 0.12s;
+  transition: background 0.12s, opacity 0.32s;
 }
 .notif-item:last-child { border-bottom: none; }
 
+/* Read items hidden by default; visible in history mode */
+.notif-item.lida { display: none; }
+#notif-panel.ver-historico .notif-item.lida { display: block; opacity: 0.55; }
+#notif-panel.ver-historico .notif-item.lida .notif-item-header:hover { opacity: 1; }
+
+/* Fade-out when transitioning to read */
+.notif-item.notif-saindo { opacity: 0 !important; pointer-events: none; }
+
 .notif-item.nao-lida { background: color-mix(in srgb, var(--accent) 5%, var(--bg-card)); }
+
+/* Empty-unread state */
+#notif-sem-novas { padding: 1.5rem 1rem; text-align: center; }
+#notif-sem-novas p { font-size: 0.83rem; color: var(--text-muted); margin: 0.25rem 0 0.75rem; }
+#notif-sem-novas button {
+  background: var(--bg-hover);
+  border: 1px solid var(--card-border-color);
+  color: var(--text-main);
+  padding: 0.3rem 0.9rem;
+  border-radius: 999px;
+  font-size: 0.78rem;
+  cursor: pointer;
+}
+#notif-sem-novas button:hover { color: var(--accent); border-color: var(--accent); }
+
+/* History section label */
+.notif-hist-sep {
+  padding: 0.35rem 1rem;
+  font-size: 0.68rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  color: var(--text-muted);
+  background: var(--bg-hover);
+  border-bottom: 1px solid var(--card-border-color);
+  letter-spacing: 0.04em;
+  display: none;
+}
+#notif-panel.ver-historico .notif-hist-sep { display: block; }
 
 .notif-item-header {
   display: flex;
