@@ -197,6 +197,14 @@ if (!function_exists('_nw_reldate')) {
 
     // ── Open / close ────────────────────────────────────────
     function closePanel() {
+        // Converte para 'lida' instantaneamente — painel vai sumir, fade desnecessário
+        document.querySelectorAll('.notif-item.nao-lida').forEach(function(it) {
+            if (it.dataset.lida === '1') {
+                it.classList.remove('notif-saindo');
+                it.classList.replace('nao-lida', 'lida');
+            }
+        });
+        checkEmptyState();
         panel.hidden = true;
         bellIcon.className = 'bi bi-bell-fill';
     }
@@ -241,34 +249,35 @@ if (!function_exists('_nw_reldate')) {
         else badge.textContent = cur;
     }
 
-    // Fade an item to "lida" and hide it (unless in history mode)
+    // Marca como lida no servidor + atualiza ícone/badge
+    // NÃO esconde o item aqui — ele some só quando fechado ou colapsado
     function markItemAsRead(item) {
         if (item.dataset.lida === '1') return;
         item.dataset.lida = '1';
         var env = item.querySelector('.notif-envelope');
         if (env) env.className = 'bi bi-envelope-open notif-envelope';
         decreaseBadge(1);
-
         fetch('/notificacoes/marcar_lida.php', {
             method: 'POST',
             headers: {'X-Requested-With': 'XMLHttpRequest', 'Content-Type': 'application/json'},
             body: JSON.stringify({id: item.dataset.id})
         });
+    }
 
-        if (!panel.classList.contains('ver-historico')) {
-            // Delay switch until body is read and user has a moment to see it
-            setTimeout(function() {
-                item.classList.add('notif-saindo');
-                setTimeout(function() {
-                    item.classList.replace('nao-lida', 'lida');
-                    item.classList.remove('notif-saindo');
-                    checkEmptyState();
-                }, 340);
-            }, 800);
-        } else {
+    // Anima e esconde um item já lido (chamado ao colapsar ou fechar painel)
+    function hideReadItem(item) {
+        if (!item.classList.contains('nao-lida') || item.dataset.lida !== '1') return;
+        if (panel.classList.contains('ver-historico')) {
             item.classList.replace('nao-lida', 'lida');
             checkEmptyState();
+            return;
         }
+        item.classList.add('notif-saindo');
+        setTimeout(function() {
+            item.classList.replace('nao-lida', 'lida');
+            item.classList.remove('notif-saindo');
+            checkEmptyState();
+        }, 340);
     }
 
     // ── Mark all read ────────────────────────────────────────
@@ -282,23 +291,13 @@ if (!function_exists('_nw_reldate')) {
                 body: JSON.stringify({todas: true})
             }).then(function(r) { return r.json(); }).then(function(d) {
                 if (!d.ok) return;
-                var inHist = panel.classList.contains('ver-historico');
                 unreadItems.forEach(function(el) {
                     el.dataset.lida = '1';
                     var env = el.querySelector('.notif-envelope');
                     if (env) env.className = 'bi bi-envelope-open notif-envelope';
-                    if (!inHist) {
-                        el.classList.add('notif-saindo');
-                        setTimeout(function() {
-                            el.classList.replace('nao-lida', 'lida');
-                            el.classList.remove('notif-saindo');
-                        }, 340);
-                    } else {
-                        el.classList.replace('nao-lida', 'lida');
-                    }
+                    hideReadItem(el);
                 });
                 if (badge) { badge.remove(); badge = null; }
-                setTimeout(checkEmptyState, 400);
             });
         });
     }
@@ -311,20 +310,31 @@ if (!function_exists('_nw_reldate')) {
         if (!header) return;
 
         header.addEventListener('click', function() {
-            var expanding = body.hidden;
-            // Collapse others
+            var expanding = body.hidden; // true = vai expandir
+
+            // Colapsa outros; se algum estava lido, some agora
             document.querySelectorAll('.notif-item').forEach(function(other) {
                 if (other !== item) {
                     var ob = other.querySelector('.notif-item-body');
                     var oc = other.querySelector('.notif-chevron');
-                    if (ob) ob.hidden = true;
-                    if (oc) oc.style.transform = '';
+                    if (ob && !ob.hidden) {
+                        ob.hidden = true;
+                        if (oc) oc.style.transform = '';
+                        hideReadItem(other);
+                    }
                 }
             });
+
             body.hidden = !expanding;
             if (chev) chev.style.transform = expanding ? 'rotate(90deg)' : '';
 
-            if (expanding && item.dataset.lida === '0') markItemAsRead(item);
+            if (expanding) {
+                // Abrindo: marcar como lido
+                if (item.dataset.lida === '0') markItemAsRead(item);
+            } else {
+                // Fechando: se já foi lido, some agora
+                hideReadItem(item);
+            }
         });
     });
 
