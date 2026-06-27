@@ -79,6 +79,31 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && ($_POST['action'] ?? '') === 'exclu
     exit;
 }
 
+// Mover transação para outro dia (drag-and-drop)
+if ($_SERVER['REQUEST_METHOD'] === 'POST' && ($_POST['action'] ?? '') === 'mover_dia') {
+    ob_clean();
+    header('Content-Type: application/json; charset=utf-8');
+    $id       = trim($_POST['registro_id'] ?? '');
+    $novaData = trim($_POST['nova_data'] ?? '');
+    if (!$id || !preg_match('/^\d{4}-\d{2}-\d{2}$/', $novaData)) {
+        echo json_encode(['ok' => false, 'erro' => 'Dados inválidos']); exit;
+    }
+    try {
+        $pdo->prepare("
+            UPDATE Registro
+            SET DataVencimento  = CASE WHEN DataVencimento IS NOT NULL THEN :nd1 ELSE NULL END,
+                MomentoRegistro = CASE WHEN DataVencimento IS NULL
+                                       THEN CONCAT(:nd2, ' ', TIME(MomentoRegistro))
+                                       ELSE MomentoRegistro END
+            WHERE IDRegistro = :id AND FKUsuario = :uid
+        ")->execute([':nd1' => $novaData, ':nd2' => $novaData, ':id' => $id, ':uid' => $usuario_id]);
+        echo json_encode(['ok' => true]);
+    } catch (PDOException $e) {
+        echo json_encode(['ok' => false, 'erro' => $e->getMessage()]);
+    }
+    exit;
+}
+
 // Detalhe de fatura de cartão para o modal da agenda
 if (isset($_GET['ajax']) && $_GET['acao'] === 'fatura_detalhe') {
     ob_clean();
@@ -536,6 +561,16 @@ require_once 'geral/header.php';
     .calendar-event:hover {
         filter: brightness(1.25);
         transform: translateY(-1px);
+    }
+
+    /* ── Drag-and-drop ─────────────────────── */
+    .calendar-event[draggable="true"] { cursor: grab; }
+    .calendar-event[draggable="true"]:active { cursor: grabbing; }
+    .calendar-event.drag-ghost { opacity: 0.35; }
+    .calendar-day.drag-over {
+        background: rgba(212,175,55,0.12) !important;
+        outline: 2px dashed var(--accent);
+        outline-offset: -2px;
     }
 
     .calendar-event.evento-pago {
@@ -1102,6 +1137,19 @@ require_once 'geral/header.php';
                         e.stopPropagation();
                         window._mostrarMenuPill(e.clientX, e.clientY, t);
                     });
+                    // Drag-and-drop
+                    pill.draggable = true;
+                    pill.addEventListener('dragstart', (e) => {
+                        e.stopPropagation();
+                        e.dataTransfer.effectAllowed = 'move';
+                        e.dataTransfer.setData('text/plain', t.id);
+                        pill.classList.add('drag-arrastando');
+                        setTimeout(() => pill.classList.add('drag-ghost'), 0);
+                    });
+                    pill.addEventListener('dragend', () => {
+                        pill.classList.remove('drag-arrastando', 'drag-ghost');
+                        document.querySelectorAll('.calendar-day.drag-over').forEach(c => c.classList.remove('drag-over'));
+                    });
                     const arrow = isRec ?
                         `<i class="bi bi-arrow-up-short" style="color:#6ee7c7;font-size:0.95rem;flex-shrink:0;line-height:1;"></i>` :
                         `<i class="bi bi-arrow-down-short" style="color:#f87171;font-size:0.95rem;flex-shrink:0;line-height:1;"></i>`;
@@ -1113,6 +1161,28 @@ require_once 'geral/header.php';
             });
 
             cel.appendChild(eventsDiv);
+
+            // Drop zone — recebe pills arrastados
+            cel.addEventListener('dragover', (e) => { e.preventDefault(); e.dataTransfer.dropEffect = 'move'; });
+            cel.addEventListener('dragenter', (e) => { e.preventDefault(); cel.classList.add('drag-over'); });
+            cel.addEventListener('dragleave', (e) => { if (!cel.contains(e.relatedTarget)) cel.classList.remove('drag-over'); });
+            cel.addEventListener('drop', async (e) => {
+                e.preventDefault();
+                e.stopPropagation();
+                cel.classList.remove('drag-over');
+                const id = e.dataTransfer.getData('text/plain');
+                if (!id) return;
+                const fd = new FormData();
+                fd.append('action', 'mover_dia');
+                fd.append('registro_id', id);
+                fd.append('nova_data', dataStr);
+                try {
+                    const res = await fetch('agenda.php', { method: 'POST', body: fd });
+                    const json = await res.json();
+                    if (json.ok) window.carregarMes(anoAtual, mesAtual);
+                    else alert('Erro ao mover transação.');
+                } catch { alert('Erro de conexão.'); }
+            });
 
             // Clique no fundo do dia → modal de detalhes
             cel.addEventListener('click', () => abrirModalDia(dataStr, transacoesDoDia));
