@@ -126,6 +126,15 @@ function _lp_itensRecursos($planoCarta, $recursos)
 </section>
 
 <!-- ── PRODUTO EM AÇÃO ───────────────────────────────────────────────────── -->
+<?php
+// Cache-buster: usa o timestamp de modificação mais recente entre as imagens de preview
+$_pvDir = __DIR__ . '/img/';
+$_pvV   = max(
+    @filemtime($_pvDir . 'preview-dashboard.png') ?: 0,
+    @filemtime($_pvDir . 'preview-analises.png')  ?: 0,
+    @filemtime($_pvDir . 'preview-agenda.png')    ?: 0,
+) ?: time();
+?>
 <section class="py-5 border-top border-secondary-subtle">
     <div class="container">
         <div class="text-center mb-4">
@@ -142,7 +151,7 @@ function _lp_itensRecursos($planoCarta, $recursos)
             ] as [$tab, $icon, $label, $sub]):
             ?>
                 <button class="preview-tab-btn <?= $tab === 'dashboard' ? 'active' : '' ?> d-flex align-items-center gap-2 px-3 py-2 rounded-3 border-0 transition-hover"
-                    data-preview="/geral/img/preview-<?= $tab ?>.png"
+                    data-preview="/geral/img/preview-<?= $tab ?>.png?v=<?= $_pvV ?>"
                     data-label="auralis.app/<?= $tab ?>"
                     style="font-size:0.82rem;cursor:pointer;">
                     <i class="bi <?= $icon ?>"></i>
@@ -170,7 +179,7 @@ function _lp_itensRecursos($planoCarta, $recursos)
             <!-- Imagem -->
             <div class="rounded-bottom-4 overflow-hidden" style="border:1px solid #2d3139;border-top:0;background:#121418;line-height:0;">
                 <img id="previewImg"
-                    src="/geral/img/preview-dashboard.png"
+                    src="/geral/img/preview-dashboard.png?v=<?= $_pvV ?>"
                     alt="Auralis Dashboard"
                     style="width:100%;display:block;transition:opacity .2s ease,transform .2s ease;">
                 <!-- Gradiente de fade na base (efeito "há mais abaixo") -->
