@@ -1028,7 +1028,7 @@ require_once 'geral/header.php';
                     <tr>
                         <th class="ps-3 ps-md-4 py-3 border-0">Descrição</th>
                         <th class="py-3 border-0 d-none d-md-table-cell">Categoria</th>
-                        <th class="py-3 border-0 d-none d-md-table-cell">Data</th>
+                        <th class="py-3 border-0 d-none d-md-table-cell">Vencimento</th>
                         <th class="py-3 border-0 d-none d-md-table-cell">Status</th>
                         <th class="text-end pe-3 pe-md-4 py-3 border-0">Valor</th>
                     </tr>
@@ -1040,7 +1040,10 @@ require_once 'geral/header.php';
                             Nenhuma transação encontrada para essa busca.
                         </td>
                     </tr>
-                    <?php foreach ($transacoes as $index => $t):
+                    <?php
+                    $_mesesDash = ['janeiro','fevereiro','março','abril','maio','junho','julho','agosto','setembro','outubro','novembro','dezembro'];
+                    $_diaSepAtual = '';
+                    foreach ($transacoes as $index => $t):
                         $isTransfSaida  = ($t['TipoRegistro'] === 'transferencia_saida');
                         $isTransfEntr   = ($t['TipoRegistro'] === 'transferencia_entrada');
                         $isTransfer     = $isTransfSaida || $isTransfEntr;
@@ -1048,6 +1051,17 @@ require_once 'geral/header.php';
                         $sinalValor     = ($isDespesa || $isTransfSaida) ? '-' : '+';
                         $corValor       = ($isDespesa || $isTransfSaida) ? 'text-danger' : 'text-success';
                         $dataFormatada  = date('d/m/Y', strtotime($t['MomentoRegistro']));
+                        $_diaTrans      = date('Y-m-d', strtotime($t['MomentoRegistro']));
+                        $_diaLabel      = intval(date('d', strtotime($_diaTrans))) . ' de ' . $_mesesDash[date('n', strtotime($_diaTrans)) - 1];
+                        if ($_diaTrans !== $_diaSepAtual):
+                            $_diaSepAtual = $_diaTrans;
+                    ?>
+                    <tr class="tr-dia-sep" data-dia="<?= $_diaTrans ?>">
+                        <td colspan="5" class="px-3 px-md-4 py-2 border-0 tr-dia-sep-cell">
+                            <span class="tr-dia-sep-label"><?= htmlspecialchars($_diaLabel) ?></span>
+                        </td>
+                    </tr>
+                    <?php endif; ?>
 
                         if ($isTransfer) {
                             $iconeTipo = '<span class="d-inline-flex align-items-center justify-content-center rounded-circle flex-shrink-0 me-3" style="width:32px;height:32px;min-width:32px;background:rgba(96,165,250,0.12);"><i class="bi bi-arrow-left-right" style="color:#60a5fa;font-size:0.85rem;"></i></span>';
@@ -1064,6 +1078,7 @@ require_once 'geral/header.php';
                         <tr data-bs-toggle="collapse" data-bs-target="#<?php echo $rowId ?>"
                             class="cursor-pointer transition-hover tr-transacao"
                             style="cursor:pointer;"
+                            data-dia="<?= $_diaTrans ?>"
                             data-desc="<?= strtolower(htmlspecialchars($t['Descricao'])) ?>"
                             data-cat="<?= strtolower(htmlspecialchars($t['NomeCategoria'] ?? '')) ?>"
                             data-valor="<?= number_format((float)$t['Valor'], 2, ',', '.') ?>"
@@ -1940,6 +1955,20 @@ require_once 'geral/header.php';
 </script>
 
 <style>
+.tr-dia-sep-cell {
+    background: rgba(255,255,255,0.025);
+    border-top: 1px solid var(--card-border-color) !important;
+}
+.tr-dia-sep-label {
+    font-size: 0.72rem;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    color: var(--text-muted);
+}
+.tr-dia-sep:first-child .tr-dia-sep-cell {
+    border-top: none !important;
+}
 .busca-pill {
     background: var(--bg-card);
     border: 1px solid var(--card-border-color);
@@ -1996,6 +2025,16 @@ require_once 'geral/header.php';
         });
 
         if (emptyRow) emptyRow.style.display = visiveis === 0 ? '' : 'none';
+
+        // Oculta separadores de dia quando todas as transações do dia estão filtradas
+        document.querySelectorAll('tr.tr-dia-sep').forEach(function(sep) {
+            var dia = sep.dataset.dia;
+            var temVisivel = false;
+            document.querySelectorAll('tr.tr-transacao[data-dia="' + dia + '"]').forEach(function(tr) {
+                if (tr.style.display !== 'none') temVisivel = true;
+            });
+            sep.style.display = temVisivel ? '' : 'none';
+        });
     }
 
     if (input) input.addEventListener('input', filtrar);
