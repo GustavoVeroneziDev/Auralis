@@ -1061,7 +1061,7 @@ require_once 'geral/header.php';
                             <span class="tr-dia-sep-label"><?= htmlspecialchars($_diaLabel) ?></span>
                         </td>
                     </tr>
-                    <?php endif; ?>
+                    <?php endif;
 
                         if ($isTransfer) {
                             $iconeTipo = '<span class="d-inline-flex align-items-center justify-content-center rounded-circle flex-shrink-0 me-3" style="width:32px;height:32px;min-width:32px;background:rgba(96,165,250,0.12);"><i class="bi bi-arrow-left-right" style="color:#60a5fa;font-size:0.85rem;"></i></span>';
