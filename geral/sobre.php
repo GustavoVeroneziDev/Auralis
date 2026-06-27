@@ -86,7 +86,7 @@
                     'bi-calendar3',
                     '#38bdf8',
                     'Agenda Financeira',
-                    'Calendário mensal com todas as suas transações. Clique em qualquer dia para ver os detalhes ou use o botão de + para registrar receitas e despesas diretamente pelo calendário.'
+                    'Calendário mensal com drag-and-drop — arraste qualquer transação para outro dia e a data é atualizada na hora. Clique num dia para ver detalhes ou use os botões de + para registrar diretamente.'
                 ],
                 [
                     'bi-hourglass-split',
@@ -105,6 +105,30 @@
                     '#c084fc',
                     'Múltiplas Carteiras',
                     'Conta Itaú, Nubank, Carteira Física — cada uma com saldo real calculado pela soma das transações. Filtro de carteira presente em todas as telas.'
+                ],
+                [
+                    'bi-credit-card-fill',
+                    '#a78bfa',
+                    'Cartão de Crédito',
+                    'Cadastre cartões com limite, bandeira e datas de fechamento/vencimento. Faturas calculadas automaticamente mês a mês. Lançamentos aparecem na agenda com ícone próprio e link para a fatura completa.'
+                ],
+                [
+                    'bi-piggy-bank',
+                    '#f59e0b',
+                    'Cofrinhos & Metas',
+                    'Crie caixinhas de poupança vinculadas a uma carteira. Defina meta de valor, data limite e acompanhe o progresso com barra visual. Depósitos debitam automaticamente do saldo da carteira.'
+                ],
+                [
+                    'bi-bell-fill',
+                    '#38bdf8',
+                    'Notificações & Pesquisas',
+                    'Sistema de comunicados internos com suporte a pesquisas de múltipla escolha, checkbox e texto livre. Usuários recebem alertas em tempo real pelo sininho — admin envia para grupos específicos ou todos.'
+                ],
+                [
+                    'bi-file-earmark-arrow-down',
+                    '#22c55e',
+                    'Exportação CSV e PDF',
+                    'Exporte o extrato completo de qualquer mês como CSV (compatível com Excel) ou PDF formatado e pronto para impressão. Filtros por carteira e tipo de transação.'
                 ],
                 [
                     'bi-paperclip',
@@ -186,16 +210,15 @@
     <div class="py-5 border-top border-secondary-subtle card-animado surgir-baixo">
         <div class="text-center mb-5">
             <h2 class="fw-bold text-light mb-2">O que vem por aí</h2>
-            <p class="text-secondary">Já planejado — próximas evoluções do sistema.</p>
+            <p class="text-secondary">Próximas evoluções já planejadas.</p>
         </div>
         <div class="row g-3 justify-content-center">
             <?php foreach (
                 [
-                    ['bi-credit-card-fill',    '#f59e0b', 'Módulo de Cartão de Crédito', 'Faturas, parcelamentos no cartão e datas de fechamento/vencimento separadas da conta corrente.'],
                     ['bi-people-fill',         '#22c55e', 'Compartilhamento Familiar',   'Até 4 membros por grupo, com permissões de leitura ou escrita por carteira.'],
-                    ['bi-bullseye',            '#38bdf8', 'Metas Financeiras',            'Defina uma meta de economia ou compra e acompanhe o progresso mês a mês.'],
-                    ['bi-file-earmark-pdf',    '#fb7185', 'Exportação de Extratos',       'PDF e Excel completos do histórico de transações filtrado por carteira, categoria e período.'],
-                    ['bi-bank',               '#d4af37',  'Open Finance',                 'Importação automática de extratos bancários via OFX — sem digitar nada manualmente.'],
+                    ['bi-bank',                '#d4af37', 'Open Finance',                 'Importação automática de extratos bancários via OFX — sem digitar nada manualmente.'],
+                    ['bi-robot',               '#a78bfa', 'Assistente Financeiro IA',     'Análise automática dos seus padrões de gasto com sugestões personalizadas de economia.'],
+                    ['bi-graph-up',            '#38bdf8', 'Relatórios Avançados',         'Relatórios mensais e anuais com evolução patrimonial, comparativos e projeções de longo prazo.'],
                 ] as [$icon, $color, $title, $desc]
             ): ?>
                 <div class="col-12 col-sm-6 col-lg-4">
