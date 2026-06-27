@@ -38,6 +38,7 @@ try {
 
 $_nw_unread = 0;
 foreach ($_nw_items as $ni) { if (!$ni['Lida']) $_nw_unread++; }
+$_nw_lidas  = count($_nw_items) - $_nw_unread;
 
 // Relative date helper
 if (!function_exists('_nw_reldate')) {
@@ -70,12 +71,20 @@ if (!function_exists('_nw_reldate')) {
             <span class="notif-panel-title">
                 <i class="bi bi-bell me-2"></i>Notificações
                 <?php if ($_nw_unread > 0): ?>
-                <span class="notif-count-pill"><?= $_nw_unread ?> nova<?= $_nw_unread > 1 ? 's' : '' ?></span>
+                <span class="notif-count-pill" id="notif-count-pill"><?= $_nw_unread ?> nova<?= $_nw_unread > 1 ? 's' : '' ?></span>
                 <?php endif; ?>
             </span>
-            <button id="notif-mark-all" type="button" title="Marcar todas como lidas">
-                <i class="bi bi-check2-all"></i>
-            </button>
+            <div class="notif-head-actions">
+                <button id="notif-mark-all" type="button" title="Marcar todas como lidas">
+                    <i class="bi bi-check2-all"></i>
+                </button>
+                <button id="notif-toggle-hist" type="button" title="Ver notificações lidas">
+                    <i class="bi bi-clock-history"></i>
+                </button>
+                <button id="notif-close" type="button" title="Fechar">
+                    <i class="bi bi-x-lg"></i>
+                </button>
+            </div>
         </div>
 
         <!-- List -->
@@ -85,7 +94,25 @@ if (!function_exists('_nw_reldate')) {
                 <i class="bi bi-bell-slash"></i>
                 <p>Nenhuma notificação por enquanto</p>
             </div>
-        <?php else: foreach ($_nw_items as $ni):
+        <?php else: ?>
+
+            <!-- "All read" empty state (shown when no unread items visible) -->
+            <div id="notif-sem-novas" <?= $_nw_unread > 0 ? 'hidden' : '' ?>>
+                <i class="bi bi-check2-circle" style="font-size:1.8rem;color:var(--accent);display:block;margin-bottom:0.5rem;"></i>
+                <p>Tudo em dia por aqui!</p>
+                <?php if ($_nw_lidas > 0): ?>
+                <button type="button" id="notif-ver-hist">
+                    <i class="bi bi-clock-history me-1"></i>Ver histórico (<?= $_nw_lidas ?>)
+                </button>
+                <?php endif; ?>
+            </div>
+
+            <!-- History section label (visible only in history mode) -->
+            <?php if ($_nw_lidas > 0): ?>
+            <div class="notif-hist-sep">Já lidas</div>
+            <?php endif; ?>
+
+        <?php foreach ($_nw_items as $ni):
             $lida      = (bool)$ni['Lida'];
             $respondida = (bool)$ni['Respondida'];
             $itens     = (!empty($ni['ItensPesquisa']) && $ni['TipoInteracao'] === 'pesquisa')
@@ -157,46 +184,107 @@ if (!function_exists('_nw_reldate')) {
 
 <script>
 (function() {
-    var bell      = document.getElementById('notif-bell');
-    var panel     = document.getElementById('notif-panel');
-    var markAll   = document.getElementById('notif-mark-all');
-    var badge     = document.getElementById('notif-badge');
-    var bellIcon  = document.getElementById('notif-bell-icon');
+    var bell       = document.getElementById('notif-bell');
+    var panel      = document.getElementById('notif-panel');
+    var badge      = document.getElementById('notif-badge');
+    var bellIcon   = document.getElementById('notif-bell-icon');
+    var markAll    = document.getElementById('notif-mark-all');
+    var closeBtn   = document.getElementById('notif-close');
+    var histBtn    = document.getElementById('notif-toggle-hist');
+    var semNovas   = document.getElementById('notif-sem-novas');
+    var verHist    = document.getElementById('notif-ver-hist');
     if (!bell || !panel) return;
 
-    // ── Open / close panel ──────────────────────────────────
+    // ── Open / close ────────────────────────────────────────
+    function closePanel() {
+        // Converte para 'lida' instantaneamente — painel vai sumir, fade desnecessário
+        document.querySelectorAll('.notif-item.nao-lida').forEach(function(it) {
+            if (it.dataset.lida === '1') {
+                it.classList.remove('notif-saindo');
+                it.classList.replace('nao-lida', 'lida');
+            }
+        });
+        checkEmptyState();
+        panel.hidden = true;
+        bellIcon.className = 'bi bi-bell-fill';
+    }
     bell.addEventListener('click', function(e) {
         e.stopPropagation();
-        var isHidden = panel.hidden;
-        panel.hidden = !isHidden;
+        panel.hidden = !panel.hidden;
         bellIcon.className = panel.hidden ? 'bi bi-bell-fill' : 'bi bi-bell';
-        if (!panel.hidden) panel.querySelector('#notif-list').focus && null;
     });
+    if (closeBtn) closeBtn.addEventListener('click', closePanel);
     document.addEventListener('click', function(e) {
-        if (!panel.hidden && !bell.contains(e.target) && !panel.contains(e.target)) {
-            panel.hidden = true;
-            bellIcon.className = 'bi bi-bell-fill';
-        }
+        if (!panel.hidden && !bell.contains(e.target) && !panel.contains(e.target)) closePanel();
     });
     document.addEventListener('keydown', function(e) {
-        if (e.key === 'Escape' && !panel.hidden) {
-            panel.hidden = true;
-            bellIcon.className = 'bi bi-bell-fill';
-        }
+        if (e.key === 'Escape' && !panel.hidden) closePanel();
     });
 
-    // ── Decrease badge count ────────────────────────────────
+    // ── History toggle ───────────────────────────────────────
+    function checkEmptyState() {
+        if (!semNovas) return;
+        var hasUnread = document.querySelectorAll('.notif-item.nao-lida').length > 0;
+        var inHist    = panel.classList.contains('ver-historico');
+        semNovas.hidden = hasUnread || inHist;
+    }
+
+    function toggleHist() {
+        panel.classList.toggle('ver-historico');
+        var inHist = panel.classList.contains('ver-historico');
+        if (histBtn) {
+            histBtn.classList.toggle('notif-hist-ativo', inHist);
+            histBtn.title = inHist ? 'Ocultar lidas' : 'Ver notificações lidas';
+        }
+        checkEmptyState();
+    }
+    if (histBtn) histBtn.addEventListener('click', toggleHist);
+    if (verHist) verHist.addEventListener('click', toggleHist);
+
+    // ── Badge update ─────────────────────────────────────────
     function decreaseBadge(n) {
         if (!badge) return;
         var cur = parseInt(badge.textContent) - n;
-        if (cur <= 0) badge.remove();
+        if (cur <= 0) { badge.remove(); badge = null; }
         else badge.textContent = cur;
     }
 
-    // ── Mark all read ───────────────────────────────────────
+    // Marca como lida no servidor + atualiza ícone/badge
+    // NÃO esconde o item aqui — ele some só quando fechado ou colapsado
+    function markItemAsRead(item) {
+        if (item.dataset.lida === '1') return;
+        item.dataset.lida = '1';
+        var env = item.querySelector('.notif-envelope');
+        if (env) env.className = 'bi bi-envelope-open notif-envelope';
+        decreaseBadge(1);
+        fetch('/notificacoes/marcar_lida.php', {
+            method: 'POST',
+            headers: {'X-Requested-With': 'XMLHttpRequest', 'Content-Type': 'application/json'},
+            body: JSON.stringify({id: item.dataset.id})
+        });
+    }
+
+    // Anima e esconde um item já lido (chamado ao colapsar ou fechar painel)
+    function hideReadItem(item) {
+        if (!item.classList.contains('nao-lida') || item.dataset.lida !== '1') return;
+        if (panel.classList.contains('ver-historico')) {
+            item.classList.replace('nao-lida', 'lida');
+            checkEmptyState();
+            return;
+        }
+        item.classList.add('notif-saindo');
+        setTimeout(function() {
+            item.classList.replace('nao-lida', 'lida');
+            item.classList.remove('notif-saindo');
+            checkEmptyState();
+        }, 340);
+    }
+
+    // ── Mark all read ────────────────────────────────────────
     if (markAll) {
         markAll.addEventListener('click', function() {
-            var unreadItems = document.querySelectorAll('.notif-item.nao-lida');
+            var unreadItems = Array.from(document.querySelectorAll('.notif-item.nao-lida'));
+            if (!unreadItems.length) return;
             fetch('/notificacoes/marcar_lida.php', {
                 method: 'POST',
                 headers: {'X-Requested-With': 'XMLHttpRequest', 'Content-Type': 'application/json'},
@@ -204,55 +292,53 @@ if (!function_exists('_nw_reldate')) {
             }).then(function(r) { return r.json(); }).then(function(d) {
                 if (!d.ok) return;
                 unreadItems.forEach(function(el) {
-                    el.classList.replace('nao-lida', 'lida');
                     el.dataset.lida = '1';
                     var env = el.querySelector('.notif-envelope');
-                    if (env) { env.className = 'bi bi-envelope-open notif-envelope'; }
+                    if (env) env.className = 'bi bi-envelope-open notif-envelope';
+                    hideReadItem(el);
                 });
-                if (badge) badge.remove();
+                if (badge) { badge.remove(); badge = null; }
             });
         });
     }
 
-    // ── Individual item toggle + mark read ──────────────────
+    // ── Individual item expand + mark read ───────────────────
     document.querySelectorAll('.notif-item').forEach(function(item) {
         var header = item.querySelector('.notif-item-header');
         var body   = item.querySelector('.notif-item-body');
         var chev   = item.querySelector('.notif-chevron');
-
         if (!header) return;
+
         header.addEventListener('click', function() {
-            var expanded = !body.hidden;
-            // Collapse all others
+            var expanding = body.hidden; // true = vai expandir
+
+            // Colapsa outros; se algum estava lido, some agora
             document.querySelectorAll('.notif-item').forEach(function(other) {
                 if (other !== item) {
                     var ob = other.querySelector('.notif-item-body');
                     var oc = other.querySelector('.notif-chevron');
-                    if (ob) ob.hidden = true;
-                    if (oc) oc.style.transform = '';
+                    if (ob && !ob.hidden) {
+                        ob.hidden = true;
+                        if (oc) oc.style.transform = '';
+                        hideReadItem(other);
+                    }
                 }
             });
 
-            body.hidden = expanded;
-            if (chev) chev.style.transform = expanded ? '' : 'rotate(90deg)';
+            body.hidden = !expanding;
+            if (chev) chev.style.transform = expanding ? 'rotate(90deg)' : '';
 
-            // Mark as read on first open
-            if (!expanded && item.dataset.lida === '0') {
-                item.dataset.lida = '1';
-                item.classList.replace('nao-lida', 'lida');
-                var env = item.querySelector('.notif-envelope');
-                if (env) env.className = 'bi bi-envelope-open notif-envelope';
-                decreaseBadge(1);
-                fetch('/notificacoes/marcar_lida.php', {
-                    method: 'POST',
-                    headers: {'X-Requested-With': 'XMLHttpRequest', 'Content-Type': 'application/json'},
-                    body: JSON.stringify({id: item.dataset.id})
-                });
+            if (expanding) {
+                // Abrindo: marcar como lido
+                if (item.dataset.lida === '0') markItemAsRead(item);
+            } else {
+                // Fechando: se já foi lido, some agora
+                hideReadItem(item);
             }
         });
     });
 
-    // ── Survey submit ───────────────────────────────────────
+    // ── Survey submit ────────────────────────────────────────
     document.querySelectorAll('.notif-survey-form').forEach(function(form) {
         form.addEventListener('submit', function(e) {
             e.preventDefault();
@@ -292,5 +378,8 @@ if (!function_exists('_nw_reldate')) {
             });
         });
     });
+
+    // ── Init ─────────────────────────────────────────────────
+    checkEmptyState();
 })();
 </script>

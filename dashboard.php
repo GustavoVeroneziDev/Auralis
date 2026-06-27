@@ -1028,7 +1028,7 @@ require_once 'geral/header.php';
                     <tr>
                         <th class="ps-3 ps-md-4 py-3 border-0">Descrição</th>
                         <th class="py-3 border-0 d-none d-md-table-cell">Categoria</th>
-                        <th class="py-3 border-0 d-none d-md-table-cell">Data</th>
+                        <th class="py-3 border-0 d-none d-md-table-cell">Vencimento</th>
                         <th class="py-3 border-0 d-none d-md-table-cell">Status</th>
                         <th class="text-end pe-3 pe-md-4 py-3 border-0">Valor</th>
                     </tr>
@@ -1040,7 +1040,10 @@ require_once 'geral/header.php';
                             Nenhuma transação encontrada para essa busca.
                         </td>
                     </tr>
-                    <?php foreach ($transacoes as $index => $t):
+                    <?php
+                    $_mesesDash = ['janeiro','fevereiro','março','abril','maio','junho','julho','agosto','setembro','outubro','novembro','dezembro'];
+                    $_diaSepAtual = '';
+                    foreach ($transacoes as $index => $t):
                         $isTransfSaida  = ($t['TipoRegistro'] === 'transferencia_saida');
                         $isTransfEntr   = ($t['TipoRegistro'] === 'transferencia_entrada');
                         $isTransfer     = $isTransfSaida || $isTransfEntr;
@@ -1048,6 +1051,17 @@ require_once 'geral/header.php';
                         $sinalValor     = ($isDespesa || $isTransfSaida) ? '-' : '+';
                         $corValor       = ($isDespesa || $isTransfSaida) ? 'text-danger' : 'text-success';
                         $dataFormatada  = date('d/m/Y', strtotime($t['MomentoRegistro']));
+                        $_diaTrans      = date('Y-m-d', strtotime($t['MomentoRegistro']));
+                        $_diaLabel      = intval(date('d', strtotime($_diaTrans))) . ' de ' . $_mesesDash[date('n', strtotime($_diaTrans)) - 1];
+                        if ($_diaTrans !== $_diaSepAtual):
+                            $_diaSepAtual = $_diaTrans;
+                    ?>
+                    <tr class="tr-dia-sep" data-dia="<?= $_diaTrans ?>">
+                        <td colspan="5" class="px-3 px-md-4 py-2 border-0 tr-dia-sep-cell">
+                            <span class="tr-dia-sep-label"><?= htmlspecialchars($_diaLabel) ?></span>
+                        </td>
+                    </tr>
+                    <?php endif;
 
                         if ($isTransfer) {
                             $iconeTipo = '<span class="d-inline-flex align-items-center justify-content-center rounded-circle flex-shrink-0 me-3" style="width:32px;height:32px;min-width:32px;background:rgba(96,165,250,0.12);"><i class="bi bi-arrow-left-right" style="color:#60a5fa;font-size:0.85rem;"></i></span>';
@@ -1064,6 +1078,7 @@ require_once 'geral/header.php';
                         <tr data-bs-toggle="collapse" data-bs-target="#<?php echo $rowId ?>"
                             class="cursor-pointer transition-hover tr-transacao"
                             style="cursor:pointer;"
+                            data-dia="<?= $_diaTrans ?>"
                             data-desc="<?= strtolower(htmlspecialchars($t['Descricao'])) ?>"
                             data-cat="<?= strtolower(htmlspecialchars($t['NomeCategoria'] ?? '')) ?>"
                             data-valor="<?= number_format((float)$t['Valor'], 2, ',', '.') ?>"
@@ -1090,9 +1105,9 @@ require_once 'geral/header.php';
 
                                             <div class="d-md-none">
                                                 <?php if ($isPendente): ?>
-                                                    <span class="badge bg-warning text-dark px-1 py-1" style="font-size: 0.6rem;"><i class="bi bi-clock-history"></i> Pendente</span>
+                                                    <span class="badge-status badge-pendente" style="font-size:0.6rem;padding:2px 7px;"><i class="bi bi-clock-history"></i> Pendente</span>
                                                 <?php else: ?>
-                                                    <span class="badge bg-secondary bg-opacity-25 text-light px-1 py-1" style="font-size: 0.6rem;"><i class="bi bi-check2-circle"></i> Efetivado</span>
+                                                    <span class="badge-status badge-efetivado" style="font-size:0.6rem;padding:2px 7px;"><i class="bi bi-check2-circle"></i> Efetivado</span>
                                                 <?php endif; ?>
                                             </div>
 
@@ -1107,22 +1122,22 @@ require_once 'geral/header.php';
                                 </div>
                             </td>
 
-                            <td class="py-3 border-secondary-subtle text-secondary small d-none d-md-table-cell">
+                            <td class="py-3 border-secondary-subtle td-categoria d-none d-md-table-cell">
                                 <div class="d-flex align-items-center">
                                     <i class="bi <?php echo htmlspecialchars($t['IconeCategoria'] ?? 'bi-tag') ?> me-2 fs-6"></i>
                                     <span><?php echo htmlspecialchars($t['NomeCategoria'] ?? 'Sem categoria') ?></span>
                                 </div>
                             </td>
 
-                            <td class="py-3 border-secondary-subtle text-secondary small d-none d-md-table-cell">
+                            <td class="py-3 border-secondary-subtle td-vencimento d-none d-md-table-cell">
                                 <?php echo $dataFormatada ?>
                             </td>
 
                             <td class="py-3 border-secondary-subtle d-none d-md-table-cell">
                                 <?php if ($isPendente): ?>
-                                    <span class="badge bg-warning text-dark px-2 py-1 rounded-pill fw-semibold shadow-sm"><i class="bi bi-clock-history me-1"></i> Pendente</span>
+                                    <span class="badge-status badge-pendente"><i class="bi bi-clock-history me-1"></i> Pendente</span>
                                 <?php else: ?>
-                                    <span class="badge bg-secondary bg-opacity-25 px-2 py-1 rounded-pill" style="color:var(--text-main);"><i class="bi bi-check2-circle me-1"></i> Efetivado</span>
+                                    <span class="badge-status badge-efetivado"><i class="bi bi-check2-circle me-1"></i> Efetivado</span>
                                 <?php endif; ?>
                             </td>
 
@@ -1940,6 +1955,62 @@ require_once 'geral/header.php';
 </script>
 
 <style>
+/* ── Separador de dia ─────────────────────────── */
+.tr-dia-sep-cell {
+    background: rgba(255,255,255,0.04);
+    border-top: 1px solid rgba(255,255,255,0.09) !important;
+    padding-top: 9px !important;
+    padding-bottom: 9px !important;
+}
+.tr-dia-sep-label {
+    font-size: 0.68rem;
+    font-weight: 800;
+    text-transform: uppercase;
+    letter-spacing: 0.1em;
+    color: var(--accent);
+    opacity: 0.9;
+}
+.tr-dia-sep:first-child .tr-dia-sep-cell { border-top: none !important; }
+
+/* ── Linhas de transação ──────────────────────── */
+.auralis-table tbody .tr-transacao {
+    border-bottom: 1px solid rgba(255,255,255,0.05) !important;
+}
+.auralis-table tbody .tr-transacao:hover { background: rgba(255,255,255,0.03); }
+
+/* ── Hierarquia de colunas ───────────────────── */
+.td-categoria {
+    color: rgba(255,255,255,0.62) !important;
+    font-size: 0.84rem;
+}
+.td-vencimento {
+    color: rgba(255,255,255,0.45) !important;
+    font-size: 0.82rem;
+    font-variant-numeric: tabular-nums;
+}
+
+/* ── Badges de status ────────────────────────── */
+.badge-status {
+    display: inline-flex;
+    align-items: center;
+    padding: 4px 10px;
+    border-radius: 20px;
+    font-size: 0.75rem;
+    font-weight: 600;
+    white-space: nowrap;
+}
+.badge-efetivado {
+    background: rgba(74,222,128,0.1);
+    color: #6ee7a0;
+    border: 1px solid rgba(74,222,128,0.22);
+}
+.badge-pendente {
+    background: rgba(251,191,36,0.12);
+    color: #fbbf24;
+    border: 1px solid rgba(251,191,36,0.28);
+}
+
+/* ── Pills de busca ──────────────────────────── */
 .busca-pill {
     background: var(--bg-card);
     border: 1px solid var(--card-border-color);
@@ -1996,6 +2067,16 @@ require_once 'geral/header.php';
         });
 
         if (emptyRow) emptyRow.style.display = visiveis === 0 ? '' : 'none';
+
+        // Oculta separadores de dia quando todas as transações do dia estão filtradas
+        document.querySelectorAll('tr.tr-dia-sep').forEach(function(sep) {
+            var dia = sep.dataset.dia;
+            var temVisivel = false;
+            document.querySelectorAll('tr.tr-transacao[data-dia="' + dia + '"]').forEach(function(tr) {
+                if (tr.style.display !== 'none') temVisivel = true;
+            });
+            sep.style.display = temVisivel ? '' : 'none';
+        });
     }
 
     if (input) input.addEventListener('input', filtrar);

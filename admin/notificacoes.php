@@ -384,14 +384,13 @@ require_once '../geral/header.php';
                             style="font-size:0.8rem;">
                         <i class="bi bi-pencil"></i>
                     </button>
-                    <form method="POST" class="d-inline form-excluir-notif">
-                        <input type="hidden" name="action" value="excluir">
-                        <input type="hidden" name="notificacao_id" value="<?= htmlspecialchars($n['IDNotificacao']) ?>">
-                        <button type="submit" class="btn btn-sm btn-outline-danger rounded-pill"
-                                style="font-size:0.8rem;" title="Excluir">
-                            <i class="bi bi-trash"></i>
-                        </button>
-                    </form>
+                    <button type="button"
+                            class="btn btn-sm btn-outline-danger rounded-pill btn-abrir-exclusao"
+                            data-id="<?= htmlspecialchars($n['IDNotificacao']) ?>"
+                            data-titulo="<?= htmlspecialchars($n['Titulo']) ?>"
+                            style="font-size:0.8rem;" title="Excluir">
+                        <i class="bi bi-trash"></i>
+                    </button>
                 </td>
             </tr>
             <?php endforeach; ?>
@@ -429,7 +428,7 @@ require_once '../geral/header.php';
 <div class="modal fade" id="modalNotif" tabindex="-1" aria-hidden="true">
 <div class="modal-dialog modal-lg modal-dialog-centered modal-dialog-scrollable">
 <div class="modal-content rounded-4 border-0 shadow-lg" style="background:var(--bg-card);">
-<form id="formNotif" method="POST">
+<form id="formNotif" method="POST" style="display:flex;flex-direction:column;height:100%;min-height:0;">
     <input type="hidden" name="action" id="formAction" value="criar">
     <input type="hidden" name="notificacao_id" id="formNotifId" value="">
     <input type="hidden" name="pesquisa_json" id="pesquisaJson" value="[]">
@@ -577,6 +576,35 @@ require_once '../geral/header.php';
 </div>
 </div>
 
+<!-- ══════════════════════════════════════════════════════════
+     MODAL: CONFIRMAR EXCLUSÃO
+     ══════════════════════════════════════════════════════════ -->
+<div class="modal fade" id="modalExcluir" tabindex="-1" aria-hidden="true">
+<div class="modal-dialog modal-sm modal-dialog-centered">
+<div class="modal-content rounded-4 border-0 shadow-lg" style="background:var(--bg-card);">
+    <div class="modal-body p-4 text-center">
+        <div class="rounded-circle d-inline-flex align-items-center justify-content-center mb-3"
+             style="width:52px;height:52px;background:#E6394620;">
+            <i class="bi bi-trash3-fill fs-4" style="color:#E63946;"></i>
+        </div>
+        <p class="fw-bold mb-1" style="color:var(--text-main);font-size:1rem;">Excluir notificação?</p>
+        <p id="excluirModalTitulo" class="mb-0"
+           style="font-size:0.83rem;color:var(--text-muted);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;max-width:220px;margin:0 auto;"></p>
+        <p class="mt-2 mb-0" style="font-size:0.75rem;color:var(--text-muted);">Ela ficará invisível para os usuários.</p>
+    </div>
+    <div class="modal-footer border-top border-secondary-subtle px-4 pb-4 pt-0 gap-2 justify-content-stretch border-0">
+        <button type="button" class="btn btn-outline-secondary rounded-pill flex-grow-1"
+                data-bs-dismiss="modal">Cancelar</button>
+        <button type="button" id="btnConfirmarExclusao"
+                class="btn rounded-pill fw-semibold flex-grow-1"
+                style="background:#E63946;color:#fff;">
+            <i class="bi bi-trash me-1"></i>Excluir
+        </button>
+    </div>
+</div>
+</div>
+</div>
+
 <?php require_once '../geral/footer.php'; ?>
 
 <script>
@@ -588,10 +616,47 @@ var _todosUsuarios = <?= json_encode(array_map(fn($u) => [
     'plano' => $u['Plano'],
 ], $todosUsuarios)) ?>;
 
-// ── Confirm delete ─────────────────────────────────────
-document.querySelectorAll('.form-excluir-notif').forEach(function(f) {
-    f.addEventListener('submit', function(e) {
-        if (!confirm('Excluir esta notificação? Ela ficará invisível para os usuários.')) e.preventDefault();
+// ── Modal de exclusão ──────────────────────────────────
+var _excluirModal   = new bootstrap.Modal(document.getElementById('modalExcluir'));
+var _excluirPending = null;
+
+document.querySelectorAll('.btn-abrir-exclusao').forEach(function(btn) {
+    btn.addEventListener('click', function() {
+        _excluirPending = {id: this.dataset.id, row: this.closest('tr')};
+        document.getElementById('excluirModalTitulo').textContent = '"' + this.dataset.titulo + '"';
+        _excluirModal.show();
+    });
+});
+
+document.getElementById('btnConfirmarExclusao').addEventListener('click', function() {
+    if (!_excluirPending) return;
+    var self = this;
+    self.disabled = true;
+    self.innerHTML = '<span class="spinner-border spinner-border-sm me-1"></span>Excluindo...';
+    var fd = new FormData();
+    fd.append('action', 'excluir');
+    fd.append('notificacao_id', _excluirPending.id);
+    fetch('notificacoes.php', {
+        method: 'POST',
+        headers: {'X-Requested-With': 'XMLHttpRequest'},
+        body: fd
+    }).then(function(r) { return r.json(); }).then(function(d) {
+        _excluirModal.hide();
+        self.disabled = false;
+        self.innerHTML = '<i class="bi bi-trash me-1"></i>Excluir';
+        if (d.ok && _excluirPending.row) {
+            var row = _excluirPending.row;
+            row.style.transition = 'opacity 0.35s';
+            row.style.opacity = '0';
+            setTimeout(function() { row.remove(); }, 360);
+            if (typeof auralisToast === 'function') auralisToast('Notificação excluída.');
+        }
+        _excluirPending = null;
+    }).catch(function() {
+        _excluirModal.hide();
+        self.disabled = false;
+        self.innerHTML = '<i class="bi bi-trash me-1"></i>Excluir';
+        _excluirPending = null;
     });
 });
 
