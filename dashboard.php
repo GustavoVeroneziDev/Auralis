@@ -1105,9 +1105,9 @@ require_once 'geral/header.php';
 
                                             <div class="d-md-none">
                                                 <?php if ($isPendente): ?>
-                                                    <span class="badge bg-warning text-dark px-1 py-1" style="font-size: 0.6rem;"><i class="bi bi-clock-history"></i> Pendente</span>
+                                                    <span class="badge-status badge-pendente" style="font-size:0.6rem;padding:2px 7px;"><i class="bi bi-clock-history"></i> Pendente</span>
                                                 <?php else: ?>
-                                                    <span class="badge bg-secondary bg-opacity-25 text-light px-1 py-1" style="font-size: 0.6rem;"><i class="bi bi-check2-circle"></i> Efetivado</span>
+                                                    <span class="badge-status badge-efetivado" style="font-size:0.6rem;padding:2px 7px;"><i class="bi bi-check2-circle"></i> Efetivado</span>
                                                 <?php endif; ?>
                                             </div>
 
@@ -1122,22 +1122,22 @@ require_once 'geral/header.php';
                                 </div>
                             </td>
 
-                            <td class="py-3 border-secondary-subtle text-secondary small d-none d-md-table-cell">
+                            <td class="py-3 border-secondary-subtle td-categoria d-none d-md-table-cell">
                                 <div class="d-flex align-items-center">
                                     <i class="bi <?php echo htmlspecialchars($t['IconeCategoria'] ?? 'bi-tag') ?> me-2 fs-6"></i>
                                     <span><?php echo htmlspecialchars($t['NomeCategoria'] ?? 'Sem categoria') ?></span>
                                 </div>
                             </td>
 
-                            <td class="py-3 border-secondary-subtle text-secondary small d-none d-md-table-cell">
+                            <td class="py-3 border-secondary-subtle td-vencimento d-none d-md-table-cell">
                                 <?php echo $dataFormatada ?>
                             </td>
 
                             <td class="py-3 border-secondary-subtle d-none d-md-table-cell">
                                 <?php if ($isPendente): ?>
-                                    <span class="badge bg-warning text-dark px-2 py-1 rounded-pill fw-semibold shadow-sm"><i class="bi bi-clock-history me-1"></i> Pendente</span>
+                                    <span class="badge-status badge-pendente"><i class="bi bi-clock-history me-1"></i> Pendente</span>
                                 <?php else: ?>
-                                    <span class="badge bg-secondary bg-opacity-25 px-2 py-1 rounded-pill" style="color:var(--text-main);"><i class="bi bi-check2-circle me-1"></i> Efetivado</span>
+                                    <span class="badge-status badge-efetivado"><i class="bi bi-check2-circle me-1"></i> Efetivado</span>
                                 <?php endif; ?>
                             </td>
 
@@ -1955,20 +1955,62 @@ require_once 'geral/header.php';
 </script>
 
 <style>
+/* ── Separador de dia ─────────────────────────── */
 .tr-dia-sep-cell {
-    background: rgba(255,255,255,0.025);
-    border-top: 1px solid var(--card-border-color) !important;
+    background: rgba(255,255,255,0.04);
+    border-top: 1px solid rgba(255,255,255,0.09) !important;
+    padding-top: 9px !important;
+    padding-bottom: 9px !important;
 }
 .tr-dia-sep-label {
-    font-size: 0.72rem;
-    font-weight: 700;
+    font-size: 0.68rem;
+    font-weight: 800;
     text-transform: uppercase;
-    letter-spacing: 0.08em;
-    color: var(--text-muted);
+    letter-spacing: 0.1em;
+    color: var(--accent);
+    opacity: 0.9;
 }
-.tr-dia-sep:first-child .tr-dia-sep-cell {
-    border-top: none !important;
+.tr-dia-sep:first-child .tr-dia-sep-cell { border-top: none !important; }
+
+/* ── Linhas de transação ──────────────────────── */
+.auralis-table tbody .tr-transacao {
+    border-bottom: 1px solid rgba(255,255,255,0.05) !important;
 }
+.auralis-table tbody .tr-transacao:hover { background: rgba(255,255,255,0.03); }
+
+/* ── Hierarquia de colunas ───────────────────── */
+.td-categoria {
+    color: rgba(255,255,255,0.62) !important;
+    font-size: 0.84rem;
+}
+.td-vencimento {
+    color: rgba(255,255,255,0.45) !important;
+    font-size: 0.82rem;
+    font-variant-numeric: tabular-nums;
+}
+
+/* ── Badges de status ────────────────────────── */
+.badge-status {
+    display: inline-flex;
+    align-items: center;
+    padding: 4px 10px;
+    border-radius: 20px;
+    font-size: 0.75rem;
+    font-weight: 600;
+    white-space: nowrap;
+}
+.badge-efetivado {
+    background: rgba(74,222,128,0.1);
+    color: #6ee7a0;
+    border: 1px solid rgba(74,222,128,0.22);
+}
+.badge-pendente {
+    background: rgba(251,191,36,0.12);
+    color: #fbbf24;
+    border: 1px solid rgba(251,191,36,0.28);
+}
+
+/* ── Pills de busca ──────────────────────────── */
 .busca-pill {
     background: var(--bg-card);
     border: 1px solid var(--card-border-color);
