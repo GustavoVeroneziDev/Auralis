@@ -206,6 +206,14 @@ $_carteiraParam = (!empty($_SESSION['ultima_carteira']))
                 <span class="sidebar-label">Planos</span>
             </a>
             <?php endif; ?>
+            <?php if ($_ehRevendedor): ?>
+            <a href="/revendedor/dashboard.php"
+               class="sidebar-item <?= strpos($_SERVER['PHP_SELF'], '/revendedor/') !== false ? 'active' : '' ?>"
+               style="color:#d4af37;">
+                <i class="bi bi-people-fill" style="color:#d4af37;"></i>
+                <span class="sidebar-label">Revendedor</span>
+            </a>
+            <?php endif; ?>
             <?php if (in_array(strtolower($_SESSION['nivel_acesso'] ?? ''), ['admin', 'supremo'])): ?>
             <a href="/admin/usuarios.php"
                class="sidebar-item <?= $paginaAtual === 'usuarios.php' ? 'active' : '' ?>"
@@ -252,6 +260,14 @@ $_carteiraParam = (!empty($_SESSION['ultima_carteira']))
                             <i class="bi bi-gear me-2" style="color:gold;"></i> Configurações
                         </a>
                     </li>
+                    <?php if ($_ehRevendedor): ?>
+                    <li>
+                        <a class="dropdown-item d-flex align-items-center py-2 fw-semibold transition-hover"
+                           href="/revendedor/dashboard.php" style="color:#d4af37;">
+                            <i class="bi bi-people-fill me-2" style="color:#d4af37;"></i> Painel do Revendedor
+                        </a>
+                    </li>
+                    <?php endif; ?>
                     <li>
                         <a class="dropdown-item d-flex align-items-center py-2 transition-hover"
                            href="/ajuda.php" target="_blank" rel="noopener" style="color:var(--text-main);">
