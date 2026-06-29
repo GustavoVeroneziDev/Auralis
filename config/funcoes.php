@@ -446,12 +446,10 @@ if (!function_exists('usuarioPossuiConquista')) {
     }
 }
 
-if (!function_exists('concederConquista')) {
-    function concederConquista(string $slug): bool
+if (!function_exists('concederConquistaParaUsuario')) {
+    // Versão direta — funciona sem sessão (webhooks, ativação de conta, etc.)
+    function concederConquistaParaUsuario(PDO $pdo, string $uid, string $slug): bool
     {
-        global $pdo;
-        $uid = $_SESSION['usuario_id'] ?? null;
-        if (!$uid || !$pdo) return false;
         try {
             $stmt = $pdo->prepare("SELECT IDConquista FROM conquista WHERE Slug = :slug AND Ativo = 1 LIMIT 1");
             $stmt->execute([':slug' => $slug]);
@@ -463,13 +461,23 @@ if (!function_exists('concederConquista')) {
             if ($check->fetchColumn()) return false;
 
             $pdo->prepare("
-                INSERT INTO usuario_conquista (IDUsuarioConquista, FKUsuario, FKConquista)
-                VALUES (:id, :uid, :cid)
+                INSERT INTO usuario_conquista (IDUsuarioConquista, FKUsuario, FKConquista, DataConquistado)
+                VALUES (:id, :uid, :cid, NOW())
             ")->execute([':id' => gerarUuid(), ':uid' => $uid, ':cid' => $cid]);
             return true;
-        } catch (PDOException $e) {
+        } catch (Throwable $e) {
             return false;
         }
+    }
+}
+
+if (!function_exists('concederConquista')) {
+    function concederConquista(string $slug): bool
+    {
+        global $pdo;
+        $uid = $_SESSION['usuario_id'] ?? null;
+        if (!$uid || !$pdo) return false;
+        return concederConquistaParaUsuario($pdo, $uid, $slug);
     }
 }
 
@@ -572,6 +580,8 @@ if (!function_exists('mpAtivarPlano')) {
                 ->execute([':plano' => $config['plano'], ':uid' => $uid]);
 
             $pdo->commit();
+
+            concederConquistaParaUsuario($pdo, $uid, $config['plano'] === 'vip' ? 'plano_vip' : 'plano_pro');
 
             // 8. Cancela as assinaturas antigas no Mercado Pago (fora da transação BD
             //    para que uma falha de rede não desfaça a ativação já confirmada)
@@ -706,6 +716,7 @@ function processarIndicacaoConversao(PDO $pdo, string $emailComprador, float $va
             $jaExiste->execute([':uid' => $compradorId]);
             if ($jaExiste->fetchColumn()) return;
 
+            concederConquistaParaUsuario($pdo, $indicadorId, 'indicou_amigo');
             $perc  = (float)$revendedor['ComissaoPercentual'];
             $valor = round($valorPago * $perc / 100, 2);
             $pdo->prepare(
@@ -725,6 +736,7 @@ function processarIndicacaoConversao(PDO $pdo, string $emailComprador, float $va
         }
 
         // ── Caminho B: usuário comum — verifica recompensas por indicação ────
+        concederConquistaParaUsuario($pdo, $indicadorId, 'indicou_amigo');
         // Conta quantos usuários o indicador trouxe que agora têm plano ativo
         $stmtCnt = $pdo->prepare(
             "SELECT COUNT(DISTINCT u.IDUsuario)

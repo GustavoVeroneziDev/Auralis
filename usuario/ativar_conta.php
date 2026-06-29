@@ -1,5 +1,6 @@
 <?php
 require_once '../config/conexao.php';
+require_once '../config/funcoes.php';
 
 if (isset($_GET['token']) && !empty($_GET['token'])) {
     $token = $_GET['token'];
@@ -16,6 +17,8 @@ if (isset($_GET['token']) && !empty($_GET['token'])) {
             $sqlUpdate = "UPDATE Usuario SET StatusConta = 'ativo', TokenAtivacao = NULL WHERE IDUsuario = :uid";
             $stmtUpdate = $pdo->prepare($sqlUpdate);
             $stmtUpdate->execute([':uid' => $usuario['IDUsuario']]);
+
+            concederConquistaParaUsuario($pdo, $usuario['IDUsuario'], 'primeiro_acesso');
 
             // Manda pro login com sucesso
             header("Location: login.php?ativacao=sucesso");

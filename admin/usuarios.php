@@ -72,6 +72,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
                 $pdo->commit();
 
+                concederConquistaParaUsuario($pdo, $uid, $plano === 'vip' ? 'plano_vip' : 'plano_pro');
+
                 $planoNome = strtoupper($plano);
                 $dataFmt   = date('d/m/Y', strtotime($dataExpiracao));
                 $plural    = $dias > 1 ? 's' : '';

@@ -204,6 +204,11 @@ $_carteiraParam = (!empty($_SESSION['ultima_carteira']))
                 <i class="bi bi-credit-card-2-front"></i>
                 <span class="sidebar-label">Cartões</span>
             </a>
+            <a href="/perfil.php"
+               class="sidebar-item <?= $paginaAtual === 'perfil.php' ? 'active' : '' ?>">
+                <i class="bi bi-person-circle"></i>
+                <span class="sidebar-label">Perfil</span>
+            </a>
             <?php if ($_ehFreeRestrito): ?>
             <a href="/planos.php"
                class="sidebar-item <?= $paginaAtual === 'planos.php' ? 'active' : '' ?>">
@@ -258,6 +263,12 @@ $_carteiraParam = (!empty($_SESSION['ultima_carteira']))
                             <i class="bi bi-stars me-1"></i> Fazer upgrade
                         </a>
                         <?php endif; ?>
+                    </li>
+                    <li>
+                        <a class="dropdown-item d-flex align-items-center py-2 transition-hover"
+                           href="/perfil.php" style="color:var(--text-main);">
+                            <i class="bi bi-person-circle me-2" style="color:#6366f1;"></i> Perfil
+                        </a>
                     </li>
                     <li>
                         <a class="dropdown-item d-flex align-items-center py-2 transition-hover"
@@ -496,6 +507,7 @@ $_carteiraParam = (!empty($_SESSION['ultima_carteira']))
                                     </a>
                                     <?php endif; ?>
                                 </li>
+                                <li><a class="dropdown-item text-light d-flex align-items-center py-2" href="/perfil.php"><i class="bi bi-person-circle me-2" style="color:#6366f1;"></i> Perfil</a></li>
                                 <li><a class="dropdown-item text-light d-flex align-items-center py-2" href="/configuracoes.php"><i class="bi bi-gear me-2" style="color:gold;"></i> Configurações</a></li>
                                 <?php if ($_ehRevendedor): ?>
                                 <li><a class="dropdown-item d-flex align-items-center py-2 fw-semibold" href="/revendedor/dashboard.php" style="color:#d4af37;"><i class="bi bi-people-fill me-2" style="color:#d4af37;"></i> Painel do Revendedor</a></li>
