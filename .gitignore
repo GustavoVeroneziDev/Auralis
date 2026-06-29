@@ -7,3 +7,4 @@ deletar_usuario.sql
 add_*.sql
 limpar_*.sql
 alter_*.sql
+retroativos_*.sql
