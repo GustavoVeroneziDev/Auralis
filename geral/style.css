@@ -706,7 +706,6 @@ input[type="number"] {
   color: var(--text-main);
   line-height: 1.6;
   margin-bottom: 0.75rem;
-  white-space: pre-wrap;
   word-break: break-word;
 }
 
