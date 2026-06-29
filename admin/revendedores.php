@@ -115,7 +115,7 @@ $idsRevendedores = array_column($revendedores, 'FKUsuario');
 // Todos os usuários ativos (para o campo de busca ao atribuir novo revendedor)
 $usuarios = $pdo->query(
     "SELECT IDUsuario, Nome, Email, Plano, CodigoIndicacao FROM Usuario
-     WHERE StatusConta = 'ativa' ORDER BY Nome"
+     WHERE StatusConta = 'ativo' ORDER BY Nome"
 )->fetchAll(PDO::FETCH_ASSOC);
 
 // Comissões detalhadas para o revendedor selecionado (via ?rev=ID)

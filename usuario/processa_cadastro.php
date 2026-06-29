@@ -39,7 +39,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $fkIndicadoPor = null;
         if ($refCode) {
             $stmtRef = $pdo->prepare(
-                "SELECT IDUsuario FROM Usuario WHERE CodigoIndicacao = :c AND StatusConta = 'ativa' LIMIT 1"
+                "SELECT IDUsuario FROM Usuario WHERE CodigoIndicacao = :c AND StatusConta = 'ativo' LIMIT 1"
             );
             $stmtRef->execute([':c' => $refCode]);
             $indicadorId = $stmtRef->fetchColumn();
