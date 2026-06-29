@@ -35,6 +35,9 @@ require_once '../geral/header.php';
                 <?php endif; ?>
 
                 <form action="processa_cadastro.php" method="POST" id="formCadastro">
+                    <?php if (!empty($_GET['ref'])): ?>
+                        <input type="hidden" name="ref_code" value="<?= htmlspecialchars(strtoupper(trim($_GET['ref']))) ?>">
+                    <?php endif; ?>
 
                     <div class="mb-4">
                         <label for="nome" class="form-label text-light opacity-75 fw-semibold">Nome Completo</label>

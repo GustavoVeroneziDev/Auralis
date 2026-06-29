@@ -575,3 +575,135 @@ function badgePremium($nivelExigido = 'pro', $emTeste = false)
 
     return "<span class=\"badge ms-1\" style=\"background: {$cor}22; color: {$cor}; border: 1px solid {$cor}66; font-size: 0.55rem; padding: 2px 5px; vertical-align: middle;\"><i class=\"bi bi-star-fill\"></i> {$texto}</span>";
 }
+
+// ── Indicações & Revendedores ─────────────────────────────────────────────────
+
+/**
+ * Gera um código de indicação único no formato AUR-XXXXXX.
+ * Usa apenas caracteres sem ambiguidade visual (sem O/0, I/1).
+ */
+function gerarCodigoIndicacao(PDO $pdo): string
+{
+    $chars = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
+    do {
+        $code = 'AUR-';
+        for ($i = 0; $i < 6; $i++) {
+            $code .= $chars[random_int(0, strlen($chars) - 1)];
+        }
+        $existe = $pdo->prepare("SELECT 1 FROM Usuario WHERE CodigoIndicacao = :c");
+        $existe->execute([':c' => $code]);
+    } while ($existe->fetchColumn());
+    return $code;
+}
+
+/**
+ * Chamado após mpAtivarPlano() confirmar uma conversão.
+ * - Se o indicador é revendedor → cria registro de comissão monetária.
+ * - Se o indicador é usuário comum → conta conversões e aplica recompensas configuradas.
+ */
+function processarIndicacaoConversao(PDO $pdo, string $emailComprador, float $valorPago, string $plano): void
+{
+    try {
+        // Encontra o comprador e quem o indicou
+        $stmt = $pdo->prepare("SELECT IDUsuario, FKIndicadoPor FROM Usuario WHERE LOWER(Email) = LOWER(:e) LIMIT 1");
+        $stmt->execute([':e' => $emailComprador]);
+        $comprador = $stmt->fetch(PDO::FETCH_ASSOC);
+        if (!$comprador || empty($comprador['FKIndicadoPor'])) return;
+
+        $compradorId  = $comprador['IDUsuario'];
+        $indicadorId  = $comprador['FKIndicadoPor'];
+
+        // ── Caminho A: indicador é revendedor ────────────────────────────────
+        $stmtRev = $pdo->prepare("SELECT * FROM Revendedor WHERE FKUsuario = :uid AND Ativo = 1 LIMIT 1");
+        $stmtRev->execute([':uid' => $indicadorId]);
+        $revendedor = $stmtRev->fetch(PDO::FETCH_ASSOC);
+
+        if ($revendedor) {
+            // Idempotência: só uma comissão por comprador
+            $jaExiste = $pdo->prepare("SELECT 1 FROM ComissaoRevendedor WHERE FKUsuarioComprador = :uid LIMIT 1");
+            $jaExiste->execute([':uid' => $compradorId]);
+            if ($jaExiste->fetchColumn()) return;
+
+            $perc  = (float)$revendedor['ComissaoPercentual'];
+            $valor = round($valorPago * $perc / 100, 2);
+            $pdo->prepare(
+                "INSERT INTO ComissaoRevendedor
+                     (IDComissao, FKRevendedor, FKUsuarioComprador, ValorVenda, PercentualAplicado, ValorComissao, Plano)
+                 VALUES (:id, :rev, :comp, :venda, :perc, :com, :plano)"
+            )->execute([
+                ':id'    => gerarUuid(),
+                ':rev'   => $revendedor['IDRevendedor'],
+                ':comp'  => $compradorId,
+                ':venda' => $valorPago,
+                ':perc'  => $perc,
+                ':com'   => $valor,
+                ':plano' => $plano,
+            ]);
+            return;
+        }
+
+        // ── Caminho B: usuário comum — verifica recompensas por indicação ────
+        // Conta quantos usuários o indicador trouxe que agora têm plano ativo
+        $stmtCnt = $pdo->prepare(
+            "SELECT COUNT(DISTINCT u.IDUsuario)
+             FROM Usuario u
+             JOIN Assinatura a ON a.FKUsuario = u.IDUsuario AND a.Status IN ('ativa','trial')
+             WHERE u.FKIndicadoPor = :uid"
+        );
+        $stmtCnt->execute([':uid' => $indicadorId]);
+        $totalConversoes = (int)$stmtCnt->fetchColumn();
+
+        // Busca regra de recompensa que o indicador ainda não recebeu
+        $stmtCfg = $pdo->prepare(
+            "SELECT c.* FROM indicacao_recompensa_config c
+             WHERE c.Ativo = 1 AND c.MinIndicacoes <= :total
+               AND NOT EXISTS (
+                   SELECT 1 FROM indicacao_recompensa_concedida irc
+                   WHERE irc.FKUsuario = :uid AND irc.FKConfig = c.IDConfig
+               )
+             ORDER BY c.MinIndicacoes DESC LIMIT 1"
+        );
+        $stmtCfg->execute([':total' => $totalConversoes, ':uid' => $indicadorId]);
+        $recompensa = $stmtCfg->fetch(PDO::FETCH_ASSOC);
+        if (!$recompensa) return;
+
+        // Aplica recompensa: cria assinatura de bônus para o indicador
+        $dataInicio = date('Y-m-d H:i:s');
+        // Se já tem assinatura ativa, acumula dias por cima
+        $stmtAtual = $pdo->prepare("SELECT DataExpiracao FROM Assinatura WHERE FKUsuario = :uid AND Status = 'ativa' LIMIT 1");
+        $stmtAtual->execute([':uid' => $indicadorId]);
+        $expAtual = $stmtAtual->fetchColumn();
+        $base     = ($expAtual && $expAtual > $dataInicio) ? $expAtual : $dataInicio;
+        $dataExp  = date('Y-m-d H:i:s', strtotime($base . " +" . (int)$recompensa['DuracaoDias'] . " days"));
+
+        $pdo->beginTransaction();
+        $pdo->prepare("UPDATE Assinatura SET Status = 'cancelada' WHERE FKUsuario = :uid AND Status = 'ativa'")
+            ->execute([':uid' => $indicadorId]);
+        $pdo->prepare(
+            "INSERT INTO Assinatura
+                 (IDAssinatura, FKUsuario, Plano, Status, Ciclo, ValorPago, DataInicio, DataExpiracao, FontePagamento)
+             VALUES (:id, :uid, :plano, 'ativa', 'manual', 0, :ini, :exp, 'indicacao')"
+        )->execute([
+            ':id'    => gerarUuid(),
+            ':uid'   => $indicadorId,
+            ':plano' => $recompensa['PlanoRecompensa'],
+            ':ini'   => $dataInicio,
+            ':exp'   => $dataExp,
+        ]);
+        $pdo->prepare("UPDATE Usuario SET Plano = :p WHERE IDUsuario = :uid")
+            ->execute([':p' => $recompensa['PlanoRecompensa'], ':uid' => $indicadorId]);
+        $pdo->prepare(
+            "INSERT INTO indicacao_recompensa_concedida (IDConcessao, FKUsuario, FKConfig, TotalNaEpoca)
+             VALUES (:id, :uid, :cfg, :total)"
+        )->execute([
+            ':id'    => gerarUuid(),
+            ':uid'   => $indicadorId,
+            ':cfg'   => $recompensa['IDConfig'],
+            ':total' => $totalConversoes,
+        ]);
+        $pdo->commit();
+
+    } catch (Exception $e) {
+        if ($pdo->inTransaction()) $pdo->rollBack();
+    }
+}

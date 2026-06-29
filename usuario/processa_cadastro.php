@@ -27,15 +27,34 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
         $senhaHash = password_hash($senha, PASSWORD_DEFAULT);
         $id_novo_usuario = gerarUuid();
-        
+
         // GERA O TOKEN SECRETO DE 64 CARACTERES
         $token_ativacao = bin2hex(random_bytes(32));
 
+        // Gera código de indicação único para este usuário
+        $codigoIndicacao = gerarCodigoIndicacao($pdo);
+
+        // Resolve quem indicou (via ?ref= na URL, passado como campo oculto)
+        $refCode      = strtoupper(trim($_POST['ref_code'] ?? ''));
+        $fkIndicadoPor = null;
+        if ($refCode) {
+            $stmtRef = $pdo->prepare(
+                "SELECT IDUsuario FROM Usuario WHERE CodigoIndicacao = :c AND StatusConta = 'ativa' LIMIT 1"
+            );
+            $stmtRef->execute([':c' => $refCode]);
+            $indicadorId = $stmtRef->fetchColumn();
+            if ($indicadorId) {
+                $fkIndicadoPor = $indicadorId;
+            }
+        }
+
         // Insere com Status = 'pendente' e salva o Token
         $sql = "INSERT INTO Usuario (
-                    IDUsuario, Nome, Email, Senha, TipoPessoa, NivelAcesso, StatusConta, TokenAtivacao
+                    IDUsuario, Nome, Email, Senha, TipoPessoa, NivelAcesso, StatusConta, TokenAtivacao,
+                    CodigoIndicacao, FKIndicadoPor
                 ) VALUES (
-                    :id_usuario, :nome, :email, :senha, 'PF', 'Titular', 'pendente', :token
+                    :id_usuario, :nome, :email, :senha, 'PF', 'Titular', 'pendente', :token,
+                    :codigo, :fk_ind
                 )";
 
         $stmt = $pdo->prepare($sql);
@@ -44,7 +63,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             ':nome'         => $nome,
             ':email'        => $email,
             ':senha'        => $senhaHash,
-            ':token'        => $token_ativacao
+            ':token'        => $token_ativacao,
+            ':codigo'       => $codigoIndicacao,
+            ':fk_ind'       => $fkIndicadoPor,
         ]);
 
         // Injeção do Kit Inicial de Categorias (Starter Pack Premium)

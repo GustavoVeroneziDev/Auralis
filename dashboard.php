@@ -500,6 +500,40 @@ try {
 } catch (PDOException $e) {
 }
 
+// ── Indicações: código do usuário e progresso ────────────────────────────
+$dadosIndicacao = ['codigo' => null, 'total_indicados' => 0, 'total_convertidos' => 0, 'proxima_regra' => null];
+try {
+    $stmtInd = $pdo->prepare("SELECT CodigoIndicacao FROM Usuario WHERE IDUsuario = :uid");
+    $stmtInd->execute([':uid' => $usuario_id]);
+    $dadosIndicacao['codigo'] = $stmtInd->fetchColumn();
+
+    $stmtIndCnt = $pdo->prepare(
+        "SELECT
+             COUNT(u.IDUsuario) as total,
+             SUM(CASE WHEN a.Status IN ('ativa','trial') THEN 1 ELSE 0 END) as convertidos
+         FROM Usuario u
+         LEFT JOIN Assinatura a ON a.FKUsuario = u.IDUsuario AND a.Status IN ('ativa','trial')
+         WHERE u.FKIndicadoPor = :uid"
+    );
+    $stmtIndCnt->execute([':uid' => $usuario_id]);
+    $indCnt = $stmtIndCnt->fetch(PDO::FETCH_ASSOC);
+    $dadosIndicacao['total_indicados']   = (int)($indCnt['total']       ?? 0);
+    $dadosIndicacao['total_convertidos'] = (int)($indCnt['convertidos'] ?? 0);
+
+    // Próxima regra de recompensa ainda não conquistada
+    $stmtReg = $pdo->prepare(
+        "SELECT c.* FROM indicacao_recompensa_config c
+         WHERE c.Ativo = 1 AND c.MinIndicacoes > :conv
+           AND NOT EXISTS (
+               SELECT 1 FROM indicacao_recompensa_concedida irc
+               WHERE irc.FKUsuario = :uid AND irc.FKConfig = c.IDConfig
+           )
+         ORDER BY c.MinIndicacoes ASC LIMIT 1"
+    );
+    $stmtReg->execute([':conv' => $dadosIndicacao['total_convertidos'], ':uid' => $usuario_id]);
+    $dadosIndicacao['proxima_regra'] = $stmtReg->fetch(PDO::FETCH_ASSOC) ?: null;
+} catch (PDOException $e) {}
+
 // ── Cofrinhos: lista individual para cards no dashboard ─────────────────
 $listaCofrinhosDash = [];
 $totalCofrinhos     = 0.0;
@@ -1277,6 +1311,64 @@ require_once 'geral/header.php';
             </table>
         </div>
     <?php endif; ?>
+
+    <!-- ── Widget de Indicação ──────────────────────────────────────────── -->
+    <?php if ($dadosIndicacao['codigo']): ?>
+    <?php
+        $protocolo  = (isset($_SERVER['HTTPS']) && $_SERVER['HTTPS'] === 'on') ? 'https' : 'http';
+        $linkRefDash = $protocolo . '://' . $_SERVER['HTTP_HOST'] . '/usuario/cadastro.php?ref=' . $dadosIndicacao['codigo'];
+        $proxRegra   = $dadosIndicacao['proxima_regra'];
+        $conv        = $dadosIndicacao['total_convertidos'];
+        $progPct     = $proxRegra ? min(100, round($conv / max(1, $proxRegra['MinIndicacoes']) * 100)) : 100;
+    ?>
+    <div class="card rounded-4 mb-5 mt-2" style="background:var(--bg-card);border:1px solid rgba(255,255,255,.07);">
+        <div class="card-body px-4 py-3">
+            <div class="d-flex align-items-start justify-content-between flex-wrap gap-3">
+                <div class="d-flex align-items-center gap-3">
+                    <div class="rounded-3 d-flex align-items-center justify-content-center flex-shrink-0"
+                        style="width:40px;height:40px;background:rgba(212,175,55,.1);border:1px solid rgba(212,175,55,.25);">
+                        <i class="bi bi-share-fill" style="color:#d4af37;font-size:1rem;"></i>
+                    </div>
+                    <div>
+                        <div class="text-light fw-semibold small">Indique amigos</div>
+                        <div class="d-flex align-items-center gap-2 mt-1">
+                            <code style="color:#d4af37;font-size:.78rem;"><?= htmlspecialchars($dadosIndicacao['codigo']) ?></code>
+                            <button onclick="(function(){navigator.clipboard.writeText('<?= htmlspecialchars($linkRefDash) ?>');var b=document.getElementById('btnCopInd');b.innerHTML='<i class=\'bi bi-check2\'></i>';setTimeout(function(){b.innerHTML='<i class=\'bi bi-clipboard\'></i>';},2000);})()"
+                                id="btnCopInd" class="btn btn-sm p-0 border-0 text-secondary" title="Copiar link">
+                                <i class="bi bi-clipboard" style="font-size:.8rem;"></i>
+                            </button>
+                        </div>
+                    </div>
+                </div>
+                <div class="d-flex gap-4">
+                    <div class="text-center">
+                        <div class="fw-bold text-light"><?= $dadosIndicacao['total_indicados'] ?></div>
+                        <div class="text-secondary" style="font-size:.7rem;">cadastrados</div>
+                    </div>
+                    <div class="text-center">
+                        <div class="fw-bold" style="color:#86efac;"><?= $conv ?></div>
+                        <div class="text-secondary" style="font-size:.7rem;">pagantes</div>
+                    </div>
+                </div>
+            </div>
+            <?php if ($proxRegra): ?>
+            <div class="mt-3">
+                <div class="d-flex justify-content-between mb-1" style="font-size:.73rem;">
+                    <span class="text-secondary"><?= $conv ?>/<?= $proxRegra['MinIndicacoes'] ?> para ganhar <?= $proxRegra['DuracaoDias'] ?> dias <?= strtoupper($proxRegra['PlanoRecompensa']) ?></span>
+                    <span class="text-secondary"><?= $progPct ?>%</span>
+                </div>
+                <div class="rounded-pill overflow-hidden" style="height:5px;background:rgba(255,255,255,.08);">
+                    <div class="rounded-pill h-100" style="width:<?= $progPct ?>%;background:linear-gradient(90deg,#d4af37,#f9e596);transition:width .4s;"></div>
+                </div>
+                <?php if ($proxRegra['Descricao']): ?>
+                <div class="text-secondary mt-1" style="font-size:.7rem;"><?= htmlspecialchars($proxRegra['Descricao']) ?></div>
+                <?php endif; ?>
+            </div>
+            <?php endif; ?>
+        </div>
+    </div>
+    <?php endif; ?>
+
 </main>
 
 <!-- ======================================================================= -->
