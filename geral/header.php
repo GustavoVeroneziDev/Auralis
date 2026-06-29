@@ -30,6 +30,11 @@ $_ehFreeRestrito = !$_emTrial
     && isset($_SESSION['usuario_id'])
     && strtolower($_SESSION['plano'] ?? 'free') === 'free';
 
+// Avisos automáticos: trial expirando, etc. (uma vez por sessão)
+if (isset($_SESSION['usuario_id']) && isset($pdo) && function_exists('verificarAvisosAutomaticos')) {
+    verificarAvisosAutomaticos($pdo);
+}
+
 // Verifica se o usuário logado é revendedor ativo (para exibir link no menu)
 $_ehRevendedor = false;
 if (isset($_SESSION['usuario_id']) && isset($pdo)) {

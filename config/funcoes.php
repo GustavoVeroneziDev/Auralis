@@ -162,14 +162,43 @@ if (!function_exists('verificarExpiracao')) {
             $assinatura = $stmt->fetch();
 
             if (!$assinatura || $assinatura['Status'] !== 'ativa') {
+                $planoAnterior = strtoupper($_SESSION['plano']);
+                criarNotificacaoSistema(
+                    $pdo, $_SESSION['usuario_id'],
+                    "Seu plano {$planoAnterior} foi encerrado",
+                    "Seu acesso ao plano {$planoAnterior} foi encerrado e você voltou para o plano gratuito.\n\nVocê ainda pode usar os recursos do plano Free. Para continuar com todos os recursos, considere renovar sua assinatura.",
+                    3
+                );
                 _rebaixarParaFree($pdo, $_SESSION['usuario_id']);
                 return;
             }
 
-            if (strtotime($assinatura['DataExpiracao']) < time()) {
+            $expTimestamp = strtotime($assinatura['DataExpiracao']);
+
+            if ($expTimestamp < time()) {
                 $pdo->prepare("UPDATE Assinatura SET Status = 'expirada' WHERE FKUsuario = :uid AND Status = 'ativa'")
                     ->execute([':uid' => $_SESSION['usuario_id']]);
+                $planoAnterior = strtoupper($_SESSION['plano']);
+                criarNotificacaoSistema(
+                    $pdo, $_SESSION['usuario_id'],
+                    "Seu plano {$planoAnterior} expirou",
+                    "Seu plano {$planoAnterior} expirou e você foi automaticamente movido para o plano gratuito.\n\nRenove sua assinatura para recuperar o acesso a todos os recursos!",
+                    3
+                );
                 _rebaixarParaFree($pdo, $_SESSION['usuario_id']);
+            } else {
+                $diasRestantes = (int) ceil(($expTimestamp - time()) / 86400);
+                if ($diasRestantes <= 3) {
+                    $planoNome = strtoupper($_SESSION['plano']);
+                    $dataFmt   = date('d/m/Y', $expTimestamp);
+                    $plural    = $diasRestantes > 1 ? 's' : '';
+                    criarNotificacaoSistema(
+                        $pdo, $_SESSION['usuario_id'],
+                        "Seu plano {$planoNome} expira em {$diasRestantes} dia{$plural}!",
+                        "Atenção: seu plano {$planoNome} expira em {$diasRestantes} dia{$plural} ({$dataFmt}).\n\nRenove agora para não perder o acesso aos seus recursos.",
+                        1
+                    );
+                }
             }
         } catch (PDOException $e) {
         }
@@ -572,6 +601,61 @@ function badgePremium($nivelExigido = 'pro', $emTeste = false)
     }
 
     return "<span class=\"badge ms-1\" style=\"background: {$cor}22; color: {$cor}; border: 1px solid {$cor}66; font-size: 0.55rem; padding: 2px 5px; vertical-align: middle;\"><i class=\"bi bi-star-fill\"></i> {$texto}</span>";
+}
+
+// ── Notificações automáticas do sistema ──────────────────────────────────────
+
+if (!function_exists('criarNotificacaoSistema')) {
+    function criarNotificacaoSistema(PDO $pdo, string $uid, string $titulo, string $conteudo, int $dedupeJanelaDias = 0): void
+    {
+        try {
+            if ($dedupeJanelaDias > 0) {
+                $chk = $pdo->prepare("
+                    SELECT 1 FROM Notificacao n
+                    JOIN NotificacaoDestinatario nd ON nd.FKNotificacao = n.IDNotificacao
+                    WHERE nd.FKUsuario = :uid AND n.Titulo = :titulo
+                      AND n.DataCriacao >= DATE_SUB(NOW(), INTERVAL :dias DAY)
+                    LIMIT 1
+                ");
+                $chk->execute([':uid' => $uid, ':titulo' => $titulo, ':dias' => $dedupeJanelaDias]);
+                if ($chk->fetchColumn()) return;
+            }
+
+            $nid = gerarUuid();
+            $pdo->prepare("
+                INSERT INTO Notificacao (IDNotificacao, Titulo, Conteudo, DestinatarioTipo, TipoInteracao)
+                VALUES (:id, :titulo, :conteudo, 'selecionado', 'nenhuma')
+            ")->execute([':id' => $nid, ':titulo' => $titulo, ':conteudo' => $conteudo]);
+
+            $pdo->prepare("
+                INSERT IGNORE INTO NotificacaoDestinatario (FKNotificacao, FKUsuario)
+                VALUES (:nid, :uid)
+            ")->execute([':nid' => $nid, ':uid' => $uid]);
+        } catch (Throwable $e) { /* silent — notificações não devem quebrar o fluxo principal */ }
+    }
+}
+
+if (!function_exists('verificarAvisosAutomaticos')) {
+    function verificarAvisosAutomaticos(PDO $pdo): void
+    {
+        if (!isset($_SESSION['usuario_id'])) return;
+        if (isset($_SESSION['avisos_auto_verificados'])) return;
+        $_SESSION['avisos_auto_verificados'] = true;
+
+        if (strtolower($_SESSION['plano'] ?? 'free') !== 'free') return;
+
+        $horasRestantes = function_exists('obterHorasRestantesTeste') ? obterHorasRestantesTeste() : 0;
+        if ($horasRestantes > 0 && $horasRestantes <= 24) {
+            $plural = $horasRestantes > 1 ? 's' : '';
+            criarNotificacaoSistema(
+                $pdo,
+                $_SESSION['usuario_id'],
+                'Seu período de teste termina em breve!',
+                "Atenção: seu período gratuito de teste termina em menos de {$horasRestantes} hora{$plural}.\n\nApós esse período, você continuará com o plano gratuito com recursos limitados. Considere fazer o upgrade para não perder o acesso a todos os recursos!",
+                1
+            );
+        }
+    }
 }
 
 // ── Indicações & Revendedores ─────────────────────────────────────────────────

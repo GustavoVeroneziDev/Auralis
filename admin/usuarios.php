@@ -71,6 +71,15 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                     ->execute([':plano' => $plano, ':uid' => $uid]);
 
                 $pdo->commit();
+
+                $planoNome = strtoupper($plano);
+                $dataFmt   = date('d/m/Y', strtotime($dataExpiracao));
+                $plural    = $dias > 1 ? 's' : '';
+                criarNotificacaoSistema($pdo, $uid,
+                    "Você recebeu {$dias} dia{$plural} de plano {$planoNome}!",
+                    "Boas notícias! Um administrador concedeu a você {$dias} dia{$plural} de acesso ao plano {$planoNome}.\n\nSeu acesso é válido até {$dataFmt}. Aproveite todos os recursos disponíveis no seu painel!"
+                );
+
                 header("Location: usuarios.php?sucesso=acesso_dado");
                 exit;
             } catch (PDOException $e) {
@@ -86,6 +95,12 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             $pdo->prepare("UPDATE Usuario SET Plano = 'free' WHERE IDUsuario = :uid")
                 ->execute([':uid' => $uid]);
             $pdo->commit();
+
+            criarNotificacaoSistema($pdo, $uid,
+                "Seu plano foi alterado para Free",
+                "Um administrador encerrou seu plano pago. Você voltou para o plano gratuito com recursos limitados.\n\nSe tiver dúvidas, entre em contato com o suporte."
+            );
+
             header("Location: usuarios.php?sucesso=revogado");
             exit;
         } catch (PDOException $e) {
