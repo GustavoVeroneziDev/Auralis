@@ -1,20 +1,7 @@
-﻿<?php
+<?php
 // ==============================================================================
 // ADMIN/USUARIOS.PHP — Gestão manual de usuários e planos
 // ==============================================================================
-ob_start();
-ini_set('display_errors', 1);
-error_reporting(E_ALL);
-register_shutdown_function(function () {
-    $err = error_get_last();
-    if ($err && in_array($err['type'], [E_ERROR, E_PARSE, E_CORE_ERROR, E_COMPILE_ERROR])) {
-        ob_end_clean();
-        header('Content-Type: text/plain; charset=utf-8', true, 500);
-        echo "FATAL: [{$err['type']}] {$err['message']} em {$err['file']}:{$err['line']}";
-    } else {
-        ob_end_flush();
-    }
-});
 session_start();
 
 if (!isset($_SESSION['usuario_id'])) {
