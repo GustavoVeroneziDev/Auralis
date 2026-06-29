@@ -44,17 +44,22 @@ $stmtStats->execute([':uid' => $uid, ':uid2' => $uid, ':uid3' => $uid]);
 $stats = $stmtStats->fetch(PDO::FETCH_ASSOC);
 
 // ── Conquistas ───────────────────────────────────────────────────────────────
-$stmtC = $pdo->prepare("
-    SELECT c.IDConquista, c.Slug, c.Nome, c.Descricao, c.Icone, c.ImagemUrl, c.Cor, c.Raridade, c.Ordem,
-           uc.DataConquista
-    FROM conquista c
-    LEFT JOIN usuario_conquista uc
-           ON uc.FKConquista = c.IDConquista AND uc.FKUsuario = :uid
-    WHERE c.Ativo = 1
-    ORDER BY c.Ordem ASC
-");
-$stmtC->execute([':uid' => $uid]);
-$conquistas = $stmtC->fetchAll(PDO::FETCH_ASSOC);
+$conquistas = [];
+try {
+    $stmtC = $pdo->prepare("
+        SELECT c.IDConquista, c.Slug, c.Nome, c.Descricao, c.Icone,
+               COALESCE(c.ImagemUrl, '') AS ImagemUrl,
+               c.Cor, c.Raridade, c.Ordem,
+               uc.DataConquista
+        FROM conquista c
+        LEFT JOIN usuario_conquista uc
+               ON uc.FKConquista = c.IDConquista AND uc.FKUsuario = :uid
+        WHERE c.Ativo = 1
+        ORDER BY c.Ordem ASC
+    ");
+    $stmtC->execute([':uid' => $uid]);
+    $conquistas = $stmtC->fetchAll(PDO::FETCH_ASSOC);
+} catch (Throwable $e) { /* colunas ainda não migradas em produção */ }
 
 $totalConquistas     = count($conquistas);
 $totalDesbloqueadas  = count(array_filter($conquistas, fn($c) => $c['DataConquista'] !== null));
