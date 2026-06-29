@@ -128,6 +128,18 @@ require_once '../geral/header.php';
                 <i class="bi bi-bell-fill me-1"></i> Notificações
             </a>
         </li>
+        <li class="nav-item">
+            <a href="/admin/revendedores.php" class="nav-link rounded-pill"
+               style="background:rgba(255,255,255,.05);color:#9ca3af;font-size:0.85rem;">
+                <i class="bi bi-people-fill me-1"></i> Revendedores
+            </a>
+        </li>
+        <li class="nav-item">
+            <a href="/admin/indicacoes.php" class="nav-link rounded-pill"
+               style="background:rgba(255,255,255,.05);color:#9ca3af;font-size:0.85rem;">
+                <i class="bi bi-share-fill me-1"></i> Indicações
+            </a>
+        </li>
     </ul>
 
     <!-- Alertas -->

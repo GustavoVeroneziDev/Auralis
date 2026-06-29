@@ -30,6 +30,16 @@ $_ehFreeRestrito = !$_emTrial
     && isset($_SESSION['usuario_id'])
     && strtolower($_SESSION['plano'] ?? 'free') === 'free';
 
+// Verifica se o usuário logado é revendedor ativo (para exibir link no menu)
+$_ehRevendedor = false;
+if (isset($_SESSION['usuario_id']) && isset($pdo)) {
+    try {
+        $stmtRev = $pdo->prepare("SELECT 1 FROM Revendedor WHERE FKUsuario = :uid AND Ativo = 1 LIMIT 1");
+        $stmtRev->execute([':uid' => $_SESSION['usuario_id']]);
+        $_ehRevendedor = (bool)$stmtRev->fetchColumn();
+    } catch (Throwable $e) {}
+}
+
 // ── Tema ─────────────────────────────────────────────────────────────────
 $_temasDisponiveis = function_exists('temasDisponiveis') ? temasDisponiveis() : [
     'dark'  => ['bs_mode' => 'dark'],
@@ -466,6 +476,9 @@ $_carteiraParam = (!empty($_SESSION['ultima_carteira']))
                                     <?php endif; ?>
                                 </li>
                                 <li><a class="dropdown-item text-light d-flex align-items-center py-2" href="/configuracoes.php"><i class="bi bi-gear me-2" style="color:gold;"></i> Configurações</a></li>
+                                <?php if ($_ehRevendedor): ?>
+                                <li><a class="dropdown-item d-flex align-items-center py-2 fw-semibold" href="/revendedor/dashboard.php" style="color:#d4af37;"><i class="bi bi-people-fill me-2" style="color:#d4af37;"></i> Painel do Revendedor</a></li>
+                                <?php endif; ?>
                                 <li><a class="dropdown-item text-light d-flex align-items-center py-2" href="/ajuda.php" target="_blank" rel="noopener"><i class="bi bi-mortarboard me-2" style="color:gold;"></i> Tutoriais</a></li>
                                 <li><a class="dropdown-item text-light d-flex align-items-center py-2" href="/contato.php"><i class="bi bi-headset me-2" style="color:gold;"></i> Contato & Suporte</a></li>
                                 <li class="btn-instalar-app" style="display:none;"><a class="dropdown-item text-light d-flex align-items-center py-2" href="#" onclick="auralisInstalar();return false;"><i class="bi bi-download me-2" style="color:gold;"></i> Instalar como App</a></li>

@@ -143,52 +143,69 @@ if (!empty($_GET['rev'])) {
 }
 
 $pageTitle = 'Revendedores — Admin Auralis';
+require_once '../geral/header.php';
 ?>
-<!DOCTYPE html>
-<html lang="pt-BR">
-<head>
-<meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1">
-<title><?= $pageTitle ?></title>
-<link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
-<link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css" rel="stylesheet">
 <style>
-:root { --bg:#0f1117; --card:#1a1d27; --border:rgba(255,255,255,.08); --accent:#d4af37; }
-body { background:var(--bg); color:#e2e8f0; font-family:'Inter',system-ui,sans-serif; }
-.card-admin { background:var(--card); border:1px solid var(--border); border-radius:12px; }
-.table-dark { --bs-table-bg:transparent; --bs-table-striped-bg:rgba(255,255,255,.03); }
-.table-dark th { color:#94a3b8; font-size:.75rem; text-transform:uppercase; letter-spacing:.05em; font-weight:600; }
+.card-admin { background:var(--bg-card,#1a1d27); border:1px solid rgba(255,255,255,.08); border-radius:12px; }
 .badge-ativo   { background:rgba(34,197,94,.15);  color:#86efac; border:1px solid rgba(34,197,94,.3); }
 .badge-inativo { background:rgba(239,68,68,.1);   color:#fca5a5; border:1px solid rgba(239,68,68,.2); }
 .badge-pendente{ background:rgba(245,158,11,.15); color:#fbbf24; border:1px solid rgba(245,158,11,.3); }
 .badge-paga    { background:rgba(34,197,94,.15);  color:#86efac; border:1px solid rgba(34,197,94,.3); }
-.form-control, .form-select { background:#111827; border:1px solid rgba(255,255,255,.12); color:#e2e8f0; }
-.form-control:focus, .form-select:focus { background:#111827; color:#e2e8f0; border-color:var(--accent); box-shadow:none; }
-.nav-link.active { color:var(--accent) !important; border-bottom:2px solid var(--accent); }
-a { color:#a78bfa; text-decoration:none; }
-a:hover { color:#c4b5fd; }
 </style>
-</head>
-<body>
 
-<div class="container-fluid py-4 px-4" style="max-width:1200px;">
+<main class="container-fluid py-4 mt-2 flex-grow-1" style="max-width:1200px;padding-inline:var(--space-page-x);">
 
-    <!-- Header -->
-    <div class="d-flex align-items-center justify-content-between mb-4 flex-wrap gap-3">
-        <div>
-            <div class="d-flex align-items-center gap-2 mb-1">
-                <a href="/dashboard.php" class="text-secondary small"><i class="bi bi-arrow-left me-1"></i>Dashboard</a>
-                <span class="text-secondary small">/</span>
-                <span class="text-secondary small">Admin</span>
-            </div>
-            <h4 class="fw-bold text-light mb-0"><i class="bi bi-people-fill me-2" style="color:var(--accent);"></i>Revendedores</h4>
-        </div>
+    <!-- Cabeçalho -->
+    <div class="d-flex justify-content-between align-items-center mb-4 border-bottom border-secondary-subtle pb-3 gap-3 flex-wrap">
+        <a href="/dashboard.php" class="btn btn-outline-secondary btn-sm rounded-pill px-3 flex-shrink-0">
+            <i class="bi bi-arrow-left me-1"></i> Voltar
+        </a>
         <button class="btn btn-sm rounded-pill px-4 fw-semibold"
             style="background:rgba(212,175,55,.15);color:#d4af37;border:1px solid rgba(212,175,55,.35);"
             data-bs-toggle="modal" data-bs-target="#modalAtribuir">
             <i class="bi bi-person-plus-fill me-1"></i> Atribuir revendedor
         </button>
     </div>
+
+    <!-- Tabs de navegação admin -->
+    <ul class="nav nav-pills gap-2 mb-4">
+        <li class="nav-item">
+            <a href="/admin/usuarios.php" class="nav-link rounded-pill"
+               style="background:rgba(255,255,255,.05);color:#9ca3af;font-size:0.85rem;">
+                <i class="bi bi-people me-1"></i> Usuários
+            </a>
+        </li>
+        <li class="nav-item">
+            <a href="/admin/configuracoes_planos.php" class="nav-link rounded-pill"
+               style="background:rgba(255,255,255,.05);color:#9ca3af;font-size:0.85rem;">
+                <i class="bi bi-sliders me-1"></i> Configurações de Planos
+            </a>
+        </li>
+        <li class="nav-item">
+            <a href="/admin/codigos.php" class="nav-link rounded-pill"
+               style="background:rgba(255,255,255,.05);color:#9ca3af;font-size:0.85rem;">
+                <i class="bi bi-gift-fill me-1"></i> Códigos de Ativação
+            </a>
+        </li>
+        <li class="nav-item">
+            <a href="/admin/notificacoes.php" class="nav-link rounded-pill"
+               style="background:rgba(255,255,255,.05);color:#9ca3af;font-size:0.85rem;">
+                <i class="bi bi-bell-fill me-1"></i> Notificações
+            </a>
+        </li>
+        <li class="nav-item">
+            <a href="/admin/revendedores.php" class="nav-link rounded-pill active"
+               style="background:#7c3aed;color:#fff;font-size:0.85rem;">
+                <i class="bi bi-people-fill me-1"></i> Revendedores
+            </a>
+        </li>
+        <li class="nav-item">
+            <a href="/admin/indicacoes.php" class="nav-link rounded-pill"
+               style="background:rgba(255,255,255,.05);color:#9ca3af;font-size:0.85rem;">
+                <i class="bi bi-share-fill me-1"></i> Indicações
+            </a>
+        </li>
+    </ul>
 
     <!-- Alertas -->
     <?php if ($sucesso): ?>
@@ -416,7 +433,7 @@ a:hover { color:#c4b5fd; }
         <?php endif; ?>
     </div>
     <?php endif; ?>
-</div>
+</main>
 
 <!-- ── Modal: Atribuir revendedor ────────────────────────────────────────────── -->
 <div class="modal fade" id="modalAtribuir" tabindex="-1">
@@ -540,7 +557,6 @@ a:hover { color:#c4b5fd; }
     </div>
 </div>
 
-<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
 <script>
 document.querySelectorAll('[data-bs-target="#modalEditar"]').forEach(function(btn) {
     btn.addEventListener('click', function() {
@@ -557,5 +573,5 @@ document.querySelectorAll('[data-bs-target="#modalDesativar"]').forEach(function
     });
 });
 </script>
-</body>
-</html>
+
+<?php require_once '../geral/footer.php'; ?>

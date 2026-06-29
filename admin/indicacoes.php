@@ -80,46 +80,67 @@ $stats = $pdo->query(
 )->fetch(PDO::FETCH_ASSOC);
 
 $pageTitle = 'Indicações — Admin Auralis';
+require_once '../geral/header.php';
 ?>
-<!DOCTYPE html>
-<html lang="pt-BR">
-<head>
-<meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1">
-<title><?= $pageTitle ?></title>
-<link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
-<link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css" rel="stylesheet">
 <style>
-:root { --bg:#0f1117; --card:#1a1d27; --border:rgba(255,255,255,.08); --accent:#d4af37; }
-body { background:var(--bg); color:#e2e8f0; font-family:'Inter',system-ui,sans-serif; }
-.card-admin { background:var(--card); border:1px solid var(--border); border-radius:12px; }
-.table-dark { --bs-table-bg:transparent; }
-.table-dark th { color:#94a3b8; font-size:.75rem; text-transform:uppercase; letter-spacing:.05em; font-weight:600; }
-.form-control, .form-select { background:#111827; border:1px solid rgba(255,255,255,.12); color:#e2e8f0; }
-.form-control:focus, .form-select:focus { background:#111827; color:#e2e8f0; border-color:var(--accent); box-shadow:none; }
+.card-admin { background:var(--bg-card,#1a1d27); border:1px solid rgba(255,255,255,.08); border-radius:12px; }
 .badge-pro { background:rgba(124,58,237,.2); color:#a78bfa; border:1px solid rgba(124,58,237,.3); }
 .badge-vip { background:rgba(212,175,55,.15); color:#d4af37; border:1px solid rgba(212,175,55,.3); }
 </style>
-</head>
-<body>
-<div class="container-fluid py-4 px-4" style="max-width:960px;">
 
-    <!-- Header -->
-    <div class="d-flex align-items-center justify-content-between mb-4 flex-wrap gap-3">
-        <div>
-            <div class="d-flex align-items-center gap-2 mb-1">
-                <a href="/dashboard.php" class="text-secondary small"><i class="bi bi-arrow-left me-1"></i>Dashboard</a>
-                <span class="text-secondary small">/</span>
-                <a href="revendedores.php" class="text-secondary small">Revendedores</a>
-            </div>
-            <h4 class="fw-bold text-light mb-0"><i class="bi bi-share-fill me-2" style="color:var(--accent);"></i>Programa de Indicação</h4>
-        </div>
+<main class="container-fluid py-4 mt-2 flex-grow-1" style="max-width:960px;padding-inline:var(--space-page-x);">
+
+    <!-- Cabeçalho -->
+    <div class="d-flex justify-content-between align-items-center mb-4 border-bottom border-secondary-subtle pb-3 gap-3 flex-wrap">
+        <a href="/dashboard.php" class="btn btn-outline-secondary btn-sm rounded-pill px-3 flex-shrink-0">
+            <i class="bi bi-arrow-left me-1"></i> Voltar
+        </a>
         <button class="btn btn-sm rounded-pill px-4 fw-semibold"
             style="background:rgba(212,175,55,.15);color:#d4af37;border:1px solid rgba(212,175,55,.35);"
             data-bs-toggle="modal" data-bs-target="#modalNovaRegra">
             <i class="bi bi-plus-lg me-1"></i> Nova regra
         </button>
     </div>
+
+    <!-- Tabs de navegação admin -->
+    <ul class="nav nav-pills gap-2 mb-4">
+        <li class="nav-item">
+            <a href="/admin/usuarios.php" class="nav-link rounded-pill"
+               style="background:rgba(255,255,255,.05);color:#9ca3af;font-size:0.85rem;">
+                <i class="bi bi-people me-1"></i> Usuários
+            </a>
+        </li>
+        <li class="nav-item">
+            <a href="/admin/configuracoes_planos.php" class="nav-link rounded-pill"
+               style="background:rgba(255,255,255,.05);color:#9ca3af;font-size:0.85rem;">
+                <i class="bi bi-sliders me-1"></i> Configurações de Planos
+            </a>
+        </li>
+        <li class="nav-item">
+            <a href="/admin/codigos.php" class="nav-link rounded-pill"
+               style="background:rgba(255,255,255,.05);color:#9ca3af;font-size:0.85rem;">
+                <i class="bi bi-gift-fill me-1"></i> Códigos de Ativação
+            </a>
+        </li>
+        <li class="nav-item">
+            <a href="/admin/notificacoes.php" class="nav-link rounded-pill"
+               style="background:rgba(255,255,255,.05);color:#9ca3af;font-size:0.85rem;">
+                <i class="bi bi-bell-fill me-1"></i> Notificações
+            </a>
+        </li>
+        <li class="nav-item">
+            <a href="/admin/revendedores.php" class="nav-link rounded-pill"
+               style="background:rgba(255,255,255,.05);color:#9ca3af;font-size:0.85rem;">
+                <i class="bi bi-people-fill me-1"></i> Revendedores
+            </a>
+        </li>
+        <li class="nav-item">
+            <a href="/admin/indicacoes.php" class="nav-link rounded-pill active"
+               style="background:#7c3aed;color:#fff;font-size:0.85rem;">
+                <i class="bi bi-share-fill me-1"></i> Indicações
+            </a>
+        </li>
+    </ul>
 
     <?php if ($sucesso): ?>
     <div class="alert border-0 rounded-3 mb-4 py-2 px-3" style="background:rgba(34,197,94,.1);color:#86efac;">
@@ -257,7 +278,7 @@ body { background:var(--bg); color:#e2e8f0; font-family:'Inter',system-ui,sans-s
         </div>
         <?php endif; ?>
     </div>
-</div>
+</main>
 
 <!-- Modal Nova Regra -->
 <div class="modal fade" id="modalNovaRegra" tabindex="-1">
@@ -305,6 +326,4 @@ body { background:var(--bg); color:#e2e8f0; font-family:'Inter',system-ui,sans-s
     </div>
 </div>
 
-<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
-</body>
-</html>
+<?php require_once '../geral/footer.php'; ?>
