@@ -238,11 +238,11 @@ function cartao_sincronizarPreview(PDO $pdo, string $faturaId, string $uid, arra
 /**
  * Fecha uma fatura: remove preview, congela valor, cria lembrete de pagamento e abre próxima.
  */
-function cartao_fecharFatura(PDO $pdo, array $fatura, string $uid): void
+function cartao_fecharFatura(PDO $pdo, array $fatura, string $uid, ?float $valorManual = null): void
 {
     $stmt = $pdo->prepare("SELECT COALESCE(SUM(Valor), 0) FROM LancamentoCartao WHERE FKFatura = :id");
     $stmt->execute([':id' => $fatura['IDFatura']]);
-    $total = (float)$stmt->fetchColumn();
+    $total = $valorManual !== null ? $valorManual : (float)$stmt->fetchColumn();
 
     // Remove o Registro de preview (será substituído pelo definitivo de pagamento)
     if (!empty($fatura['FKRegistroPreview'])) {
