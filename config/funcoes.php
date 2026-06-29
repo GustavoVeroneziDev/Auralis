@@ -34,7 +34,7 @@ if (!function_exists('obterNivelAcesso')) {
 }
 
 if (!function_exists('exigirAcessoMinimo')) {
-    function exigirAcessoMinimo($nivelNecessario)
+    function exigirAcessoMinimo(int $nivelNecessario): void
     {
         $nivelAtual = obterNivelAcesso();
         if ($nivelAtual < $nivelNecessario) {
@@ -54,7 +54,7 @@ if (!function_exists('obterPlanoAtual')) {
 }
 
 if (!function_exists('exigirPlano')) {
-    function exigirPlano($planoMinimo)
+    function exigirPlano(string $planoMinimo): void
     {
         $hierarquia = ['free' => 0, 'pro' => 1, 'vip' => 2];
         $atual      = $hierarquia[obterPlanoAtual()] ?? 0;
@@ -67,7 +67,7 @@ if (!function_exists('exigirPlano')) {
 }
 
 if (!function_exists('temPlano')) {
-    function temPlano($planoMinimo)
+    function temPlano(string $planoMinimo): bool
     {
         $hierarquia = ['free' => 0, 'pro' => 1, 'vip' => 2];
         $atual      = $hierarquia[obterPlanoAtual()] ?? 0;
@@ -91,8 +91,8 @@ if (!function_exists('badgePlano')) {
 }
 
 if (!function_exists('exibirLimite')) {
-    function exibirLimite($valor) {
-        return $valor === PHP_INT_MAX ? 'ilimitado' : $valor;
+    function exibirLimite(int $valor): string {
+        return $valor === PHP_INT_MAX ? 'ilimitado' : (string)$valor;
     }
 }
 
@@ -138,7 +138,7 @@ if (!function_exists('limitesDoPlano')) {
 }
 
 if (!function_exists('verificarExpiracao')) {
-    function verificarExpiracao($pdo)
+    function verificarExpiracao(PDO $pdo): void
     {
         if (!isset($_SESSION['usuario_id'])) return;
         if (($_SESSION['plano'] ?? 'free') === 'free') return;
@@ -177,7 +177,7 @@ if (!function_exists('verificarExpiracao')) {
 }
 
 if (!function_exists('_rebaixarParaFree')) {
-    function _rebaixarParaFree($pdo, $uid)
+    function _rebaixarParaFree(PDO $pdo, string $uid): void
     {
         try {
             $pdo->prepare("UPDATE Usuario SET Plano = 'free' WHERE IDUsuario = :uid")
@@ -254,7 +254,7 @@ if (!function_exists('obterHorasRestantesTeste')) {
 // ── Configuração dinâmica de recursos por plano ──────────────────────────
 
 if (!function_exists('recursoDisponivelParaPlano')) {
-    function recursoDisponivelParaPlano($slug, $plano = null)
+    function recursoDisponivelParaPlano(string $slug, ?string $plano = null): bool
     {
         global $pdo;
         static $cache = [];
@@ -289,7 +289,7 @@ if (!function_exists('recursoDisponivelParaPlano')) {
 
 if (!function_exists('nivelMinimoRecurso')) {
     // Retorna o menor plano com acesso — usado para exibição de badges no nav
-    function nivelMinimoRecurso($slug)
+    function nivelMinimoRecurso(string $slug): string
     {
         global $pdo;
         static $cache = [];
@@ -356,7 +356,7 @@ if (!defined('MP_PLANOS')) {
 
 // ── Helper MP: consulta API com cURL (saída do servidor → sem bloqueio) ──
 if (!function_exists('mpConsultarApi')) {
-    function mpConsultarApi($url)
+    function mpConsultarApi(string $url): array
     {
         $ch = curl_init($url);
         curl_setopt_array($ch, [
@@ -366,7 +366,6 @@ if (!function_exists('mpConsultarApi')) {
         ]);
         $resp     = curl_exec($ch);
         $httpCode = curl_getinfo($ch, CURLINFO_HTTP_CODE);
-        curl_close($ch);
         return [$httpCode, json_decode($resp, true)];
     }
 }
@@ -399,7 +398,7 @@ if (!function_exists('temaDoUsuario')) {
 }
 
 if (!function_exists('usuarioPossuiConquista')) {
-    function usuarioPossuiConquista($slug)
+    function usuarioPossuiConquista(string $slug): bool
     {
         global $pdo;
         $uid = $_SESSION['usuario_id'] ?? null;
@@ -419,7 +418,7 @@ if (!function_exists('usuarioPossuiConquista')) {
 }
 
 if (!function_exists('concederConquista')) {
-    function concederConquista($slug)
+    function concederConquista(string $slug): bool
     {
         global $pdo;
         $uid = $_SESSION['usuario_id'] ?? null;
@@ -447,7 +446,7 @@ if (!function_exists('concederConquista')) {
 
 // ── Helper MP: cancela assinatura no Mercado Pago via API ────────────────
 if (!function_exists('mpCancelarNoMP')) {
-    function mpCancelarNoMP($gwId)
+    function mpCancelarNoMP(string $gwId): void
     {
         if (empty($gwId)) return;
         $ch = curl_init("https://api.mercadopago.com/preapproval/{$gwId}");
@@ -462,13 +461,12 @@ if (!function_exists('mpCancelarNoMP')) {
             CURLOPT_TIMEOUT => 10,
         ]);
         curl_exec($ch);
-        curl_close($ch);
     }
 }
 
 // ── Helper MP: ativa plano no banco a partir de dados da assinatura ───────
 if (!function_exists('mpAtivarPlano')) {
-    function mpAtivarPlano($pdo, $emailComprador, $planId, $gwId, $valorPago = 0)
+    function mpAtivarPlano(PDO $pdo, string $emailComprador, string $planId, string $gwId, float $valorPago = 0): string|false
     {
         $planos = MP_PLANOS;
         if (!isset($planos[$planId])) return false;
