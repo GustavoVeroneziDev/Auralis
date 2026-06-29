@@ -45,7 +45,7 @@ $stats = $stmtStats->fetch(PDO::FETCH_ASSOC);
 
 // ── Conquistas ───────────────────────────────────────────────────────────────
 $stmtC = $pdo->prepare("
-    SELECT c.IDConquista, c.Slug, c.Nome, c.Descricao, c.Icone, c.Cor, c.Raridade, c.Ordem,
+    SELECT c.IDConquista, c.Slug, c.Nome, c.Descricao, c.Icone, c.ImagemUrl, c.Cor, c.Raridade, c.Ordem,
            uc.DataConquista
     FROM conquista c
     LEFT JOIN usuario_conquista uc
@@ -239,9 +239,11 @@ require_once 'geral/header.php';
             <div class="conquista-card <?= $desbloqueada ? '' : 'bloqueada' ?>">
                 <!-- Ícone -->
                 <div class="conquista-icon-wrap"
-                     style="background:<?= htmlspecialchars($c['Cor']) ?>22;color:<?= htmlspecialchars($c['Cor']) ?>;">
+                     style="background:<?= htmlspecialchars($c['Cor']) ?>22;color:<?= htmlspecialchars($c['Cor']) ?>;overflow:hidden;">
                     <?php if (!$desbloqueada): ?>
                         <i class="bi bi-lock-fill" style="color:var(--text-muted);font-size:1.1rem;"></i>
+                    <?php elseif (!empty($c['ImagemUrl'])): ?>
+                        <img src="<?= htmlspecialchars($c['ImagemUrl']) ?>" alt="<?= htmlspecialchars($c['Nome']) ?>" style="width:100%;height:100%;object-fit:cover;border-radius:50%;">
                     <?php else: ?>
                         <i class="bi <?= htmlspecialchars($c['Icone']) ?>"></i>
                     <?php endif; ?>
