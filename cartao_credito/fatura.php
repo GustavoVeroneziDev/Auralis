@@ -124,6 +124,16 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         }
     }
 
+    if ($action === 'ajustar_valor') {
+        $faturaId  = trim($_POST['fatura_id'] ?? '');
+        $novoTotal = (float)str_replace(['.', ','], ['', '.'], trim($_POST['novo_total'] ?? ''));
+        if ($faturaId && $novoTotal >= 0) {
+            $pdo->prepare("UPDATE FaturaCartao SET ValorTotal = :v WHERE IDFatura = :id AND FKUsuario = :uid AND Status != 'aberta'")
+                ->execute([':v' => $novoTotal, ':id' => $faturaId, ':uid' => $uid]);
+            $sucesso = 'Valor da fatura ajustado.';
+        }
+    }
+
     if ($action === 'marcar_paga') {
         $faturaId = trim($_POST['fatura_id'] ?? '');
         $pdo->prepare("UPDATE FaturaCartao SET Status='paga' WHERE IDFatura=:id AND FKUsuario=:uid AND Status='fechada'")
@@ -366,8 +376,10 @@ require_once '../geral/header.php';
     <h5 class="fw-bold text-light mb-3">Histórico de faturas</h5>
     <div class="d-flex flex-column gap-3">
         <?php foreach ($historico as $fh):
-            $isPaga    = $fh['Status'] === 'paga';
-            $lancsFh   = $lancHistorico[$fh['IDFatura']] ?? [];
+            $isPaga       = $fh['Status'] === 'paga';
+            $lancsFh      = $lancHistorico[$fh['IDFatura']] ?? [];
+            $vencTxt      = strtotime($fh['DataVencimento']) < strtotime('today') ? 'Venceu' : 'Vence';
+            $fechouLabel  = !empty($fh['DataFechamento']) ? 'Fechou em ' . date('d/m/Y', strtotime($fh['DataFechamento'])) . ' · ' : '';
         ?>
         <div class="card rounded-4" style="background:var(--bg-card);border:1px solid rgba(255,255,255,.08);">
             <div class="card-body p-0">
@@ -385,12 +397,20 @@ require_once '../geral/header.php';
                                 Fatura <?= date('M/Y', strtotime($fh['MesReferencia'] . '-01')) ?>
                             </p>
                             <p class="text-secondary mb-0" style="font-size:0.72rem;">
-                                Venceu em <?= date('d/m/Y', strtotime($fh['DataVencimento'])) ?>
+                                <?= $fechouLabel ?><?= $vencTxt ?> em <?= date('d/m/Y', strtotime($fh['DataVencimento'])) ?>
                             </p>
                         </div>
                     </div>
                     <div class="d-flex align-items-center gap-3">
-                        <span class="fw-bold" style="color:#f87171;">R$ <?= number_format($fh['ValorTotal'], 2, ',', '.') ?></span>
+                        <div class="d-flex align-items-center gap-1" onclick="event.stopPropagation()">
+                            <span class="fw-bold" style="color:#f87171;">R$ <?= number_format($fh['ValorTotal'], 2, ',', '.') ?></span>
+                            <button type="button" title="Ajustar valor total"
+                                class="btn btn-sm p-1 border-0 text-secondary"
+                                style="line-height:1;background:transparent;"
+                                onclick="abrirAjuste('<?= $fh['IDFatura'] ?>', <?= (float)$fh['ValorTotal'] ?>)">
+                                <i class="bi bi-pencil-square" style="font-size:0.75rem;"></i>
+                            </button>
+                        </div>
                         <?php if (!$isPaga): ?>
                             <form method="POST" onclick="event.stopPropagation()">
                                 <input type="hidden" name="action" value="marcar_paga">
@@ -443,6 +463,50 @@ require_once '../geral/header.php';
     </div>
     <?php endif; ?>
 </main>
+
+<!-- ── Modal: Ajustar valor de fatura ──────────────────────────────────── -->
+<div class="modal fade" id="modalAjustarValor" tabindex="-1">
+    <div class="modal-dialog modal-dialog-centered modal-sm">
+        <div class="modal-content border-secondary-subtle shadow-lg" style="background:var(--bg-card);">
+            <form method="POST">
+                <input type="hidden" name="action" value="ajustar_valor">
+                <input type="hidden" name="fatura_id" id="ajusteFaturaId">
+                <div class="modal-header border-secondary-subtle px-4 py-3">
+                    <h6 class="modal-title fw-bold text-light mb-0">Ajustar valor da fatura</h6>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                </div>
+                <div class="modal-body px-4 py-3">
+                    <p class="text-secondary mb-3" style="font-size:0.83rem;">
+                        Informe o valor real cobrado pelo cartão. Útil para incluir juros, multas ou discrepâncias.
+                    </p>
+                    <label class="form-label text-secondary small fw-semibold mb-1">Novo valor total</label>
+                    <div class="input-group">
+                        <span class="input-group-text border-secondary-subtle text-secondary" style="background:var(--bg-hover);">R$</span>
+                        <input type="text" name="novo_total" id="ajusteValorInput"
+                            class="form-control border-secondary-subtle shadow-none"
+                            style="background:var(--bg-card);color:var(--text-main);"
+                            placeholder="0,00" required>
+                    </div>
+                </div>
+                <div class="modal-footer border-secondary-subtle px-4 py-3 gap-2">
+                    <button type="button" class="btn btn-sm btn-outline-secondary rounded-pill px-3" data-bs-dismiss="modal">Cancelar</button>
+                    <button type="submit" class="btn btn-sm rounded-pill px-3 fw-semibold"
+                        style="background:rgba(212,175,55,.15);color:#d4af37;border:1px solid rgba(212,175,55,.35);">
+                        Salvar ajuste
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+<script>
+function abrirAjuste(faturaId, valorAtual) {
+    document.getElementById('ajusteFaturaId').value = faturaId;
+    var inp = document.getElementById('ajusteValorInput');
+    inp.value = valorAtual.toFixed(2).replace('.', ',');
+    new bootstrap.Modal(document.getElementById('modalAjustarValor')).show();
+}
+</script>
 
 <!-- ── Modal: Excluir lançamento ───────────────────────────────────────── -->
 <div class="modal fade" id="modalExcluirLanc" tabindex="-1">
