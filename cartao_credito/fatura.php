@@ -151,6 +151,21 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         } catch (PDOException $e) {}
         $sucesso = 'Fatura marcada como paga.';
     }
+
+    if ($action === 'reabrir_fatura') {
+        $faturaId = trim($_POST['fatura_id'] ?? '');
+        $stmt = $pdo->prepare(
+            "SELECT f.*, c.DiaVencimento, c.FKCarteiraDebito, c.Nome AS NomeCartao
+             FROM FaturaCartao f JOIN CartaoCredito c ON f.FKCartao = c.IDCartao
+             WHERE f.IDFatura = :id AND f.FKUsuario = :uid AND f.Status = 'fechada'"
+        );
+        $stmt->execute([':id' => $faturaId, ':uid' => $uid]);
+        $fat = $stmt->fetch(PDO::FETCH_ASSOC);
+        if ($fat) {
+            cartao_reabrirFatura($pdo, $fat, $uid, $cartao);
+            $sucesso = 'Fatura reaberta. Você pode adicionar ou editar lançamentos normalmente.';
+        }
+    }
 }
 
 // Fatura aberta atual
@@ -422,6 +437,12 @@ require_once '../geral/header.php';
                                     Marcar como paga
                                 </button>
                             </form>
+                            <button type="button" title="Reabrir fatura"
+                                onclick="event.stopPropagation(); abrirModalReabrir('<?= $fh['IDFatura'] ?>')"
+                                class="btn btn-sm rounded-pill px-3"
+                                style="background:rgba(148,163,184,.08);color:#94a3b8;border:1px solid rgba(148,163,184,.2);font-size:0.75rem;">
+                                <i class="bi bi-arrow-counterclockwise me-1"></i> Reabrir
+                            </button>
                         <?php endif; ?>
                         <i class="bi bi-chevron-down text-secondary" id="ico-fh-<?= $fh['IDFatura'] ?>"></i>
                     </div>
@@ -465,6 +486,37 @@ require_once '../geral/header.php';
     </div>
     <?php endif; ?>
 </main>
+
+<!-- ── Modal: Reabrir fatura ─────────────────────────────────────────────── -->
+<div class="modal fade" id="modalReabrirFatura" tabindex="-1">
+    <div class="modal-dialog modal-dialog-centered modal-sm">
+        <div class="modal-content border-secondary-subtle shadow-lg" style="background:var(--bg-card);">
+            <form method="POST">
+                <input type="hidden" name="action" value="reabrir_fatura">
+                <input type="hidden" name="fatura_id" id="reabrirFaturaId">
+                <div class="modal-header border-secondary-subtle px-4 py-3">
+                    <h6 class="modal-title fw-bold text-light mb-0">Reabrir fatura</h6>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                </div>
+                <div class="modal-body px-4 py-3">
+                    <p class="text-secondary mb-2" style="font-size:0.83rem;">
+                        A fatura voltará para <strong class="text-light">aberta</strong> e o lembrete de pagamento pendente será removido da agenda.
+                    </p>
+                    <p class="text-secondary mb-0" style="font-size:0.78rem;">
+                        Lançamentos e faturas posteriores não são afetados.
+                    </p>
+                </div>
+                <div class="modal-footer border-secondary-subtle d-flex justify-content-between p-3">
+                    <button type="button" class="btn btn-sm btn-link text-secondary text-decoration-none" data-bs-dismiss="modal">Cancelar</button>
+                    <button type="submit" class="btn btn-sm fw-bold rounded-pill px-4"
+                        style="background:rgba(148,163,184,.12);color:#94a3b8;border:1px solid rgba(148,163,184,.3);">
+                        <i class="bi bi-arrow-counterclockwise me-1"></i> Reabrir
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
 
 <!-- ── Modal: Ajustar valor de fatura ──────────────────────────────────── -->
 <div class="modal fade" id="modalAjustarValor" tabindex="-1">
@@ -776,6 +828,11 @@ function setCurrencyInputValue(el, floatVal) {
     var cents = Math.round(Math.abs(floatVal) * 100);
     el._digits = cents === 0 ? '' : String(cents);
     _fmtCurrency(el);
+}
+
+function abrirModalReabrir(faturaId) {
+    document.getElementById('reabrirFaturaId').value = faturaId;
+    bsModal('modalReabrirFatura').show();
 }
 
 function abrirModalFecharFatura(faturaId, totalStr) {

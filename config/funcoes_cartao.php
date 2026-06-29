@@ -288,6 +288,26 @@ function cartao_fecharFatura(PDO $pdo, array $fatura, string $uid, ?float $valor
 }
 
 /**
+ * Reabre uma fatura fechada: remove o lembrete de pagamento pendente e restaura status aberta.
+ */
+function cartao_reabrirFatura(PDO $pdo, array $fatura, string $uid, array $cartao): void
+{
+    if (!empty($fatura['FKRegistroPagamento'])) {
+        $pdo->prepare(
+            "DELETE FROM Registro WHERE IDRegistro = :rid AND FKUsuario = :uid AND StatusRegistro = 'pendente'"
+        )->execute([':rid' => $fatura['FKRegistroPagamento'], ':uid' => $uid]);
+    }
+
+    $pdo->prepare(
+        "UPDATE FaturaCartao
+         SET Status = 'aberta', ValorTotal = 0, FKRegistroPagamento = NULL
+         WHERE IDFatura = :id AND FKUsuario = :uid AND Status = 'fechada'"
+    )->execute([':id' => $fatura['IDFatura'], ':uid' => $uid]);
+
+    cartao_sincronizarPreview($pdo, $fatura['IDFatura'], $uid, $cartao);
+}
+
+/**
  * Verificação automática: fecha faturas cujo DataFechamento já passou.
  */
 function cartao_verificarFechamentos(PDO $pdo, string $uid): void
