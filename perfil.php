@@ -46,7 +46,7 @@ $stats = $stmtStats->fetch(PDO::FETCH_ASSOC);
 // ── Conquistas ───────────────────────────────────────────────────────────────
 $stmtC = $pdo->prepare("
     SELECT c.IDConquista, c.Slug, c.Nome, c.Descricao, c.Icone, c.Cor, c.Raridade, c.Ordem,
-           uc.DataConquistado
+           uc.DataConquista
     FROM conquista c
     LEFT JOIN usuario_conquista uc
            ON uc.FKConquista = c.IDConquista AND uc.FKUsuario = :uid
@@ -57,7 +57,7 @@ $stmtC->execute([':uid' => $uid]);
 $conquistas = $stmtC->fetchAll(PDO::FETCH_ASSOC);
 
 $totalConquistas     = count($conquistas);
-$totalDesbloqueadas  = count(array_filter($conquistas, fn($c) => $c['DataConquistado'] !== null));
+$totalDesbloqueadas  = count(array_filter($conquistas, fn($c) => $c['DataConquista'] !== null));
 
 // ── Mapa de raridade → label/cor ────────────────────────────────────────────
 $raridadeInfo = [
@@ -221,13 +221,13 @@ require_once 'geral/header.php';
     <?php else: ?>
     <div class="row g-3">
         <?php foreach ($conquistas as $c):
-            $desbloqueada = $c['DataConquistado'] !== null;
+            $desbloqueada = $c['DataConquista'] !== null;
             $raridade     = $raridadeInfo[$c['Raridade']] ?? $raridadeInfo['comum'];
 
             // Data relativa de desbloqueio
             $dataDesbloq = '';
             if ($desbloqueada) {
-                $diff = (new DateTime())->diff(new DateTime($c['DataConquistado']));
+                $diff = (new DateTime())->diff(new DateTime($c['DataConquista']));
                 if ($diff->days === 0)      $dataDesbloq = 'hoje';
                 elseif ($diff->days === 1)  $dataDesbloq = 'ontem';
                 elseif ($diff->days < 30)   $dataDesbloq = "há {$diff->days} dias";

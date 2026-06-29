@@ -461,7 +461,7 @@ if (!function_exists('concederConquistaParaUsuario')) {
             if ($check->fetchColumn()) return false;
 
             $pdo->prepare("
-                INSERT INTO usuario_conquista (IDUsuarioConquista, FKUsuario, FKConquista, DataConquistado)
+                INSERT INTO usuario_conquista (IDUsuarioConquista, FKUsuario, FKConquista, DataConquista)
                 VALUES (:id, :uid, :cid, NOW())
             ")->execute([':id' => gerarUuid(), ':uid' => $uid, ':cid' => $cid]);
             return true;
