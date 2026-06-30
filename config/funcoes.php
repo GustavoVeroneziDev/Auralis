@@ -540,6 +540,24 @@ if (!function_exists('verificarConquistasAutomaticas')) {
                     $total = (int)$stmt->fetchColumn();
                     break;
 
+                case 'comprovantes':
+                    $stmt = $pdo->prepare("
+                        SELECT COUNT(DISTINCT FKRegistro) FROM Comprovante WHERE FKUsuario = :uid
+                    ");
+                    $stmt->execute([':uid' => $uid]);
+                    $total = (int)$stmt->fetchColumn();
+                    break;
+
+                case 'categorias':
+                    $stmt = $pdo->prepare("
+                        SELECT COUNT(DISTINCT FKCategoria) FROM Registro
+                        WHERE FKUsuario = :uid AND FKCategoria IS NOT NULL
+                          AND TipoRegistro IN ('receita','despesa')
+                    ");
+                    $stmt->execute([':uid' => $uid]);
+                    $total = (int)$stmt->fetchColumn();
+                    break;
+
                 default:
                     return;
             }
@@ -566,6 +584,20 @@ if (!function_exists('verificarConquistasDiasMembro')) {
     function verificarConquistasDiasMembro(PDO $pdo, string $uid): void
     {
         verificarConquistasAutomaticas($pdo, $uid, 'dias_membro');
+    }
+}
+
+if (!function_exists('verificarConquistasComprovantes')) {
+    function verificarConquistasComprovantes(PDO $pdo, string $uid): void
+    {
+        verificarConquistasAutomaticas($pdo, $uid, 'comprovantes');
+    }
+}
+
+if (!function_exists('verificarConquistasCategorias')) {
+    function verificarConquistasCategorias(PDO $pdo, string $uid): void
+    {
+        verificarConquistasAutomaticas($pdo, $uid, 'categorias');
     }
 }
 

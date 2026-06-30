@@ -479,6 +479,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                     if ($primeiroIdParc) processarComprovantes($pdo, $primeiroIdParc, $usuario_id);
                     concederConquista('primeira_transacao');
                     verificarConquistasRegistros($pdo, $usuario_id);
+                    verificarConquistasComprovantes($pdo, $usuario_id);
+                    verificarConquistasCategorias($pdo, $usuario_id);
                     header("Location: " . $_urlVoltar . (strpos($_urlVoltar, '?') !== false ? '&' : '?') . "sucesso=parcelado&parcelas={$numParcelas}");
                     exit;
                 }
@@ -533,6 +535,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 if ($primeiroIdRec) processarComprovantes($pdo, $primeiroIdRec, $usuario_id);
                 concederConquista('primeira_transacao');
                 verificarConquistasRegistros($pdo, $usuario_id);
+                verificarConquistasComprovantes($pdo, $usuario_id);
+                verificarConquistasCategorias($pdo, $usuario_id);
                 header("Location: " . $_urlVoltar . (strpos($_urlVoltar, '?') !== false ? '&' : '?') . "sucesso=recorrente");
             } else {
                 // ── CRIAÇÃO SIMPLES (Transação Única) ────────────────────────
@@ -564,6 +568,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 processarComprovantes($pdo, $novoId, $usuario_id);
                 concederConquista('primeira_transacao');
                 verificarConquistasRegistros($pdo, $usuario_id);
+                verificarConquistasComprovantes($pdo, $usuario_id);
+                verificarConquistasCategorias($pdo, $usuario_id);
                 header("Location: " . $_urlVoltar . (strpos($_urlVoltar, '?') !== false ? '&' : '?') . "sucesso=registro");
             }
             exit;

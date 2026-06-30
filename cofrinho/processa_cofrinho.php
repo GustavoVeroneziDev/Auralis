@@ -171,6 +171,27 @@ if ($acao === 'depositar') {
             ':uid'      => $uid,
             ':cofrinho' => $idCofrinho,
         ]);
+
+        // Verifica conquista metabatida (atingiu a meta do cofrinho)
+        try {
+            $stmtMeta = $pdo->prepare("
+                SELECT c.ValorMeta,
+                       COALESCE(SUM(CASE
+                           WHEN r.TipoRegistro = 'cofrinho' THEN r.Valor
+                           WHEN r.TipoRegistro = 'cofrinho_retirada' THEN -r.Valor
+                           ELSE 0 END), 0) AS Saldo
+                FROM Cofrinho c
+                LEFT JOIN Registro r ON r.FKCofrinho = c.IDCofrinho AND r.FKUsuario = :uid
+                WHERE c.IDCofrinho = :id
+                GROUP BY c.IDCofrinho, c.ValorMeta
+            ");
+            $stmtMeta->execute([':id' => $idCofrinho, ':uid' => $uid]);
+            $cofRow = $stmtMeta->fetch(PDO::FETCH_ASSOC);
+            if ($cofRow && $cofRow['ValorMeta'] > 0 && $cofRow['Saldo'] >= $cofRow['ValorMeta']) {
+                concederConquistaParaUsuario($pdo, $uid, 'metabatida');
+            }
+        } catch (PDOException $e) {}
+
         header("Location: {$voltar}?sucesso=deposito_realizado");
     } catch (PDOException $e) {
         header("Location: {$voltar}?erro=banco&detail=" . urlencode($e->getMessage()) . "");
