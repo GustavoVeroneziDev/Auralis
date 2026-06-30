@@ -83,7 +83,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                     $sucesso = "Conquista criada com sucesso!";
                 } else {
                     if (empty($cid)) throw new RuntimeException("ID inválido.");
-                    // Só atualiza ImagemUrl se algo foi enviado; caso contrário mantém o existente
                     if ($imagemUrl !== null) {
                         $pdo->prepare("
                             UPDATE conquista
@@ -336,7 +335,7 @@ require_once '../geral/header.php';
         <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
       </div>
       <form method="post" enctype="multipart/form-data" id="formConquista">
-        <div class="modal-body px-4 py-4">
+        <div class="modal-body px-4 py-4" style="max-height:65vh;overflow-y:auto;overscroll-behavior:contain;">
           <input type="hidden" name="action" id="fAction" value="criar">
           <input type="hidden" name="conquista_id" id="fId">
 
@@ -556,10 +555,7 @@ function abrirModalEditar(c) {
     document.getElementById('fAtivo').checked   = c.Ativo == 1;
     document.getElementById('iconePreview').className = 'bi ' + (c.Icone || 'bi-trophy');
 
-    var sel = document.getElementById('fRaridade');
-    for (var i = 0; i < sel.options.length; i++) {
-        sel.options[i].selected = sel.options[i].value === c.Raridade;
-    }
+    document.getElementById('fRaridade').value = c.Raridade || 'comum';
 
     limparImagem();
     var imgAtualWrap = document.getElementById('imgAtualWrap');

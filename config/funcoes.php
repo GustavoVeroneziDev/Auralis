@@ -481,6 +481,63 @@ if (!function_exists('concederConquista')) {
     }
 }
 
+if (!function_exists('verificarConquistasAutomaticas')) {
+    /**
+     * Verifica e concede conquistas automáticas de um tipo para um usuário.
+     * Os thresholds e slugs são definidos em config/conquistas_regras.php.
+     * Para adicionar novos tipos de gatilho, adicione um 'case' aqui e
+     * a entrada correspondente em conquistas_regras.php.
+     */
+    function verificarConquistasAutomaticas(PDO $pdo, string $uid, string $tipo): void
+    {
+        try {
+            $regras = require __DIR__ . '/conquistas_regras.php';
+            if (!isset($regras[$tipo])) return;
+
+            $thresholds = $regras[$tipo]['thresholds'] ?? [];
+            if (empty($thresholds)) return;
+
+            // Calcula o valor atual do usuário para o tipo solicitado
+            switch ($tipo) {
+                case 'registros':
+                    $stmt = $pdo->prepare("
+                        SELECT COUNT(*) FROM Usuario
+                        WHERE FKIndicadoPor = :uid AND StatusConta != 'pendente'
+                    ");
+                    $stmt->execute([':uid' => $uid]);
+                    $total = (int)$stmt->fetchColumn();
+                    break;
+
+                // case 'dias_membro':
+                //     $stmt = $pdo->prepare("
+                //         SELECT DATEDIFF(NOW(), DataCadastro) FROM Usuario WHERE IDUsuario = :uid
+                //     ");
+                //     $stmt->execute([':uid' => $uid]);
+                //     $total = (int)$stmt->fetchColumn();
+                //     break;
+
+                default:
+                    return;
+            }
+
+            foreach ($thresholds as $minimo => $slug) {
+                if ($total >= $minimo) {
+                    concederConquistaParaUsuario($pdo, $uid, $slug);
+                }
+            }
+        } catch (Throwable $e) {
+            // silencia — conquistas nunca devem quebrar o fluxo principal
+        }
+    }
+}
+
+if (!function_exists('verificarConquistasRegistros')) {
+    function verificarConquistasRegistros(PDO $pdo, string $uid): void
+    {
+        verificarConquistasAutomaticas($pdo, $uid, 'registros');
+    }
+}
+
 // ── Helper MP: cancela assinatura no Mercado Pago via API ────────────────
 if (!function_exists('mpCancelarNoMP')) {
     function mpCancelarNoMP(string $gwId): void
@@ -717,6 +774,7 @@ function processarIndicacaoConversao(PDO $pdo, string $emailComprador, float $va
             if ($jaExiste->fetchColumn()) return;
 
             concederConquistaParaUsuario($pdo, $indicadorId, 'indicou_amigo');
+            verificarConquistasRegistros($pdo, $indicadorId);
             $perc  = (float)$revendedor['ComissaoPercentual'];
             $valor = round($valorPago * $perc / 100, 2);
             $pdo->prepare(
@@ -737,6 +795,7 @@ function processarIndicacaoConversao(PDO $pdo, string $emailComprador, float $va
 
         // ── Caminho B: usuário comum — verifica recompensas por indicação ────
         concederConquistaParaUsuario($pdo, $indicadorId, 'indicou_amigo');
+        verificarConquistasRegistros($pdo, $indicadorId);
         // Conta quantos usuários o indicador trouxe que agora têm plano ativo
         $stmtCnt = $pdo->prepare(
             "SELECT COUNT(DISTINCT u.IDUsuario)
