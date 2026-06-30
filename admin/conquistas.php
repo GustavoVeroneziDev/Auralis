@@ -34,7 +34,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $descricao= trim($_POST['descricao'] ?? '');
         $icone    = trim($_POST['icone'] ?? 'bi-trophy');
         $cor      = preg_match('/^#[0-9a-fA-F]{6}$/', $_POST['cor'] ?? '') ? $_POST['cor'] : '#d4af37';
-        $raridade = in_array($_POST['raridade'] ?? '', ['comum','raro','epico','lendario']) ? $_POST['raridade'] : 'comum';
+        $raridade = in_array($_POST['raridade'] ?? '', ['comum','incomum','raro','epico','lendario','mitico']) ? $_POST['raridade'] : 'comum';
         $ordem    = max(1, min(255, (int)($_POST['ordem'] ?? 99)));
         $ativo    = isset($_POST['ativo']) ? 1 : 0;
 
@@ -160,10 +160,12 @@ try {
 } catch (PDOException $e) { $erro = "Erro ao buscar conquistas."; }
 
 $raridadeInfo = [
-    'comum'    => ['label' => 'Comum',    'cor' => '#9ca3af'],
-    'raro'     => ['label' => 'Raro',     'cor' => '#06b6d4'],
-    'epico'    => ['label' => 'Épico',    'cor' => '#7c3aed'],
-    'lendario' => ['label' => 'Lendário', 'cor' => '#d4af37'],
+    'comum'    => ['label' => 'Comum',    'cor' => '#808080'],
+    'incomum'  => ['label' => 'Incomum',  'cor' => '#3eb23e'],
+    'raro'     => ['label' => 'Raro',     'cor' => '#0070dd'],
+    'epico'    => ['label' => 'Épico',    'cor' => '#a335ee'],
+    'lendario' => ['label' => 'Lendário', 'cor' => '#ff8000'],
+    'mitico'   => ['label' => 'Mítico',   'cor' => '#f3d3fd'],
 ];
 
 $pageTitle = 'Admin — Conquistas';
@@ -395,9 +397,11 @@ require_once '../geral/header.php';
               <select name="raridade" id="fRaridade" class="form-select rounded-3"
                       style="background:var(--input-bg,#1e2028);border-color:var(--bs-border-color);color:var(--text-main);">
                 <option value="comum">Comum</option>
+                <option value="incomum">Incomum</option>
                 <option value="raro">Raro</option>
                 <option value="epico">Épico</option>
                 <option value="lendario">Lendário</option>
+                <option value="mitico">Mítico</option>
               </select>
             </div>
 

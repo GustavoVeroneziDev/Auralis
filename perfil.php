@@ -66,10 +66,12 @@ $totalDesbloqueadas  = count(array_filter($conquistas, fn($c) => $c['DataConquis
 
 // ── Mapa de raridade → label/cor ────────────────────────────────────────────
 $raridadeInfo = [
-    'comum'    => ['label' => 'Comum',    'cor' => '#9ca3af'],
-    'raro'     => ['label' => 'Raro',     'cor' => '#06b6d4'],
-    'epico'    => ['label' => 'Épico',    'cor' => '#7c3aed'],
-    'lendario' => ['label' => 'Lendário', 'cor' => '#d4af37'],
+    'comum'    => ['label' => 'Comum',    'cor' => '#808080'],
+    'incomum'  => ['label' => 'Incomum',  'cor' => '#3eb23e'],
+    'raro'     => ['label' => 'Raro',     'cor' => '#0070dd'],
+    'epico'    => ['label' => 'Épico',    'cor' => '#a335ee'],
+    'lendario' => ['label' => 'Lendário', 'cor' => '#ff8000'],
+    'mitico'   => ['label' => 'Mítico',   'cor' => '#f3d3fd'],
 ];
 
 // ── Cor da inicial do avatar baseada no plano ────────────────────────────────
@@ -137,28 +139,43 @@ require_once 'geral/header.php';
 
 /* ── Frames por raridade ────────────────────────────── */
 .badge-comum {
-    background: rgba(156,163,175,0.08);
-    border: 1.5px solid rgba(156,163,175,0.35);
+    background: rgba(128,128,128,0.08);
+    border: 1.5px solid rgba(128,128,128,0.35);
+}
+.badge-incomum {
+    background: rgba(62,178,62,0.1);
+    border: 1.5px solid rgba(62,178,62,0.55);
+    box-shadow: 0 0 8px rgba(62,178,62,0.2);
 }
 .badge-raro {
-    background: rgba(6,182,212,0.1);
-    border: 1.5px solid rgba(6,182,212,0.65);
-    box-shadow: 0 0 10px rgba(6,182,212,0.22);
+    background: rgba(0,112,221,0.1);
+    border: 1.5px solid rgba(0,112,221,0.65);
+    box-shadow: 0 0 10px rgba(0,112,221,0.25);
 }
 .badge-epico {
-    background: linear-gradient(135deg,rgba(124,58,237,0.16),rgba(168,85,247,0.06));
-    border: 2px solid rgba(168,85,247,0.75);
-    box-shadow: 0 0 14px rgba(124,58,237,0.38), inset 0 0 8px rgba(124,58,237,0.08);
+    background: linear-gradient(135deg,rgba(163,53,238,0.16),rgba(163,53,238,0.06));
+    border: 2px solid rgba(163,53,238,0.75);
+    box-shadow: 0 0 14px rgba(163,53,238,0.4), inset 0 0 8px rgba(163,53,238,0.08);
 }
 .badge-lendario {
-    background: linear-gradient(135deg,rgba(212,175,55,0.18),rgba(245,158,11,0.06));
-    border: 2px solid rgba(212,175,55,0.88);
-    box-shadow: 0 0 16px rgba(212,175,55,0.48), inset 0 0 10px rgba(212,175,55,0.1);
+    background: linear-gradient(135deg,rgba(255,128,0,0.18),rgba(255,128,0,0.06));
+    border: 2px solid rgba(255,128,0,0.88);
+    box-shadow: 0 0 16px rgba(255,128,0,0.5), inset 0 0 10px rgba(255,128,0,0.1);
     animation: glow-lendario 2.8s ease-in-out infinite;
 }
 @keyframes glow-lendario {
-    0%,100% { box-shadow: 0 0 16px rgba(212,175,55,0.48), inset 0 0 10px rgba(212,175,55,0.10); }
-    50%      { box-shadow: 0 0 26px rgba(212,175,55,0.72), inset 0 0 14px rgba(212,175,55,0.18); }
+    0%,100% { box-shadow: 0 0 16px rgba(255,128,0,0.50), inset 0 0 10px rgba(255,128,0,0.10); }
+    50%      { box-shadow: 0 0 28px rgba(255,128,0,0.75), inset 0 0 14px rgba(255,128,0,0.20); }
+}
+.badge-mitico {
+    background: linear-gradient(135deg,rgba(243,211,253,0.15),rgba(243,211,253,0.04));
+    border: 2px solid rgba(243,211,253,0.80);
+    box-shadow: 0 0 20px rgba(243,211,253,0.5), inset 0 0 12px rgba(243,211,253,0.08);
+    animation: glow-mitico 2.2s ease-in-out infinite;
+}
+@keyframes glow-mitico {
+    0%,100% { box-shadow: 0 0 20px rgba(243,211,253,0.50), inset 0 0 12px rgba(243,211,253,0.08); }
+    50%      { box-shadow: 0 0 38px rgba(243,211,253,0.88), inset 0 0 20px rgba(243,211,253,0.18); }
 }
 .conquista-card.bloqueada .conquista-icon-wrap {
     animation: none !important;
