@@ -7,7 +7,7 @@ if (isset($_GET['token']) && !empty($_GET['token'])) {
 
     try {
         // Busca se existe alguém com esse token específico
-        $sql = "SELECT IDUsuario FROM Usuario WHERE TokenAtivacao = :token AND StatusConta = 'pendente' LIMIT 1";
+        $sql = "SELECT IDUsuario, Nome FROM Usuario WHERE TokenAtivacao = :token AND StatusConta = 'pendente' LIMIT 1";
         $stmt = $pdo->prepare($sql);
         $stmt->execute([':token' => $token]);
         $usuario = $stmt->fetch(PDO::FETCH_ASSOC);
@@ -19,6 +19,29 @@ if (isset($_GET['token']) && !empty($_GET['token'])) {
             $stmtUpdate->execute([':uid' => $usuario['IDUsuario']]);
 
             concederConquistaParaUsuario($pdo, $usuario['IDUsuario'], 'primeiro_acesso');
+
+            // Notificação de boas-vindas com campo de resposta livre
+            try {
+                $primeiroNome = explode(' ', $usuario['Nome'])[0];
+                $nidBV = gerarUuid();
+                $itensBV = json_encode([[
+                    'pergunta' => 'Tem alguma mensagem, sugestão ou dúvida para a nossa equipe?',
+                    'tipo'     => 'texto',
+                ]]);
+                $pdo->prepare("
+                    INSERT INTO Notificacao (IDNotificacao, Titulo, Conteudo, DestinatarioTipo, TipoInteracao, ItensPesquisa)
+                    VALUES (:id, :titulo, :conteudo, 'selecionado', 'pesquisa', :itens)
+                ")->execute([
+                    ':id'      => $nidBV,
+                    ':titulo'  => 'Bem-vindo ao Auralis!',
+                    ':conteudo' => "Olá, {$primeiroNome}!\n\nÉ uma alegria ter você aqui. O Auralis foi criado para simplificar sua vida financeira — explore o painel, registre suas movimentações, crie metas e aproveite tudo que preparamos para você.\n\nSinta-se completamente à vontade para testar, explorar e, se quiser, nos enviar uma mensagem com dúvidas, sugestões ou qualquer feedback. Você também pode nos contatar pelos canais no rodapé do site.\n\nObrigado por confiar no Auralis!\n\n— Equipe Auralis",
+                    ':itens'   => $itensBV,
+                ]);
+                $pdo->prepare("
+                    INSERT IGNORE INTO NotificacaoDestinatario (FKNotificacao, FKUsuario)
+                    VALUES (:nid, :uid)
+                ")->execute([':nid' => $nidBV, ':uid' => $usuario['IDUsuario']]);
+            } catch (Throwable $e) { /* silencia — boas-vindas não devem bloquear a ativação */ }
 
             // Manda pro login com sucesso
             header("Location: login.php?ativacao=sucesso");

@@ -302,6 +302,33 @@ function parseBRL(val) {
 <?php if (isset($_SESSION['usuario_id']) && isset($pdo)): ?>
 <?php include_once __DIR__ . '/../notificacoes/_widget.php'; ?>
 <?php endif; ?>
+
+<script>
+(function () {
+    var SK_URL = 'auralis_scroll_url';
+    var SK_POS = 'auralis_scroll_pos';
+
+    // Antes de qualquer POST, salva a URL atual e a posição do scroll
+    document.addEventListener('submit', function (e) {
+        var form = e.target;
+        if (form && form.method && form.method.toLowerCase() === 'post') {
+            sessionStorage.setItem(SK_URL, window.location.pathname);
+            sessionStorage.setItem(SK_POS, window.scrollY);
+        }
+    }, true);
+
+    // Ao carregar, restaura o scroll se a URL bater com a que foi salva
+    document.addEventListener('DOMContentLoaded', function () {
+        var savedUrl = sessionStorage.getItem(SK_URL);
+        var savedPos = sessionStorage.getItem(SK_POS);
+        if (savedUrl && savedPos !== null && savedUrl === window.location.pathname) {
+            window.scrollTo(0, parseInt(savedPos, 10));
+        }
+        sessionStorage.removeItem(SK_URL);
+        sessionStorage.removeItem(SK_POS);
+    });
+})();
+</script>
 </body>
 
 </html>

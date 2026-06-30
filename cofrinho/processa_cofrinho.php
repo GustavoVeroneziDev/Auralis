@@ -29,7 +29,7 @@ $uid  = $_SESSION['usuario_id'];
 $acao = $_POST['acao'] ?? $_GET['acao'] ?? '';
 
 if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
-    header("Location: ../analises.php#cofrinhos");
+    header("Location: ../analises.php");
     exit;
 }
 
@@ -50,7 +50,7 @@ if ($acao === 'criar') {
     if (empty($nome) || empty($carteira)
         || !in_array($icone, $iconesPermitidos)
         || !in_array($cor, $coresPermitidas)) {
-        header("Location: {$voltar}?erro=cofrinho_invalido#cofrinhos");
+        header("Location: {$voltar}?erro=cofrinho_invalido");
         exit;
     }
 
@@ -58,11 +58,11 @@ if ($acao === 'criar') {
         $stmtV = $pdo->prepare("SELECT IDCarteira FROM Carteira WHERE IDCarteira = :id AND FKUsuarioDono = :uid");
         $stmtV->execute([':id' => $carteira, ':uid' => $uid]);
         if (!$stmtV->fetch()) {
-            header("Location: {$voltar}?erro=cofrinho_invalido#cofrinhos");
+            header("Location: {$voltar}?erro=cofrinho_invalido");
             exit;
         }
     } catch (PDOException $e) {
-        header("Location: {$voltar}?erro=banco#cofrinhos");
+        header("Location: {$voltar}?erro=banco");
         exit;
     }
 
@@ -81,9 +81,9 @@ if ($acao === 'criar') {
             ':meta'       => $meta,
             ':data_limite'=> $dataLimite,
         ]);
-        header("Location: {$voltar}?sucesso=cofrinho_criado#cofrinhos");
+        header("Location: {$voltar}?sucesso=cofrinho_criado");
     } catch (PDOException $e) {
-        header("Location: {$voltar}?erro=banco#cofrinhos");
+        header("Location: {$voltar}?erro=banco");
     }
     exit;
 }
@@ -103,7 +103,7 @@ if ($acao === 'editar') {
     if (empty($idCofrinho) || empty($nome)
         || !in_array($icone, $iconesPermitidos)
         || !in_array($cor, $coresPermitidas)) {
-        header("Location: {$voltar}?erro=cofrinho_invalido#cofrinhos");
+        header("Location: {$voltar}?erro=cofrinho_invalido");
         exit;
     }
 
@@ -121,9 +121,9 @@ if ($acao === 'editar') {
             ':meta'       => $meta,
             ':data_limite'=> $dataLimite,
         ]);
-        header("Location: {$voltar}?sucesso=cofrinho_editado#cofrinhos");
+        header("Location: {$voltar}?sucesso=cofrinho_editado");
     } catch (PDOException $e) {
-        header("Location: {$voltar}?erro=banco#cofrinhos");
+        header("Location: {$voltar}?erro=banco");
     }
     exit;
 }
@@ -135,7 +135,7 @@ if ($acao === 'depositar') {
     $descricao  = trim($_POST['descricao'] ?? '') ?: null;
 
     if (empty($idCofrinho) || $valor <= 0) {
-        header("Location: {$voltar}?erro=deposito_invalido#cofrinhos");
+        header("Location: {$voltar}?erro=deposito_invalido");
         exit;
     }
 
@@ -144,11 +144,11 @@ if ($acao === 'depositar') {
         $stmtCof->execute([':id' => $idCofrinho, ':uid' => $uid]);
         $cofrinho = $stmtCof->fetch(PDO::FETCH_ASSOC);
         if (!$cofrinho) {
-            header("Location: {$voltar}?erro=cofrinho_invalido#cofrinhos");
+            header("Location: {$voltar}?erro=cofrinho_invalido");
             exit;
         }
     } catch (PDOException $e) {
-        header("Location: {$voltar}?erro=banco#cofrinhos");
+        header("Location: {$voltar}?erro=banco");
         exit;
     }
 
@@ -171,9 +171,9 @@ if ($acao === 'depositar') {
             ':uid'      => $uid,
             ':cofrinho' => $idCofrinho,
         ]);
-        header("Location: {$voltar}?sucesso=deposito_realizado#cofrinhos");
+        header("Location: {$voltar}?sucesso=deposito_realizado");
     } catch (PDOException $e) {
-        header("Location: {$voltar}?erro=banco&detail=" . urlencode($e->getMessage()) . "#cofrinhos");
+        header("Location: {$voltar}?erro=banco&detail=" . urlencode($e->getMessage()) . "");
     }
     exit;
 }
@@ -185,7 +185,7 @@ if ($acao === 'retirar') {
     $descricao  = trim($_POST['descricao'] ?? '') ?: null;
 
     if (empty($idCofrinho) || $valor <= 0) {
-        header("Location: {$voltar}?erro=retirada_invalida#cofrinhos");
+        header("Location: {$voltar}?erro=retirada_invalida");
         exit;
     }
 
@@ -194,11 +194,11 @@ if ($acao === 'retirar') {
         $stmtCof->execute([':id' => $idCofrinho, ':uid' => $uid]);
         $cofrinho = $stmtCof->fetch(PDO::FETCH_ASSOC);
         if (!$cofrinho) {
-            header("Location: {$voltar}?erro=cofrinho_invalido#cofrinhos");
+            header("Location: {$voltar}?erro=cofrinho_invalido");
             exit;
         }
     } catch (PDOException $e) {
-        header("Location: {$voltar}?erro=banco#cofrinhos");
+        header("Location: {$voltar}?erro=banco");
         exit;
     }
 
@@ -221,9 +221,9 @@ if ($acao === 'retirar') {
             ':uid'      => $uid,
             ':cofrinho' => $idCofrinho,
         ]);
-        header("Location: {$voltar}?sucesso=retirada_realizada#cofrinhos");
+        header("Location: {$voltar}?sucesso=retirada_realizada");
     } catch (PDOException $e) {
-        header("Location: {$voltar}?erro=banco&detail=" . urlencode($e->getMessage()) . "#cofrinhos");
+        header("Location: {$voltar}?erro=banco&detail=" . urlencode($e->getMessage()) . "");
     }
     exit;
 }
@@ -235,7 +235,7 @@ if ($acao === 'reajustar') {
     $valorAtualDB = round((float) ($_POST['valor_atual'] ?? 0), 2);
 
     if (empty($idCofrinho) || $novoValor < 0) {
-        header("Location: {$voltar}?erro=reajuste_invalido#cofrinhos");
+        header("Location: {$voltar}?erro=reajuste_invalido");
         exit;
     }
 
@@ -244,17 +244,17 @@ if ($acao === 'reajustar') {
         $stmtCof->execute([':id' => $idCofrinho, ':uid' => $uid]);
         $cofrinho = $stmtCof->fetch(PDO::FETCH_ASSOC);
         if (!$cofrinho) {
-            header("Location: {$voltar}?erro=cofrinho_invalido#cofrinhos");
+            header("Location: {$voltar}?erro=cofrinho_invalido");
             exit;
         }
     } catch (PDOException $e) {
-        header("Location: {$voltar}?erro=banco#cofrinhos");
+        header("Location: {$voltar}?erro=banco");
         exit;
     }
 
     $delta = round($novoValor - $valorAtualDB, 2);
     if (abs($delta) < 0.01) {
-        header("Location: {$voltar}?sucesso=sem_alteracao#cofrinhos");
+        header("Location: {$voltar}?sucesso=sem_alteracao");
         exit;
     }
 
@@ -282,9 +282,9 @@ if ($acao === 'reajustar') {
             ':uid'      => $uid,
             ':cofrinho' => $idCofrinho,
         ]);
-        header("Location: {$voltar}?sucesso=reajuste_feito#cofrinhos");
+        header("Location: {$voltar}?sucesso=reajuste_feito");
     } catch (PDOException $e) {
-        header("Location: {$voltar}?erro=banco&detail=" . urlencode($e->getMessage()) . "#cofrinhos");
+        header("Location: {$voltar}?erro=banco&detail=" . urlencode($e->getMessage()) . "");
     }
     exit;
 }
@@ -294,7 +294,7 @@ if ($acao === 'excluir') {
     $idCofrinho = trim($_POST['id_cofrinho'] ?? '');
 
     if (empty($idCofrinho)) {
-        header("Location: {$voltar}?erro=cofrinho_invalido#cofrinhos");
+        header("Location: {$voltar}?erro=cofrinho_invalido");
         exit;
     }
 
@@ -307,10 +307,10 @@ if ($acao === 'excluir') {
         $stmtCof = $pdo->prepare("DELETE FROM Cofrinho WHERE IDCofrinho=:id AND FKUsuario=:uid");
         $stmtCof->execute([':id' => $idCofrinho, ':uid' => $uid]);
         $pdo->commit();
-        header("Location: {$voltar}?sucesso=cofrinho_excluido#cofrinhos");
+        header("Location: {$voltar}?sucesso=cofrinho_excluido");
     } catch (PDOException $e) {
         $pdo->rollBack();
-        header("Location: {$voltar}?erro=banco#cofrinhos");
+        header("Location: {$voltar}?erro=banco");
     }
     exit;
 }
@@ -349,5 +349,5 @@ if ($acao === 'editar_registro') {
     exit;
 }
 
-header("Location: {$voltar}#cofrinhos");
+header("Location: {$voltar}");
 exit;

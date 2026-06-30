@@ -523,7 +523,10 @@ if (!function_exists('verificarConquistasAutomaticas')) {
             switch ($tipo) {
                 case 'registros':
                     $stmt = $pdo->prepare("
-                        SELECT COUNT(*) FROM Registro WHERE FKUsuario = :uid
+                        SELECT
+                            (SELECT COUNT(*) FROM Registro WHERE FKUsuario = :uid AND GrupoParcela IS NULL)
+                            +
+                            (SELECT COUNT(DISTINCT GrupoParcela) FROM Registro WHERE FKUsuario = :uid AND GrupoParcela IS NOT NULL)
                     ");
                     $stmt->execute([':uid' => $uid]);
                     $total = (int)$stmt->fetchColumn();
