@@ -30,8 +30,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
     if ($action === 'fechar_fatura') {
         $faturaId    = trim($_POST['fatura_id'] ?? '');
-        $valorRaw    = trim($_POST['valor_manual'] ?? '');
-        $valorManual = $valorRaw !== '' ? (float)str_replace(['.', ','], ['', '.'], $valorRaw) : null;
+        $valorRaw    = preg_replace('/[^\d,]/', '', trim($_POST['valor_manual'] ?? ''));
+        $valorManual = $valorRaw !== '' ? (float) str_replace(',', '.', $valorRaw) : null;
         $stmt = $pdo->prepare("SELECT f.*, c.DiaVencimento, c.FKCarteiraDebito, c.Nome AS NomeCartao
                                 FROM FaturaCartao f JOIN CartaoCredito c ON f.FKCartao = c.IDCartao
                                 WHERE f.IDFatura = :id AND f.FKUsuario = :uid AND f.Status = 'aberta'");
@@ -85,8 +85,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $grupo        = trim($_POST['grupo'] ?? '');
         $parcelaAtual = (int)($_POST['parcela_atual'] ?? 0);
         $desc         = trim($_POST['descricao'] ?? '');
-        $valorRaw     = str_replace(['.', ','], ['', '.'], trim($_POST['valor'] ?? '0'));
-        $valor        = (float)$valorRaw;
+        $valorRaw     = preg_replace('/[^\d,]/', '', trim($_POST['valor'] ?? '0'));
+        $valor        = (float) str_replace(',', '.', $valorRaw);
         $data         = trim($_POST['data_compra'] ?? '');
         $catId        = trim($_POST['categoria_id'] ?? '') ?: null;
 
@@ -631,7 +631,7 @@ function abrirAjuste(faturaId, valorAtual) {
                         <label class="form-label text-secondary small">Valor (R$)</label>
                         <input type="text" name="valor" id="editarLancValor"
                             class="form-control bg-transparent text-light border-secondary"
-                            required inputmode="decimal">
+                            required inputmode="numeric" oninput="mascaraMoeda(this)" placeholder="R$ 0,00" autocomplete="off">
                     </div>
                     <div id="editarDataWrap">
                         <label class="form-label text-secondary small">Data da compra</label>
@@ -701,7 +701,8 @@ function abrirAjuste(faturaId, valorAtual) {
                         <input type="text" name="valor_manual" id="fecharFaturaValor"
                             class="form-control border-secondary-subtle shadow-none"
                             style="background:var(--bg-card);color:var(--text-main);font-variant-numeric:tabular-nums;letter-spacing:.02em;"
-                            placeholder="0,00" required autocomplete="off">
+                            placeholder="R$ 0,00" required autocomplete="off"
+                            inputmode="numeric" oninput="mascaraMoeda(this)">
                     </div>
                     <p class="text-secondary mt-2 mb-0" style="font-size:0.75rem;">O valor será congelado e um lembrete de pagamento será criado na agenda.</p>
                 </div>
@@ -750,7 +751,9 @@ document.addEventListener('click', function(e) {
         const d = btnEdit.dataset;
         document.getElementById('editarLancId').value          = d.id;
         document.getElementById('editarLancDesc').value        = d.desc;
-        document.getElementById('editarLancValor').value       = d.valor;
+        var lancValorInp = document.getElementById('editarLancValor');
+        lancValorInp.value = d.valor;
+        mascaraMoeda(lancValorInp);
         document.getElementById('editarLancData').value        = d.data;
         document.getElementById('editarLancCat').value         = d.cat || '';
         document.getElementById('editarLancGrupo').value       = d.grupo || '';

@@ -259,7 +259,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'])) {
     }
 
     if ($_POST['action'] === 'ajustar_saldo') {
-        $saldo_informado    = (float) str_replace(',', '.', $_POST['saldo_real']);
+        $saldo_informado    = (float) str_replace(',', '.', preg_replace('/[^\d,]/', '', $_POST['saldo_real'] ?? '0'));
         $saldo_sistema      = (float) $_POST['saldo_sistema_atual'];
         $carteira_id_ajuste = $_POST['carteira_id_ajuste'];
 
@@ -1399,7 +1399,7 @@ require_once 'geral/header.php';
                         <label class="form-label text-secondary small">Qual o seu saldo exato hoje?</label>
                         <div class="input-group input-group-lg">
                             <span class="input-group-text bg-transparent border-secondary-subtle text-light fw-bold">R$</span>
-                            <input type="number" step="0.01" name="saldo_real" class="form-control bg-transparent border-secondary-subtle text-light fw-bold shadow-none no-spinners" required placeholder="0,00" value="<?php echo number_format($saldoAtual ?? 0, 2, '.', '') ?>" autofocus>
+                            <input type="text" name="saldo_real" inputmode="numeric" class="form-control bg-transparent border-secondary-subtle text-light fw-bold shadow-none" required placeholder="R$ 0,00" oninput="mascaraMoeda(this)" autocomplete="off" data-saldo-inicial="<?php echo number_format($saldoAtual ?? 0, 2, '.', '') ?>" autofocus>
                         </div>
                     </div>
                 </div>
@@ -1653,7 +1653,7 @@ require_once 'geral/header.php';
 
                         <div class="input-group input-group-lg mb-4 shadow-sm">
                             <span class="input-group-text bg-body-tertiary border-secondary-subtle text-primary fw-bold border-end-0 fs-4" style="color: var(--primary-gold-analysis) !important;">R$</span>
-                            <input type="number" step="0.01" name="saldo_real" class="form-control bg-body-tertiary border-secondary-subtle border-start-0 text-light fw-bold shadow-none no-spinners fs-3 py-3" required placeholder="0,00" autofocus>
+                            <input type="text" name="saldo_real" inputmode="numeric" class="form-control bg-body-tertiary border-secondary-subtle border-start-0 text-light fw-bold shadow-none fs-3 py-3" required placeholder="R$ 0,00" oninput="mascaraMoeda(this)" autocomplete="off" autofocus>
                         </div>
 
                         <button type="submit" class="btn btn-gold btn-lg w-100 fw-bold text-dark rounded-pill py-3 shadow-lg transition-hover">
@@ -1723,8 +1723,8 @@ require_once 'geral/header.php';
                     <label class="form-label text-secondary small fw-semibold text-uppercase mb-1">Valor</label>
                     <div class="input-group">
                         <span class="input-group-text bg-body-tertiary border-secondary-subtle text-secondary fw-bold">R$</span>
-                        <input type="number" id="transf-valor" class="form-control bg-body-tertiary border-secondary-subtle text-light"
-                            min="0.01" step="0.01" placeholder="0,00">
+                        <input type="text" id="transf-valor" inputmode="numeric" class="form-control bg-body-tertiary border-secondary-subtle text-light"
+                            placeholder="R$ 0,00" oninput="mascaraMoeda(this)" autocomplete="off">
                     </div>
                 </div>
 
@@ -1947,7 +1947,7 @@ require_once 'geral/header.php';
         btn.addEventListener('click', function() {
             var de     = document.getElementById('transf-de').value;
             var para   = document.getElementById('transf-para').value;
-            var valor  = parseFloat(document.getElementById('transf-valor').value);
+            var valor  = parseBRL(document.getElementById('transf-valor').value);
             var desc   = document.getElementById('transf-desc').value.trim();
             var data   = document.getElementById('transf-data').value;
             var status = document.getElementById('transf-status').value;
@@ -2004,7 +2004,8 @@ require_once 'geral/header.php';
                 document.getElementById('transf-erro').classList.add('d-none');
                 btn.disabled = false;
                 btn.innerHTML = '<i class="bi bi-arrow-left-right me-1"></i> Transferir';
-                document.getElementById('transf-valor').value = '';
+                var tv = document.getElementById('transf-valor');
+                tv.value = '';
             });
         }
     })();
@@ -2041,6 +2042,19 @@ require_once 'geral/header.php';
                 var chev = document.getElementById('chev-' + key);
                 if (sec)  sec.style.display = 'none';
                 if (chev) chev.style.transform = 'rotate(180deg)';
+            }
+        });
+    })();
+
+    // Formata o saldo pré-preenchido ao abrir modalAjusteSaldo
+    (function() {
+        var m = document.getElementById('modalAjusteSaldo');
+        if (!m) return;
+        m.addEventListener('show.bs.modal', function() {
+            var inp = m.querySelector('input[name="saldo_real"]');
+            if (inp && inp.dataset.saldoInicial) {
+                inp.value = inp.dataset.saldoInicial;
+                mascaraMoeda(inp);
             }
         });
     })();

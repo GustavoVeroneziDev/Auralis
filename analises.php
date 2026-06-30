@@ -1270,9 +1270,9 @@ require_once 'geral/header.php';
                     <!-- Meta (opcional) -->
                     <div class="mb-3">
                         <label class="form-label text-secondary small fw-semibold">Meta (R$) <span class="opacity-50">— opcional</span></label>
-                        <input type="number" name="meta" class="form-control rounded-3 border-secondary-subtle"
+                        <input type="text" name="meta" inputmode="numeric" class="form-control rounded-3 border-secondary-subtle"
                                style="background:var(--bg-hover);color:var(--text-main);"
-                               placeholder="0,00" min="0.01" step="0.01">
+                               placeholder="R$ 0,00" oninput="mascaraMoeda(this)" autocomplete="off">
                     </div>
 
                     <!-- Data limite (opcional) -->
@@ -1338,8 +1338,8 @@ require_once 'geral/header.php';
                     </div>
                     <div class="mb-3">
                         <label class="form-label text-secondary small fw-semibold">Meta (R$) <span class="opacity-50">— opcional</span></label>
-                        <input type="number" name="meta" id="editar_meta" class="form-control rounded-3 border-secondary-subtle"
-                               style="background:var(--bg-hover);color:var(--text-main);" placeholder="0,00" min="0.01" step="0.01">
+                        <input type="text" name="meta" id="editar_meta" inputmode="numeric" class="form-control rounded-3 border-secondary-subtle"
+                               style="background:var(--bg-hover);color:var(--text-main);" placeholder="R$ 0,00" oninput="mascaraMoeda(this)" autocomplete="off">
                     </div>
                     <div class="mb-1">
                         <label class="form-label text-secondary small fw-semibold">Data limite <span class="opacity-50">— opcional</span></label>
@@ -1373,10 +1373,10 @@ require_once 'geral/header.php';
                 <input type="hidden" name="id_cofrinho" id="dep_id">
                 <div class="modal-body p-4">
                     <label class="form-label text-secondary small fw-semibold">Valor (R$) *</label>
-                    <input type="number" name="valor" id="dep_valor"
+                    <input type="text" name="valor" id="dep_valor" inputmode="numeric"
                            class="form-control form-control-lg rounded-3 border-secondary-subtle"
                            style="background:var(--bg-hover);color:var(--text-main);font-size:1.4rem;font-weight:700;"
-                           placeholder="0,00" min="0.01" step="0.01" required>
+                           placeholder="R$ 0,00" oninput="mascaraMoeda(this)" autocomplete="off" required>
                     <label class="form-label text-secondary small fw-semibold mt-3">Descrição <span class="opacity-50">— opcional</span></label>
                     <input type="text" name="descricao" class="form-control rounded-3 border-secondary-subtle"
                            style="background:var(--bg-hover);color:var(--text-main);" placeholder="Ex: Salário, economias...">
@@ -1410,10 +1410,10 @@ require_once 'geral/header.php';
                 <input type="hidden" name="id_cofrinho" id="ret_id">
                 <div class="modal-body p-4">
                     <label class="form-label text-secondary small fw-semibold">Valor a retirar (R$) *</label>
-                    <input type="number" name="valor" id="ret_valor"
+                    <input type="text" name="valor" id="ret_valor" inputmode="numeric"
                            class="form-control form-control-lg rounded-3 border-secondary-subtle"
                            style="background:var(--bg-hover);color:var(--text-main);font-size:1.4rem;font-weight:700;"
-                           placeholder="0,00" min="0.01" step="0.01" required>
+                           placeholder="R$ 0,00" oninput="mascaraMoeda(this)" autocomplete="off" required>
                     <label class="form-label text-secondary small fw-semibold mt-3">Descrição <span class="opacity-50">— opcional</span></label>
                     <input type="text" name="descricao" class="form-control rounded-3 border-secondary-subtle"
                            style="background:var(--bg-hover);color:var(--text-main);" placeholder="Ex: Emergência, compra...">
@@ -1452,10 +1452,10 @@ require_once 'geral/header.php';
                         <div class="fw-bold text-light" id="reaj_saldo_display" style="font-size:1.1rem;"></div>
                     </div>
                     <label class="form-label text-secondary small fw-semibold">Novo saldo desejado (R$) *</label>
-                    <input type="number" name="novo_valor" id="reaj_novo_valor"
+                    <input type="text" name="novo_valor" id="reaj_novo_valor" inputmode="numeric"
                            class="form-control form-control-lg rounded-3 border-secondary-subtle"
                            style="background:var(--bg-hover);color:var(--text-main);font-size:1.4rem;font-weight:700;"
-                           placeholder="0,00" min="0" step="0.01" required>
+                           placeholder="R$ 0,00" oninput="mascaraMoeda(this)" autocomplete="off" required>
                     <div class="text-secondary small mt-2">
                         <i class="bi bi-info-circle me-1"></i>A diferença será lançada como depósito ou retirada automática.
                     </div>
@@ -1510,9 +1510,9 @@ require_once 'geral/header.php';
                 <input type="hidden" id="editReg_id">
                 <div class="mb-3">
                     <label class="form-label text-secondary small fw-semibold">Valor (R$) *</label>
-                    <input type="number" id="editReg_val" class="form-control rounded-3 border-secondary-subtle"
+                    <input type="text" id="editReg_val" inputmode="numeric" class="form-control rounded-3 border-secondary-subtle"
                            style="background:var(--bg-hover);color:var(--text-main);font-size:1.2rem;font-weight:700;"
-                           placeholder="0,00" min="0.01" step="0.01" required>
+                           placeholder="R$ 0,00" oninput="mascaraMoeda(this)" autocomplete="off" required>
                 </div>
                 <div class="mb-1">
                     <label class="form-label text-secondary small fw-semibold">Descrição <span class="opacity-50">— opcional</span></label>
@@ -1637,6 +1637,7 @@ function abrirHistorico(id, nome, cor, valAtual, valMeta, icone, histJSON, dataL
                 e.stopPropagation();
                 _get('editReg_id').value   = row.dataset.rid;
                 _get('editReg_val').value  = row.dataset.valor;
+                mascaraMoeda(_get('editReg_val'));
                 _get('editReg_desc').value = row.dataset.desc;
                 _modal('modalEditarRegistro').show();
             });
@@ -1706,7 +1707,9 @@ function abrirReajustar(id, nome, valAtual) {
 function abrirEditar(id, nome, cor, icone, meta, dataLimite) {
     _get('editar_id').value = id;
     _get('editar_nome').value = nome;
-    _get('editar_meta').value = meta !== null ? meta : '';
+    var metaInp = _get('editar_meta');
+    metaInp.value = meta !== null ? meta : '';
+    if (metaInp.value !== '') mascaraMoeda(metaInp);
     _get('editar_data_limite').value = dataLimite || '';
 
     // Marca ícone correto
@@ -1734,9 +1737,9 @@ document.addEventListener('DOMContentLoaded', function() {
     if (!btn) return;
     btn.addEventListener('click', function() {
         var rid   = _get('editReg_id').value;
-        var valor = parseFloat(_get('editReg_val').value);
+        var valor = parseBRL(_get('editReg_val').value);
         var desc  = _get('editReg_desc').value.trim();
-        if (!rid || isNaN(valor) || valor <= 0) { alert('Informe um valor válido.'); return; }
+        if (!rid || valor <= 0) { alert('Informe um valor válido.'); return; }
         btn.disabled = true;
         fetch('cofrinho/processa_cofrinho.php', {
             method: 'POST',

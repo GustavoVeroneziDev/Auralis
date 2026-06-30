@@ -34,7 +34,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     } elseif ($action === 'dar_acesso') {
         $plano = in_array($_POST['plano'] ?? '', ['pro', 'vip']) ? $_POST['plano'] : '';
         $dias  = max(1, min(3650, (int)($_POST['dias'] ?? 30)));
-        $valor = max(0.0, (float)str_replace(',', '.', $_POST['valor_pago'] ?? '0'));
+        $valor = max(0.0, (float) str_replace(',', '.', preg_replace('/[^\d,]/', '', $_POST['valor_pago'] ?? '0')));
 
         if (!$plano) {
             $erro = "Selecione um plano válido.";
@@ -529,9 +529,10 @@ require_once '../geral/header.php';
                         </label>
                         <div class="input-group">
                             <span class="input-group-text bg-dark border-secondary-subtle text-secondary">R$</span>
-                            <input type="text" name="valor_pago"
+                            <input type="text" name="valor_pago" inputmode="numeric"
                                 class="form-control bg-dark border-secondary-subtle text-light"
-                                placeholder="0,00" autocomplete="off">
+                                placeholder="R$ 0,00" autocomplete="off"
+                                oninput="mascaraMoeda(this)">
                         </div>
                     </div>
 
