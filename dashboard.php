@@ -1241,6 +1241,30 @@ require_once 'geral/header.php';
                                             <a href="nova_transacao.php?editar=<?php echo $t['IDRegistro'] ?>&voltar=<?php echo urlencode($_uv_dash) ?>" class="btn btn-sm btn-outline-warning rounded-pill fw-semibold px-3 d-inline-flex align-items-center gap-1 transition-hover">
                                                 <i class="bi bi-pencil-square"></i> <span class="d-none d-sm-inline">Editar</span>
                                             </a>
+                                            <?php if ($totalCarteiras > 1): ?>
+                                            <div class="dropdown d-inline-block">
+                                                <button type="button"
+                                                    class="btn btn-sm btn-outline-info rounded-pill fw-semibold px-3 d-inline-flex align-items-center gap-1 transition-hover dropdown-toggle"
+                                                    data-bs-toggle="dropdown" aria-expanded="false" title="Transferir para outra carteira">
+                                                    <i class="bi bi-arrow-left-right"></i>
+                                                </button>
+                                                <ul class="dropdown-menu shadow border-secondary-subtle" style="background:var(--bg-card);min-width:180px;">
+                                                    <li><span class="dropdown-header text-secondary small text-uppercase" style="font-size:.7rem;">Transferir para</span></li>
+                                                    <?php foreach ($carteiras as $cart): ?>
+                                                        <?php if ($cart['IDCarteira'] != $carteira_selecionada): ?>
+                                                        <li>
+                                                            <button class="dropdown-item d-flex align-items-center gap-2 py-2" type="button"
+                                                                    style="font-size:.875rem;color:var(--text-main);"
+                                                                    onclick="transferirRegistroDash(this, '<?= htmlspecialchars($t['IDRegistro'], ENT_QUOTES) ?>', '<?= htmlspecialchars($cart['IDCarteira'], ENT_QUOTES) ?>', '<?= htmlspecialchars($cart['TipoCarteira'], ENT_QUOTES) ?>')">
+                                                                <i class="bi bi-wallet2" style="color:#60a5fa;"></i>
+                                                                <?= htmlspecialchars($cart['TipoCarteira']) ?>
+                                                            </button>
+                                                        </li>
+                                                        <?php endif; ?>
+                                                    <?php endforeach; ?>
+                                                </ul>
+                                            </div>
+                                            <?php endif; ?>
                                             <?php endif; ?>
 
                                             <?php if ($_temAcessoComp && ($t['qtd_comprovantes'] ?? 0) > 0): ?>
@@ -2021,6 +2045,24 @@ require_once 'geral/header.php';
                 if (res.ok) { window.location.reload(); }
                 else { alert('Erro ao excluir: ' + (res.erro || 'desconhecido')); }
             });
+    }
+
+    function transferirRegistroDash(btn, id, destId, destNome) {
+        fetch('/geral/acao_registro.php', {
+            method: 'POST',
+            headers: {'Content-Type': 'application/x-www-form-urlencoded'},
+            body: 'acao=transferir&id=' + encodeURIComponent(id) + '&carteira_destino=' + encodeURIComponent(destId)
+        }).then(function(r) { return r.json(); }).then(function(d) {
+            if (d.ok) {
+                var row = btn.closest('tr');
+                if (row) {
+                    var next = row.nextElementSibling;
+                    row.remove();
+                    if (next) next.remove();
+                }
+                auralisToast('Transferido para ' + destNome + '!');
+            }
+        });
     }
 
     function toggleSection(key) {

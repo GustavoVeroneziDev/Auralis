@@ -714,6 +714,28 @@ require_once 'geral/header.php';
          onmouseenter="this.style.background='rgba(255,255,255,.07)'" onmouseleave="this.style.background=''">
         <i class="bi bi-clock-history" style="color:#f59e0b;"></i> Não efetivar
     </div>
+    <?php if (count($carteiras) > 1): ?>
+    <div onclick="ctxToggleTransferirMenu(event)"
+         style="padding:10px 16px;cursor:pointer;display:flex;align-items:center;justify-content:space-between;font-size:.875rem;color:var(--text-main);"
+         onmouseenter="this.style.background='rgba(255,255,255,.07)'" onmouseleave="this.style.background=''">
+        <span style="display:flex;align-items:center;gap:10px;">
+            <i class="bi bi-arrow-left-right" style="color:#60a5fa;"></i> Transferir para
+        </span>
+        <i class="bi bi-chevron-down text-secondary" id="ctxTransferirChevron" style="font-size:.7rem;transition:transform .15s;"></i>
+    </div>
+    <div id="ctxTransferirSubmenu" style="display:none;border-top:1px solid var(--card-border-color);">
+        <?php foreach ($carteiras as $cart): ?>
+            <?php if ($cart['IDCarteira'] != $carteira_selecionada): ?>
+                <div onclick="ctxTransferir('<?= htmlspecialchars($cart['IDCarteira'], ENT_QUOTES) ?>', '<?= htmlspecialchars($cart['TipoCarteira'], ENT_QUOTES) ?>')"
+                     style="padding:9px 16px 9px 28px;cursor:pointer;display:flex;align-items:center;gap:10px;font-size:.85rem;color:var(--text-main);"
+                     onmouseenter="this.style.background='rgba(96,165,250,.08)'" onmouseleave="this.style.background=''">
+                    <i class="bi bi-wallet2" style="color:#60a5fa;font-size:.85rem;"></i>
+                    <?= htmlspecialchars($cart['TipoCarteira']) ?>
+                </div>
+            <?php endif; ?>
+        <?php endforeach; ?>
+    </div>
+    <?php endif; ?>
     <div style="height:1px;background:var(--card-border-color);margin:2px 0;"></div>
     <div onclick="ctxExcluir()"
          style="padding:10px 16px;cursor:pointer;display:flex;align-items:center;gap:10px;font-size:.875rem;color:#f87171;"
@@ -1081,6 +1103,10 @@ require_once 'geral/header.php';
     document.addEventListener('click', () => {
         const menu = document.getElementById('analiseContextMenu');
         if (menu) menu.style.display = 'none';
+        const sub = document.getElementById('ctxTransferirSubmenu');
+        if (sub) sub.style.display = 'none';
+        const chev = document.getElementById('ctxTransferirChevron');
+        if (chev) chev.style.transform = '';
         _ctxTarget = null;
     });
 
@@ -1098,6 +1124,36 @@ require_once 'geral/header.php';
             body: `acao=excluir&id=${encodeURIComponent(id)}`
         }).then(r => r.json()).then(d => {
             if (d.ok) { _ctxTarget.remove(); auralisToast('Lançamento excluído.'); }
+        });
+    }
+
+    function ctxToggleTransferirMenu(e) {
+        e.stopPropagation();
+        const sub  = document.getElementById('ctxTransferirSubmenu');
+        const chev = document.getElementById('ctxTransferirChevron');
+        const open = sub.style.display !== 'none';
+        sub.style.display  = open ? 'none' : 'block';
+        if (chev) chev.style.transform = open ? '' : 'rotate(180deg)';
+        const menu = document.getElementById('analiseContextMenu');
+        const x = parseFloat(menu.style.left);
+        const newH = menu.offsetHeight;
+        menu.style.top = Math.min(parseFloat(menu.style.top), window.innerHeight - newH - 8) + 'px';
+    }
+
+    function ctxTransferir(destId, destNome) {
+        if (!_ctxTarget) return;
+        const id = _ctxTarget.dataset.id;
+        const el = _ctxTarget;
+        fetch('/geral/acao_registro.php', {
+            method: 'POST',
+            headers: {'Content-Type': 'application/x-www-form-urlencoded'},
+            body: `acao=transferir&id=${encodeURIComponent(id)}&carteira_destino=${encodeURIComponent(destId)}`
+        }).then(r => r.json()).then(d => {
+            if (d.ok) {
+                el.remove();
+                document.getElementById('analiseContextMenu').style.display = 'none';
+                auralisToast('Transferido para ' + destNome + '!');
+            }
         });
     }
 
