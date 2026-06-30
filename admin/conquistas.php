@@ -335,7 +335,7 @@ require_once '../geral/header.php';
         <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
       </div>
       <form method="post" enctype="multipart/form-data" id="formConquista">
-        <div class="modal-body px-4 py-4">
+        <div class="modal-body px-4 py-4" style="max-height:70vh;overflow-y:auto;">
           <input type="hidden" name="action" id="fAction" value="criar">
           <input type="hidden" name="conquista_id" id="fId">
 
