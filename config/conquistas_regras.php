@@ -36,7 +36,7 @@ return [
     // Concedida automaticamente quando o usuário atinge cada marco de pessoas
     // cadastradas usando o seu link de indicação.
     'registros' => [
-        'descricao'  => 'Pessoas cadastradas via link de indicação',
+        'descricao'  => 'Lançamentos financeiros registrados pelo usuário',
         'thresholds' => [
             1    => 'registro1',
             50   => 'registro50',
@@ -47,16 +47,15 @@ return [
         ],
     ],
 
-    // ── Dias como membro (descomente quando implementar) ────────────────────
-    // 'dias_membro' => [
-    //     'descricao'  => 'Dias com conta ativa na plataforma',
-    //     'thresholds' => [
-    //         7   => 'membro-semana',
-    //         30  => 'membro-mes',
-    //         180 => 'membro-semestre',
-    //         365 => 'membro-ano',
-    //     ],
-    // ],
+    // ── Dias como membro ────────────────────────────────────────────────────
+    'dias_membro' => [
+        'descricao'  => 'Dias com conta ativa na plataforma',
+        'thresholds' => [
+            30  => 'diasdeuso',
+            90  => 'veterano_90',
+            180 => 'usoveterano',
+        ],
+    ],
 
     // ── Carteiras criadas (descomente quando implementar) ───────────────────
     // 'carteiras' => [

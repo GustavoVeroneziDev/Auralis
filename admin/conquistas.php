@@ -35,7 +35,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $icone    = trim($_POST['icone'] ?? 'bi-trophy');
         $cor      = preg_match('/^#[0-9a-fA-F]{6}$/', $_POST['cor'] ?? '') ? $_POST['cor'] : '#d4af37';
         $raridade = in_array($_POST['raridade'] ?? '', ['comum','incomum','raro','epico','lendario','mitico']) ? $_POST['raridade'] : 'comum';
-        $ordem    = max(1, min(255, (int)($_POST['ordem'] ?? 99)));
+        $ordem    = 99;
         $ativo    = isset($_POST['ativo']) ? 1 : 0;
 
         if (empty($slug) || empty($nome)) {
@@ -242,7 +242,7 @@ require_once '../geral/header.php';
                         <th class="px-4 py-3">Insígnia</th>
                         <th class="py-3">Nome / Slug</th>
                         <th class="py-3">Raridade</th>
-                        <th class="py-3">Ordem</th>
+
                         <th class="py-3">Usuários</th>
                         <th class="py-3">Status</th>
                         <th class="py-3 text-end pe-4">Ações</th>
@@ -288,9 +288,6 @@ require_once '../geral/header.php';
                             <span style="display:inline-block;width:12px;height:12px;border-radius:3px;background:<?= htmlspecialchars($c['Cor']) ?>;flex-shrink:0;"></span>
                             <code style="font-size:0.7rem;color:var(--text-muted);"><?= htmlspecialchars($c['Cor']) ?></code>
                         </div>
-                    </td>
-                    <td class="py-3 text-center">
-                        <span class="badge bg-secondary bg-opacity-25 text-secondary"><?= (int)$c['Ordem'] ?></span>
                     </td>
                     <td class="py-3 text-center">
                         <span class="fw-semibold" style="color:var(--accent);"><?= number_format((int)$c['TotalUsuarios']) ?></span>
@@ -456,12 +453,7 @@ require_once '../geral/header.php';
               </div>
             </div>
 
-            <!-- Ordem e Ativo -->
-            <div class="col-md-4">
-              <label class="form-label fw-semibold small">Ordem de exibição</label>
-              <input type="number" name="ordem" id="fOrdem" class="form-control rounded-3" value="99" min="1" max="255"
-                     style="background:var(--input-bg,#1e2028);border-color:var(--bs-border-color);color:var(--text-main);">
-            </div>
+            <!-- Ativo -->
             <div class="col-md-4 d-flex align-items-end pb-1">
               <div class="form-check form-switch">
                 <input class="form-check-input" type="checkbox" name="ativo" id="fAtivo" checked>
@@ -551,7 +543,6 @@ function abrirModalEditar(c) {
     document.getElementById('fIcone').value     = c.Icone      || 'bi-trophy';
     document.getElementById('fCor').value       = c.Cor        || '#d4af37';
     document.getElementById('fCorTexto').value  = c.Cor        || '#d4af37';
-    document.getElementById('fOrdem').value     = c.Ordem      || 99;
     document.getElementById('fAtivo').checked   = c.Ativo == 1;
     document.getElementById('iconePreview').className = 'bi ' + (c.Icone || 'bi-trophy');
 

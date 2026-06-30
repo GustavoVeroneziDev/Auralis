@@ -35,6 +35,13 @@ if (isset($_SESSION['usuario_id']) && isset($pdo) && function_exists('verificarA
     verificarAvisosAutomaticos($pdo);
 }
 
+// Conquistas por dias de uso — verificadas uma vez por sessão no primeiro carregamento de página
+if (isset($_SESSION['usuario_id']) && isset($pdo) && function_exists('verificarConquistasDiasMembro')
+    && empty($_SESSION['dias_conquistas_verificadas'])) {
+    $_SESSION['dias_conquistas_verificadas'] = true;
+    verificarConquistasDiasMembro($pdo, $_SESSION['usuario_id']);
+}
+
 // Verifica se o usuário logado é revendedor ativo (para exibir link no menu)
 $_ehRevendedor = false;
 if (isset($_SESSION['usuario_id']) && isset($pdo)) {
