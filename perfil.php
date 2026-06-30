@@ -92,14 +92,14 @@ require_once 'geral/header.php';
     border: 3px solid;
 }
 .perfil-hero {
-    background: var(--card-bg);
-    border: 1px solid var(--border-color);
+    background: var(--bg-card);
+    border: 1px solid var(--bs-border-color);
     border-radius: 16px;
     padding: 2rem;
 }
 .stat-card {
-    background: var(--card-bg);
-    border: 1px solid var(--border-color);
+    background: var(--bg-card);
+    border: 1px solid var(--bs-border-color);
     border-radius: 12px;
     padding: 1.25rem 1rem;
     text-align: center;
@@ -108,8 +108,8 @@ require_once 'geral/header.php';
 .stat-label { font-size: 0.75rem; color: var(--text-muted); margin-top: 4px; }
 
 .conquista-card {
-    background: var(--card-bg);
-    border: 1px solid var(--border-color);
+    background: var(--bg-card);
+    border: 1px solid var(--bs-border-color);
     border-radius: 14px;
     padding: 1.25rem;
     display: flex;
@@ -122,16 +122,49 @@ require_once 'geral/header.php';
     box-shadow: 0 6px 20px rgba(0,0,0,.25);
 }
 .conquista-card.bloqueada {
-    opacity: .45;
+    opacity: .4;
     filter: grayscale(1);
 }
 .conquista-icon-wrap {
-    width: 52px; height: 52px;
+    width: 72px; height: 72px;
     border-radius: 50%;
     display: flex; align-items: center; justify-content: center;
-    font-size: 1.35rem;
+    font-size: 1.75rem;
     flex-shrink: 0;
+    overflow: hidden;
+    position: relative;
 }
+
+/* ── Frames por raridade ────────────────────────────── */
+.badge-comum {
+    background: rgba(156,163,175,0.08);
+    border: 1.5px solid rgba(156,163,175,0.35);
+}
+.badge-raro {
+    background: rgba(6,182,212,0.1);
+    border: 1.5px solid rgba(6,182,212,0.65);
+    box-shadow: 0 0 10px rgba(6,182,212,0.22);
+}
+.badge-epico {
+    background: linear-gradient(135deg,rgba(124,58,237,0.16),rgba(168,85,247,0.06));
+    border: 2px solid rgba(168,85,247,0.75);
+    box-shadow: 0 0 14px rgba(124,58,237,0.38), inset 0 0 8px rgba(124,58,237,0.08);
+}
+.badge-lendario {
+    background: linear-gradient(135deg,rgba(212,175,55,0.18),rgba(245,158,11,0.06));
+    border: 2px solid rgba(212,175,55,0.88);
+    box-shadow: 0 0 16px rgba(212,175,55,0.48), inset 0 0 10px rgba(212,175,55,0.1);
+    animation: glow-lendario 2.8s ease-in-out infinite;
+}
+@keyframes glow-lendario {
+    0%,100% { box-shadow: 0 0 16px rgba(212,175,55,0.48), inset 0 0 10px rgba(212,175,55,0.10); }
+    50%      { box-shadow: 0 0 26px rgba(212,175,55,0.72), inset 0 0 14px rgba(212,175,55,0.18); }
+}
+.conquista-card.bloqueada .conquista-icon-wrap {
+    animation: none !important;
+    box-shadow: none !important;
+}
+
 .conquista-nome { font-weight: 600; font-size: 0.9rem; margin-bottom: 2px; }
 .conquista-desc { font-size: 0.78rem; color: var(--text-muted); line-height: 1.45; }
 .conquista-footer { margin-top: 6px; font-size: 0.72rem; }
@@ -243,14 +276,13 @@ require_once 'geral/header.php';
         <div class="col-12 col-md-6">
             <div class="conquista-card <?= $desbloqueada ? '' : 'bloqueada' ?>">
                 <!-- Ícone -->
-                <div class="conquista-icon-wrap"
-                     style="background:<?= htmlspecialchars($c['Cor']) ?>22;color:<?= htmlspecialchars($c['Cor']) ?>;overflow:hidden;">
+                <div class="conquista-icon-wrap badge-<?= htmlspecialchars($c['Raridade'] ?? 'comum') ?>">
                     <?php if (!$desbloqueada): ?>
-                        <i class="bi bi-lock-fill" style="color:var(--text-muted);font-size:1.1rem;"></i>
+                        <i class="bi bi-lock-fill" style="color:rgba(156,163,175,0.5);font-size:1.4rem;"></i>
                     <?php elseif (!empty($c['ImagemUrl'])): ?>
-                        <img src="<?= htmlspecialchars($c['ImagemUrl']) ?>" alt="<?= htmlspecialchars($c['Nome']) ?>" style="width:100%;height:100%;object-fit:cover;border-radius:50%;">
+                        <img src="<?= htmlspecialchars($c['ImagemUrl']) ?>" alt="<?= htmlspecialchars($c['Nome']) ?>" style="width:78%;height:78%;object-fit:contain;border-radius:50%;">
                     <?php else: ?>
-                        <i class="bi <?= htmlspecialchars($c['Icone']) ?>"></i>
+                        <i class="bi <?= htmlspecialchars($c['Icone']) ?>" style="color:<?= htmlspecialchars($c['Cor']) ?>;"></i>
                     <?php endif; ?>
                 </div>
 
