@@ -238,11 +238,11 @@ function cartao_sincronizarPreview(PDO $pdo, string $faturaId, string $uid, arra
 /**
  * Fecha uma fatura: remove preview, congela valor, cria lembrete de pagamento e abre próxima.
  */
-function cartao_fecharFatura(PDO $pdo, array $fatura, string $uid): void
+function cartao_fecharFatura(PDO $pdo, array $fatura, string $uid, ?float $valorManual = null): void
 {
     $stmt = $pdo->prepare("SELECT COALESCE(SUM(Valor), 0) FROM LancamentoCartao WHERE FKFatura = :id");
     $stmt->execute([':id' => $fatura['IDFatura']]);
-    $total = (float)$stmt->fetchColumn();
+    $total = $valorManual !== null ? $valorManual : (float)$stmt->fetchColumn();
 
     // Remove o Registro de preview (será substituído pelo definitivo de pagamento)
     if (!empty($fatura['FKRegistroPreview'])) {
@@ -285,6 +285,26 @@ function cartao_fecharFatura(PDO $pdo, array $fatura, string $uid): void
         $proximoMes = _cc_mesRefAdiante($fatura['MesReferencia'], 1);
         cartao_criarFatura($pdo, $cartao['IDCartao'], $uid, $cartao, $proximoMes);
     }
+}
+
+/**
+ * Reabre uma fatura fechada: remove o lembrete de pagamento pendente e restaura status aberta.
+ */
+function cartao_reabrirFatura(PDO $pdo, array $fatura, string $uid, array $cartao): void
+{
+    if (!empty($fatura['FKRegistroPagamento'])) {
+        $pdo->prepare(
+            "DELETE FROM Registro WHERE IDRegistro = :rid AND FKUsuario = :uid AND StatusRegistro = 'pendente'"
+        )->execute([':rid' => $fatura['FKRegistroPagamento'], ':uid' => $uid]);
+    }
+
+    $pdo->prepare(
+        "UPDATE FaturaCartao
+         SET Status = 'aberta', ValorTotal = 0, FKRegistroPagamento = NULL
+         WHERE IDFatura = :id AND FKUsuario = :uid AND Status = 'fechada'"
+    )->execute([':id' => $fatura['IDFatura'], ':uid' => $uid]);
+
+    cartao_sincronizarPreview($pdo, $fatura['IDFatura'], $uid, $cartao);
 }
 
 /**

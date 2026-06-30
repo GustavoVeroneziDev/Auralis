@@ -259,7 +259,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'])) {
     }
 
     if ($_POST['action'] === 'ajustar_saldo') {
-        $saldo_informado    = (float) str_replace(',', '.', $_POST['saldo_real']);
+        $saldo_informado    = (float) str_replace(',', '.', preg_replace('/[^\d,]/', '', $_POST['saldo_real'] ?? '0'));
         $saldo_sistema      = (float) $_POST['saldo_sistema_atual'];
         $carteira_id_ajuste = $_POST['carteira_id_ajuste'];
 
@@ -499,6 +499,40 @@ try {
     }
 } catch (PDOException $e) {
 }
+
+// ── Indicações: código do usuário e progresso ────────────────────────────
+$dadosIndicacao = ['codigo' => null, 'total_indicados' => 0, 'total_convertidos' => 0, 'proxima_regra' => null];
+try {
+    $stmtInd = $pdo->prepare("SELECT CodigoIndicacao FROM Usuario WHERE IDUsuario = :uid");
+    $stmtInd->execute([':uid' => $usuario_id]);
+    $dadosIndicacao['codigo'] = $stmtInd->fetchColumn();
+
+    $stmtIndCnt = $pdo->prepare(
+        "SELECT
+             COUNT(u.IDUsuario) as total,
+             SUM(CASE WHEN a.Status IN ('ativa','trial') THEN 1 ELSE 0 END) as convertidos
+         FROM Usuario u
+         LEFT JOIN Assinatura a ON a.FKUsuario = u.IDUsuario AND a.Status IN ('ativa','trial')
+         WHERE u.FKIndicadoPor = :uid"
+    );
+    $stmtIndCnt->execute([':uid' => $usuario_id]);
+    $indCnt = $stmtIndCnt->fetch(PDO::FETCH_ASSOC);
+    $dadosIndicacao['total_indicados']   = (int)($indCnt['total']       ?? 0);
+    $dadosIndicacao['total_convertidos'] = (int)($indCnt['convertidos'] ?? 0);
+
+    // Próxima regra de recompensa ainda não conquistada
+    $stmtReg = $pdo->prepare(
+        "SELECT c.* FROM indicacao_recompensa_config c
+         WHERE c.Ativo = 1 AND c.MinIndicacoes > :conv
+           AND NOT EXISTS (
+               SELECT 1 FROM indicacao_recompensa_concedida irc
+               WHERE irc.FKUsuario = :uid AND irc.FKConfig = c.IDConfig
+           )
+         ORDER BY c.MinIndicacoes ASC LIMIT 1"
+    );
+    $stmtReg->execute([':conv' => $dadosIndicacao['total_convertidos'], ':uid' => $usuario_id]);
+    $dadosIndicacao['proxima_regra'] = $stmtReg->fetch(PDO::FETCH_ASSOC) ?: null;
+} catch (PDOException $e) {}
 
 // ── Cofrinhos: lista individual para cards no dashboard ─────────────────
 $listaCofrinhosDash = [];
@@ -1277,6 +1311,64 @@ require_once 'geral/header.php';
             </table>
         </div>
     <?php endif; ?>
+
+    <!-- ── Widget de Indicação ──────────────────────────────────────────── -->
+    <?php if ($dadosIndicacao['codigo']): ?>
+    <?php
+        $protocolo  = (isset($_SERVER['HTTPS']) && $_SERVER['HTTPS'] === 'on') ? 'https' : 'http';
+        $linkRefDash = $protocolo . '://' . $_SERVER['HTTP_HOST'] . '/usuario/cadastro.php?ref=' . $dadosIndicacao['codigo'];
+        $proxRegra   = $dadosIndicacao['proxima_regra'];
+        $conv        = $dadosIndicacao['total_convertidos'];
+        $progPct     = $proxRegra ? min(100, round($conv / max(1, $proxRegra['MinIndicacoes']) * 100)) : 100;
+    ?>
+    <div class="card rounded-4 mb-5 mt-2" style="background:var(--bg-card);border:1px solid rgba(255,255,255,.07);">
+        <div class="card-body px-4 py-3">
+            <div class="d-flex align-items-start justify-content-between flex-wrap gap-3">
+                <div class="d-flex align-items-center gap-3">
+                    <div class="rounded-3 d-flex align-items-center justify-content-center flex-shrink-0"
+                        style="width:40px;height:40px;background:rgba(212,175,55,.1);border:1px solid rgba(212,175,55,.25);">
+                        <i class="bi bi-share-fill" style="color:#d4af37;font-size:1rem;"></i>
+                    </div>
+                    <div>
+                        <div class="text-light fw-semibold small">Indique amigos</div>
+                        <div class="d-flex align-items-center gap-2 mt-1">
+                            <code style="color:#d4af37;font-size:.78rem;"><?= htmlspecialchars($dadosIndicacao['codigo']) ?></code>
+                            <button onclick="(function(){navigator.clipboard.writeText('<?= htmlspecialchars($linkRefDash) ?>');var b=document.getElementById('btnCopInd');b.innerHTML='<i class=\'bi bi-check2\'></i>';setTimeout(function(){b.innerHTML='<i class=\'bi bi-clipboard\'></i>';},2000);})()"
+                                id="btnCopInd" class="btn btn-sm p-0 border-0 text-secondary" title="Copiar link">
+                                <i class="bi bi-clipboard" style="font-size:.8rem;"></i>
+                            </button>
+                        </div>
+                    </div>
+                </div>
+                <div class="d-flex gap-4">
+                    <div class="text-center">
+                        <div class="fw-bold text-light"><?= $dadosIndicacao['total_indicados'] ?></div>
+                        <div class="text-secondary" style="font-size:.7rem;">cadastrados</div>
+                    </div>
+                    <div class="text-center">
+                        <div class="fw-bold" style="color:#86efac;"><?= $conv ?></div>
+                        <div class="text-secondary" style="font-size:.7rem;">pagantes</div>
+                    </div>
+                </div>
+            </div>
+            <?php if ($proxRegra): ?>
+            <div class="mt-3">
+                <div class="d-flex justify-content-between mb-1" style="font-size:.73rem;">
+                    <span class="text-secondary"><?= $conv ?>/<?= $proxRegra['MinIndicacoes'] ?> para ganhar <?= $proxRegra['DuracaoDias'] ?> dias <?= strtoupper($proxRegra['PlanoRecompensa']) ?></span>
+                    <span class="text-secondary"><?= $progPct ?>%</span>
+                </div>
+                <div class="rounded-pill overflow-hidden" style="height:5px;background:rgba(255,255,255,.08);">
+                    <div class="rounded-pill h-100" style="width:<?= $progPct ?>%;background:linear-gradient(90deg,#d4af37,#f9e596);transition:width .4s;"></div>
+                </div>
+                <?php if ($proxRegra['Descricao']): ?>
+                <div class="text-secondary mt-1" style="font-size:.7rem;"><?= htmlspecialchars($proxRegra['Descricao']) ?></div>
+                <?php endif; ?>
+            </div>
+            <?php endif; ?>
+        </div>
+    </div>
+    <?php endif; ?>
+
 </main>
 
 <!-- ======================================================================= -->
@@ -1307,7 +1399,7 @@ require_once 'geral/header.php';
                         <label class="form-label text-secondary small">Qual o seu saldo exato hoje?</label>
                         <div class="input-group input-group-lg">
                             <span class="input-group-text bg-transparent border-secondary-subtle text-light fw-bold">R$</span>
-                            <input type="number" step="0.01" name="saldo_real" class="form-control bg-transparent border-secondary-subtle text-light fw-bold shadow-none no-spinners" required placeholder="0,00" value="<?php echo number_format($saldoAtual ?? 0, 2, '.', '') ?>" autofocus>
+                            <input type="text" name="saldo_real" inputmode="numeric" class="form-control bg-transparent border-secondary-subtle text-light fw-bold shadow-none" required placeholder="R$ 0,00" oninput="mascaraMoeda(this)" autocomplete="off" data-saldo-inicial="<?php echo number_format($saldoAtual ?? 0, 2, '.', '') ?>" autofocus>
                         </div>
                     </div>
                 </div>
@@ -1561,7 +1653,7 @@ require_once 'geral/header.php';
 
                         <div class="input-group input-group-lg mb-4 shadow-sm">
                             <span class="input-group-text bg-body-tertiary border-secondary-subtle text-primary fw-bold border-end-0 fs-4" style="color: var(--primary-gold-analysis) !important;">R$</span>
-                            <input type="number" step="0.01" name="saldo_real" class="form-control bg-body-tertiary border-secondary-subtle border-start-0 text-light fw-bold shadow-none no-spinners fs-3 py-3" required placeholder="0,00" autofocus>
+                            <input type="text" name="saldo_real" inputmode="numeric" class="form-control bg-body-tertiary border-secondary-subtle border-start-0 text-light fw-bold shadow-none fs-3 py-3" required placeholder="R$ 0,00" oninput="mascaraMoeda(this)" autocomplete="off" autofocus>
                         </div>
 
                         <button type="submit" class="btn btn-gold btn-lg w-100 fw-bold text-dark rounded-pill py-3 shadow-lg transition-hover">
@@ -1631,8 +1723,8 @@ require_once 'geral/header.php';
                     <label class="form-label text-secondary small fw-semibold text-uppercase mb-1">Valor</label>
                     <div class="input-group">
                         <span class="input-group-text bg-body-tertiary border-secondary-subtle text-secondary fw-bold">R$</span>
-                        <input type="number" id="transf-valor" class="form-control bg-body-tertiary border-secondary-subtle text-light"
-                            min="0.01" step="0.01" placeholder="0,00">
+                        <input type="text" id="transf-valor" inputmode="numeric" class="form-control bg-body-tertiary border-secondary-subtle text-light"
+                            placeholder="R$ 0,00" oninput="mascaraMoeda(this)" autocomplete="off">
                     </div>
                 </div>
 
@@ -1855,7 +1947,7 @@ require_once 'geral/header.php';
         btn.addEventListener('click', function() {
             var de     = document.getElementById('transf-de').value;
             var para   = document.getElementById('transf-para').value;
-            var valor  = parseFloat(document.getElementById('transf-valor').value);
+            var valor  = parseBRL(document.getElementById('transf-valor').value);
             var desc   = document.getElementById('transf-desc').value.trim();
             var data   = document.getElementById('transf-data').value;
             var status = document.getElementById('transf-status').value;
@@ -1912,7 +2004,8 @@ require_once 'geral/header.php';
                 document.getElementById('transf-erro').classList.add('d-none');
                 btn.disabled = false;
                 btn.innerHTML = '<i class="bi bi-arrow-left-right me-1"></i> Transferir';
-                document.getElementById('transf-valor').value = '';
+                var tv = document.getElementById('transf-valor');
+                tv.value = '';
             });
         }
     })();
@@ -1949,6 +2042,19 @@ require_once 'geral/header.php';
                 var chev = document.getElementById('chev-' + key);
                 if (sec)  sec.style.display = 'none';
                 if (chev) chev.style.transform = 'rotate(180deg)';
+            }
+        });
+    })();
+
+    // Formata o saldo pré-preenchido ao abrir modalAjusteSaldo
+    (function() {
+        var m = document.getElementById('modalAjusteSaldo');
+        if (!m) return;
+        m.addEventListener('show.bs.modal', function() {
+            var inp = m.querySelector('input[name="saldo_real"]');
+            if (inp && inp.dataset.saldoInicial) {
+                inp.value = inp.dataset.saldoInicial;
+                mascaraMoeda(inp);
             }
         });
     })();

@@ -16,6 +16,7 @@ error_reporting(0);
 
 try {
     require_once __DIR__ . '/config/conexao.php';
+    require_once __DIR__ . '/config/funcoes.php';
 
     $raw  = file_get_contents('php://input');
     $data = json_decode($raw, true) ?? [];
@@ -55,6 +56,9 @@ try {
         if (in_array($mpStatus, ['authorized', 'active'])) {
             $resultado = mpAtivarPlano($pdo, $email, $planId, $id);
             _mpLog($resultado ? "ATIVADO: {$email} → {$resultado}" : "FALHOU ativação para {$email}");
+            if ($resultado) {
+                processarIndicacaoConversao($pdo, $email, 0.0, $resultado);
+            }
 
         } elseif (in_array($mpStatus, ['cancelled', 'paused', 'pending'])) {
             // Cancelamento ou inadimplência — rebaixa para free

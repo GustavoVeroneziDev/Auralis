@@ -37,6 +37,8 @@ if ($preapprovalId && $status === 'authorized') {
                 // Atualiza a sessão imediatamente — sem precisar de novo login
                 $_SESSION['plano'] = $resultado;
                 unset($_SESSION['expiracao_verificada']);
+                // Processa comissão do revendedor ou recompensa por indicação
+                processarIndicacaoConversao($pdo, $email, (float)$valor, $resultado);
             } else {
                 $erro = 'plano_nao_mapeado';
             }

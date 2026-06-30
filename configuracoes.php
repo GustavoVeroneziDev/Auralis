@@ -220,7 +220,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 // 2. BUSCA OS DADOS ATUAIS (Incluindo Senha para a lógica do Front-end)
 // ==============================================================================
 try {
-    $sqlBusca = "SELECT Nome, Email, Senha, Tema FROM Usuario WHERE IDUsuario = :uid LIMIT 1";
+    $sqlBusca = "SELECT Nome, Email, Senha, Tema, CodigoIndicacao FROM Usuario WHERE IDUsuario = :uid LIMIT 1";
     $stmtBusca = $pdo->prepare($sqlBusca);
     $stmtBusca->execute([':uid' => $usuario_id]);
     $dadosUsuario = $stmtBusca->fetch(PDO::FETCH_ASSOC);
@@ -255,6 +255,44 @@ require_once 'geral/header.php';
             <strong><?= $mensagem ?></strong>
             <button type="button" class="btn-close opacity-50" data-bs-dismiss="alert" aria-label="Close"></button>
         </div>
+    <?php endif; ?>
+
+    <?php
+    $codigoRef  = $dadosUsuario['CodigoIndicacao'] ?? null;
+    if ($codigoRef) {
+        $protocolo = (isset($_SERVER['HTTPS']) && $_SERVER['HTTPS'] === 'on') ? 'https' : 'http';
+        $linkRef   = $protocolo . '://' . $_SERVER['HTTP_HOST'] . '/usuario/cadastro.php?ref=' . $codigoRef;
+    }
+    ?>
+    <?php if (!empty($codigoRef)): ?>
+    <!-- Widget de indicação -->
+    <div class="rounded-4 p-4 mb-4" style="background:rgba(212,175,55,.05);border:1px solid rgba(212,175,55,.18);">
+        <div class="d-flex align-items-center gap-3 mb-3 flex-wrap">
+            <div class="rounded-3 d-flex align-items-center justify-content-center flex-shrink-0"
+                style="width:40px;height:40px;background:rgba(212,175,55,.12);border:1px solid rgba(212,175,55,.25);">
+                <i class="bi bi-share-fill" style="color:#d4af37;font-size:1.1rem;"></i>
+            </div>
+            <div>
+                <div class="fw-semibold text-light">Seu link de indicação</div>
+                <div class="text-secondary" style="font-size:.78rem;">Quando alguém se cadastrar pelo seu link e assinar um plano, você acumula recompensas.</div>
+            </div>
+        </div>
+        <div class="d-flex align-items-center gap-2 flex-wrap">
+            <code id="cfgLinkRef" class="px-3 py-2 rounded-3 flex-grow-1"
+                style="background:rgba(0,0,0,.3);color:#d4af37;font-size:.82rem;word-break:break-all;display:block;">
+                <?= htmlspecialchars($linkRef) ?>
+            </code>
+            <button onclick="cfgCopiarLink()" id="cfgBtnCopiar"
+                class="btn btn-sm rounded-pill px-3 flex-shrink-0"
+                style="background:rgba(212,175,55,.15);color:#d4af37;border:1px solid rgba(212,175,55,.3);">
+                <i class="bi bi-clipboard me-1"></i> Copiar link
+            </button>
+        </div>
+        <div class="mt-2 d-flex align-items-center gap-2">
+            <span class="text-secondary" style="font-size:.75rem;">Código:</span>
+            <code style="color:#d4af37;font-size:.78rem;"><?= htmlspecialchars($codigoRef) ?></code>
+        </div>
+    </div>
     <?php endif; ?>
 
     <div class="row g-4 mb-5">
@@ -688,6 +726,18 @@ require_once 'geral/header.php';
     </div>
 
 </main>
+
+<script>
+function cfgCopiarLink() {
+    var texto = document.getElementById('cfgLinkRef').textContent.trim();
+    navigator.clipboard.writeText(texto).then(function() {
+        var btn = document.getElementById('cfgBtnCopiar');
+        var orig = btn.innerHTML;
+        btn.innerHTML = '<i class="bi bi-check2 me-1"></i> Copiado!';
+        setTimeout(function() { btn.innerHTML = orig; }, 2000);
+    });
+}
+</script>
 
 <div class="modal fade" id="modalExcluirConta" tabindex="-1" aria-hidden="true">
     <div class="modal-dialog modal-dialog-centered">

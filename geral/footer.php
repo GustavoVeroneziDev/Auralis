@@ -54,6 +54,15 @@ function auralisToast(msg) {
 }
 if (window._pendingToast) auralisToast(window._pendingToast);
 
+function mascaraMoeda(input) {
+    var v = input.value.replace(/\D/g, '');
+    if (v === '') { input.value = ''; return; }
+    input.value = (parseInt(v, 10) / 100).toLocaleString('pt-BR', {style: 'currency', currency: 'BRL'});
+}
+function parseBRL(val) {
+    return parseFloat((val || '').replace(/[^\d,]/g, '').replace(',', '.')) || 0;
+}
+
 // Salvar posição de scroll antes de qualquer POST
 (function() {
     var key = 'auralis_scroll_' + location.pathname;

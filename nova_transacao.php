@@ -213,6 +213,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && trim($_POST['tipo_registro'] ?? '')
             ]);
             cartao_sincronizarPreview($pdo, $fatura['IDFatura'], $usuario_id, $cartao);
         }
+        concederConquista('primeira_transacao');
         header("Location: " . $_urlVoltar . (strpos($_urlVoltar, '?') !== false ? '&' : '?') . "sucesso=registro");
         exit;
     }
@@ -476,6 +477,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                     }
 
                     if ($primeiroIdParc) processarComprovantes($pdo, $primeiroIdParc, $usuario_id);
+                    concederConquista('primeira_transacao');
                     header("Location: " . $_urlVoltar . (strpos($_urlVoltar, '?') !== false ? '&' : '?') . "sucesso=parcelado&parcelas={$numParcelas}");
                     exit;
                 }
@@ -528,6 +530,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                     ]);
                 }
                 if ($primeiroIdRec) processarComprovantes($pdo, $primeiroIdRec, $usuario_id);
+                concederConquista('primeira_transacao');
                 header("Location: " . $_urlVoltar . (strpos($_urlVoltar, '?') !== false ? '&' : '?') . "sucesso=recorrente");
             } else {
                 // ── CRIAÇÃO SIMPLES (Transação Única) ────────────────────────
@@ -557,6 +560,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                     ':categoria' => $categoriaId,
                 ]);
                 processarComprovantes($pdo, $novoId, $usuario_id);
+                concederConquista('primeira_transacao');
                 header("Location: " . $_urlVoltar . (strpos($_urlVoltar, '?') !== false ? '&' : '?') . "sucesso=registro");
             }
             exit;

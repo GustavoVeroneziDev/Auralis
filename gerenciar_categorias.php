@@ -349,7 +349,7 @@ $listaIcones = [
                     </div>
                     <h6 class="mb-0 text-light fw-bold fs-5">Categorias de Despesa</h6>
                 </div>
-                <div class="table-responsive">
+                <div class="table-responsive rounded-3 overflow-hidden" style="border:1px solid rgba(255,255,255,.07);">
                     <table class="table table-dark table-hover align-middle mb-0 auralis-table">
                         <tbody class="border-top-0">
                             <?php if (empty($categorias_despesa)): ?>
@@ -425,7 +425,7 @@ $listaIcones = [
                     </div>
                     <h6 class="mb-0 text-light fw-bold fs-5">Categorias de Receita</h6>
                 </div>
-                <div class="table-responsive">
+                <div class="table-responsive rounded-3 overflow-hidden" style="border:1px solid rgba(255,255,255,.07);">
                     <table class="table table-dark table-hover align-middle mb-0 auralis-table">
                         <tbody class="border-top-0">
                             <?php if (empty($categorias_receita)): ?>

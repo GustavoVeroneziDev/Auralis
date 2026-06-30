@@ -29,14 +29,16 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $action = $_POST['action'] ?? '';
 
     if ($action === 'fechar_fatura') {
-        $faturaId = trim($_POST['fatura_id'] ?? '');
+        $faturaId    = trim($_POST['fatura_id'] ?? '');
+        $valorRaw    = preg_replace('/[^\d,]/', '', trim($_POST['valor_manual'] ?? ''));
+        $valorManual = $valorRaw !== '' ? (float) str_replace(',', '.', $valorRaw) : null;
         $stmt = $pdo->prepare("SELECT f.*, c.DiaVencimento, c.FKCarteiraDebito, c.Nome AS NomeCartao
                                 FROM FaturaCartao f JOIN CartaoCredito c ON f.FKCartao = c.IDCartao
                                 WHERE f.IDFatura = :id AND f.FKUsuario = :uid AND f.Status = 'aberta'");
         $stmt->execute([':id' => $faturaId, ':uid' => $uid]);
         $fat = $stmt->fetch(PDO::FETCH_ASSOC);
         if ($fat) {
-            cartao_fecharFatura($pdo, $fat, $uid);
+            cartao_fecharFatura($pdo, $fat, $uid, $valorManual);
             $sucesso = 'Fatura fechada com sucesso. O lembrete de pagamento foi criado na agenda.';
         }
     }
@@ -83,8 +85,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $grupo        = trim($_POST['grupo'] ?? '');
         $parcelaAtual = (int)($_POST['parcela_atual'] ?? 0);
         $desc         = trim($_POST['descricao'] ?? '');
-        $valorRaw     = str_replace(['.', ','], ['', '.'], trim($_POST['valor'] ?? '0'));
-        $valor        = (float)$valorRaw;
+        $valorRaw     = preg_replace('/[^\d,]/', '', trim($_POST['valor'] ?? '0'));
+        $valor        = (float) str_replace(',', '.', $valorRaw);
         $data         = trim($_POST['data_compra'] ?? '');
         $catId        = trim($_POST['categoria_id'] ?? '') ?: null;
 
@@ -124,6 +126,16 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         }
     }
 
+    if ($action === 'ajustar_valor') {
+        $faturaId  = trim($_POST['fatura_id'] ?? '');
+        $novoTotal = (float)str_replace(['.', ','], ['', '.'], trim($_POST['novo_total'] ?? ''));
+        if ($faturaId && $novoTotal >= 0) {
+            $pdo->prepare("UPDATE FaturaCartao SET ValorTotal = :v WHERE IDFatura = :id AND FKUsuario = :uid AND Status != 'aberta'")
+                ->execute([':v' => $novoTotal, ':id' => $faturaId, ':uid' => $uid]);
+            $sucesso = 'Valor da fatura ajustado.';
+        }
+    }
+
     if ($action === 'marcar_paga') {
         $faturaId = trim($_POST['fatura_id'] ?? '');
         $pdo->prepare("UPDATE FaturaCartao SET Status='paga' WHERE IDFatura=:id AND FKUsuario=:uid AND Status='fechada'")
@@ -138,6 +150,21 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             )->execute([':fid' => $faturaId, ':uid' => $uid]);
         } catch (PDOException $e) {}
         $sucesso = 'Fatura marcada como paga.';
+    }
+
+    if ($action === 'reabrir_fatura') {
+        $faturaId = trim($_POST['fatura_id'] ?? '');
+        $stmt = $pdo->prepare(
+            "SELECT f.*, c.DiaVencimento, c.FKCarteiraDebito, c.Nome AS NomeCartao
+             FROM FaturaCartao f JOIN CartaoCredito c ON f.FKCartao = c.IDCartao
+             WHERE f.IDFatura = :id AND f.FKUsuario = :uid AND f.Status = 'fechada'"
+        );
+        $stmt->execute([':id' => $faturaId, ':uid' => $uid]);
+        $fat = $stmt->fetch(PDO::FETCH_ASSOC);
+        if ($fat) {
+            cartao_reabrirFatura($pdo, $fat, $uid, $cartao);
+            $sucesso = 'Fatura reaberta. Você pode adicionar ou editar lançamentos normalmente.';
+        }
     }
 }
 
@@ -278,8 +305,8 @@ require_once '../geral/header.php';
             <?php if (empty($lancamentosAberta)): ?>
                 <p class="text-secondary text-center py-3 mb-0 small">Nenhum lançamento nesta fatura ainda.</p>
             <?php else: ?>
-                <div class="table-responsive mb-3">
-                    <table class="table table-dark table-hover rounded-3 overflow-hidden mb-0" style="font-size:0.875rem;">
+                <div class="table-responsive mb-3 rounded-3 overflow-hidden" style="border:1px solid rgba(255,255,255,.08);">
+                    <table class="table table-dark table-hover mb-0" style="font-size:0.875rem;">
                         <thead>
                             <tr style="background:rgba(255,255,255,.04);">
                                 <th class="fw-semibold text-secondary border-0 py-2">Descrição</th>
@@ -366,8 +393,10 @@ require_once '../geral/header.php';
     <h5 class="fw-bold text-light mb-3">Histórico de faturas</h5>
     <div class="d-flex flex-column gap-3">
         <?php foreach ($historico as $fh):
-            $isPaga    = $fh['Status'] === 'paga';
-            $lancsFh   = $lancHistorico[$fh['IDFatura']] ?? [];
+            $isPaga       = $fh['Status'] === 'paga';
+            $lancsFh      = $lancHistorico[$fh['IDFatura']] ?? [];
+            $vencTxt      = strtotime($fh['DataVencimento']) < strtotime('today') ? 'Venceu' : 'Vence';
+            $fechouLabel  = !empty($fh['DataFechamento']) ? 'Fechou em ' . date('d/m/Y', strtotime($fh['DataFechamento'])) . ' · ' : '';
         ?>
         <div class="card rounded-4" style="background:var(--bg-card);border:1px solid rgba(255,255,255,.08);">
             <div class="card-body p-0">
@@ -385,12 +414,20 @@ require_once '../geral/header.php';
                                 Fatura <?= date('M/Y', strtotime($fh['MesReferencia'] . '-01')) ?>
                             </p>
                             <p class="text-secondary mb-0" style="font-size:0.72rem;">
-                                Venceu em <?= date('d/m/Y', strtotime($fh['DataVencimento'])) ?>
+                                <?= $fechouLabel ?><?= $vencTxt ?> em <?= date('d/m/Y', strtotime($fh['DataVencimento'])) ?>
                             </p>
                         </div>
                     </div>
                     <div class="d-flex align-items-center gap-3">
-                        <span class="fw-bold" style="color:#f87171;">R$ <?= number_format($fh['ValorTotal'], 2, ',', '.') ?></span>
+                        <div class="d-flex align-items-center gap-1" onclick="event.stopPropagation()">
+                            <span class="fw-bold" style="color:#f87171;">R$ <?= number_format($fh['ValorTotal'], 2, ',', '.') ?></span>
+                            <button type="button" title="Ajustar valor total"
+                                class="btn btn-sm p-1 border-0 text-secondary"
+                                style="line-height:1;background:transparent;"
+                                onclick="abrirAjuste('<?= $fh['IDFatura'] ?>', <?= (float)$fh['ValorTotal'] ?>)">
+                                <i class="bi bi-pencil-square" style="font-size:0.75rem;"></i>
+                            </button>
+                        </div>
                         <?php if (!$isPaga): ?>
                             <form method="POST" onclick="event.stopPropagation()">
                                 <input type="hidden" name="action" value="marcar_paga">
@@ -400,6 +437,12 @@ require_once '../geral/header.php';
                                     Marcar como paga
                                 </button>
                             </form>
+                            <button type="button" title="Reabrir fatura"
+                                onclick="event.stopPropagation(); abrirModalReabrir('<?= $fh['IDFatura'] ?>')"
+                                class="btn btn-sm rounded-pill px-3"
+                                style="background:rgba(148,163,184,.08);color:#94a3b8;border:1px solid rgba(148,163,184,.2);font-size:0.75rem;">
+                                <i class="bi bi-arrow-counterclockwise me-1"></i> Reabrir
+                            </button>
                         <?php endif; ?>
                         <i class="bi bi-chevron-down text-secondary" id="ico-fh-<?= $fh['IDFatura'] ?>"></i>
                     </div>
@@ -411,7 +454,7 @@ require_once '../geral/header.php';
                         <?php if (empty($lancsFh)): ?>
                             <p class="text-secondary small mb-0 text-center py-2">Nenhum lançamento registrado.</p>
                         <?php else: ?>
-                            <div class="table-responsive">
+                            <div class="table-responsive rounded-3 overflow-hidden" style="border:1px solid rgba(255,255,255,.07);">
                                 <table class="table table-dark mb-0" style="font-size:0.82rem;">
                                     <tbody>
                                         <?php foreach ($lancsFh as $l): ?>
@@ -443,6 +486,80 @@ require_once '../geral/header.php';
     </div>
     <?php endif; ?>
 </main>
+
+<!-- ── Modal: Reabrir fatura ─────────────────────────────────────────────── -->
+<div class="modal fade" id="modalReabrirFatura" tabindex="-1">
+    <div class="modal-dialog modal-dialog-centered modal-sm">
+        <div class="modal-content border-secondary-subtle shadow-lg" style="background:var(--bg-card);">
+            <form method="POST">
+                <input type="hidden" name="action" value="reabrir_fatura">
+                <input type="hidden" name="fatura_id" id="reabrirFaturaId">
+                <div class="modal-header border-secondary-subtle px-4 py-3">
+                    <h6 class="modal-title fw-bold text-light mb-0">Reabrir fatura</h6>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                </div>
+                <div class="modal-body px-4 py-3">
+                    <p class="text-secondary mb-2" style="font-size:0.83rem;">
+                        A fatura voltará para <strong class="text-light">aberta</strong> e o lembrete de pagamento pendente será removido da agenda.
+                    </p>
+                    <p class="text-secondary mb-0" style="font-size:0.78rem;">
+                        Lançamentos e faturas posteriores não são afetados.
+                    </p>
+                </div>
+                <div class="modal-footer border-secondary-subtle d-flex justify-content-between p-3">
+                    <button type="button" class="btn btn-sm btn-link text-secondary text-decoration-none" data-bs-dismiss="modal">Cancelar</button>
+                    <button type="submit" class="btn btn-sm fw-bold rounded-pill px-4"
+                        style="background:rgba(148,163,184,.12);color:#94a3b8;border:1px solid rgba(148,163,184,.3);">
+                        <i class="bi bi-arrow-counterclockwise me-1"></i> Reabrir
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+<!-- ── Modal: Ajustar valor de fatura ──────────────────────────────────── -->
+<div class="modal fade" id="modalAjustarValor" tabindex="-1">
+    <div class="modal-dialog modal-dialog-centered modal-sm">
+        <div class="modal-content border-secondary-subtle shadow-lg" style="background:var(--bg-card);">
+            <form method="POST">
+                <input type="hidden" name="action" value="ajustar_valor">
+                <input type="hidden" name="fatura_id" id="ajusteFaturaId">
+                <div class="modal-header border-secondary-subtle px-4 py-3">
+                    <h6 class="modal-title fw-bold text-light mb-0">Ajustar valor da fatura</h6>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                </div>
+                <div class="modal-body px-4 py-3">
+                    <p class="text-secondary mb-3" style="font-size:0.83rem;">
+                        Informe o valor real cobrado pelo cartão. Útil para incluir juros, multas ou discrepâncias.
+                    </p>
+                    <label class="form-label text-secondary small fw-semibold mb-1">Novo valor total</label>
+                    <div class="input-group">
+                        <span class="input-group-text border-secondary-subtle text-secondary" style="background:var(--bg-hover);">R$</span>
+                        <input type="text" name="novo_total" id="ajusteValorInput"
+                            class="form-control border-secondary-subtle shadow-none"
+                            style="background:var(--bg-card);color:var(--text-main);"
+                            placeholder="0,00" required>
+                    </div>
+                </div>
+                <div class="modal-footer border-secondary-subtle px-4 py-3 gap-2">
+                    <button type="button" class="btn btn-sm btn-outline-secondary rounded-pill px-3" data-bs-dismiss="modal">Cancelar</button>
+                    <button type="submit" class="btn btn-sm rounded-pill px-3 fw-semibold"
+                        style="background:rgba(212,175,55,.15);color:#d4af37;border:1px solid rgba(212,175,55,.35);">
+                        Salvar ajuste
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+<script>
+function abrirAjuste(faturaId, valorAtual) {
+    document.getElementById('ajusteFaturaId').value = faturaId;
+    setCurrencyInputValue(document.getElementById('ajusteValorInput'), valorAtual);
+    new bootstrap.Modal(document.getElementById('modalAjustarValor')).show();
+}
+</script>
 
 <!-- ── Modal: Excluir lançamento ───────────────────────────────────────── -->
 <div class="modal fade" id="modalExcluirLanc" tabindex="-1">
@@ -514,7 +631,7 @@ require_once '../geral/header.php';
                         <label class="form-label text-secondary small">Valor (R$)</label>
                         <input type="text" name="valor" id="editarLancValor"
                             class="form-control bg-transparent text-light border-secondary"
-                            required inputmode="decimal">
+                            required inputmode="numeric" oninput="mascaraMoeda(this)" placeholder="R$ 0,00" autocomplete="off">
                     </div>
                     <div id="editarDataWrap">
                         <label class="form-label text-secondary small">Data da compra</label>
@@ -567,25 +684,36 @@ require_once '../geral/header.php';
 <div class="modal fade" id="modalFecharFatura" tabindex="-1">
     <div class="modal-dialog modal-dialog-centered">
         <div class="modal-content border-secondary-subtle shadow-lg" style="background:var(--bg-card);">
-            <div class="modal-header border-secondary-subtle px-4 py-3">
-                <h6 class="modal-title fw-bold text-light mb-0">Fechar fatura</h6>
-                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
-            </div>
-            <div class="modal-body px-4 py-3">
-                <p class="text-secondary mb-1">Deseja fechar a fatura de <strong class="text-light" id="fecharFaturaTotal"></strong>?</p>
-                <p class="text-secondary small mb-0">O valor será congelado e um lembrete de pagamento será criado na agenda.</p>
-            </div>
-            <div class="modal-footer border-secondary-subtle d-flex justify-content-between p-3">
-                <button type="button" class="btn btn-sm btn-link text-secondary text-decoration-none" data-bs-dismiss="modal">Cancelar</button>
-                <form method="POST">
-                    <input type="hidden" name="action" value="fechar_fatura">
-                    <input type="hidden" name="fatura_id" id="fecharFaturaId">
+            <form method="POST">
+                <input type="hidden" name="action" value="fechar_fatura">
+                <input type="hidden" name="fatura_id" id="fecharFaturaId">
+                <div class="modal-header border-secondary-subtle px-4 py-3">
+                    <h6 class="modal-title fw-bold text-light mb-0">Fechar fatura</h6>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                </div>
+                <div class="modal-body px-4 py-3">
+                    <p class="text-secondary mb-3" style="font-size:0.83rem;">
+                        Lançamentos somam <strong class="text-light" id="fecharFaturaTotal"></strong>. Confirme ou ajuste o valor real cobrado pelo cartão.
+                    </p>
+                    <label class="form-label text-secondary small fw-semibold mb-1">Valor de fechamento</label>
+                    <div class="input-group">
+                        <span class="input-group-text border-secondary-subtle text-secondary" style="background:var(--bg-hover);">R$</span>
+                        <input type="text" name="valor_manual" id="fecharFaturaValor"
+                            class="form-control border-secondary-subtle shadow-none"
+                            style="background:var(--bg-card);color:var(--text-main);font-variant-numeric:tabular-nums;letter-spacing:.02em;"
+                            placeholder="R$ 0,00" required autocomplete="off"
+                            inputmode="numeric" oninput="mascaraMoeda(this)">
+                    </div>
+                    <p class="text-secondary mt-2 mb-0" style="font-size:0.75rem;">O valor será congelado e um lembrete de pagamento será criado na agenda.</p>
+                </div>
+                <div class="modal-footer border-secondary-subtle d-flex justify-content-between p-3">
+                    <button type="button" class="btn btn-sm btn-link text-secondary text-decoration-none" data-bs-dismiss="modal">Cancelar</button>
                     <button type="submit" class="btn btn-sm fw-bold rounded-pill px-4"
                         style="background:rgba(239,68,68,.15);color:#f87171;border:1px solid rgba(239,68,68,.4);">
                         <i class="bi bi-lock-fill me-1"></i> Fechar fatura
                     </button>
-                </form>
-            </div>
+                </div>
+            </form>
         </div>
     </div>
 </div>
@@ -623,7 +751,9 @@ document.addEventListener('click', function(e) {
         const d = btnEdit.dataset;
         document.getElementById('editarLancId').value          = d.id;
         document.getElementById('editarLancDesc').value        = d.desc;
-        document.getElementById('editarLancValor').value       = d.valor;
+        var lancValorInp = document.getElementById('editarLancValor');
+        lancValorInp.value = d.valor;
+        mascaraMoeda(lancValorInp);
         document.getElementById('editarLancData').value        = d.data;
         document.getElementById('editarLancCat').value         = d.cat || '';
         document.getElementById('editarLancGrupo').value       = d.grupo || '';
@@ -664,11 +794,62 @@ document.addEventListener('click', function(e) {
     }
 });
 
-function abrirModalFecharFatura(faturaId, total) {
+// ── ATM-style currency input ──────────────────────────────────────────────
+function setupCurrencyInput(el) {
+    if (!el || el._currencyReady) return;
+    el._currencyReady = true;
+    el._digits = '';
+    el.value = '0,00';
+    el.addEventListener('keydown', function(e) {
+        if (e.key >= '0' && e.key <= '9') {
+            e.preventDefault();
+            if (el._digits.length >= 11) return;
+            el._digits += e.key;
+            _fmtCurrency(el);
+        } else if (e.key === 'Backspace') {
+            e.preventDefault();
+            el._digits = el._digits.slice(0, -1);
+            _fmtCurrency(el);
+        } else if (e.key !== 'Tab' && e.key !== 'Enter') {
+            e.preventDefault();
+        }
+    });
+    el.addEventListener('click', function() { el.setSelectionRange(el.value.length, el.value.length); });
+    el.addEventListener('focus', function() { el.setSelectionRange(el.value.length, el.value.length); });
+}
+function _fmtCurrency(el) {
+    var d = el._digits || '';
+    var padded = d.padStart(3, '0');
+    var cents = padded.slice(-2);
+    var reais = padded.slice(0, -2).replace(/^0+/, '') || '0';
+    reais = reais.replace(/\B(?=(\d{3})+(?!\d))/g, '.');
+    el.value = reais + ',' + cents;
+}
+function setCurrencyInputValue(el, floatVal) {
+    if (!el) return;
+    if (!el._currencyReady) setupCurrencyInput(el);
+    var cents = Math.round(Math.abs(floatVal) * 100);
+    el._digits = cents === 0 ? '' : String(cents);
+    _fmtCurrency(el);
+}
+
+function abrirModalReabrir(faturaId) {
+    document.getElementById('reabrirFaturaId').value = faturaId;
+    bsModal('modalReabrirFatura').show();
+}
+
+function abrirModalFecharFatura(faturaId, totalStr) {
     document.getElementById('fecharFaturaId').value          = faturaId;
-    document.getElementById('fecharFaturaTotal').textContent = 'R$ ' + total;
+    document.getElementById('fecharFaturaTotal').textContent = 'R$ ' + totalStr;
+    var floatVal = parseFloat(totalStr.replace(/\./g, '').replace(',', '.')) || 0;
+    setCurrencyInputValue(document.getElementById('fecharFaturaValor'), floatVal);
     bsModal('modalFecharFatura').show();
 }
+
+document.addEventListener('DOMContentLoaded', function() {
+    setupCurrencyInput(document.getElementById('fecharFaturaValor'));
+    setupCurrencyInput(document.getElementById('ajusteValorInput'));
+});
 </script>
 
 <?php require_once '../geral/footer.php'; ?>

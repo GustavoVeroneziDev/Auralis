@@ -34,7 +34,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     } elseif ($action === 'dar_acesso') {
         $plano = in_array($_POST['plano'] ?? '', ['pro', 'vip']) ? $_POST['plano'] : '';
         $dias  = max(1, min(3650, (int)($_POST['dias'] ?? 30)));
-        $valor = max(0.0, (float)str_replace(',', '.', $_POST['valor_pago'] ?? '0'));
+        $valor = max(0.0, (float) str_replace(',', '.', preg_replace('/[^\d,]/', '', $_POST['valor_pago'] ?? '0')));
 
         if (!$plano) {
             $erro = "Selecione um plano válido.";
@@ -71,6 +71,17 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                     ->execute([':plano' => $plano, ':uid' => $uid]);
 
                 $pdo->commit();
+
+                concederConquistaParaUsuario($pdo, $uid, $plano === 'vip' ? 'plano_vip' : 'plano_pro');
+
+                $planoNome = strtoupper($plano);
+                $dataFmt   = date('d/m/Y', strtotime($dataExpiracao));
+                $plural    = $dias > 1 ? 's' : '';
+                criarNotificacaoSistema($pdo, $uid,
+                    "Você recebeu {$dias} dia{$plural} de plano {$planoNome}!",
+                    "Boas notícias! Um administrador concedeu a você {$dias} dia{$plural} de acesso ao plano {$planoNome}.\n\nSeu acesso é válido até {$dataFmt}. Aproveite todos os recursos disponíveis no seu painel!"
+                );
+
                 header("Location: usuarios.php?sucesso=acesso_dado");
                 exit;
             } catch (PDOException $e) {
@@ -86,6 +97,12 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             $pdo->prepare("UPDATE Usuario SET Plano = 'free' WHERE IDUsuario = :uid")
                 ->execute([':uid' => $uid]);
             $pdo->commit();
+
+            criarNotificacaoSistema($pdo, $uid,
+                "Seu plano foi alterado para Free",
+                "Um administrador encerrou seu plano pago. Você voltou para o plano gratuito com recursos limitados.\n\nSe tiver dúvidas, entre em contato com o suporte."
+            );
+
             header("Location: usuarios.php?sucesso=revogado");
             exit;
         } catch (PDOException $e) {
@@ -167,6 +184,24 @@ require_once '../geral/header.php';
             <a href="/admin/notificacoes.php" class="nav-link rounded-pill"
                 style="background:rgba(255,255,255,.05);color:#9ca3af;font-size:0.85rem;">
                 <i class="bi bi-bell-fill me-1"></i> Notificações
+            </a>
+        </li>
+        <li class="nav-item">
+            <a href="/admin/revendedores.php" class="nav-link rounded-pill"
+                style="background:rgba(255,255,255,.05);color:#9ca3af;font-size:0.85rem;">
+                <i class="bi bi-people-fill me-1"></i> Revendedores
+            </a>
+        </li>
+        <li class="nav-item">
+            <a href="/admin/indicacoes.php" class="nav-link rounded-pill"
+                style="background:rgba(255,255,255,.05);color:#9ca3af;font-size:0.85rem;">
+                <i class="bi bi-share-fill me-1"></i> Indicações
+            </a>
+        </li>
+        <li class="nav-item">
+            <a href="/admin/conquistas.php" class="nav-link rounded-pill"
+                style="background:rgba(255,255,255,.05);color:#9ca3af;font-size:0.85rem;">
+                <i class="bi bi-trophy-fill me-1"></i> Conquistas
             </a>
         </li>
     </ul>
@@ -494,9 +529,10 @@ require_once '../geral/header.php';
                         </label>
                         <div class="input-group">
                             <span class="input-group-text bg-dark border-secondary-subtle text-secondary">R$</span>
-                            <input type="text" name="valor_pago"
+                            <input type="text" name="valor_pago" inputmode="numeric"
                                 class="form-control bg-dark border-secondary-subtle text-light"
-                                placeholder="0,00" autocomplete="off">
+                                placeholder="R$ 0,00" autocomplete="off"
+                                oninput="mascaraMoeda(this)">
                         </div>
                     </div>
 

@@ -37,7 +37,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $bandeira    = in_array($_POST['bandeira'] ?? '', ['visa','mastercard','elo','amex','hipercard','outro'])
                        ? $_POST['bandeira'] : 'outro';
         $cor         = preg_match('/^#[0-9a-fA-F]{6}$/', $_POST['cor'] ?? '') ? $_POST['cor'] : '#7c3aed';
-        $limite      = is_numeric($_POST['limite'] ?? '') ? (float)$_POST['limite'] : null;
+        $limiteRaw   = preg_replace('/[^\d,]/', '', $_POST['limite'] ?? '');
+        $limite      = $limiteRaw !== '' ? (float) str_replace(',', '.', $limiteRaw) : null;
         $diaFech     = max(1, min(31, (int)($_POST['dia_fechamento'] ?? 1)));
         $diaVenc     = max(1, min(31, (int)($_POST['dia_vencimento'] ?? 10)));
         $carteiraDb  = trim($_POST['carteira_debito'] ?? '') ?: null;
@@ -429,7 +430,7 @@ require_once '../geral/header.php';
 
                     <div>
                         <label class="form-label text-secondary small">Limite (opcional)</label>
-                        <input type="number" name="limite" id="mc_limite" class="form-control bg-transparent text-light border-secondary" step="0.01" min="0" placeholder="R$ 0,00">
+                        <input type="text" name="limite" id="mc_limite" inputmode="numeric" class="form-control bg-transparent text-light border-secondary" placeholder="R$ 0,00" oninput="mascaraMoeda(this)" autocomplete="off">
                     </div>
 
                     <div>
@@ -533,7 +534,9 @@ function abrirModalEditar(c) {
     document.getElementById('mc_cor').value      = c.Cor;
     document.getElementById('mc_fech').value     = c.DiaFechamento;
     document.getElementById('mc_venc').value     = c.DiaVencimento;
-    document.getElementById('mc_limite').value   = c.Limite ?? '';
+    var limiteInp = document.getElementById('mc_limite');
+    limiteInp.value = c.Limite ?? '';
+    if (limiteInp.value !== '') mascaraMoeda(limiteInp);
     document.getElementById('mc_carteira').value = c.FKCarteiraDebito ?? '';
     document.getElementById('mc_titulo').textContent = 'Editar Cartão';
 }

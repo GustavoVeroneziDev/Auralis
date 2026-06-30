@@ -34,7 +34,7 @@ if (!function_exists('obterNivelAcesso')) {
 }
 
 if (!function_exists('exigirAcessoMinimo')) {
-    function exigirAcessoMinimo($nivelNecessario)
+    function exigirAcessoMinimo(int $nivelNecessario): void
     {
         $nivelAtual = obterNivelAcesso();
         if ($nivelAtual < $nivelNecessario) {
@@ -54,7 +54,7 @@ if (!function_exists('obterPlanoAtual')) {
 }
 
 if (!function_exists('exigirPlano')) {
-    function exigirPlano($planoMinimo)
+    function exigirPlano(string $planoMinimo): void
     {
         $hierarquia = ['free' => 0, 'pro' => 1, 'vip' => 2];
         $atual      = $hierarquia[obterPlanoAtual()] ?? 0;
@@ -67,7 +67,7 @@ if (!function_exists('exigirPlano')) {
 }
 
 if (!function_exists('temPlano')) {
-    function temPlano($planoMinimo)
+    function temPlano(string $planoMinimo): bool
     {
         $hierarquia = ['free' => 0, 'pro' => 1, 'vip' => 2];
         $atual      = $hierarquia[obterPlanoAtual()] ?? 0;
@@ -91,8 +91,8 @@ if (!function_exists('badgePlano')) {
 }
 
 if (!function_exists('exibirLimite')) {
-    function exibirLimite($valor) {
-        return $valor === PHP_INT_MAX ? 'ilimitado' : $valor;
+    function exibirLimite(int $valor): string {
+        return $valor === PHP_INT_MAX ? 'ilimitado' : (string)$valor;
     }
 }
 
@@ -138,7 +138,7 @@ if (!function_exists('limitesDoPlano')) {
 }
 
 if (!function_exists('verificarExpiracao')) {
-    function verificarExpiracao($pdo)
+    function verificarExpiracao(PDO $pdo): void
     {
         if (!isset($_SESSION['usuario_id'])) return;
         if (($_SESSION['plano'] ?? 'free') === 'free') return;
@@ -162,14 +162,43 @@ if (!function_exists('verificarExpiracao')) {
             $assinatura = $stmt->fetch();
 
             if (!$assinatura || $assinatura['Status'] !== 'ativa') {
+                $planoAnterior = strtoupper($_SESSION['plano']);
+                criarNotificacaoSistema(
+                    $pdo, $_SESSION['usuario_id'],
+                    "Seu plano {$planoAnterior} foi encerrado",
+                    "Seu acesso ao plano {$planoAnterior} foi encerrado e você voltou para o plano gratuito.\n\nVocê ainda pode usar os recursos do plano Free. Para continuar com todos os recursos, considere renovar sua assinatura.",
+                    3
+                );
                 _rebaixarParaFree($pdo, $_SESSION['usuario_id']);
                 return;
             }
 
-            if (strtotime($assinatura['DataExpiracao']) < time()) {
+            $expTimestamp = strtotime($assinatura['DataExpiracao']);
+
+            if ($expTimestamp < time()) {
                 $pdo->prepare("UPDATE Assinatura SET Status = 'expirada' WHERE FKUsuario = :uid AND Status = 'ativa'")
                     ->execute([':uid' => $_SESSION['usuario_id']]);
+                $planoAnterior = strtoupper($_SESSION['plano']);
+                criarNotificacaoSistema(
+                    $pdo, $_SESSION['usuario_id'],
+                    "Seu plano {$planoAnterior} expirou",
+                    "Seu plano {$planoAnterior} expirou e você foi automaticamente movido para o plano gratuito.\n\nRenove sua assinatura para recuperar o acesso a todos os recursos!",
+                    3
+                );
                 _rebaixarParaFree($pdo, $_SESSION['usuario_id']);
+            } else {
+                $diasRestantes = (int) ceil(($expTimestamp - time()) / 86400);
+                if ($diasRestantes <= 3) {
+                    $planoNome = strtoupper($_SESSION['plano']);
+                    $dataFmt   = date('d/m/Y', $expTimestamp);
+                    $plural    = $diasRestantes > 1 ? 's' : '';
+                    criarNotificacaoSistema(
+                        $pdo, $_SESSION['usuario_id'],
+                        "Seu plano {$planoNome} expira em {$diasRestantes} dia{$plural}!",
+                        "Atenção: seu plano {$planoNome} expira em {$diasRestantes} dia{$plural} ({$dataFmt}).\n\nRenove agora para não perder o acesso aos seus recursos.",
+                        1
+                    );
+                }
             }
         } catch (PDOException $e) {
         }
@@ -177,7 +206,7 @@ if (!function_exists('verificarExpiracao')) {
 }
 
 if (!function_exists('_rebaixarParaFree')) {
-    function _rebaixarParaFree($pdo, $uid)
+    function _rebaixarParaFree(PDO $pdo, string $uid): void
     {
         try {
             $pdo->prepare("UPDATE Usuario SET Plano = 'free' WHERE IDUsuario = :uid")
@@ -254,7 +283,7 @@ if (!function_exists('obterHorasRestantesTeste')) {
 // ── Configuração dinâmica de recursos por plano ──────────────────────────
 
 if (!function_exists('recursoDisponivelParaPlano')) {
-    function recursoDisponivelParaPlano($slug, $plano = null)
+    function recursoDisponivelParaPlano(string $slug, ?string $plano = null): bool
     {
         global $pdo;
         static $cache = [];
@@ -289,7 +318,7 @@ if (!function_exists('recursoDisponivelParaPlano')) {
 
 if (!function_exists('nivelMinimoRecurso')) {
     // Retorna o menor plano com acesso — usado para exibição de badges no nav
-    function nivelMinimoRecurso($slug)
+    function nivelMinimoRecurso(string $slug): string
     {
         global $pdo;
         static $cache = [];
@@ -356,7 +385,7 @@ if (!defined('MP_PLANOS')) {
 
 // ── Helper MP: consulta API com cURL (saída do servidor → sem bloqueio) ──
 if (!function_exists('mpConsultarApi')) {
-    function mpConsultarApi($url)
+    function mpConsultarApi(string $url): array
     {
         $ch = curl_init($url);
         curl_setopt_array($ch, [
@@ -366,7 +395,6 @@ if (!function_exists('mpConsultarApi')) {
         ]);
         $resp     = curl_exec($ch);
         $httpCode = curl_getinfo($ch, CURLINFO_HTTP_CODE);
-        curl_close($ch);
         return [$httpCode, json_decode($resp, true)];
     }
 }
@@ -399,7 +427,7 @@ if (!function_exists('temaDoUsuario')) {
 }
 
 if (!function_exists('usuarioPossuiConquista')) {
-    function usuarioPossuiConquista($slug)
+    function usuarioPossuiConquista(string $slug): bool
     {
         global $pdo;
         $uid = $_SESSION['usuario_id'] ?? null;
@@ -418,12 +446,10 @@ if (!function_exists('usuarioPossuiConquista')) {
     }
 }
 
-if (!function_exists('concederConquista')) {
-    function concederConquista($slug)
+if (!function_exists('concederConquistaParaUsuario')) {
+    // Versão direta — funciona sem sessão (webhooks, ativação de conta, etc.)
+    function concederConquistaParaUsuario(PDO $pdo, string $uid, string $slug): bool
     {
-        global $pdo;
-        $uid = $_SESSION['usuario_id'] ?? null;
-        if (!$uid || !$pdo) return false;
         try {
             $stmt = $pdo->prepare("SELECT IDConquista FROM conquista WHERE Slug = :slug AND Ativo = 1 LIMIT 1");
             $stmt->execute([':slug' => $slug]);
@@ -435,19 +461,29 @@ if (!function_exists('concederConquista')) {
             if ($check->fetchColumn()) return false;
 
             $pdo->prepare("
-                INSERT INTO usuario_conquista (IDUsuarioConquista, FKUsuario, FKConquista)
-                VALUES (:id, :uid, :cid)
+                INSERT INTO usuario_conquista (IDUsuarioConquista, FKUsuario, FKConquista, DataConquista)
+                VALUES (:id, :uid, :cid, NOW())
             ")->execute([':id' => gerarUuid(), ':uid' => $uid, ':cid' => $cid]);
             return true;
-        } catch (PDOException $e) {
+        } catch (Throwable $e) {
             return false;
         }
     }
 }
 
+if (!function_exists('concederConquista')) {
+    function concederConquista(string $slug): bool
+    {
+        global $pdo;
+        $uid = $_SESSION['usuario_id'] ?? null;
+        if (!$uid || !$pdo) return false;
+        return concederConquistaParaUsuario($pdo, $uid, $slug);
+    }
+}
+
 // ── Helper MP: cancela assinatura no Mercado Pago via API ────────────────
 if (!function_exists('mpCancelarNoMP')) {
-    function mpCancelarNoMP($gwId)
+    function mpCancelarNoMP(string $gwId): void
     {
         if (empty($gwId)) return;
         $ch = curl_init("https://api.mercadopago.com/preapproval/{$gwId}");
@@ -462,13 +498,12 @@ if (!function_exists('mpCancelarNoMP')) {
             CURLOPT_TIMEOUT => 10,
         ]);
         curl_exec($ch);
-        curl_close($ch);
     }
 }
 
 // ── Helper MP: ativa plano no banco a partir de dados da assinatura ───────
 if (!function_exists('mpAtivarPlano')) {
-    function mpAtivarPlano($pdo, $emailComprador, $planId, $gwId, $valorPago = 0)
+    function mpAtivarPlano(PDO $pdo, string $emailComprador, string $planId, string $gwId, float $valorPago = 0): string|false
     {
         $planos = MP_PLANOS;
         if (!isset($planos[$planId])) return false;
@@ -546,6 +581,8 @@ if (!function_exists('mpAtivarPlano')) {
 
             $pdo->commit();
 
+            concederConquistaParaUsuario($pdo, $uid, $config['plano'] === 'vip' ? 'plano_vip' : 'plano_pro');
+
             // 8. Cancela as assinaturas antigas no Mercado Pago (fora da transação BD
             //    para que uma falha de rede não desfaça a ativação já confirmada)
             foreach ($assinaturasAntigas as $antiga) {
@@ -574,4 +611,193 @@ function badgePremium($nivelExigido = 'pro', $emTeste = false)
     }
 
     return "<span class=\"badge ms-1\" style=\"background: {$cor}22; color: {$cor}; border: 1px solid {$cor}66; font-size: 0.55rem; padding: 2px 5px; vertical-align: middle;\"><i class=\"bi bi-star-fill\"></i> {$texto}</span>";
+}
+
+// ── Notificações automáticas do sistema ──────────────────────────────────────
+
+if (!function_exists('criarNotificacaoSistema')) {
+    function criarNotificacaoSistema(PDO $pdo, string $uid, string $titulo, string $conteudo, int $dedupeJanelaDias = 0): void
+    {
+        try {
+            if ($dedupeJanelaDias > 0) {
+                $chk = $pdo->prepare("
+                    SELECT 1 FROM Notificacao n
+                    JOIN NotificacaoDestinatario nd ON nd.FKNotificacao = n.IDNotificacao
+                    WHERE nd.FKUsuario = :uid AND n.Titulo = :titulo
+                      AND n.DataCriacao >= DATE_SUB(NOW(), INTERVAL :dias DAY)
+                    LIMIT 1
+                ");
+                $chk->execute([':uid' => $uid, ':titulo' => $titulo, ':dias' => $dedupeJanelaDias]);
+                if ($chk->fetchColumn()) return;
+            }
+
+            $nid = gerarUuid();
+            $pdo->prepare("
+                INSERT INTO Notificacao (IDNotificacao, Titulo, Conteudo, DestinatarioTipo, TipoInteracao)
+                VALUES (:id, :titulo, :conteudo, 'selecionado', 'nenhuma')
+            ")->execute([':id' => $nid, ':titulo' => $titulo, ':conteudo' => $conteudo]);
+
+            $pdo->prepare("
+                INSERT IGNORE INTO NotificacaoDestinatario (FKNotificacao, FKUsuario)
+                VALUES (:nid, :uid)
+            ")->execute([':nid' => $nid, ':uid' => $uid]);
+        } catch (Throwable $e) { /* silent — notificações não devem quebrar o fluxo principal */ }
+    }
+}
+
+if (!function_exists('verificarAvisosAutomaticos')) {
+    function verificarAvisosAutomaticos(PDO $pdo): void
+    {
+        if (!isset($_SESSION['usuario_id'])) return;
+        if (isset($_SESSION['avisos_auto_verificados'])) return;
+        $_SESSION['avisos_auto_verificados'] = true;
+
+        if (strtolower($_SESSION['plano'] ?? 'free') !== 'free') return;
+
+        $horasRestantes = function_exists('obterHorasRestantesTeste') ? obterHorasRestantesTeste() : 0;
+        if ($horasRestantes > 0 && $horasRestantes <= 24) {
+            $plural = $horasRestantes > 1 ? 's' : '';
+            criarNotificacaoSistema(
+                $pdo,
+                $_SESSION['usuario_id'],
+                'Seu período de teste termina em breve!',
+                "Atenção: seu período gratuito de teste termina em menos de {$horasRestantes} hora{$plural}.\n\nApós esse período, você continuará com o plano gratuito com recursos limitados. Considere fazer o upgrade para não perder o acesso a todos os recursos!",
+                1
+            );
+        }
+    }
+}
+
+// ── Indicações & Revendedores ─────────────────────────────────────────────────
+
+/**
+ * Gera um código de indicação único no formato AUR-XXXXXX.
+ * Usa apenas caracteres sem ambiguidade visual (sem O/0, I/1).
+ */
+function gerarCodigoIndicacao(PDO $pdo): string
+{
+    $chars = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
+    do {
+        $code = 'AUR-';
+        for ($i = 0; $i < 6; $i++) {
+            $code .= $chars[random_int(0, strlen($chars) - 1)];
+        }
+        $existe = $pdo->prepare("SELECT 1 FROM Usuario WHERE CodigoIndicacao = :c");
+        $existe->execute([':c' => $code]);
+    } while ($existe->fetchColumn());
+    return $code;
+}
+
+/**
+ * Chamado após mpAtivarPlano() confirmar uma conversão.
+ * - Se o indicador é revendedor → cria registro de comissão monetária.
+ * - Se o indicador é usuário comum → conta conversões e aplica recompensas configuradas.
+ */
+function processarIndicacaoConversao(PDO $pdo, string $emailComprador, float $valorPago, string $plano): void
+{
+    try {
+        // Encontra o comprador e quem o indicou
+        $stmt = $pdo->prepare("SELECT IDUsuario, FKIndicadoPor FROM Usuario WHERE LOWER(Email) = LOWER(:e) LIMIT 1");
+        $stmt->execute([':e' => $emailComprador]);
+        $comprador = $stmt->fetch(PDO::FETCH_ASSOC);
+        if (!$comprador || empty($comprador['FKIndicadoPor'])) return;
+
+        $compradorId  = $comprador['IDUsuario'];
+        $indicadorId  = $comprador['FKIndicadoPor'];
+
+        // ── Caminho A: indicador é revendedor ────────────────────────────────
+        $stmtRev = $pdo->prepare("SELECT * FROM Revendedor WHERE FKUsuario = :uid AND Ativo = 1 LIMIT 1");
+        $stmtRev->execute([':uid' => $indicadorId]);
+        $revendedor = $stmtRev->fetch(PDO::FETCH_ASSOC);
+
+        if ($revendedor) {
+            // Idempotência: só uma comissão por comprador
+            $jaExiste = $pdo->prepare("SELECT 1 FROM ComissaoRevendedor WHERE FKUsuarioComprador = :uid LIMIT 1");
+            $jaExiste->execute([':uid' => $compradorId]);
+            if ($jaExiste->fetchColumn()) return;
+
+            concederConquistaParaUsuario($pdo, $indicadorId, 'indicou_amigo');
+            $perc  = (float)$revendedor['ComissaoPercentual'];
+            $valor = round($valorPago * $perc / 100, 2);
+            $pdo->prepare(
+                "INSERT INTO ComissaoRevendedor
+                     (IDComissao, FKRevendedor, FKUsuarioComprador, ValorVenda, PercentualAplicado, ValorComissao, Plano)
+                 VALUES (:id, :rev, :comp, :venda, :perc, :com, :plano)"
+            )->execute([
+                ':id'    => gerarUuid(),
+                ':rev'   => $revendedor['IDRevendedor'],
+                ':comp'  => $compradorId,
+                ':venda' => $valorPago,
+                ':perc'  => $perc,
+                ':com'   => $valor,
+                ':plano' => $plano,
+            ]);
+            return;
+        }
+
+        // ── Caminho B: usuário comum — verifica recompensas por indicação ────
+        concederConquistaParaUsuario($pdo, $indicadorId, 'indicou_amigo');
+        // Conta quantos usuários o indicador trouxe que agora têm plano ativo
+        $stmtCnt = $pdo->prepare(
+            "SELECT COUNT(DISTINCT u.IDUsuario)
+             FROM Usuario u
+             JOIN Assinatura a ON a.FKUsuario = u.IDUsuario AND a.Status IN ('ativa','trial')
+             WHERE u.FKIndicadoPor = :uid"
+        );
+        $stmtCnt->execute([':uid' => $indicadorId]);
+        $totalConversoes = (int)$stmtCnt->fetchColumn();
+
+        // Busca regra de recompensa que o indicador ainda não recebeu
+        $stmtCfg = $pdo->prepare(
+            "SELECT c.* FROM indicacao_recompensa_config c
+             WHERE c.Ativo = 1 AND c.MinIndicacoes <= :total
+               AND NOT EXISTS (
+                   SELECT 1 FROM indicacao_recompensa_concedida irc
+                   WHERE irc.FKUsuario = :uid AND irc.FKConfig = c.IDConfig
+               )
+             ORDER BY c.MinIndicacoes DESC LIMIT 1"
+        );
+        $stmtCfg->execute([':total' => $totalConversoes, ':uid' => $indicadorId]);
+        $recompensa = $stmtCfg->fetch(PDO::FETCH_ASSOC);
+        if (!$recompensa) return;
+
+        // Aplica recompensa: cria assinatura de bônus para o indicador
+        $dataInicio = date('Y-m-d H:i:s');
+        // Se já tem assinatura ativa, acumula dias por cima
+        $stmtAtual = $pdo->prepare("SELECT DataExpiracao FROM Assinatura WHERE FKUsuario = :uid AND Status = 'ativa' LIMIT 1");
+        $stmtAtual->execute([':uid' => $indicadorId]);
+        $expAtual = $stmtAtual->fetchColumn();
+        $base     = ($expAtual && $expAtual > $dataInicio) ? $expAtual : $dataInicio;
+        $dataExp  = date('Y-m-d H:i:s', strtotime($base . " +" . (int)$recompensa['DuracaoDias'] . " days"));
+
+        $pdo->beginTransaction();
+        $pdo->prepare("UPDATE Assinatura SET Status = 'cancelada' WHERE FKUsuario = :uid AND Status = 'ativa'")
+            ->execute([':uid' => $indicadorId]);
+        $pdo->prepare(
+            "INSERT INTO Assinatura
+                 (IDAssinatura, FKUsuario, Plano, Status, Ciclo, ValorPago, DataInicio, DataExpiracao, FontePagamento)
+             VALUES (:id, :uid, :plano, 'ativa', 'manual', 0, :ini, :exp, 'indicacao')"
+        )->execute([
+            ':id'    => gerarUuid(),
+            ':uid'   => $indicadorId,
+            ':plano' => $recompensa['PlanoRecompensa'],
+            ':ini'   => $dataInicio,
+            ':exp'   => $dataExp,
+        ]);
+        $pdo->prepare("UPDATE Usuario SET Plano = :p WHERE IDUsuario = :uid")
+            ->execute([':p' => $recompensa['PlanoRecompensa'], ':uid' => $indicadorId]);
+        $pdo->prepare(
+            "INSERT INTO indicacao_recompensa_concedida (IDConcessao, FKUsuario, FKConfig, TotalNaEpoca)
+             VALUES (:id, :uid, :cfg, :total)"
+        )->execute([
+            ':id'    => gerarUuid(),
+            ':uid'   => $indicadorId,
+            ':cfg'   => $recompensa['IDConfig'],
+            ':total' => $totalConversoes,
+        ]);
+        $pdo->commit();
+
+    } catch (Exception $e) {
+        if ($pdo->inTransaction()) $pdo->rollBack();
+    }
 }

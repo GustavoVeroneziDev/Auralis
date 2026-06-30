@@ -30,6 +30,21 @@ $_ehFreeRestrito = !$_emTrial
     && isset($_SESSION['usuario_id'])
     && strtolower($_SESSION['plano'] ?? 'free') === 'free';
 
+// Avisos automáticos: trial expirando, etc. (uma vez por sessão)
+if (isset($_SESSION['usuario_id']) && isset($pdo) && function_exists('verificarAvisosAutomaticos')) {
+    verificarAvisosAutomaticos($pdo);
+}
+
+// Verifica se o usuário logado é revendedor ativo (para exibir link no menu)
+$_ehRevendedor = false;
+if (isset($_SESSION['usuario_id']) && isset($pdo)) {
+    try {
+        $stmtRev = $pdo->prepare("SELECT 1 FROM Revendedor WHERE FKUsuario = :uid AND Ativo = 1 LIMIT 1");
+        $stmtRev->execute([':uid' => $_SESSION['usuario_id']]);
+        $_ehRevendedor = (bool)$stmtRev->fetchColumn();
+    } catch (Throwable $e) {}
+}
+
 // ── Tema ─────────────────────────────────────────────────────────────────
 $_temasDisponiveis = function_exists('temasDisponiveis') ? temasDisponiveis() : [
     'dark'  => ['bs_mode' => 'dark'],
@@ -189,11 +204,24 @@ $_carteiraParam = (!empty($_SESSION['ultima_carteira']))
                 <i class="bi bi-credit-card-2-front"></i>
                 <span class="sidebar-label">Cartões</span>
             </a>
+            <a href="/perfil.php"
+               class="sidebar-item <?= $paginaAtual === 'perfil.php' ? 'active' : '' ?>">
+                <i class="bi bi-person-circle"></i>
+                <span class="sidebar-label">Perfil</span>
+            </a>
             <?php if ($_ehFreeRestrito): ?>
             <a href="/planos.php"
                class="sidebar-item <?= $paginaAtual === 'planos.php' ? 'active' : '' ?>">
                 <i class="bi bi-star"></i>
                 <span class="sidebar-label">Planos</span>
+            </a>
+            <?php endif; ?>
+            <?php if ($_ehRevendedor): ?>
+            <a href="/revendedor/dashboard.php"
+               class="sidebar-item <?= strpos($_SERVER['PHP_SELF'], '/revendedor/') !== false ? 'active' : '' ?>"
+               style="color:#d4af37;">
+                <i class="bi bi-people-fill" style="color:#d4af37;"></i>
+                <span class="sidebar-label">Revendedor</span>
             </a>
             <?php endif; ?>
             <?php if (in_array(strtolower($_SESSION['nivel_acesso'] ?? ''), ['admin', 'supremo'])): ?>
@@ -238,10 +266,24 @@ $_carteiraParam = (!empty($_SESSION['ultima_carteira']))
                     </li>
                     <li>
                         <a class="dropdown-item d-flex align-items-center py-2 transition-hover"
+                           href="/perfil.php" style="color:var(--text-main);">
+                            <i class="bi bi-person-circle me-2" style="color:#6366f1;"></i> Perfil
+                        </a>
+                    </li>
+                    <li>
+                        <a class="dropdown-item d-flex align-items-center py-2 transition-hover"
                            href="/configuracoes.php" style="color:var(--text-main);">
                             <i class="bi bi-gear me-2" style="color:gold;"></i> Configurações
                         </a>
                     </li>
+                    <?php if ($_ehRevendedor): ?>
+                    <li>
+                        <a class="dropdown-item d-flex align-items-center py-2 fw-semibold transition-hover"
+                           href="/revendedor/dashboard.php" style="color:#d4af37;">
+                            <i class="bi bi-people-fill me-2" style="color:#d4af37;"></i> Painel do Revendedor
+                        </a>
+                    </li>
+                    <?php endif; ?>
                     <li>
                         <a class="dropdown-item d-flex align-items-center py-2 transition-hover"
                            href="/ajuda.php" target="_blank" rel="noopener" style="color:var(--text-main);">
@@ -465,7 +507,11 @@ $_carteiraParam = (!empty($_SESSION['ultima_carteira']))
                                     </a>
                                     <?php endif; ?>
                                 </li>
+                                <li><a class="dropdown-item text-light d-flex align-items-center py-2" href="/perfil.php"><i class="bi bi-person-circle me-2" style="color:#6366f1;"></i> Perfil</a></li>
                                 <li><a class="dropdown-item text-light d-flex align-items-center py-2" href="/configuracoes.php"><i class="bi bi-gear me-2" style="color:gold;"></i> Configurações</a></li>
+                                <?php if ($_ehRevendedor): ?>
+                                <li><a class="dropdown-item d-flex align-items-center py-2 fw-semibold" href="/revendedor/dashboard.php" style="color:#d4af37;"><i class="bi bi-people-fill me-2" style="color:#d4af37;"></i> Painel do Revendedor</a></li>
+                                <?php endif; ?>
                                 <li><a class="dropdown-item text-light d-flex align-items-center py-2" href="/ajuda.php" target="_blank" rel="noopener"><i class="bi bi-mortarboard me-2" style="color:gold;"></i> Tutoriais</a></li>
                                 <li><a class="dropdown-item text-light d-flex align-items-center py-2" href="/contato.php"><i class="bi bi-headset me-2" style="color:gold;"></i> Contato & Suporte</a></li>
                                 <li class="btn-instalar-app" style="display:none;"><a class="dropdown-item text-light d-flex align-items-center py-2" href="#" onclick="auralisInstalar();return false;"><i class="bi bi-download me-2" style="color:gold;"></i> Instalar como App</a></li>
