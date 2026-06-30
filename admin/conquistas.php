@@ -521,8 +521,8 @@ require_once '../geral/header.php';
 </div>
 
 <script>
-var _modalConquista = new bootstrap.Modal(document.getElementById('modalConquista'));
-var _modalExcluir   = new bootstrap.Modal(document.getElementById('modalExcluir'));
+function _modalConquista() { return bootstrap.Modal.getOrCreateInstance(document.getElementById('modalConquista')); }
+function _modalExcluir()   { return bootstrap.Modal.getOrCreateInstance(document.getElementById('modalExcluir')); }
 
 // ── Abrir criar ─────────────────────────────────────────────
 function abrirModalCriar() {
@@ -536,7 +536,7 @@ function abrirModalCriar() {
     limparImagem();
     atualizarPreviewFinal();
     document.getElementById('imgAtualWrap').hidden = true;
-    _modalConquista.show();
+    _modalConquista().show();
 }
 
 // ── Abrir editar ─────────────────────────────────────────────
@@ -570,14 +570,14 @@ function abrirModalEditar(c) {
     }
 
     atualizarPreviewFinal();
-    _modalConquista.show();
+    _modalConquista().show();
 }
 
 // ── Confirmar exclusão ──────────────────────────────────────
 function confirmarExclusao(id, nome) {
     document.getElementById('excId').value   = id;
     document.getElementById('excNome').textContent = nome;
-    _modalExcluir.show();
+    _modalExcluir().show();
 }
 
 // ── Toggle tab upload/url ───────────────────────────────────
