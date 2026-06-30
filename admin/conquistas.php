@@ -328,14 +328,14 @@ require_once '../geral/header.php';
 <!-- MODAL CRIAR / EDITAR                                       -->
 <!-- ══════════════════════════════════════════════════════════ -->
 <div class="modal fade" id="modalConquista" tabindex="-1">
-  <div class="modal-dialog modal-lg modal-dialog-centered modal-dialog-scrollable" style="max-height:90vh;">
+  <div class="modal-dialog modal-lg modal-dialog-centered modal-dialog-scrollable">
     <div class="modal-content border-secondary-subtle rounded-4" style="background:#1a1d21;color:#e5e7eb;">
       <div class="modal-header border-bottom border-secondary-subtle px-4">
         <h5 class="modal-title fw-bold" id="modalConquistaTitulo">Nova Conquista</h5>
         <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
       </div>
       <form method="post" enctype="multipart/form-data" id="formConquista">
-        <div class="modal-body px-4 py-4">
+        <div class="modal-body px-4 py-4" style="max-height:65vh;overflow-y:auto;overscroll-behavior:contain;">
           <input type="hidden" name="action" id="fAction" value="criar">
           <input type="hidden" name="conquista_id" id="fId">
 
