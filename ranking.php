@@ -51,7 +51,7 @@ function _formatarDias(int $dias): string {
 
 // ── Posição do usuário fora do top 10 ────────────────────────────────────────
 // Retorna ['pos' => N, 'total' => X] onde pos >= 11
-function _minhaPosicao(PDO $pdo, string $sqlMeuTotal, string $sqlQuantosAcima, int $uid): array {
+function _minhaPosicao(PDO $pdo, string $sqlMeuTotal, string $sqlQuantosAcima, string $uid): array {
     try {
         $st = $pdo->prepare($sqlMeuTotal);
         $st->execute([':uid' => $uid]);
@@ -68,9 +68,17 @@ function _minhaPosicao(PDO $pdo, string $sqlMeuTotal, string $sqlQuantosAcima, i
 }
 
 // ── Queries de ranking ────────────────────────────────────────────────────────
+function _rankQuery(PDO $pdo, string $sql): array {
+    try {
+        $st = $pdo->prepare($sql);
+        $st->execute();
+        return $st->fetchAll();
+    } catch (Throwable $e) {
+        return [];
+    }
+}
 
-// 1. Mais lançamentos (receita + despesa)
-$stmt = $pdo->prepare("
+$r_registros = _rankQuery($pdo, "
     SELECT u.IDUsuario, u.Nome, u.FotoPerfil, COUNT(*) AS total
     FROM Registro r
     JOIN Usuario u ON u.IDUsuario = r.FKUsuario
@@ -79,11 +87,8 @@ $stmt = $pdo->prepare("
     ORDER BY total DESC, u.MomentoCriacao ASC
     LIMIT 10
 ");
-$stmt->execute();
-$r_registros = $stmt->fetchAll();
 
-// 2. Mais conquistas
-$stmt = $pdo->prepare("
+$r_conquistas = _rankQuery($pdo, "
     SELECT u.IDUsuario, u.Nome, u.FotoPerfil, COUNT(*) AS total
     FROM usuario_conquista uc
     JOIN Usuario u ON u.IDUsuario = uc.FKUsuario
@@ -92,11 +97,8 @@ $stmt = $pdo->prepare("
     ORDER BY total DESC, u.MomentoCriacao ASC
     LIMIT 10
 ");
-$stmt->execute();
-$r_conquistas = $stmt->fetchAll();
 
-// 3. Mais comprovantes
-$stmt = $pdo->prepare("
+$r_comprovantes = _rankQuery($pdo, "
     SELECT u.IDUsuario, u.Nome, u.FotoPerfil, COUNT(*) AS total
     FROM Comprovante c
     JOIN Usuario u ON u.IDUsuario = c.FKUsuario
@@ -105,11 +107,8 @@ $stmt = $pdo->prepare("
     ORDER BY total DESC, u.MomentoCriacao ASC
     LIMIT 10
 ");
-$stmt->execute();
-$r_comprovantes = $stmt->fetchAll();
 
-// 4. Veteranos (mais antigos)
-$stmt = $pdo->prepare("
+$r_veteranos = _rankQuery($pdo, "
     SELECT IDUsuario, Nome, FotoPerfil,
            DATEDIFF(NOW(), MomentoCriacao) AS total
     FROM Usuario
@@ -117,11 +116,8 @@ $stmt = $pdo->prepare("
     ORDER BY MomentoCriacao ASC
     LIMIT 10
 ");
-$stmt->execute();
-$r_veteranos = $stmt->fetchAll();
 
-// 5. Mais categorias criadas
-$stmt = $pdo->prepare("
+$r_categorias = _rankQuery($pdo, "
     SELECT u.IDUsuario, u.Nome, u.FotoPerfil, COUNT(*) AS total
     FROM Categoria cat
     JOIN Usuario u ON u.IDUsuario = cat.FKUsuario
@@ -130,12 +126,10 @@ $stmt = $pdo->prepare("
     ORDER BY total DESC, u.MomentoCriacao ASC
     LIMIT 10
 ");
-$stmt->execute();
-$r_categorias = $stmt->fetchAll();
 
 // ── Verifica se usuário está fora do top 10 e busca sua posição ───────────────
-function _usuarioNaLista(array $lista, int $uid): bool {
-    foreach ($lista as $r) if ((int)$r['IDUsuario'] === $uid) return true;
+function _usuarioNaLista(array $lista, string $uid): bool {
+    foreach ($lista as $r) if ((string)$r['IDUsuario'] === $uid) return true;
     return false;
 }
 
@@ -305,12 +299,12 @@ require_once 'geral/header.php';
                         $valLabel = ($alt === 'dias') ? _formatarDias($val) : number_format($val) . ' ' . ($val === 1 ? $pane['unidade'] : $pane['unidades']);
                     ?>
                     <div class="col-4">
-                        <div class="rounded-4 p-3 text-center position-relative"
-                             style="background:<?= $podiumBgs[$oi] ?>;
-                                    border:1px solid <?= $cor ?>44;
-                                    <?= $isMe ? "box-shadow:0 0 0 2px {$cor}66;" : '' ?>
-                                    min-height:<?= $podiumHeights[$oi] ?>;
-                                    transition:transform .2s;"
+                            <div class="rounded-4 p-3 text-center position-relative"
+                                style="background:<?= $podiumBgs[$oi] ?>; 
+                                     border:1px solid <?= $cor ?>44; 
+                                     <?= $isMe ? 'echo_box_shadow' : '' ?>
+                                     min-height:<?= $podiumHeights[$oi] ?>; 
+                                     transition:transform .2s;"
                              onmouseenter="this.style.transform='translateY(-3px)'"
                              onmouseleave="this.style.transform=''">
 

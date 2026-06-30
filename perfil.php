@@ -48,7 +48,6 @@ $conquistas = [];
 try {
     $stmtC = $pdo->prepare("
         SELECT c.IDConquista, c.Slug, c.Nome, c.Descricao, c.Icone,
-               COALESCE(c.ImagemUrl, '') AS ImagemUrl,
                c.Cor, c.Raridade, c.Ordem,
                uc.DataConquista
         FROM conquista c
@@ -502,7 +501,7 @@ require_once 'geral/header.php';
                 <div class="conquista-icon-wrap badge-<?= htmlspecialchars($c['Raridade'] ?? 'comum') ?>">
                     <?php if (!$desbloqueada): ?>
                         <i class="bi bi-lock-fill" style="color:rgba(156,163,175,0.5);font-size:1.4rem;"></i>
-                    <?php elseif (!empty($c['ImagemUrl'])): ?>
+                    <?php elseif (!empty($c['ImagemUrl'] ?? '')): ?>
                         <img src="<?= htmlspecialchars($c['ImagemUrl']) ?>" alt="<?= htmlspecialchars($c['Nome']) ?>" style="width:78%;height:78%;object-fit:contain;border-radius:50%;">
                     <?php else: ?>
                         <i class="bi <?= htmlspecialchars($c['Icone']) ?>" style="color:<?= htmlspecialchars($c['Cor']) ?>;"></i>
