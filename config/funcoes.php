@@ -482,34 +482,47 @@ if (!function_exists('concederConquista')) {
 }
 
 if (!function_exists('verificarConquistasAutomaticas')) {
+    /**
+     * Verifica e concede conquistas automáticas de um tipo para um usuário.
+     * Os thresholds e slugs são definidos em config/conquistas_regras.php.
+     * Para adicionar novos tipos de gatilho, adicione um 'case' aqui e
+     * a entrada correspondente em conquistas_regras.php.
+     */
     function verificarConquistasAutomaticas(PDO $pdo, string $uid, string $tipo): void
     {
         try {
-            // Busca todas as conquistas ativas desse tipo, ordenadas pelo menor threshold
-            $conquistas = $pdo->prepare("
-                SELECT Slug, ValorGatilho FROM conquista
-                WHERE TipoGatilho = :tipo AND Ativo = 1 AND ValorGatilho IS NOT NULL
-                ORDER BY ValorGatilho ASC
-            ");
-            $conquistas->execute([':tipo' => $tipo]);
-            $lista = $conquistas->fetchAll(PDO::FETCH_ASSOC);
-            if (empty($lista)) return;
+            $regras = require __DIR__ . '/conquistas_regras.php';
+            if (!isset($regras[$tipo])) return;
 
-            // Calcula o valor atual do usuário para esse tipo
-            if ($tipo === 'registros') {
-                $stmt = $pdo->prepare("
-                    SELECT COUNT(*) FROM Usuario
-                    WHERE FKIndicadoPor = :uid AND StatusConta != 'pendente'
-                ");
-                $stmt->execute([':uid' => $uid]);
-                $total = (int)$stmt->fetchColumn();
-            } else {
-                return; // tipo desconhecido — ignora silenciosamente
+            $thresholds = $regras[$tipo]['thresholds'] ?? [];
+            if (empty($thresholds)) return;
+
+            // Calcula o valor atual do usuário para o tipo solicitado
+            switch ($tipo) {
+                case 'registros':
+                    $stmt = $pdo->prepare("
+                        SELECT COUNT(*) FROM Usuario
+                        WHERE FKIndicadoPor = :uid AND StatusConta != 'pendente'
+                    ");
+                    $stmt->execute([':uid' => $uid]);
+                    $total = (int)$stmt->fetchColumn();
+                    break;
+
+                // case 'dias_membro':
+                //     $stmt = $pdo->prepare("
+                //         SELECT DATEDIFF(NOW(), DataCadastro) FROM Usuario WHERE IDUsuario = :uid
+                //     ");
+                //     $stmt->execute([':uid' => $uid]);
+                //     $total = (int)$stmt->fetchColumn();
+                //     break;
+
+                default:
+                    return;
             }
 
-            foreach ($lista as $c) {
-                if ($total >= (int)$c['ValorGatilho']) {
-                    concederConquistaParaUsuario($pdo, $uid, $c['Slug']);
+            foreach ($thresholds as $minimo => $slug) {
+                if ($total >= $minimo) {
+                    concederConquistaParaUsuario($pdo, $uid, $slug);
                 }
             }
         } catch (Throwable $e) {
@@ -518,7 +531,6 @@ if (!function_exists('verificarConquistasAutomaticas')) {
     }
 }
 
-// Alias de compatibilidade para chamadas antigas
 if (!function_exists('verificarConquistasRegistros')) {
     function verificarConquistasRegistros(PDO $pdo, string $uid): void
     {
