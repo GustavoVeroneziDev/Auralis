@@ -207,25 +207,25 @@ require_once '../geral/header.php';
     <!-- Stats -->
     <div class="row g-3 mb-4">
         <div class="col-6 col-md-3">
-            <div class="card border-0 rounded-3 p-3 text-center" style="background:var(--card-bg);">
+            <div class="card border-0 rounded-3 p-3 text-center" style="background:var(--bg-card);">
                 <div class="fw-bold" style="font-size:1.6rem;color:var(--accent);"><?= count($conquistas) ?></div>
                 <div class="small text-muted">Total</div>
             </div>
         </div>
         <div class="col-6 col-md-3">
-            <div class="card border-0 rounded-3 p-3 text-center" style="background:var(--card-bg);">
+            <div class="card border-0 rounded-3 p-3 text-center" style="background:var(--bg-card);">
                 <div class="fw-bold" style="font-size:1.6rem;color:#22c55e;"><?= count(array_filter($conquistas, fn($c) => $c['Ativo'])) ?></div>
                 <div class="small text-muted">Ativas</div>
             </div>
         </div>
         <div class="col-6 col-md-3">
-            <div class="card border-0 rounded-3 p-3 text-center" style="background:var(--card-bg);">
+            <div class="card border-0 rounded-3 p-3 text-center" style="background:var(--bg-card);">
                 <div class="fw-bold" style="font-size:1.6rem;color:#d4af37;"><?= array_sum(array_column($conquistas, 'TotalUsuarios')) ?></div>
                 <div class="small text-muted">Conquistas concedidas</div>
             </div>
         </div>
         <div class="col-6 col-md-3">
-            <div class="card border-0 rounded-3 p-3 text-center" style="background:var(--card-bg);">
+            <div class="card border-0 rounded-3 p-3 text-center" style="background:var(--bg-card);">
                 <div class="fw-bold" style="font-size:1.6rem;color:#7c3aed;"><?= count(array_filter($conquistas, fn($c) => !empty($c['ImagemUrl']))) ?></div>
                 <div class="small text-muted">Com imagem</div>
             </div>
@@ -233,10 +233,10 @@ require_once '../geral/header.php';
     </div>
 
     <!-- Tabela de conquistas -->
-    <div class="card border-0 rounded-4" style="background:var(--card-bg);">
+    <div class="card border-0 rounded-4" style="background:var(--bg-card);">
         <div class="table-responsive">
             <table class="table table-hover align-middle mb-0" style="color:var(--text-main);">
-                <thead style="border-bottom:1px solid var(--border-color);font-size:0.78rem;color:var(--text-muted);text-transform:uppercase;letter-spacing:.05em;">
+                <thead style="border-bottom:1px solid var(--bs-border-color);font-size:0.78rem;color:var(--text-muted);text-transform:uppercase;letter-spacing:.05em;">
                     <tr>
                         <th class="px-4 py-3">Insígnia</th>
                         <th class="py-3">Nome / Slug</th>
@@ -254,7 +254,7 @@ require_once '../geral/header.php';
                 <?php foreach ($conquistas as $c):
                     $rar = $raridadeInfo[$c['Raridade']] ?? $raridadeInfo['comum'];
                 ?>
-                <tr style="border-bottom:1px solid var(--border-color);">
+                <tr style="border-bottom:1px solid var(--bs-border-color);">
                     <td class="px-4 py-3">
                         <!-- Preview da insígnia -->
                         <div style="width:44px;height:44px;border-radius:50%;background:<?= htmlspecialchars($c['Cor']) ?>22;border:2px solid <?= htmlspecialchars($c['Cor']) ?>55;display:flex;align-items:center;justify-content:center;flex-shrink:0;">
@@ -328,7 +328,7 @@ require_once '../geral/header.php';
 <!-- ══════════════════════════════════════════════════════════ -->
 <div class="modal fade" id="modalConquista" tabindex="-1">
   <div class="modal-dialog modal-lg modal-dialog-centered modal-dialog-scrollable">
-    <div class="modal-content border-0 rounded-4" style="background:var(--card-bg);color:var(--text-main);">
+    <div class="modal-content border-secondary-subtle rounded-4" style="background:#1a1d21;color:#e5e7eb;">
       <div class="modal-header border-bottom border-secondary-subtle px-4">
         <h5 class="modal-title fw-bold" id="modalConquistaTitulo">Nova Conquista</h5>
         <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
@@ -343,14 +343,14 @@ require_once '../geral/header.php';
             <div class="col-md-8">
               <label class="form-label fw-semibold small">Nome <span class="text-danger">*</span></label>
               <input type="text" name="nome" id="fNome" class="form-control rounded-3" required maxlength="80"
-                     style="background:var(--input-bg,#1e2028);border-color:var(--border-color);color:var(--text-main);">
+                     style="background:var(--input-bg,#1e2028);border-color:var(--bs-border-color);color:var(--text-main);">
             </div>
             <!-- Slug -->
             <div class="col-md-4">
               <label class="form-label fw-semibold small">Slug <span class="text-danger">*</span></label>
               <input type="text" name="slug" id="fSlug" class="form-control rounded-3 font-monospace" required maxlength="50"
                      placeholder="ex: primeira_transacao"
-                     style="background:var(--input-bg,#1e2028);border-color:var(--border-color);color:var(--text-main);">
+                     style="background:var(--input-bg,#1e2028);border-color:var(--bs-border-color);color:var(--text-main);">
               <div class="form-text">Minúsculas, sem espaços. Usado internamente.</div>
             </div>
 
@@ -358,19 +358,19 @@ require_once '../geral/header.php';
             <div class="col-12">
               <label class="form-label fw-semibold small">Descrição</label>
               <textarea name="descricao" id="fDescricao" class="form-control rounded-3" rows="2" maxlength="255"
-                        style="background:var(--input-bg,#1e2028);border-color:var(--border-color);color:var(--text-main);"></textarea>
+                        style="background:var(--input-bg,#1e2028);border-color:var(--bs-border-color);color:var(--text-main);"></textarea>
             </div>
 
             <!-- Ícone Bootstrap -->
             <div class="col-md-4">
               <label class="form-label fw-semibold small">Ícone Bootstrap Icons</label>
               <div class="input-group">
-                <span class="input-group-text" style="background:var(--input-bg,#1e2028);border-color:var(--border-color);">
+                <span class="input-group-text" style="background:var(--input-bg,#1e2028);border-color:var(--bs-border-color);">
                   <i id="iconePreview" class="bi bi-trophy" style="color:var(--accent);"></i>
                 </span>
                 <input type="text" name="icone" id="fIcone" class="form-control rounded-end-3" value="bi-trophy"
                        placeholder="bi-trophy"
-                       style="background:var(--input-bg,#1e2028);border-color:var(--border-color);color:var(--text-main);"
+                       style="background:var(--input-bg,#1e2028);border-color:var(--bs-border-color);color:var(--text-main);"
                        oninput="document.getElementById('iconePreview').className='bi '+this.value">
               </div>
               <div class="form-text"><a href="https://icons.getbootstrap.com" target="_blank" rel="noopener" style="color:var(--accent);">Ver todos os ícones</a></div>
@@ -381,10 +381,10 @@ require_once '../geral/header.php';
               <label class="form-label fw-semibold small">Cor da insígnia</label>
               <div class="d-flex align-items-center gap-2">
                 <input type="color" name="cor" id="fCor" value="#d4af37" class="form-control form-control-color rounded-3"
-                       style="width:48px;height:40px;padding:3px;background:var(--input-bg,#1e2028);border-color:var(--border-color);">
+                       style="width:48px;height:40px;padding:3px;background:var(--input-bg,#1e2028);border-color:var(--bs-border-color);">
                 <input type="text" id="fCorTexto" class="form-control rounded-3 font-monospace" maxlength="7"
                        value="#d4af37" placeholder="#d4af37"
-                       style="background:var(--input-bg,#1e2028);border-color:var(--border-color);color:var(--text-main);"
+                       style="background:var(--input-bg,#1e2028);border-color:var(--bs-border-color);color:var(--text-main);"
                        oninput="document.getElementById('fCor').value=this.value">
               </div>
             </div>
@@ -393,7 +393,7 @@ require_once '../geral/header.php';
             <div class="col-md-4">
               <label class="form-label fw-semibold small">Raridade</label>
               <select name="raridade" id="fRaridade" class="form-select rounded-3"
-                      style="background:var(--input-bg,#1e2028);border-color:var(--border-color);color:var(--text-main);">
+                      style="background:var(--input-bg,#1e2028);border-color:var(--bs-border-color);color:var(--text-main);">
                 <option value="comum">Comum</option>
                 <option value="raro">Raro</option>
                 <option value="epico">Épico</option>
@@ -423,14 +423,14 @@ require_once '../geral/header.php';
 
               <div id="tabUpload">
                 <input type="file" name="imagem_arquivo" id="fImagemArquivo" class="form-control rounded-3"
-                       accept="image/*" style="background:var(--input-bg,#1e2028);border-color:var(--border-color);color:var(--text-main);"
+                       accept="image/*" style="background:var(--input-bg,#1e2028);border-color:var(--bs-border-color);color:var(--text-main);"
                        onchange="previewImagem(this)">
                 <div class="form-text">JPG, PNG, SVG, WebP ou GIF. Máx. 2 MB. O arquivo é salvo em <code>/geral/img/conquistas/</code>.</div>
               </div>
               <div id="tabUrl" hidden>
                 <input type="text" name="imagem_url_manual" id="fImagemUrl" class="form-control rounded-3"
                        placeholder="https://exemplo.com/imagem.png"
-                       style="background:var(--input-bg,#1e2028);border-color:var(--border-color);color:var(--text-main);"
+                       style="background:var(--input-bg,#1e2028);border-color:var(--bs-border-color);color:var(--text-main);"
                        oninput="previewImagemUrl(this.value)">
               </div>
 
@@ -457,7 +457,7 @@ require_once '../geral/header.php';
             <div class="col-md-4">
               <label class="form-label fw-semibold small">Ordem de exibição</label>
               <input type="number" name="ordem" id="fOrdem" class="form-control rounded-3" value="99" min="1" max="255"
-                     style="background:var(--input-bg,#1e2028);border-color:var(--border-color);color:var(--text-main);">
+                     style="background:var(--input-bg,#1e2028);border-color:var(--bs-border-color);color:var(--text-main);">
             </div>
             <div class="col-md-4 d-flex align-items-end pb-1">
               <div class="form-check form-switch">
@@ -468,7 +468,7 @@ require_once '../geral/header.php';
 
             <!-- Preview final da insígnia -->
             <div class="col-12">
-              <div class="rounded-3 p-3 d-flex align-items-center gap-3" style="background:rgba(255,255,255,.03);border:1px solid var(--border-color);">
+              <div class="rounded-3 p-3 d-flex align-items-center gap-3" style="background:rgba(255,255,255,.03);border:1px solid var(--bs-border-color);">
                 <div id="prevFinalCircle" style="width:52px;height:52px;border-radius:50%;background:#d4af3722;border:2px solid #d4af3755;display:flex;align-items:center;justify-content:center;flex-shrink:0;font-size:1.3rem;">
                   <i class="bi bi-trophy" id="prevFinalIcon" style="color:#d4af37;"></i>
                 </div>
@@ -497,7 +497,7 @@ require_once '../geral/header.php';
 <!-- ══════════════════════════════════════════════════════════ -->
 <div class="modal fade" id="modalExcluir" tabindex="-1">
   <div class="modal-dialog modal-dialog-centered">
-    <div class="modal-content border-0 rounded-4" style="background:var(--card-bg);color:var(--text-main);">
+    <div class="modal-content border-secondary-subtle rounded-4" style="background:#1a1d21;color:#e5e7eb;">
       <div class="modal-header border-bottom border-secondary-subtle px-4">
         <h5 class="modal-title fw-bold text-danger"><i class="bi bi-exclamation-triangle-fill me-2"></i>Excluir conquista</h5>
         <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
