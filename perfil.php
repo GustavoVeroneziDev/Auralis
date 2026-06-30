@@ -102,11 +102,11 @@ if (!empty($usuario['FotoPerfil'])) {
     }
 }
 $avatarDefaults = [
-    'skinColor' => 'f8d25c', 'hair' => 'shortCurly', 'hairColor' => '2c1b18',
+    'skinColor' => 'd08b5b', 'hair' => 'shortCurly', 'hairColor' => '2c1b18',
     'eyes' => 'default', 'eyebrows' => 'default', 'mouth' => 'smile',
     'clothing' => 'hoodie', 'clothingColor' => '3c4f5c',
     'accessories' => '', 'facialHair' => '', 'facialHairColor' => '2c1b18',
-    'backgroundColor' => 'b6e3f4',
+    'backgroundColor' => 'transparent',
 ];
 $cfg = array_merge($avatarDefaults, $avatarConfig);
 
@@ -674,18 +674,30 @@ require_once 'geral/header.php';
 
     function buildUrl() {
         var p = [];
-        p.push('skinColor[]='     + cfg.skinColor);
-        if (cfg.hair)        p.push('top[]='            + cfg.hair);
-        p.push('hairColor[]='     + cfg.hairColor);
-        p.push('eyes[]='          + cfg.eyes);
-        p.push('eyebrows[]='      + cfg.eyebrows);
-        p.push('mouth[]='         + cfg.mouth);
-        p.push('clothing[]='      + cfg.clothing);
-        p.push('clothingColor[]=' + cfg.clothingColor);
-        if (cfg.accessories) p.push('accessories[]='  + cfg.accessories);
-        if (cfg.facialHair)  p.push('facialHair[]='   + cfg.facialHair);
-        if (cfg.facialHair && cfg.facialHairColor) p.push('facialHairColor[]=' + cfg.facialHairColor);
-        if (cfg.backgroundColor !== 'transparent') p.push('backgroundColor[]=' + cfg.backgroundColor);
+        p.push('skinColor[]='    + cfg.skinColor);
+        if (cfg.hair) p.push('top[]=' + cfg.hair);
+        p.push('hairColor[]='    + cfg.hairColor);
+        p.push('eyes[]='         + cfg.eyes);
+        p.push('eyebrows[]='     + cfg.eyebrows);
+        p.push('mouth[]='        + cfg.mouth);
+        p.push('clothing[]='     + cfg.clothing);
+        p.push('clothesColor[]=' + cfg.clothingColor);
+        if (cfg.accessories) {
+            p.push('accessories[]='         + cfg.accessories);
+            p.push('accessoriesProbability=100');
+        } else {
+            p.push('accessoriesProbability=0');
+        }
+        if (cfg.facialHair) {
+            p.push('facialHair[]='          + cfg.facialHair);
+            p.push('facialHairColor[]='     + cfg.facialHairColor);
+            p.push('facialHairProbability=100');
+        } else {
+            p.push('facialHairProbability=0');
+        }
+        if (cfg.backgroundColor !== 'transparent') {
+            p.push('backgroundColor[]=' + cfg.backgroundColor);
+        }
         return 'https://api.dicebear.com/9.x/avataaars/svg?' + p.join('&');
     }
 

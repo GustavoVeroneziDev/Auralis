@@ -724,20 +724,30 @@ function getAvatarUrl(array $cfg): string
 {
     $base = 'https://api.dicebear.com/9.x/avataaars/svg';
     $p    = [];
-    $p[] = 'skinColor[]='     . urlencode($cfg['skinColor']     ?? 'f8d25c');
-    if (!empty($cfg['hair']))        $p[] = 'top[]='           . urlencode($cfg['hair']);
-    $p[] = 'hairColor[]='     . urlencode($cfg['hairColor']     ?? '2c1b18');
-    $p[] = 'eyes[]='          . urlencode($cfg['eyes']          ?? 'default');
-    $p[] = 'eyebrows[]='      . urlencode($cfg['eyebrows']      ?? 'default');
-    $p[] = 'mouth[]='         . urlencode($cfg['mouth']         ?? 'smile');
-    $p[] = 'clothing[]='      . urlencode($cfg['clothing']      ?? 'hoodie');
-    $p[] = 'clothingColor[]=' . urlencode($cfg['clothingColor'] ?? '3c4f5c');
-    if (!empty($cfg['accessories'])) $p[] = 'accessories[]='  . urlencode($cfg['accessories']);
-    if (!empty($cfg['facialHair']))  {
-        $p[] = 'facialHair[]='      . urlencode($cfg['facialHair']);
-        $p[] = 'facialHairColor[]=' . urlencode($cfg['facialHairColor'] ?? '2c1b18');
+    $p[] = 'skinColor[]='    . urlencode($cfg['skinColor'] ?? 'd08b5b');
+    if (!empty($cfg['hair'])) $p[] = 'top[]=' . urlencode($cfg['hair']);
+    $p[] = 'hairColor[]='    . urlencode($cfg['hairColor']    ?? '2c1b18');
+    $p[] = 'eyes[]='         . urlencode($cfg['eyes']         ?? 'default');
+    $p[] = 'eyebrows[]='     . urlencode($cfg['eyebrows']     ?? 'default');
+    $p[] = 'mouth[]='        . urlencode($cfg['mouth']        ?? 'smile');
+    $p[] = 'clothing[]='     . urlencode($cfg['clothing']     ?? 'hoodie');
+    $p[] = 'clothesColor[]=' . urlencode($cfg['clothingColor'] ?? '3c4f5c');
+    if (!empty($cfg['accessories'])) {
+        $p[] = 'accessories[]='         . urlencode($cfg['accessories']);
+        $p[] = 'accessoriesProbability=100';
+    } else {
+        $p[] = 'accessoriesProbability=0';
     }
-    $p[] = 'backgroundColor[]=' . urlencode($cfg['backgroundColor'] ?? 'b6e3f4');
+    if (!empty($cfg['facialHair'])) {
+        $p[] = 'facialHair[]='          . urlencode($cfg['facialHair']);
+        $p[] = 'facialHairColor[]='     . urlencode($cfg['facialHairColor'] ?? '2c1b18');
+        $p[] = 'facialHairProbability=100';
+    } else {
+        $p[] = 'facialHairProbability=0';
+    }
+    if (($cfg['backgroundColor'] ?? '') !== 'transparent') {
+        $p[] = 'backgroundColor[]=' . urlencode($cfg['backgroundColor'] ?? 'transparent');
+    }
     return $base . '?' . implode('&', $p);
 }
 
