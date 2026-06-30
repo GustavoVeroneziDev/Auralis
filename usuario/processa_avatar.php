@@ -40,5 +40,5 @@ $stmt->execute([':fp' => $json, ':uid' => $uid]);
 
 $_SESSION['avatar_url'] = null; // força reload no próximo acesso
 
-header("Location: /usuario/avatar.php?sucesso=1");
+header("Location: /perfil.php?sucesso=personagem#personagem");
 exit;

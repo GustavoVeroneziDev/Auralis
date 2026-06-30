@@ -11,13 +11,13 @@ if (isset($_SESSION['usuario_id']) && function_exists('obterHorasRestantesTeste'
 }
 // Badges de nav: exibe tag de plano quando o usuário não tem acesso E não está em trial
 $_emTrial = $horasRestantes > 0;
-function _navBadgeRecurso($slug, $emTrial)
+function _navBadgeRecurso(string $slug, bool $emTrial): bool
 {
     if ($emTrial || !function_exists('recursoDisponivelParaPlano')) return false;
     if (!isset($_SESSION['usuario_id'])) return false;
     return !recursoDisponivelParaPlano($slug);
 }
-function _navBadgeTag($slug)
+function _navBadgeTag(string $slug): string
 {
     $nivel = function_exists('nivelMinimoRecurso') ? strtoupper(nivelMinimoRecurso($slug)) : 'PRO';
     $cor   = $nivel === 'VIP' ? '#d4af37' : '#a78bfa';
@@ -85,6 +85,9 @@ $_navTipo    = isset($_SESSION['usuario_id']) ? ($_SESSION['nav_tipo'] ?? 'sideb
 $_useSidebar = isset($_SESSION['usuario_id']) && $_navTipo === 'sidebar';
 
 // Plano do usuário logado (para a sidebar)
+$primeiroNome      = '';
+$corPlanoSidebar   = 'var(--text-main)';
+$iconePlanoSidebar = '';
 if (isset($_SESSION['usuario_id'])) {
     $primeiroNome = explode(' ', $_SESSION['usuario_nome'] ?? 'Usuário')[0];
     $planoNavSidebar = strtolower($_SESSION['plano'] ?? 'free');
@@ -297,12 +300,6 @@ $_carteiraParam = (!empty($_SESSION['ultima_carteira']))
                         <a class="dropdown-item d-flex align-items-center py-2 transition-hover"
                            href="/perfil.php" style="color:var(--text-main);">
                             <i class="bi bi-person-circle me-2" style="color:#6366f1;"></i> Perfil
-                        </a>
-                    </li>
-                    <li>
-                        <a class="dropdown-item d-flex align-items-center py-2 transition-hover"
-                           href="/usuario/avatar.php" style="color:var(--text-main);">
-                            <i class="bi bi-person-bounding-box me-2" style="color:#ec4899;"></i> Meu Personagem
                         </a>
                     </li>
                     <li>
@@ -548,7 +545,6 @@ $_carteiraParam = (!empty($_SESSION['ultima_carteira']))
                                     <?php endif; ?>
                                 </li>
                                 <li><a class="dropdown-item text-light d-flex align-items-center py-2" href="/perfil.php"><i class="bi bi-person-circle me-2" style="color:#6366f1;"></i> Perfil</a></li>
-                                <li><a class="dropdown-item text-light d-flex align-items-center py-2" href="/usuario/avatar.php"><i class="bi bi-person-bounding-box me-2" style="color:#ec4899;"></i> Meu Personagem</a></li>
                                 <li><a class="dropdown-item text-light d-flex align-items-center py-2" href="/configuracoes.php"><i class="bi bi-gear me-2" style="color:gold;"></i> Configurações</a></li>
                                 <?php if ($_ehRevendedor): ?>
                                 <li><a class="dropdown-item d-flex align-items-center py-2 fw-semibold" href="/revendedor/dashboard.php" style="color:#d4af37;"><i class="bi bi-people-fill me-2" style="color:#d4af37;"></i> Painel do Revendedor</a></li>
