@@ -55,7 +55,17 @@ try {
         LEFT JOIN usuario_conquista uc
                ON uc.FKConquista = c.IDConquista AND uc.FKUsuario = :uid
         WHERE c.Ativo = 1
-        ORDER BY c.Ordem ASC
+        ORDER BY
+            CASE WHEN uc.DataConquista IS NOT NULL THEN 0 ELSE 1 END ASC,
+            CASE c.Raridade
+                WHEN 'mitico'   THEN 1
+                WHEN 'lendario' THEN 2
+                WHEN 'epico'    THEN 3
+                WHEN 'raro'     THEN 4
+                WHEN 'incomum'  THEN 5
+                WHEN 'comum'    THEN 6
+                ELSE 7
+            END ASC
     ");
     $stmtC->execute([':uid' => $uid]);
     $conquistas = $stmtC->fetchAll(PDO::FETCH_ASSOC);

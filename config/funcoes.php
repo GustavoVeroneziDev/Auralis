@@ -464,6 +464,28 @@ if (!function_exists('concederConquistaParaUsuario')) {
                 INSERT INTO usuario_conquista (IDUsuarioConquista, FKUsuario, FKConquista, DataConquista)
                 VALUES (:id, :uid, :cid, NOW())
             ")->execute([':id' => gerarUuid(), ':uid' => $uid, ':cid' => $cid]);
+
+            try {
+                $stmtInfo = $pdo->prepare("SELECT Nome FROM conquista WHERE IDConquista = :cid LIMIT 1");
+                $stmtInfo->execute([':cid' => $cid]);
+                $nomeConquista = (string)$stmtInfo->fetchColumn();
+
+                $stmtTotal = $pdo->prepare("SELECT COUNT(*) FROM usuario_conquista WHERE FKConquista = :cid");
+                $stmtTotal->execute([':cid' => $cid]);
+                $totalUsuarios = (int)$stmtTotal->fetchColumn();
+
+                if ($nomeConquista && function_exists('criarNotificacaoSistema')) {
+                    $plural = $totalUsuarios === 1 ? 'usuário possui' : 'usuários possuem';
+                    criarNotificacaoSistema(
+                        $pdo,
+                        $uid,
+                        'Nova conquista desbloqueada!',
+                        "Parabéns! Você recebeu a conquista \"{$nomeConquista}\". {$totalUsuarios} {$plural} esta conquista.",
+                        0
+                    );
+                }
+            } catch (Throwable $e) { /* silencia — notificação nunca deve bloquear a concessão */ }
+
             return true;
         } catch (Throwable $e) {
             return false;
@@ -501,20 +523,19 @@ if (!function_exists('verificarConquistasAutomaticas')) {
             switch ($tipo) {
                 case 'registros':
                     $stmt = $pdo->prepare("
-                        SELECT COUNT(*) FROM Usuario
-                        WHERE FKIndicadoPor = :uid AND StatusConta != 'pendente'
+                        SELECT COUNT(*) FROM Registro WHERE FKUsuario = :uid
                     ");
                     $stmt->execute([':uid' => $uid]);
                     $total = (int)$stmt->fetchColumn();
                     break;
 
-                // case 'dias_membro':
-                //     $stmt = $pdo->prepare("
-                //         SELECT DATEDIFF(NOW(), DataCadastro) FROM Usuario WHERE IDUsuario = :uid
-                //     ");
-                //     $stmt->execute([':uid' => $uid]);
-                //     $total = (int)$stmt->fetchColumn();
-                //     break;
+                case 'dias_membro':
+                    $stmt = $pdo->prepare("
+                        SELECT DATEDIFF(NOW(), MomentoCriacao) FROM Usuario WHERE IDUsuario = :uid
+                    ");
+                    $stmt->execute([':uid' => $uid]);
+                    $total = (int)$stmt->fetchColumn();
+                    break;
 
                 default:
                     return;
@@ -535,6 +556,13 @@ if (!function_exists('verificarConquistasRegistros')) {
     function verificarConquistasRegistros(PDO $pdo, string $uid): void
     {
         verificarConquistasAutomaticas($pdo, $uid, 'registros');
+    }
+}
+
+if (!function_exists('verificarConquistasDiasMembro')) {
+    function verificarConquistasDiasMembro(PDO $pdo, string $uid): void
+    {
+        verificarConquistasAutomaticas($pdo, $uid, 'dias_membro');
     }
 }
 
@@ -774,7 +802,6 @@ function processarIndicacaoConversao(PDO $pdo, string $emailComprador, float $va
             if ($jaExiste->fetchColumn()) return;
 
             concederConquistaParaUsuario($pdo, $indicadorId, 'indicou_amigo');
-            verificarConquistasRegistros($pdo, $indicadorId);
             $perc  = (float)$revendedor['ComissaoPercentual'];
             $valor = round($valorPago * $perc / 100, 2);
             $pdo->prepare(
@@ -795,7 +822,6 @@ function processarIndicacaoConversao(PDO $pdo, string $emailComprador, float $va
 
         // ── Caminho B: usuário comum — verifica recompensas por indicação ────
         concederConquistaParaUsuario($pdo, $indicadorId, 'indicou_amigo');
-        verificarConquistasRegistros($pdo, $indicadorId);
         // Conta quantos usuários o indicador trouxe que agora têm plano ativo
         $stmtCnt = $pdo->prepare(
             "SELECT COUNT(DISTINCT u.IDUsuario)
