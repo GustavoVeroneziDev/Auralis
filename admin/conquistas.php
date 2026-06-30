@@ -34,9 +34,11 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $descricao= trim($_POST['descricao'] ?? '');
         $icone    = trim($_POST['icone'] ?? 'bi-trophy');
         $cor      = preg_match('/^#[0-9a-fA-F]{6}$/', $_POST['cor'] ?? '') ? $_POST['cor'] : '#d4af37';
-        $raridade = in_array($_POST['raridade'] ?? '', ['comum','incomum','raro','epico','lendario','mitico']) ? $_POST['raridade'] : 'comum';
-        $ordem    = max(1, min(255, (int)($_POST['ordem'] ?? 99)));
-        $ativo    = isset($_POST['ativo']) ? 1 : 0;
+        $raridade     = in_array($_POST['raridade'] ?? '', ['comum','incomum','raro','epico','lendario','mitico']) ? $_POST['raridade'] : 'comum';
+        $tipoGatilho  = in_array($_POST['tipo_gatilho'] ?? '', ['manual','registros']) ? $_POST['tipo_gatilho'] : 'manual';
+        $valorGatilho = $tipoGatilho !== 'manual' ? max(1, (int)($_POST['valor_gatilho'] ?? 1)) : null;
+        $ordem        = max(1, min(255, (int)($_POST['ordem'] ?? 99)));
+        $ativo        = isset($_POST['ativo']) ? 1 : 0;
 
         if (empty($slug) || empty($nome)) {
             $erro = "Slug e nome são obrigatórios.";
@@ -66,8 +68,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
                 if ($action === 'criar') {
                     $pdo->prepare("
-                        INSERT INTO conquista (IDConquista, Slug, Nome, Descricao, Icone, ImagemUrl, Cor, Raridade, Ordem, Ativo)
-                        VALUES (:id, :slug, :nome, :desc, :icone, :img, :cor, :rar, :ord, :ativo)
+                        INSERT INTO conquista (IDConquista, Slug, Nome, Descricao, Icone, ImagemUrl, Cor, Raridade, TipoGatilho, ValorGatilho, Ordem, Ativo)
+                        VALUES (:id, :slug, :nome, :desc, :icone, :img, :cor, :rar, :tgat, :vgat, :ord, :ativo)
                     ")->execute([
                         ':id'    => gerarUuid(),
                         ':slug'  => $slug,
@@ -77,6 +79,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                         ':img'   => $imagemUrl,
                         ':cor'   => $cor,
                         ':rar'   => $raridade,
+                        ':tgat'  => $tipoGatilho,
+                        ':vgat'  => $valorGatilho,
                         ':ord'   => $ordem,
                         ':ativo' => $ativo,
                     ]);
@@ -88,20 +92,20 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                         $pdo->prepare("
                             UPDATE conquista
                             SET Slug=:slug, Nome=:nome, Descricao=:desc, Icone=:icone,
-                                ImagemUrl=:img, Cor=:cor, Raridade=:rar, Ordem=:ord, Ativo=:ativo
+                                ImagemUrl=:img, Cor=:cor, Raridade=:rar, TipoGatilho=:tgat, ValorGatilho=:vgat, Ordem=:ord, Ativo=:ativo
                             WHERE IDConquista=:id
                         ")->execute([':slug'=>$slug,':nome'=>$nome,':desc'=>$descricao,':icone'=>$icone,
-                                     ':img'=>$imagemUrl,':cor'=>$cor,':rar'=>$raridade,':ord'=>$ordem,
-                                     ':ativo'=>$ativo,':id'=>$cid]);
+                                     ':img'=>$imagemUrl,':cor'=>$cor,':rar'=>$raridade,':tgat'=>$tipoGatilho,
+                                     ':vgat'=>$valorGatilho,':ord'=>$ordem,':ativo'=>$ativo,':id'=>$cid]);
                     } else {
                         $pdo->prepare("
                             UPDATE conquista
                             SET Slug=:slug, Nome=:nome, Descricao=:desc, Icone=:icone,
-                                Cor=:cor, Raridade=:rar, Ordem=:ord, Ativo=:ativo
+                                Cor=:cor, Raridade=:rar, TipoGatilho=:tgat, ValorGatilho=:vgat, Ordem=:ord, Ativo=:ativo
                             WHERE IDConquista=:id
                         ")->execute([':slug'=>$slug,':nome'=>$nome,':desc'=>$descricao,':icone'=>$icone,
-                                     ':cor'=>$cor,':rar'=>$raridade,':ord'=>$ordem,
-                                     ':ativo'=>$ativo,':id'=>$cid]);
+                                     ':cor'=>$cor,':rar'=>$raridade,':tgat'=>$tipoGatilho,
+                                     ':vgat'=>$valorGatilho,':ord'=>$ordem,':ativo'=>$ativo,':id'=>$cid]);
                     }
                     $sucesso = "Conquista atualizada!";
                 }
@@ -243,6 +247,7 @@ require_once '../geral/header.php';
                         <th class="px-4 py-3">Insígnia</th>
                         <th class="py-3">Nome / Slug</th>
                         <th class="py-3">Raridade</th>
+                        <th class="py-3">Gatilho</th>
                         <th class="py-3">Ordem</th>
                         <th class="py-3">Usuários</th>
                         <th class="py-3">Status</th>
@@ -289,6 +294,15 @@ require_once '../geral/header.php';
                             <span style="display:inline-block;width:12px;height:12px;border-radius:3px;background:<?= htmlspecialchars($c['Cor']) ?>;flex-shrink:0;"></span>
                             <code style="font-size:0.7rem;color:var(--text-muted);"><?= htmlspecialchars($c['Cor']) ?></code>
                         </div>
+                    </td>
+                    <td class="py-3">
+                        <?php if ($c['TipoGatilho'] === 'registros'): ?>
+                            <span class="badge rounded-pill" style="background:#0070dd22;color:#0070dd;border:1px solid #0070dd44;font-size:0.7rem;">
+                                <i class="bi bi-people-fill me-1"></i><?= (int)$c['ValorGatilho'] ?> registros
+                            </span>
+                        <?php else: ?>
+                            <span class="text-muted" style="font-size:0.75rem;">Manual</span>
+                        <?php endif; ?>
                     </td>
                     <td class="py-3 text-center">
                         <span class="badge bg-secondary bg-opacity-25 text-secondary"><?= (int)$c['Ordem'] ?></span>
@@ -403,6 +417,26 @@ require_once '../geral/header.php';
                 <option value="lendario">Lendário</option>
                 <option value="mitico">Mítico</option>
               </select>
+            </div>
+
+            <!-- Gatilho automático -->
+            <div class="col-md-4">
+              <label class="form-label fw-semibold small">Gatilho</label>
+              <select name="tipo_gatilho" id="fTipoGatilho" class="form-select rounded-3"
+                      style="background:var(--input-bg,#1e2028);border-color:var(--bs-border-color);color:var(--text-main);"
+                      onchange="toggleValorGatilho()">
+                <option value="manual">Manual (só via código)</option>
+                <option value="registros">Nº de registros via indicação</option>
+              </select>
+            </div>
+
+            <!-- Valor do gatilho -->
+            <div class="col-md-4" id="wrapValorGatilho" style="display:none;">
+              <label class="form-label fw-semibold small">Quantidade necessária</label>
+              <input type="number" name="valor_gatilho" id="fValorGatilho" min="1" value="1"
+                     class="form-control rounded-3"
+                     style="background:var(--input-bg,#1e2028);border-color:var(--bs-border-color);color:var(--text-main);">
+              <div class="form-text">Usuário precisa atingir esse número para desbloquear.</div>
             </div>
 
             <!-- Imagem -->
@@ -561,6 +595,13 @@ function abrirModalEditar(c) {
         sel.options[i].selected = sel.options[i].value === c.Raridade;
     }
 
+    var selGat = document.getElementById('fTipoGatilho');
+    for (var i = 0; i < selGat.options.length; i++) {
+        selGat.options[i].selected = selGat.options[i].value === (c.TipoGatilho || 'manual');
+    }
+    document.getElementById('fValorGatilho').value = c.ValorGatilho || 1;
+    toggleValorGatilho();
+
     limparImagem();
     var imgAtualWrap = document.getElementById('imgAtualWrap');
     if (c.ImagemUrl) {
@@ -625,6 +666,12 @@ function limparImagem() {
     document.getElementById('prevFinalIcon').style.display = '';
     if (document.getElementById('fImagemArquivo')) document.getElementById('fImagemArquivo').value = '';
     if (document.getElementById('fImagemUrl'))     document.getElementById('fImagemUrl').value = '';
+}
+
+// ── Mostra/oculta campo de valor conforme gatilho ───────────
+function toggleValorGatilho() {
+    var tipo = document.getElementById('fTipoGatilho').value;
+    document.getElementById('wrapValorGatilho').style.display = tipo === 'manual' ? 'none' : '';
 }
 
 // ── Cores canônicas por raridade ────────────────────────────

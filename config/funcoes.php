@@ -481,34 +481,48 @@ if (!function_exists('concederConquista')) {
     }
 }
 
-if (!function_exists('verificarConquistasRegistros')) {
-    function verificarConquistasRegistros(PDO $pdo, string $uid): void
+if (!function_exists('verificarConquistasAutomaticas')) {
+    function verificarConquistasAutomaticas(PDO $pdo, string $uid, string $tipo): void
     {
         try {
-            $stmt = $pdo->prepare("
-                SELECT COUNT(*) FROM Usuario
-                WHERE FKIndicadoPor = :uid AND StatusConta != 'pendente'
+            // Busca todas as conquistas ativas desse tipo, ordenadas pelo menor threshold
+            $conquistas = $pdo->prepare("
+                SELECT Slug, ValorGatilho FROM conquista
+                WHERE TipoGatilho = :tipo AND Ativo = 1 AND ValorGatilho IS NOT NULL
+                ORDER BY ValorGatilho ASC
             ");
-            $stmt->execute([':uid' => $uid]);
-            $total = (int)$stmt->fetchColumn();
+            $conquistas->execute([':tipo' => $tipo]);
+            $lista = $conquistas->fetchAll(PDO::FETCH_ASSOC);
+            if (empty($lista)) return;
 
-            $thresholds = [
-                1    => 'registro-1',
-                50   => 'registro-50',
-                100  => 'registro-100',
-                250  => 'registro-250',
-                500  => 'registro-500',
-                1000 => 'registro-1000',
-            ];
+            // Calcula o valor atual do usuário para esse tipo
+            if ($tipo === 'registros') {
+                $stmt = $pdo->prepare("
+                    SELECT COUNT(*) FROM Usuario
+                    WHERE FKIndicadoPor = :uid AND StatusConta != 'pendente'
+                ");
+                $stmt->execute([':uid' => $uid]);
+                $total = (int)$stmt->fetchColumn();
+            } else {
+                return; // tipo desconhecido — ignora silenciosamente
+            }
 
-            foreach ($thresholds as $minimo => $slug) {
-                if ($total >= $minimo) {
-                    concederConquistaParaUsuario($pdo, $uid, $slug);
+            foreach ($lista as $c) {
+                if ($total >= (int)$c['ValorGatilho']) {
+                    concederConquistaParaUsuario($pdo, $uid, $c['Slug']);
                 }
             }
         } catch (Throwable $e) {
             // silencia — conquistas nunca devem quebrar o fluxo principal
         }
+    }
+}
+
+// Alias de compatibilidade para chamadas antigas
+if (!function_exists('verificarConquistasRegistros')) {
+    function verificarConquistasRegistros(PDO $pdo, string $uid): void
+    {
+        verificarConquistasAutomaticas($pdo, $uid, 'registros');
     }
 }
 
