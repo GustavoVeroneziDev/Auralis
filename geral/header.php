@@ -42,6 +42,22 @@ if (isset($_SESSION['usuario_id']) && isset($pdo) && function_exists('verificarC
     verificarConquistasDiasMembro($pdo, $_SESSION['usuario_id']);
 }
 
+// Avatar do usuário
+$_avatarUrl = '';
+if (isset($_SESSION['usuario_id']) && isset($pdo) && function_exists('getAvatarUrl')) {
+    try {
+        $stmtAv = $pdo->prepare("SELECT FotoPerfil FROM Usuario WHERE IDUsuario = :uid LIMIT 1");
+        $stmtAv->execute([':uid' => $_SESSION['usuario_id']]);
+        $fpRaw = $stmtAv->fetchColumn();
+        if ($fpRaw) {
+            $fpData = json_decode($fpRaw, true);
+            if (is_array($fpData) && ($fpData['style'] ?? '') === 'avataaars') {
+                $_avatarUrl = getAvatarUrl($fpData);
+            }
+        }
+    } catch (Throwable $e) {}
+}
+
 // Verifica se o usuário logado é revendedor ativo (para exibir link no menu)
 $_ehRevendedor = false;
 if (isset($_SESSION['usuario_id']) && isset($pdo)) {
@@ -249,8 +265,14 @@ $_carteiraParam = (!empty($_SESSION['ultima_carteira']))
                 ?>
                 <button class="sidebar-user-btn dropdown-toggle" type="button"
                     data-bs-toggle="dropdown" aria-expanded="false">
+                    <?php if ($_avatarUrl): ?>
+                    <img src="<?= htmlspecialchars($_avatarUrl) ?>" alt="Avatar"
+                         class="flex-shrink-0"
+                         style="width:32px;height:32px;border-radius:50%;object-fit:cover;border:2px solid <?= $corPlanoSidebar ?>;">
+                    <?php else: ?>
                     <i class="bi bi-person-circle flex-shrink-0"
                        style="color:<?= $corPlanoSidebar ?>;font-size:1.4rem;"></i>
+                    <?php endif; ?>
                     <span class="sidebar-label d-flex align-items-center gap-1"
                           style="color:<?= $corPlanoSidebar ?>;font-size:0.875rem;font-weight:600;">
                         <?= htmlspecialchars($primeiroNome) ?>
@@ -275,6 +297,12 @@ $_carteiraParam = (!empty($_SESSION['ultima_carteira']))
                         <a class="dropdown-item d-flex align-items-center py-2 transition-hover"
                            href="/perfil.php" style="color:var(--text-main);">
                             <i class="bi bi-person-circle me-2" style="color:#6366f1;"></i> Perfil
+                        </a>
+                    </li>
+                    <li>
+                        <a class="dropdown-item d-flex align-items-center py-2 transition-hover"
+                           href="/usuario/avatar.php" style="color:var(--text-main);">
+                            <i class="bi bi-person-bounding-box me-2" style="color:#ec4899;"></i> Meu Personagem
                         </a>
                     </li>
                     <li>
@@ -498,7 +526,12 @@ $_carteiraParam = (!empty($_SESSION['ultima_carteira']))
                                 <span class="me-2 fw-semibold d-flex align-items-center gap-2" style="font-size:1rem;color:<?= $corTop ?>;">
                                     <?= htmlspecialchars($primeiroNomeTop) ?> <?= $iconeTop ?>
                                 </span>
+                                <?php if ($_avatarUrl): ?>
+                                <img src="<?= htmlspecialchars($_avatarUrl) ?>" alt="Avatar"
+                                     style="width:36px;height:36px;border-radius:50%;object-fit:cover;border:2px solid <?= $corTop ?>;">
+                                <?php else: ?>
                                 <i class="bi bi-person-circle" style="color:<?= $corTop ?>;font-size:1.75rem;"></i>
+                                <?php endif; ?>
                             </a>
                             <ul class="dropdown-menu dropdown-menu-end shadow-lg border border-secondary-subtle mt-2 bg-dark w-100 w-lg-auto" style="min-width:230px;">
                                 <li class="px-3 py-2 border-bottom border-secondary-subtle">
@@ -515,6 +548,7 @@ $_carteiraParam = (!empty($_SESSION['ultima_carteira']))
                                     <?php endif; ?>
                                 </li>
                                 <li><a class="dropdown-item text-light d-flex align-items-center py-2" href="/perfil.php"><i class="bi bi-person-circle me-2" style="color:#6366f1;"></i> Perfil</a></li>
+                                <li><a class="dropdown-item text-light d-flex align-items-center py-2" href="/usuario/avatar.php"><i class="bi bi-person-bounding-box me-2" style="color:#ec4899;"></i> Meu Personagem</a></li>
                                 <li><a class="dropdown-item text-light d-flex align-items-center py-2" href="/configuracoes.php"><i class="bi bi-gear me-2" style="color:gold;"></i> Configurações</a></li>
                                 <?php if ($_ehRevendedor): ?>
                                 <li><a class="dropdown-item d-flex align-items-center py-2 fw-semibold" href="/revendedor/dashboard.php" style="color:#d4af37;"><i class="bi bi-people-fill me-2" style="color:#d4af37;"></i> Painel do Revendedor</a></li>
