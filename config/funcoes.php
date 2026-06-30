@@ -481,6 +481,37 @@ if (!function_exists('concederConquista')) {
     }
 }
 
+if (!function_exists('verificarConquistasRegistros')) {
+    function verificarConquistasRegistros(PDO $pdo, string $uid): void
+    {
+        try {
+            $stmt = $pdo->prepare("
+                SELECT COUNT(*) FROM Usuario
+                WHERE FKIndicadoPor = :uid AND StatusConta != 'pendente'
+            ");
+            $stmt->execute([':uid' => $uid]);
+            $total = (int)$stmt->fetchColumn();
+
+            $thresholds = [
+                1    => 'registro-1',
+                50   => 'registro-50',
+                100  => 'registro-100',
+                250  => 'registro-250',
+                500  => 'registro-500',
+                1000 => 'registro-1000',
+            ];
+
+            foreach ($thresholds as $minimo => $slug) {
+                if ($total >= $minimo) {
+                    concederConquistaParaUsuario($pdo, $uid, $slug);
+                }
+            }
+        } catch (Throwable $e) {
+            // silencia — conquistas nunca devem quebrar o fluxo principal
+        }
+    }
+}
+
 // ── Helper MP: cancela assinatura no Mercado Pago via API ────────────────
 if (!function_exists('mpCancelarNoMP')) {
     function mpCancelarNoMP(string $gwId): void
@@ -717,6 +748,7 @@ function processarIndicacaoConversao(PDO $pdo, string $emailComprador, float $va
             if ($jaExiste->fetchColumn()) return;
 
             concederConquistaParaUsuario($pdo, $indicadorId, 'indicou_amigo');
+            verificarConquistasRegistros($pdo, $indicadorId);
             $perc  = (float)$revendedor['ComissaoPercentual'];
             $valor = round($valorPago * $perc / 100, 2);
             $pdo->prepare(
@@ -737,6 +769,7 @@ function processarIndicacaoConversao(PDO $pdo, string $emailComprador, float $va
 
         // ── Caminho B: usuário comum — verifica recompensas por indicação ────
         concederConquistaParaUsuario($pdo, $indicadorId, 'indicou_amigo');
+        verificarConquistasRegistros($pdo, $indicadorId);
         // Conta quantos usuários o indicador trouxe que agora têm plano ativo
         $stmtCnt = $pdo->prepare(
             "SELECT COUNT(DISTINCT u.IDUsuario)

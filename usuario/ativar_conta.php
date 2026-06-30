@@ -20,6 +20,14 @@ if (isset($_GET['token']) && !empty($_GET['token'])) {
 
             concederConquistaParaUsuario($pdo, $usuario['IDUsuario'], 'primeiro_acesso');
 
+            // Verifica conquistas de registros para o indicador (se houver)
+            $stmtInd = $pdo->prepare("SELECT FKIndicadoPor FROM Usuario WHERE IDUsuario = :uid LIMIT 1");
+            $stmtInd->execute([':uid' => $usuario['IDUsuario']]);
+            $indicadorId = $stmtInd->fetchColumn();
+            if ($indicadorId) {
+                verificarConquistasRegistros($pdo, $indicadorId);
+            }
+
             // Manda pro login com sucesso
             header("Location: login.php?ativacao=sucesso");
             exit;
