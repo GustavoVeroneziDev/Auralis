@@ -102,7 +102,7 @@ if (!empty($usuario['FotoPerfil'])) {
     }
 }
 $avatarDefaults = [
-    'skinColor' => 'f8d25c', 'hair' => 'shortHairShortCurly', 'hairColor' => '2c1b18',
+    'skinColor' => 'f8d25c', 'hair' => 'shortCurly', 'hairColor' => '2c1b18',
     'eyes' => 'default', 'eyebrows' => 'default', 'mouth' => 'smile',
     'clothing' => 'hoodie', 'clothingColor' => '3c4f5c',
     'accessories' => '', 'facialHair' => '', 'facialHairColor' => '2c1b18',
@@ -426,7 +426,7 @@ require_once 'geral/header.php';
                 <div class="mb-4">
                     <label class="av-label">BARBA / BIGODE</label>
                     <div class="d-flex flex-wrap gap-2">
-                        <?php foreach (['' => 'Nenhuma','beardLight' => 'Leve','beardMedium' => 'Média','beardMagestic' => 'Cheia','moustacheFancy' => 'Bigode','moustacheMagnum' => 'Big Bigode'] as $v => $lbl): ?>
+                        <?php foreach (['' => 'Nenhuma','beardLight' => 'Leve','beardMedium' => 'Média','beardMajestic' => 'Cheia','moustacheFancy' => 'Bigode','moustacheMagnum' => 'Big Bigode'] as $v => $lbl): ?>
                         <button type="button" class="chip-btn" data-key="facialHair" data-val="<?= htmlspecialchars($v) ?>"><?= htmlspecialchars($lbl) ?></button>
                         <?php endforeach; ?>
                     </div>
@@ -574,44 +574,94 @@ require_once 'geral/header.php';
 
     var OPTS = {
         hair: [
-            {v:'shortHairShortCurly',l:'Cacheado curto'},{v:'shortHairShortFlat',l:'Liso curto'},
-            {v:'shortHairShortWaved',l:'Ondulado curto'},{v:'shortHairShortRound',l:'Arredondado'},
-            {v:'shortHairSides',l:'Raspado nas laterais'},{v:'shortHairTheCaesar',l:'César'},
-            {v:'shortHairFrizzle',l:'Frizzy'},{v:'shortHairShaggyMullet',l:'Mullet'},
-            {v:'shortHairDreads01',l:'Dreads'},{v:'longHairBob',l:'Bob'},
-            {v:'longHairBun',l:'Coque'},{v:'longHairCurly',l:'Cacheado longo'},
-            {v:'longHairCurvy',l:'Ondulado longo'},{v:'longHairStraight',l:'Liso longo'},
-            {v:'longHairStraight2',l:'Liso longo 2'},{v:'longHairFro',l:'Afro'},
-            {v:'longHairFroBand',l:'Afro com faixa'},{v:'longHairBigHair',l:'Volume'},
-            {v:'longHairMiaWallace',l:'Mia Wallace'},{v:'longHairShavedSides',l:'Raspado com comprido'},
-            {v:'noHair',l:'Careca'},{v:'hat',l:'Boné'},{v:'hijab',l:'Hijab'},
-            {v:'turban',l:'Turbante'},{v:'winterHat1',l:'Touca'},
+            {v:'shortCurly',           l:'Cacheado curto'},
+            {v:'shortFlat',            l:'Liso curto'},
+            {v:'shortWaved',           l:'Ondulado curto'},
+            {v:'shortRound',           l:'Arredondado curto'},
+            {v:'sides',                l:'Raspado nas laterais'},
+            {v:'theCaesar',            l:'César'},
+            {v:'theCaesarAndSidePart', l:'César com repartido'},
+            {v:'frizzle',              l:'Frizzy'},
+            {v:'shaggy',               l:'Despenteado'},
+            {v:'shaggyMullet',         l:'Mullet'},
+            {v:'dreads01',             l:'Dreads 1'},
+            {v:'dreads02',             l:'Dreads 2'},
+            {v:'bob',                  l:'Bob'},
+            {v:'bun',                  l:'Coque'},
+            {v:'curly',                l:'Cacheado longo'},
+            {v:'curvy',                l:'Ondulado longo'},
+            {v:'straight01',           l:'Liso longo'},
+            {v:'straight02',           l:'Liso longo 2'},
+            {v:'straightAndStrand',    l:'Liso com mecha'},
+            {v:'fro',                  l:'Afro'},
+            {v:'froBand',              l:'Afro com faixa'},
+            {v:'bigHair',              l:'Volume'},
+            {v:'dreads',               l:'Dreads longos'},
+            {v:'frida',                l:'Frida'},
+            {v:'miaWallace',           l:'Mia Wallace'},
+            {v:'longButNotTooLong',    l:'Médio'},
+            {v:'shavedSides',          l:'Raspado com comprido'},
+            {v:'hat',                  l:'Boné'},
+            {v:'hijab',                l:'Hijab'},
+            {v:'turban',               l:'Turbante'},
+            {v:'winterHat1',           l:'Touca 1'},
+            {v:'winterHat02',          l:'Touca 2'},
+            {v:'winterHat03',          l:'Touca 3'},
+            {v:'winterHat04',          l:'Touca 4'},
         ],
         eyes: [
-            {v:'default',l:'Normal'},{v:'happy',l:'Feliz'},{v:'wink',l:'Piscada'},
-            {v:'hearts',l:'Coração'},{v:'squint',l:'Semicerrado'},{v:'surprised',l:'Surpreso'},
-            {v:'side',l:'De lado'},{v:'close',l:'Fechado'},{v:'cry',l:'Chorando'},
-            {v:'dizzy',l:'Tonto'},{v:'eyeRoll',l:'Revirado'},{v:'winkWacky',l:'Piscada louca'},
+            {v:'default',   l:'Normal'},
+            {v:'happy',     l:'Feliz'},
+            {v:'wink',      l:'Piscada'},
+            {v:'hearts',    l:'Coração'},
+            {v:'squint',    l:'Semicerrado'},
+            {v:'surprised', l:'Surpreso'},
+            {v:'side',      l:'De lado'},
+            {v:'closed',    l:'Fechado'},
+            {v:'cry',       l:'Chorando'},
+            {v:'xDizzy',    l:'Tonto'},
+            {v:'eyeRoll',   l:'Revirado'},
+            {v:'winkWacky', l:'Piscada louca'},
         ],
         eyebrows: [
-            {v:'default',l:'Normal'},{v:'defaultNatural',l:'Natural'},
-            {v:'raisedExcited',l:'Levantado'},{v:'raisedExcitedNatural',l:'Levantado natural'},
-            {v:'angry',l:'Zangado'},{v:'angryNatural',l:'Zangado natural'},
-            {v:'upDown',l:'Assimétrico'},{v:'flatNatural',l:'Plano'},
-            {v:'sadConcerned',l:'Triste'},{v:'unibrowNatural',l:'Unidos'},
+            {v:'default',              l:'Normal'},
+            {v:'defaultNatural',       l:'Natural'},
+            {v:'raisedExcited',        l:'Levantado'},
+            {v:'raisedExcitedNatural', l:'Levantado natural'},
+            {v:'angry',                l:'Zangado'},
+            {v:'angryNatural',         l:'Zangado natural'},
+            {v:'upDown',               l:'Assimétrico'},
+            {v:'upDownNatural',        l:'Assimétrico natural'},
+            {v:'flatNatural',          l:'Plano'},
+            {v:'frownNatural',         l:'Franzido'},
+            {v:'sadConcerned',         l:'Triste'},
+            {v:'sadConcernedNatural',  l:'Triste natural'},
+            {v:'unibrowNatural',       l:'Unidos'},
         ],
         mouth: [
-            {v:'smile',l:'Sorriso'},{v:'default',l:'Normal'},{v:'serious',l:'Sério'},
-            {v:'tongue',l:'Língua'},{v:'twinkle',l:'Encantado'},{v:'eating',l:'Comendo'},
-            {v:'sad',l:'Triste'},{v:'concerned',l:'Preocupado'},{v:'grimace',l:'Grimace'},
-            {v:'screamOpen',l:'Gritando'},
+            {v:'smile',      l:'Sorriso'},
+            {v:'default',    l:'Normal'},
+            {v:'serious',    l:'Sério'},
+            {v:'tongue',     l:'Língua'},
+            {v:'twinkle',    l:'Encantado'},
+            {v:'eating',     l:'Comendo'},
+            {v:'sad',        l:'Triste'},
+            {v:'concerned',  l:'Preocupado'},
+            {v:'grimace',    l:'Grimace'},
+            {v:'screamOpen', l:'Gritando'},
+            {v:'disbelief',  l:'Descrença'},
+            {v:'vomit',      l:'Enjoado'},
         ],
         clothing: [
-            {v:'hoodie',l:'Moletom'},{v:'shirtCrewNeck',l:'Camiseta'},
-            {v:'shirtVNeck',l:'Camiseta V'},{v:'shirtScoopNeck',l:'Decote oval'},
-            {v:'blazerShirt',l:'Blazer + Camisa'},{v:'blazerSweater',l:'Blazer + Suéter'},
-            {v:'collarSweater',l:'Suéter'},{v:'overall',l:'Macacão'},
-            {v:'graphicShirt',l:'Camiseta Estampada'},
+            {v:'hoodie',          l:'Moletom'},
+            {v:'shirtCrewNeck',   l:'Camiseta'},
+            {v:'shirtVNeck',      l:'Camiseta V'},
+            {v:'shirtScoopNeck',  l:'Decote oval'},
+            {v:'blazerAndShirt',  l:'Blazer + Camisa'},
+            {v:'blazerAndSweater',l:'Blazer + Suéter'},
+            {v:'collarAndSweater',l:'Suéter'},
+            {v:'overall',         l:'Macacão'},
+            {v:'graphicShirt',    l:'Camiseta Estampada'},
         ],
     };
 
@@ -625,7 +675,7 @@ require_once 'geral/header.php';
     function buildUrl() {
         var p = [];
         p.push('skinColor[]='     + cfg.skinColor);
-        if (cfg.hair)        p.push('hair[]='          + cfg.hair);
+        if (cfg.hair)        p.push('top[]='            + cfg.hair);
         p.push('hairColor[]='     + cfg.hairColor);
         p.push('eyes[]='          + cfg.eyes);
         p.push('eyebrows[]='      + cfg.eyebrows);

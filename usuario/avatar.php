@@ -207,7 +207,7 @@ include '../geral/header.php';
                         <?php
                         $facial = [
                             '' => 'Nenhuma', 'beardLight' => 'Leve', 'beardMedium' => 'Média',
-                            'beardMagestic' => 'Cheia', 'moustacheFancy' => 'Bigode', 'moustacheMagnum' => 'Big Bigode',
+                            'beardMajestic' => 'Cheia', 'moustacheFancy' => 'Bigode', 'moustacheMagnum' => 'Big Bigode',
                         ];
                         foreach ($facial as $v => $lbl): ?>
                         <button type="button" class="chip-btn" data-key="facialHair" data-val="<?= htmlspecialchars($v) ?>">

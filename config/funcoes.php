@@ -725,7 +725,7 @@ function getAvatarUrl(array $cfg): string
     $base = 'https://api.dicebear.com/9.x/avataaars/svg';
     $p    = [];
     $p[] = 'skinColor[]='     . urlencode($cfg['skinColor']     ?? 'f8d25c');
-    if (!empty($cfg['hair']))        $p[] = 'hair[]='          . urlencode($cfg['hair']);
+    if (!empty($cfg['hair']))        $p[] = 'top[]='           . urlencode($cfg['hair']);
     $p[] = 'hairColor[]='     . urlencode($cfg['hairColor']     ?? '2c1b18');
     $p[] = 'eyes[]='          . urlencode($cfg['eyes']          ?? 'default');
     $p[] = 'eyebrows[]='      . urlencode($cfg['eyebrows']      ?? 'default');
