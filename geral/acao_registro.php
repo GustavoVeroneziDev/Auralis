@@ -54,6 +54,20 @@ try {
 
         echo json_encode(['ok' => true]);
 
+    } elseif ($acao === 'transferir') {
+        $dest = trim($_POST['carteira_destino'] ?? '');
+        if (!$dest) { echo json_encode(['ok' => false, 'erro' => 'destino invalido']); exit; }
+        $stmtCk = $pdo->prepare("SELECT IDCarteira FROM Carteira WHERE IDCarteira = :dest AND FKUsuarioDono = :uid LIMIT 1");
+        $stmtCk->execute([':dest' => $dest, ':uid' => $uid]);
+        if (!$stmtCk->fetch()) {
+            http_response_code(403);
+            echo json_encode(['ok' => false, 'erro' => 'carteira nao encontrada']);
+            exit;
+        }
+        $pdo->prepare("UPDATE Registro SET FKCarteira = :dest WHERE IDRegistro = :id AND FKUsuario = :uid")
+            ->execute([':dest' => $dest, ':id' => $id, ':uid' => $uid]);
+        echo json_encode(['ok' => true]);
+
     } else {
         echo json_encode(['ok' => false, 'erro' => 'acao desconhecida']);
     }
