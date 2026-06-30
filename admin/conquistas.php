@@ -534,11 +534,9 @@ function abrirModalCriar() {
     document.getElementById('fAction').value   = 'criar';
     document.getElementById('fId').value       = '';
     document.getElementById('formConquista').reset();
-    document.getElementById('fCor').value      = '#d4af37';
-    document.getElementById('fCorTexto').value = '#d4af37';
     document.getElementById('iconePreview').className = 'bi bi-trophy';
     limparImagem();
-    atualizarPreviewFinal();
+    sincronizarCorComRaridade();
     document.getElementById('imgAtualWrap').hidden = true;
     _modalConquista().show();
 }
@@ -629,6 +627,26 @@ function limparImagem() {
     if (document.getElementById('fImagemUrl'))     document.getElementById('fImagemUrl').value = '';
 }
 
+// ── Cores canônicas por raridade ────────────────────────────
+var RARIDADE_CORES = {
+    'comum':    '#808080',
+    'incomum':  '#3eb23e',
+    'raro':     '#0070dd',
+    'epico':    '#a335ee',
+    'lendario': '#ff8000',
+    'mitico':   '#f3d3fd'
+};
+
+function sincronizarCorComRaridade() {
+    var rar = document.getElementById('fRaridade').value;
+    var cor = RARIDADE_CORES[rar] || '#808080';
+    document.getElementById('fCor').value      = cor;
+    document.getElementById('fCorTexto').value = cor;
+    atualizarPreviewFinal();
+}
+
+document.getElementById('fRaridade').addEventListener('change', sincronizarCorComRaridade);
+
 // ── Sincroniza cor entre color picker e texto ───────────────
 document.getElementById('fCor').addEventListener('input', function() {
     document.getElementById('fCorTexto').value = this.value;
@@ -637,7 +655,7 @@ document.getElementById('fCor').addEventListener('input', function() {
 
 // ── Preview final em tempo real ─────────────────────────────
 function atualizarPreviewFinal() {
-    var cor    = document.getElementById('fCor').value || '#d4af37';
+    var cor    = document.getElementById('fCor').value || '#808080';
     var icone  = document.getElementById('fIcone').value || 'bi-trophy';
     var nome   = document.getElementById('fNome').value || 'Nome da conquista';
     var desc   = document.getElementById('fDescricao').value || 'Descrição aparece aqui';
