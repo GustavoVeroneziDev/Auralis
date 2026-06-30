@@ -540,6 +540,24 @@ if (!function_exists('verificarConquistasAutomaticas')) {
                     $total = (int)$stmt->fetchColumn();
                     break;
 
+                case 'comprovantes':
+                    $stmt = $pdo->prepare("
+                        SELECT COUNT(DISTINCT FKRegistro) FROM Comprovante WHERE FKUsuario = :uid
+                    ");
+                    $stmt->execute([':uid' => $uid]);
+                    $total = (int)$stmt->fetchColumn();
+                    break;
+
+                case 'categorias':
+                    $stmt = $pdo->prepare("
+                        SELECT COUNT(DISTINCT FKCategoria) FROM Registro
+                        WHERE FKUsuario = :uid AND FKCategoria IS NOT NULL
+                          AND TipoRegistro IN ('receita','despesa')
+                    ");
+                    $stmt->execute([':uid' => $uid]);
+                    $total = (int)$stmt->fetchColumn();
+                    break;
+
                 default:
                     return;
             }
@@ -566,6 +584,20 @@ if (!function_exists('verificarConquistasDiasMembro')) {
     function verificarConquistasDiasMembro(PDO $pdo, string $uid): void
     {
         verificarConquistasAutomaticas($pdo, $uid, 'dias_membro');
+    }
+}
+
+if (!function_exists('verificarConquistasComprovantes')) {
+    function verificarConquistasComprovantes(PDO $pdo, string $uid): void
+    {
+        verificarConquistasAutomaticas($pdo, $uid, 'comprovantes');
+    }
+}
+
+if (!function_exists('verificarConquistasCategorias')) {
+    function verificarConquistasCategorias(PDO $pdo, string $uid): void
+    {
+        verificarConquistasAutomaticas($pdo, $uid, 'categorias');
     }
 }
 
@@ -685,6 +717,28 @@ if (!function_exists('mpAtivarPlano')) {
             return false;
         }
     }
+}
+
+// Constrói a URL do avatar DiceBear a partir do array de configuração salvo no DB
+function getAvatarUrl(array $cfg): string
+{
+    $base = 'https://api.dicebear.com/9.x/avataaars/svg';
+    $p    = [];
+    $p[] = 'skinColor[]='     . urlencode($cfg['skinColor']     ?? 'f8d25c');
+    if (!empty($cfg['hair']))        $p[] = 'hair[]='          . urlencode($cfg['hair']);
+    $p[] = 'hairColor[]='     . urlencode($cfg['hairColor']     ?? '2c1b18');
+    $p[] = 'eyes[]='          . urlencode($cfg['eyes']          ?? 'default');
+    $p[] = 'eyebrows[]='      . urlencode($cfg['eyebrows']      ?? 'default');
+    $p[] = 'mouth[]='         . urlencode($cfg['mouth']         ?? 'smile');
+    $p[] = 'clothing[]='      . urlencode($cfg['clothing']      ?? 'hoodie');
+    $p[] = 'clothingColor[]=' . urlencode($cfg['clothingColor'] ?? '3c4f5c');
+    if (!empty($cfg['accessories'])) $p[] = 'accessories[]='  . urlencode($cfg['accessories']);
+    if (!empty($cfg['facialHair']))  {
+        $p[] = 'facialHair[]='      . urlencode($cfg['facialHair']);
+        $p[] = 'facialHairColor[]=' . urlencode($cfg['facialHairColor'] ?? '2c1b18');
+    }
+    $p[] = 'backgroundColor[]=' . urlencode($cfg['backgroundColor'] ?? 'b6e3f4');
+    return $base . '?' . implode('&', $p);
 }
 
 // Função universal para selos de recursos bloqueados/em teste

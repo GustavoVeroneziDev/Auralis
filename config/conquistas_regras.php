@@ -21,13 +21,22 @@
  *
  * ── Tipos disponíveis ───────────────────────────────────────────────────────
  *
- *  registros   → Nº de pessoas que se cadastraram via link de indicação do usuário
- *                Disparado em: ativar_conta.php e ao processar conversões
+ *  registros    → Nº de lançamentos financeiros criados pelo usuário
+ *                 Disparado em: nova_transacao.php
  *
- * ── Tipos planejados (comentados até serem implementados) ───────────────────
+ *  dias_membro  → Nº de dias com conta ativa na plataforma
+ *                 Disparado em: geral/header.php (uma vez por sessão)
  *
- *  dias_membro → Nº de dias como membro ativo na plataforma
- *  carteiras   → Nº de carteiras criadas pelo usuário
+ *  comprovantes → Nº de lançamentos distintos com comprovante anexado
+ *                 Disparado em: nova_transacao.php após upload
+ *
+ *  categorias   → Nº de categorias distintas usadas em lançamentos
+ *                 Disparado em: nova_transacao.php após criação
+ *
+ * ── Conquistas de evento único (sem threshold) ──────────────────────────────
+ *
+ *  metabatida   → concedida em processa_cofrinho.php quando SaldoCofrinho >= ValorMeta
+ *  sempendencias→ concedida em acao_registro.php quando todos os pendentes do mês são efetivados
  */
 
 return [
@@ -57,14 +66,20 @@ return [
         ],
     ],
 
-    // ── Carteiras criadas (descomente quando implementar) ───────────────────
-    // 'carteiras' => [
-    //     'descricao'  => 'Carteiras criadas pelo usuário',
-    //     'thresholds' => [
-    //         1  => 'primeira-carteira',
-    //         5  => 'cinco-carteiras',
-    //         10 => 'dez-carteiras',
-    //     ],
-    // ],
+    // ── Lançamentos com comprovante ─────────────────────────────────────────
+    'comprovantes' => [
+        'descricao'  => 'Lançamentos distintos com comprovante anexado',
+        'thresholds' => [
+            10 => 'cacarecibo',
+        ],
+    ],
+
+    // ── Categorias distintas utilizadas ─────────────────────────────────────
+    'categorias' => [
+        'descricao'  => 'Categorias diferentes usadas em lançamentos',
+        'thresholds' => [
+            5 => 'diverso',
+        ],
+    ],
 
 ];
