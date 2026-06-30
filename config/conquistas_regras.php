@@ -38,12 +38,12 @@ return [
     'registros' => [
         'descricao'  => 'Pessoas cadastradas via link de indicação',
         'thresholds' => [
-            1    => 'registro-1',
-            50   => 'registro-50',
-            100  => 'registro-100',
-            250  => 'registro-250',
-            500  => 'registro-500',
-            1000 => 'registro-1000',
+            1    => 'registro1',
+            50   => 'registro50',
+            100  => 'registro100',
+            250  => 'registro250',
+            500  => 'registro500',
+            1000 => 'registro1000',
         ],
     ],
 
