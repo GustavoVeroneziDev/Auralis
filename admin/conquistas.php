@@ -53,8 +53,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                     if (!in_array($ext, $allowed)) {
                         throw new RuntimeException("Formato de imagem não suportado. Use: " . implode(', ', $allowed));
                     }
-                    if ($file['size'] > 2 * 1024 * 1024) {
-                        throw new RuntimeException("Imagem muito grande. Máximo: 2 MB.");
+                    if ($file['size'] > 5 * 1024 * 1024) {
+                        throw new RuntimeException("Imagem muito grande. Máximo: 5 MB.");
                     }
                     $filename = $slug . '.' . $ext;
                     $destino  = $uploadDir . $filename;
