@@ -235,6 +235,11 @@ $_carteiraParam = (!empty($_SESSION['ultima_carteira']))
                 <i class="bi bi-person-circle"></i>
                 <span class="sidebar-label">Perfil</span>
             </a>
+            <a href="/ranking.php"
+               class="sidebar-item <?= $paginaAtual === 'ranking.php' ? 'active' : '' ?>">
+                <i class="bi bi-trophy"></i>
+                <span class="sidebar-label">Ranking</span>
+            </a>
             <?php if ($_ehFreeRestrito): ?>
             <a href="/planos.php"
                class="sidebar-item <?= $paginaAtual === 'planos.php' ? 'active' : '' ?>">
