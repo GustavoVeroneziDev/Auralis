@@ -11,13 +11,11 @@ if (!isset($_SESSION['usuario_id'])) {
 
 require_once '../config/conexao.php';
 require_once '../config/funcoes.php';
+require_once '../config/permissoes.php';
 
-// Apenas admin ou supremo
-$nivelSessao = strtolower($_SESSION['nivel_acesso'] ?? '');
-if (!in_array($nivelSessao, ['admin', 'supremo'])) {
-    header("Location: /dashboard.php?erro=sem_permissao");
-    exit;
-}
+// Página é visível para qualquer admin; ações sensíveis (dar/revogar plano,
+// promover, excluir) são checadas individualmente logo abaixo — só Supremo.
+exigirAdmin();
 
 $adminId = $_SESSION['usuario_id'];
 $sucesso = $erro = null;
@@ -29,7 +27,12 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $action = $_POST['action'] ?? '';
     $uid    = trim($_POST['usuario_id'] ?? '');
 
-    if (empty($uid)) {
+    // Ações que mexem em plano/nível/exclusão de conta são restritas ao Supremo.
+    $acoesSupremo = ['dar_acesso', 'revogar', 'editar', 'excluir'];
+
+    if (in_array($action, $acoesSupremo, true) && !ehSupremo()) {
+        $erro = "Apenas o Supremo pode executar esta ação.";
+    } elseif (empty($uid)) {
         $erro = "ID de usuário inválido.";
     } elseif ($action === 'dar_acesso') {
         $plano = in_array($_POST['plano'] ?? '', ['pro', 'vip']) ? $_POST['plano'] : '';
@@ -109,12 +112,122 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             $pdo->rollBack();
             $erro = "Erro ao revogar acesso.";
         }
+    } elseif ($action === 'editar') {
+        $novoNome  = trim($_POST['nome'] ?? '');
+        $novoNivel = strtolower(trim($_POST['nivel_acesso'] ?? ''));
+
+        if ($uid === $adminId) {
+            $erro = "Você não pode alterar seu próprio nível de acesso por aqui.";
+        } elseif ($novoNome === '') {
+            $erro = "O nome não pode ficar em branco.";
+        } elseif (!in_array($novoNivel, ['titular', 'admin', 'supremo'], true)) {
+            $erro = "Nível de acesso inválido.";
+        } else {
+            try {
+                $pdo->prepare("UPDATE Usuario SET Nome = :nome, NivelAcesso = :nivel WHERE IDUsuario = :uid")
+                    ->execute([':nome' => $novoNome, ':nivel' => $novoNivel, ':uid' => $uid]);
+                header("Location: usuarios.php?sucesso=editado");
+                exit;
+            } catch (PDOException $e) {
+                $erro = "Erro ao editar usuário.";
+            }
+        }
+    } elseif ($action === 'excluir') {
+        if ($uid === $adminId) {
+            $erro = "Você não pode excluir sua própria conta por aqui.";
+        } else {
+            try {
+                // Bloqueia se o usuário for dono de carteira compartilhada com membro ativo
+                // (evitaria apagar sem querer dados financeiros de outra pessoa).
+                $stmtCompart = $pdo->prepare("
+                    SELECT COUNT(*) FROM MembroCarteira mc
+                    JOIN Carteira c ON c.IDCarteira = mc.FKCarteira
+                    WHERE c.FKUsuarioDono = :uid AND mc.StatusConvite = 1 AND mc.FKUsuario != :uid
+                ");
+                $stmtCompart->execute([':uid' => $uid]);
+                $temCarteiraCompartilhada = (int)$stmtCompart->fetchColumn() > 0;
+
+                // Bloqueia se for revendedor com comissão pendente de pagamento
+                $stmtComissao = $pdo->prepare("
+                    SELECT COUNT(*) FROM ComissaoRevendedor c
+                    JOIN Revendedor r ON r.IDRevendedor = c.FKRevendedor
+                    WHERE r.FKUsuario = :uid AND c.Status = 'pendente'
+                ");
+                $stmtComissao->execute([':uid' => $uid]);
+                $temComissaoPendente = (int)$stmtComissao->fetchColumn() > 0;
+
+                if ($temCarteiraCompartilhada) {
+                    $erro = "Este usuário possui carteira(s) compartilhada(s) com outras pessoas. Remova os membros ou transfira a titularidade antes de excluir.";
+                } elseif ($temComissaoPendente) {
+                    $erro = "Este usuário é revendedor com comissões pendentes de pagamento. Resolva as comissões antes de excluir.";
+                } else {
+                    $pdo->beginTransaction();
+
+                    // Evita deixar outras contas com uma referência "fantasma" de indicação
+                    $pdo->prepare("UPDATE Usuario SET FKIndicadoPor = NULL WHERE FKIndicadoPor = :uid")->execute([':uid' => $uid]);
+
+                    $pdo->prepare("DELETE FROM NotificacaoResposta WHERE FKUsuario = :uid")->execute([':uid' => $uid]);
+                    $pdo->prepare("DELETE FROM NotificacaoLeitura WHERE FKUsuario = :uid")->execute([':uid' => $uid]);
+                    $pdo->prepare("DELETE FROM NotificacaoDestinatario WHERE FKUsuario = :uid")->execute([':uid' => $uid]);
+
+                    $pdo->prepare("DELETE FROM usuario_conquista WHERE FKUsuario = :uid")->execute([':uid' => $uid]);
+                    $pdo->prepare("DELETE FROM codigos_ativacao_usos WHERE FKUsuario = :uid")->execute([':uid' => $uid]);
+                    $pdo->prepare("DELETE FROM indicacao_recompensa_concedida WHERE FKUsuario = :uid")->execute([':uid' => $uid]);
+
+                    $pdo->prepare("DELETE FROM ComissaoRevendedor WHERE FKUsuarioComprador = :uid")->execute([':uid' => $uid]);
+                    $pdo->prepare("DELETE FROM ComissaoRevendedor WHERE FKRevendedor IN (SELECT IDRevendedor FROM Revendedor WHERE FKUsuario = :uid)")->execute([':uid' => $uid]);
+                    $pdo->prepare("DELETE FROM Revendedor WHERE FKUsuario = :uid")->execute([':uid' => $uid]);
+
+                    $pdo->prepare("DELETE FROM Comprovante WHERE FKUsuario = :uid")->execute([':uid' => $uid]);
+
+                    $pdo->prepare("DELETE FROM LancamentoCartao WHERE FKUsuario = :uid")->execute([':uid' => $uid]);
+                    $pdo->prepare("DELETE FROM FaturaCartao WHERE FKUsuario = :uid")->execute([':uid' => $uid]);
+                    $pdo->prepare("DELETE FROM CartaoCredito WHERE FKUsuario = :uid")->execute([':uid' => $uid]);
+
+                    // Legado — ignora se a tabela/coluna não existir mais
+                    try {
+                        $pdo->prepare("DELETE FROM RateioRegistro WHERE FKRegistro IN (SELECT IDRegistro FROM Registro WHERE FKUsuario = :uid)")->execute([':uid' => $uid]);
+                    } catch (PDOException $e) {}
+
+                    $pdo->prepare("DELETE FROM Registro WHERE FKUsuario = :uid")->execute([':uid' => $uid]);
+                    $pdo->prepare("DELETE FROM Cofrinho WHERE FKUsuario = :uid")->execute([':uid' => $uid]);
+
+                    $pdo->prepare("DELETE FROM SubCategoria WHERE FKCategoriaPai IN (SELECT IDCategoria FROM Categoria WHERE FKUsuario = :uid)")->execute([':uid' => $uid]);
+                    $pdo->prepare("DELETE FROM MembroCarteira WHERE FKUsuario = :uid")->execute([':uid' => $uid]);
+                    $pdo->prepare("DELETE FROM Categoria WHERE FKUsuario = :uid")->execute([':uid' => $uid]);
+                    $pdo->prepare("DELETE FROM ConfiguracaoSistema WHERE FKUsuario = :uid")->execute([':uid' => $uid]);
+                    $pdo->prepare("DELETE FROM Carteira WHERE FKUsuarioDono = :uid")->execute([':uid' => $uid]);
+
+                    $pdo->prepare("DELETE FROM Assinatura WHERE FKUsuario = :uid")->execute([':uid' => $uid]);
+                    $pdo->prepare("DELETE FROM Usuario WHERE IDUsuario = :uid")->execute([':uid' => $uid]);
+
+                    $pdo->commit();
+
+                    // Remove os comprovantes físicos do usuário (fora da transação do banco)
+                    $dirComprovantes = __DIR__ . '/../uploads/comprovantes/' . $uid . '/';
+                    if (is_dir($dirComprovantes)) {
+                        foreach (glob($dirComprovantes . '*') ?: [] as $arquivo) {
+                            @unlink($arquivo);
+                        }
+                        @rmdir($dirComprovantes);
+                    }
+
+                    header("Location: usuarios.php?sucesso=excluido");
+                    exit;
+                }
+            } catch (PDOException $e) {
+                if ($pdo->inTransaction()) $pdo->rollBack();
+                $erro = "Erro ao excluir usuário.";
+            }
+        }
     }
 }
 
 if (isset($_GET['sucesso'])) {
     if ($_GET['sucesso'] === 'acesso_dado') $sucesso = "Acesso concedido com sucesso!";
     if ($_GET['sucesso'] === 'revogado')    $sucesso = "Plano revertido para Free.";
+    if ($_GET['sucesso'] === 'editado')     $sucesso = "Usuário atualizado com sucesso!";
+    if ($_GET['sucesso'] === 'excluido')    $sucesso = "Usuário excluído permanentemente.";
 }
 
 // ==============================================================================
@@ -168,12 +281,14 @@ require_once '../geral/header.php';
                 <i class="bi bi-people me-1"></i> Usuários
             </a>
         </li>
+        <?php if (ehSupremo()): ?>
         <li class="nav-item">
             <a href="/admin/configuracoes_planos.php" class="nav-link rounded-pill"
                 style="background:rgba(255,255,255,.05);color:#9ca3af;font-size:0.85rem;">
                 <i class="bi bi-sliders me-1"></i> Configurações de Planos
             </a>
         </li>
+        <?php endif; ?>
         <li class="nav-item">
             <a href="/admin/codigos.php" class="nav-link rounded-pill"
                 style="background:rgba(255,255,255,.05);color:#9ca3af;font-size:0.85rem;">
@@ -421,27 +536,52 @@ require_once '../geral/header.php';
                             <!-- Ações -->
                             <td class="pe-4">
                                 <div class="d-flex gap-2 justify-content-end align-items-center">
-                                    <button type="button"
-                                        class="btn btn-sm rounded-pill px-3 fw-semibold btn-dar-acesso"
-                                        style="background:rgba(212,175,55,0.12);color:#d4af37;border:1px solid rgba(212,175,55,0.35);font-size:0.73rem;white-space:nowrap;"
-                                        data-bs-toggle="modal" data-bs-target="#modalDarAcesso"
-                                        data-id="<?= htmlspecialchars($u['IDUsuario']) ?>"
-                                        data-nome="<?= htmlspecialchars($u['Nome'] ?? '') ?>"
-                                        data-email="<?= htmlspecialchars($u['Email'] ?? '') ?>"
-                                        data-plano="<?= $plano ?>">
-                                        <i class="bi bi-plus-circle me-1"></i> Dar acesso
-                                    </button>
-                                    <?php if ($plano !== 'free'): ?>
+                                    <?php if (ehSupremo()): ?>
                                         <button type="button"
-                                            class="btn btn-sm rounded-pill btn-revogar d-flex align-items-center justify-content-center"
-                                            style="width:30px;height:30px;padding:0;background:rgba(230,57,70,0.1);color:#f87171;border:1px solid rgba(230,57,70,0.3);"
-                                            title="Revogar plano"
-                                            data-bs-toggle="modal" data-bs-target="#modalRevogar"
+                                            class="btn btn-sm rounded-pill px-3 fw-semibold btn-dar-acesso"
+                                            style="background:rgba(212,175,55,0.12);color:#d4af37;border:1px solid rgba(212,175,55,0.35);font-size:0.73rem;white-space:nowrap;"
+                                            data-bs-toggle="modal" data-bs-target="#modalDarAcesso"
                                             data-id="<?= htmlspecialchars($u['IDUsuario']) ?>"
                                             data-nome="<?= htmlspecialchars($u['Nome'] ?? '') ?>"
+                                            data-email="<?= htmlspecialchars($u['Email'] ?? '') ?>"
                                             data-plano="<?= $plano ?>">
-                                            <i class="bi bi-x-lg" style="font-size:0.7rem;"></i>
+                                            <i class="bi bi-plus-circle me-1"></i> Dar acesso
                                         </button>
+                                        <?php if ($plano !== 'free'): ?>
+                                            <button type="button"
+                                                class="btn btn-sm rounded-pill btn-revogar d-flex align-items-center justify-content-center"
+                                                style="width:30px;height:30px;padding:0;background:rgba(230,57,70,0.1);color:#f87171;border:1px solid rgba(230,57,70,0.3);"
+                                                title="Revogar plano"
+                                                data-bs-toggle="modal" data-bs-target="#modalRevogar"
+                                                data-id="<?= htmlspecialchars($u['IDUsuario']) ?>"
+                                                data-nome="<?= htmlspecialchars($u['Nome'] ?? '') ?>"
+                                                data-plano="<?= $plano ?>">
+                                                <i class="bi bi-x-lg" style="font-size:0.7rem;"></i>
+                                            </button>
+                                        <?php endif; ?>
+                                        <button type="button"
+                                            class="btn btn-sm rounded-pill btn-editar-usuario d-flex align-items-center justify-content-center"
+                                            style="width:30px;height:30px;padding:0;background:rgba(96,165,250,0.1);color:#60a5fa;border:1px solid rgba(96,165,250,0.3);"
+                                            title="Editar nome / nível de acesso"
+                                            data-bs-toggle="modal" data-bs-target="#modalEditarUsuario"
+                                            data-id="<?= htmlspecialchars($u['IDUsuario']) ?>"
+                                            data-nome="<?= htmlspecialchars($u['Nome'] ?? '') ?>"
+                                            data-nivel="<?= $nivel ?>">
+                                            <i class="bi bi-pencil" style="font-size:0.7rem;"></i>
+                                        </button>
+                                        <?php if ($u['IDUsuario'] !== $adminId): ?>
+                                            <button type="button"
+                                                class="btn btn-sm rounded-pill btn-excluir-usuario d-flex align-items-center justify-content-center"
+                                                style="width:30px;height:30px;padding:0;background:rgba(230,57,70,0.1);color:#f87171;border:1px solid rgba(230,57,70,0.3);"
+                                                title="Excluir usuário permanentemente"
+                                                data-bs-toggle="modal" data-bs-target="#modalExcluirUsuario"
+                                                data-id="<?= htmlspecialchars($u['IDUsuario']) ?>"
+                                                data-nome="<?= htmlspecialchars($u['Nome'] ?? '') ?>">
+                                                <i class="bi bi-trash3" style="font-size:0.7rem;"></i>
+                                            </button>
+                                        <?php endif; ?>
+                                    <?php else: ?>
+                                        <span class="text-secondary opacity-40" style="font-size:0.75rem;">—</span>
                                     <?php endif; ?>
                                 </div>
                             </td>
@@ -581,6 +721,89 @@ require_once '../geral/header.php';
     </div>
 </div>
 
+<!-- ═══════════════════════════════════════════════════════════════════════════
+     MODAL: EDITAR USUÁRIO (nome / nível de acesso) — Somente Supremo
+     ═══════════════════════════════════════════════════════════════════════ -->
+<div class="modal fade" id="modalEditarUsuario" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered" style="max-width: 400px;">
+        <div class="modal-content border-secondary-subtle rounded-4" style="background:#1a1d21;">
+            <div class="modal-header border-bottom border-secondary-subtle px-4">
+                <h5 class="modal-title text-light fw-bold d-flex align-items-center gap-2">
+                    <i class="bi bi-pencil-square" style="color:#60a5fa;"></i> Editar Usuário
+                </h5>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+            </div>
+            <form method="POST" action="">
+                <div class="modal-body p-4">
+                    <input type="hidden" name="action" value="editar">
+                    <input type="hidden" name="usuario_id" id="editar_usuario_id">
+
+                    <div class="mb-3">
+                        <label class="form-label text-secondary small mb-2 d-block">Nome</label>
+                        <input type="text" name="nome" id="editar_nome" maxlength="255" required
+                            class="form-control bg-dark border-secondary-subtle text-light">
+                    </div>
+
+                    <div class="mb-1">
+                        <label class="form-label text-secondary small mb-2 d-block">Nível de acesso</label>
+                        <select name="nivel_acesso" id="editar_nivel" required
+                            class="form-select bg-dark border-secondary-subtle text-light">
+                            <option value="titular">Titular</option>
+                            <option value="admin">Admin</option>
+                            <option value="supremo">Supremo</option>
+                        </select>
+                        <div class="text-secondary mt-2" style="font-size:0.72rem;">
+                            <i class="bi bi-info-circle me-1"></i> Admin não mexe em planos, promoções de admin ou exclusão de contas — só o Supremo.
+                        </div>
+                    </div>
+                </div>
+                <div class="modal-footer border-top border-secondary-subtle px-4 d-flex justify-content-between">
+                    <button type="button" class="btn btn-link text-secondary text-decoration-none" data-bs-dismiss="modal">Cancelar</button>
+                    <button type="submit" class="btn fw-bold px-4 rounded-pill" style="background:#60a5fa;color:#000;">
+                        <i class="bi bi-check-lg me-1"></i> Salvar
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+<!-- ═══════════════════════════════════════════════════════════════════════════
+     MODAL: EXCLUIR USUÁRIO — Somente Supremo, ação irreversível
+     ═══════════════════════════════════════════════════════════════════════ -->
+<div class="modal fade" id="modalExcluirUsuario" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered" style="max-width: 400px;">
+        <div class="modal-content border-secondary-subtle rounded-4" style="background:#1a1d21;">
+            <div class="modal-header border-bottom border-secondary-subtle px-4">
+                <h5 class="modal-title text-light fw-bold d-flex align-items-center gap-2">
+                    <i class="bi bi-exclamation-triangle-fill text-danger"></i> Excluir Usuário
+                </h5>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+            </div>
+            <form method="POST" action="" id="formExcluirUsuario">
+                <div class="modal-body p-4">
+                    <input type="hidden" name="action" value="excluir">
+                    <input type="hidden" name="usuario_id" id="excluir_usuario_id">
+                    <p class="text-secondary mb-3">
+                        Isso vai apagar <strong class="text-light" id="excluir_nome"></strong> e <strong class="text-danger">todos os dados</strong> (transações, carteiras, cartões, cofrinhos, comprovantes etc) permanentemente. Não tem como desfazer.
+                    </p>
+                    <label class="form-label text-secondary small mb-2 d-block">
+                        Digite <strong class="text-danger">EXCLUIR</strong> para confirmar:
+                    </label>
+                    <input type="text" id="excluir_confirmacao" autocomplete="off"
+                        class="form-control bg-dark border-secondary-subtle text-light">
+                </div>
+                <div class="modal-footer border-top border-secondary-subtle px-4 d-flex justify-content-between">
+                    <button type="button" class="btn btn-link text-secondary text-decoration-none" data-bs-dismiss="modal">Cancelar</button>
+                    <button type="submit" id="btnConfirmarExclusao" class="btn btn-danger fw-bold px-4 rounded-pill" disabled>
+                        Excluir permanentemente
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
 <style>
     #tabelaUsuarios tbody tr:hover td {
         background-color: rgba(255, 255, 255, 0.025) !important;
@@ -661,6 +884,26 @@ require_once '../geral/header.php';
         const btn = e.relatedTarget;
         document.getElementById('revogar_usuario_id').value = btn.dataset.id;
         document.getElementById('revogar_nome').textContent = btn.dataset.nome;
+    });
+
+    document.getElementById('modalEditarUsuario').addEventListener('show.bs.modal', function(e) {
+        const btn = e.relatedTarget;
+        document.getElementById('editar_usuario_id').value = btn.dataset.id;
+        document.getElementById('editar_nome').value = btn.dataset.nome;
+        document.getElementById('editar_nivel').value = btn.dataset.nivel;
+    });
+
+    document.getElementById('modalExcluirUsuario').addEventListener('show.bs.modal', function(e) {
+        const btn = e.relatedTarget;
+        document.getElementById('excluir_usuario_id').value = btn.dataset.id;
+        document.getElementById('excluir_nome').textContent = btn.dataset.nome;
+        const campoConf = document.getElementById('excluir_confirmacao');
+        campoConf.value = '';
+        document.getElementById('btnConfirmarExclusao').disabled = true;
+    });
+
+    document.getElementById('excluir_confirmacao').addEventListener('input', function() {
+        document.getElementById('btnConfirmarExclusao').disabled = this.value.trim().toUpperCase() !== 'EXCLUIR';
     });
 
     function setDias(n) {

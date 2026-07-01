@@ -11,12 +11,10 @@ if (!isset($_SESSION['usuario_id'])) {
 
 require_once '../config/conexao.php';
 require_once '../config/funcoes.php';
+require_once '../config/permissoes.php';
 
-$nivelSessao = strtolower($_SESSION['nivel_acesso'] ?? '');
-if (!in_array($nivelSessao, ['admin', 'supremo'])) {
-    header("Location: /dashboard.php?erro=sem_permissao");
-    exit;
-}
+// Configuração de planos é restrita ao Supremo — afeta preços/limites de todos os usuários.
+exigirSupremo();
 
 $sucesso = $erro = null;
 
@@ -196,7 +194,7 @@ require_once '../geral/header.php';
             <i class="bi bi-shield-fill-check" style="color:#E63946;"></i>
             Painel Administrativo
             <span style="font-size:0.65rem;background:rgba(230,57,70,0.15);color:#f87171;border:1px solid rgba(230,57,70,0.3);border-radius:999px;padding:2px 10px;font-weight:700;letter-spacing:0.06em;">
-                <?= strtoupper($nivelSessao) ?>
+                <?= strtoupper(nivelAcessoAtual()) ?>
             </span>
         </h2>
         <a href="/dashboard.php" class="btn btn-outline-secondary btn-sm rounded-pill px-3 flex-shrink-0">

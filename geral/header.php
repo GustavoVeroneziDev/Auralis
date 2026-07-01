@@ -2,6 +2,7 @@
 if (session_status() === PHP_SESSION_NONE) {
     session_start();
 }
+require_once __DIR__ . '/../config/permissoes.php';
 $paginaAtual = basename($_SERVER['PHP_SELF']);
 
 // Calcula horas de teste uma única vez — usado tanto no banner quanto nos badges do nav
@@ -255,7 +256,7 @@ $_carteiraParam = (!empty($_SESSION['ultima_carteira']))
                 <span class="sidebar-label">Revendedor</span>
             </a>
             <?php endif; ?>
-            <?php if (in_array(strtolower($_SESSION['nivel_acesso'] ?? ''), ['admin', 'supremo'])): ?>
+            <?php if (ehAdmin()): ?>
             <a href="/admin/usuarios.php"
                class="sidebar-item <?= $paginaAtual === 'usuarios.php' ? 'active' : '' ?>"
                style="color:#E63946;">
@@ -494,7 +495,7 @@ $_carteiraParam = (!empty($_SESSION['ultima_carteira']))
                             </a>
                         </li>
                         <?php endif; ?>
-                        <?php if (in_array(strtolower($_SESSION['nivel_acesso'] ?? ''), ['admin', 'supremo'])): ?>
+                        <?php if (ehAdmin()): ?>
                         <li class="nav-item">
                             <a class="nav-link custom-link py-3 py-lg-2 <?= $paginaAtual === 'usuarios.php' ? 'text-warning active' : '' ?>" href="/admin/usuarios.php">
                                 <i class="bi bi-shield-fill-check me-2" style="color:#E63946;"></i>

@@ -6,11 +6,9 @@ session_start();
 if (!isset($_SESSION['usuario_id'])) { header("Location: /usuario/login.php"); exit; }
 require_once '../config/conexao.php';
 require_once '../config/funcoes.php';
+require_once '../config/permissoes.php';
 
-$nivelSessao = strtolower($_SESSION['nivel_acesso'] ?? '');
-if (!in_array($nivelSessao, ['admin', 'supremo'])) {
-    header("Location: /dashboard.php?erro=sem_permissao"); exit;
-}
+exigirAdmin();
 
 $sucesso = $erro = null;
 $uploadDir = $_SERVER['DOCUMENT_ROOT'] . '/geral/img/conquistas/';
@@ -189,7 +187,7 @@ require_once '../geral/header.php';
     <!-- Admin tabs -->
     <ul class="nav nav-pills gap-2 mb-4 flex-wrap">
         <li class="nav-item"><a href="/admin/usuarios.php" class="nav-link rounded-pill" style="background:rgba(255,255,255,.05);color:#9ca3af;font-size:0.85rem;"><i class="bi bi-people me-1"></i> Usuários</a></li>
-        <li class="nav-item"><a href="/admin/configuracoes_planos.php" class="nav-link rounded-pill" style="background:rgba(255,255,255,.05);color:#9ca3af;font-size:0.85rem;"><i class="bi bi-sliders me-1"></i> Config. Planos</a></li>
+        <?php if (ehSupremo()): ?><li class="nav-item"><a href="/admin/configuracoes_planos.php" class="nav-link rounded-pill" style="background:rgba(255,255,255,.05);color:#9ca3af;font-size:0.85rem;"><i class="bi bi-sliders me-1"></i> Config. Planos</a></li><?php endif; ?>
         <li class="nav-item"><a href="/admin/codigos.php" class="nav-link rounded-pill" style="background:rgba(255,255,255,.05);color:#9ca3af;font-size:0.85rem;"><i class="bi bi-gift-fill me-1"></i> Códigos</a></li>
         <li class="nav-item"><a href="/admin/notificacoes.php" class="nav-link rounded-pill" style="background:rgba(255,255,255,.05);color:#9ca3af;font-size:0.85rem;"><i class="bi bi-bell-fill me-1"></i> Notificações</a></li>
         <li class="nav-item"><a href="/admin/revendedores.php" class="nav-link rounded-pill" style="background:rgba(255,255,255,.05);color:#9ca3af;font-size:0.85rem;"><i class="bi bi-people-fill me-1"></i> Revendedores</a></li>

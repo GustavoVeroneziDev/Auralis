@@ -145,7 +145,7 @@ if (!function_exists('verificarExpiracao')) {
         if (isset($_SESSION['expiracao_verificada'])) return;
 
         // Admin/supremo: plano atribuído manualmente, sem assinatura obrigatória
-        if (in_array(strtolower($_SESSION['nivel_acesso'] ?? ''), ['admin', 'supremo'])) return;
+        if (function_exists('ehAdmin') && ehAdmin()) return;
 
         $_SESSION['expiracao_verificada'] = true;
 
