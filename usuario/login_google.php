@@ -79,8 +79,8 @@ if (isset($_GET['code'])) {
                 $token_recuperacao = bin2hex(random_bytes(32));
                 $expiracao = date('Y-m-d H:i:s', strtotime('+24 hours'));
 
-                $sqlInsert = "INSERT INTO Usuario (IDUsuario, Nome, Email, Senha, TipoPessoa, NivelAcesso, StatusConta, TokenRecuperacao, TokenRecuperacaoExpiracao) 
-                              VALUES (:id, :nome, :email, :senha, 'PF', 'Titular', 'ativo', :token, :expiracao)";
+                $sqlInsert = "INSERT INTO Usuario (IDUsuario, Nome, Email, Senha, TipoPessoa, NivelAcesso, StatusConta, TokenRecuperacao, TokenRecuperacaoExpiracao, NavTipo)
+                              VALUES (:id, :nome, :email, :senha, 'PF', 'Titular', 'ativo', :token, :expiracao, 'sidebar')";
                 $pdo->prepare($sqlInsert)->execute([
                     ':id' => $id_novo_usuario,
                     ':nome' => $nome,

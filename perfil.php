@@ -468,8 +468,10 @@ require_once 'geral/header.php';
             </div>
         </div>
         <?php if ($totalConquistas > 0): ?>
-        <div style="height:6px;width:160px;background:var(--border-color);border-radius:999px;overflow:hidden;">
-            <div style="height:100%;width:<?= round($totalDesbloqueadas / $totalConquistas * 100) ?>%;background:var(--accent);border-radius:999px;transition:width .4s;"></div>
+        <div class="d-flex gap-1" id="filtroConquistas">
+            <button type="button" class="conquista-filtro-pill active" data-filtro="tenho">Tenho</button>
+            <button type="button" class="conquista-filtro-pill" data-filtro="todas">Todas</button>
+            <button type="button" class="conquista-filtro-pill" data-filtro="nao-tenho">Não tenho</button>
         </div>
         <?php endif; ?>
     </div>
@@ -480,7 +482,7 @@ require_once 'geral/header.php';
         <p class="mb-0">Nenhuma conquista cadastrada ainda.</p>
     </div>
     <?php else: ?>
-    <div class="row g-3">
+    <div class="row g-3" id="listaConquistas">
         <?php foreach ($conquistas as $c):
             $desbloqueada = $c['DataConquista'] !== null;
             $raridade     = $raridadeInfo[$c['Raridade']] ?? $raridadeInfo['comum'];
@@ -496,7 +498,7 @@ require_once 'geral/header.php';
                 else                        $dataDesbloq = 'há ' . (int)($diff->days / 365) . ' ano' . ((int)($diff->days / 365) > 1 ? 's' : '');
             }
         ?>
-        <div class="col-12 col-md-6">
+        <div class="col-12 col-md-6 item-conquista" data-desbloqueada="<?= $desbloqueada ? '1' : '0' ?>">
             <div class="conquista-card <?= $desbloqueada ? '' : 'bloqueada' ?>">
                 <!-- Ícone -->
                 <div class="conquista-icon-wrap badge-<?= htmlspecialchars($c['Raridade'] ?? 'comum') ?>">
@@ -566,6 +568,15 @@ require_once 'geral/header.php';
 }
 .chip-btn:hover  { border-color:var(--accent); }
 .chip-btn.active { background:var(--accent); border-color:var(--accent); color:#fff; font-weight:600; }
+
+.conquista-filtro-pill {
+    background:transparent; border:1px solid var(--card-border-color);
+    color:var(--text-secondary); border-radius:999px; padding:4px 12px;
+    font-size:0.72rem; font-weight:600; cursor:pointer; white-space:nowrap;
+    transition:background .15s, border-color .15s, color .15s;
+}
+.conquista-filtro-pill:hover  { border-color:var(--accent); color:var(--text-main); }
+.conquista-filtro-pill.active { background:var(--accent); border-color:var(--accent); color:#fff; }
 </style>
 
 <script>
@@ -765,6 +776,31 @@ require_once 'geral/header.php';
     });
 
     sync();
+})();
+
+// ── Filtro de Conquistas (tenho / todas / não tenho) ────────────────────────
+(function () {
+    var pills = document.querySelectorAll('.conquista-filtro-pill');
+    var itens = document.querySelectorAll('#listaConquistas .item-conquista');
+    if (!pills.length) return;
+
+    function aplicarFiltro(filtro) {
+        itens.forEach(function (item) {
+            var tem = item.dataset.desbloqueada === '1';
+            var mostrar = filtro === 'todas' || (filtro === 'tenho' && tem) || (filtro === 'nao-tenho' && !tem);
+            item.style.display = mostrar ? '' : 'none';
+        });
+    }
+
+    pills.forEach(function (pill) {
+        pill.addEventListener('click', function () {
+            pills.forEach(function (p) { p.classList.remove('active'); });
+            pill.classList.add('active');
+            aplicarFiltro(pill.dataset.filtro);
+        });
+    });
+
+    aplicarFiltro('tenho'); // Estado inicial: só as que já tem
 })();
 </script>
 
