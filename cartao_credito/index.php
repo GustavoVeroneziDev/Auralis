@@ -157,7 +157,7 @@ foreach ($cartoes as $c) {
         $stmtTot = $pdo->prepare("SELECT COALESCE(SUM(Valor), 0) FROM LancamentoCartao WHERE FKFatura = :fid");
         $stmtTot->execute([':fid' => $fatura['IDFatura']]);
         $total   = (float)$stmtTot->fetchColumn();
-        $diasAte = (new DateTime())->diff(new DateTime($fatura['DataFechamento']))->days;
+        $diasAte = (new DateTime('today'))->diff(new DateTime($fatura['DataFechamento']))->days;
         $jaFechou = new DateTime('today') > new DateTime($fatura['DataFechamento']);
         $dadosCartoes[$c['IDCartao']] = [
             'fatura'   => $fatura,
