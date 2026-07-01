@@ -1046,7 +1046,12 @@ require_once 'geral/header.php';
                        class="form-control form-control-sm shadow-none"
                        style="background:var(--bg-card);border:1px solid var(--card-border-color);color:var(--text-main);padding-left:34px;border-radius:20px;font-size:0.82rem;">
             </div>
-            <div class="d-flex gap-1 flex-wrap">
+            <button type="button" id="btnToggleFiltros"
+                    class="btn btn-sm d-md-none d-flex align-items-center gap-1 rounded-3"
+                    style="background:var(--bg-card);border:1px solid var(--card-border-color);color:var(--text-main);font-size:0.8rem;">
+                <i class="bi bi-funnel"></i> Filtros
+            </button>
+            <div class="d-md-flex gap-1 flex-wrap pills-filtro-mobile" id="filtrosPills">
                 <button class="btn btn-sm busca-pill active" data-filtro="tudo">Tudo</button>
                 <button class="btn btn-sm busca-pill" data-filtro="receita">Receitas</button>
                 <button class="btn btn-sm busca-pill" data-filtro="despesa">Despesas</button>
@@ -2175,6 +2180,12 @@ require_once 'geral/header.php';
     color: #000;
     font-weight: 600;
 }
+
+/* No mobile os filtros ficam escondidos atrás do botão "Filtros" */
+@media (max-width: 767.98px) {
+    .pills-filtro-mobile { display: none; }
+    .pills-filtro-mobile.mostrar { display: flex; }
+}
 </style>
 <script>
 (function () {
@@ -2182,6 +2193,15 @@ require_once 'geral/header.php';
     var pills      = document.querySelectorAll('.busca-pill');
     var emptyRow   = document.getElementById('buscaVazio');
     var filtroAtivo = 'tudo';
+
+    // ── Botão "Filtros" (mobile) ────────────────────────────────
+    var btnToggleFiltros = document.getElementById('btnToggleFiltros');
+    var pillsWrap         = document.getElementById('filtrosPills');
+    if (btnToggleFiltros && pillsWrap) {
+        btnToggleFiltros.addEventListener('click', function () {
+            pillsWrap.classList.toggle('mostrar');
+        });
+    }
 
     function filtrar() {
         var texto = input ? input.value.toLowerCase().trim() : '';
