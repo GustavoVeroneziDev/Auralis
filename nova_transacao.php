@@ -867,7 +867,7 @@ require_once 'geral/header.php';
 
                                 <div class="col-6 d-flex align-items-center ps-3">
                                     <i class="bi bi-calendar3 text-secondary-analysis me-2 fs-7"></i>
-                                    <input type="date" name="data_registro" class="form-control bg-transparent border-0 text-light-analysis px-0 shadow-none fs-7 fw-bold"
+                                    <input type="date" name="data_registro" id="data_registro" class="form-control bg-transparent border-0 text-light-analysis px-0 shadow-none fs-7 fw-bold"
                                         value="<?= htmlspecialchars($val_data) ?>" required>
                                 </div>
                             </div>
@@ -1057,19 +1057,35 @@ require_once 'geral/header.php';
                                             <?php endif; ?>
 
                                             <!-- ── 3. DATA LIMITE PARA PAGAMENTO ─────────────────── -->
+                                            <?php $_temVencDiferente = !empty($val_venc) && $val_venc !== $val_data; ?>
                                             <div id="bloco-vencimento" class="pt-3 border-top border-border-color"
                                                 style="<?= $val_rec ? 'display:none;' : '' ?>">
-                                                <label class="text-light fw-semibold fs-7 mb-1 d-flex align-items-center gap-2">
-                                                    <i class="bi bi-calendar-x text-danger"></i>
-                                                    Data limite para pagamento
-                                                    <span class="badge bg-secondary fw-normal" style="font-size:0.62rem;">Opcional</span>
-                                                </label>
-                                                <div class="text-secondary mb-2" style="font-size:0.75rem;">
-                                                    Quando essa conta expira ou vence — ex: boleto, fatura de cartão.
+                                                <div class="d-flex align-items-start justify-content-between gap-3">
+                                                    <div>
+                                                        <div class="text-light fw-semibold fs-7 mb-1 d-flex align-items-center gap-2">
+                                                            <i class="bi bi-calendar-x text-danger"></i>
+                                                            Possui prazo de pagamento além do dia do registro?
+                                                        </div>
+                                                        <div class="text-secondary" style="font-size:0.75rem;">
+                                                            Ex: boleto ou fatura que vence alguns dias depois da compra.
+                                                        </div>
+                                                    </div>
+                                                    <div class="form-check form-switch fs-4 mb-0 toggle-analysis flex-shrink-0 mt-1">
+                                                        <input class="form-check-input bg-dark border-border-color shadow-none"
+                                                            type="checkbox" id="toggle_tem_vencimento"
+                                                            <?= $_temVencDiferente ? 'checked' : '' ?>>
+                                                    </div>
                                                 </div>
-                                                <input type="date" name="data_vencimento"
-                                                    class="form-control bg-dark border-border-color text-light-analysis fs-7"
-                                                    value="<?= htmlspecialchars($val_venc) ?>">
+
+                                                <div id="bloco_data_vencimento" style="display:<?= $_temVencDiferente ? 'block' : 'none' ?>;"
+                                                    class="mt-3 ps-3 border-start border-border-color">
+                                                    <label class="form-label text-secondary-analysis fs-7 mb-1">Vence em qual data?</label>
+                                                    <input type="date" name="data_vencimento" id="input_data_vencimento"
+                                                        class="form-control bg-dark border-border-color text-light-analysis form-control-sm fs-7"
+                                                        style="max-width:180px;"
+                                                        min="<?= htmlspecialchars($val_data) ?>"
+                                                        value="<?= htmlspecialchars($val_venc) ?>">
+                                                </div>
                                             </div>
 
                                         </div>
@@ -1366,6 +1382,37 @@ require_once 'geral/header.php';
             if (this.checked && toggleParcelado && toggleParcelado.checked) {
                 toggleParcelado.checked = false;
                 if (blocoParcelamento) blocoParcelamento.style.display = 'none';
+            }
+        });
+    }
+
+    // ==========================================
+    // LÓGICA DO SWITCH DE VENCIMENTO
+    // ==========================================
+    const toggleTemVencimento = document.getElementById('toggle_tem_vencimento');
+    const blocoDataVencimento = document.getElementById('bloco_data_vencimento');
+    const inputDataVencimento = document.getElementById('input_data_vencimento');
+    const inputDataRegistro = document.getElementById('data_registro');
+
+    if (toggleTemVencimento && inputDataVencimento) {
+        toggleTemVencimento.addEventListener('change', function() {
+            blocoDataVencimento.style.display = this.checked ? 'block' : 'none';
+            inputDataVencimento.required = this.checked;
+            if (!this.checked) {
+                inputDataVencimento.value = '';
+            } else if (!inputDataVencimento.value && inputDataRegistro) {
+                inputDataVencimento.value = inputDataRegistro.value;
+            }
+        });
+        inputDataVencimento.required = toggleTemVencimento.checked;
+    }
+
+    // Vencimento nunca pode ser antes da data de registro
+    if (inputDataRegistro && inputDataVencimento) {
+        inputDataRegistro.addEventListener('change', function() {
+            inputDataVencimento.min = this.value;
+            if (inputDataVencimento.value && inputDataVencimento.value < this.value) {
+                inputDataVencimento.value = this.value;
             }
         });
     }
