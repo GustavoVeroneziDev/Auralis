@@ -1225,7 +1225,7 @@ require_once 'geral/header.php';
                                             <?php endif; ?>
                                         </div>
 
-                                        <div class="d-flex gap-2 w-100 w-md-auto justify-content-end">
+                                        <div class="d-flex gap-2 w-100 w-md-auto justify-content-end align-items-center flex-wrap">
                                             <form method="POST" action="" class="m-0">
                                                 <input type="hidden" name="action" value="toggle_status">
                                                 <input type="hidden" name="registro_id" value="<?php echo $t['IDRegistro'] ?>">
@@ -1249,7 +1249,7 @@ require_once 'geral/header.php';
                                             <?php if ($totalCarteiras > 1): ?>
                                             <div class="dropdown d-inline-block">
                                                 <button type="button"
-                                                    class="btn btn-sm btn-outline-info rounded-pill fw-semibold px-3 d-inline-flex align-items-center gap-1 transition-hover dropdown-toggle"
+                                                    class="btn btn-sm btn-outline-info rounded-pill fw-semibold px-3 d-inline-flex align-items-center gap-1 transition-hover dropdown-toggle dropdown-toggle-transferir"
                                                     data-bs-toggle="dropdown" aria-expanded="false" title="Transferir para outra carteira">
                                                     <i class="bi bi-arrow-left-right"></i>
                                                 </button>
@@ -2255,6 +2255,18 @@ require_once 'geral/header.php';
             this.classList.add('active');
             filtroAtivo = this.dataset.filtro;
             filtrar();
+        });
+    });
+
+    // ── Dropdown "Transferir para" — evita esticar a linha da tabela ───────
+    // Dentro do .table-responsive (overflow:auto), um dropdown posicionado via
+    // "absolute" conta na área de rolagem do ancestral e empurra/estica a linha.
+    // Usando strategy "fixed" ele passa a flutuar por cima, sem afetar o layout.
+    document.querySelectorAll('.dropdown-toggle-transferir').forEach(function (btn) {
+        new bootstrap.Dropdown(btn, {
+            popperConfig: function (defaultConfig) {
+                return Object.assign({}, defaultConfig, { strategy: 'fixed' });
+            }
         });
     });
 })();
