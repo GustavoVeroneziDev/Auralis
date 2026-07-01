@@ -48,6 +48,7 @@ $conquistas = [];
 try {
     $stmtC = $pdo->prepare("
         SELECT c.IDConquista, c.Slug, c.Nome, c.Descricao, c.Icone,
+               COALESCE(c.ImagemUrl, '') AS ImagemUrl,
                c.Cor, c.Raridade, c.Ordem,
                uc.DataConquista
         FROM conquista c
