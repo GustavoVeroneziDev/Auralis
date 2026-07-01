@@ -314,6 +314,12 @@ $_carteiraParam = (!empty($_SESSION['ultima_carteira']))
                             <i class="bi bi-gear me-2" style="color:gold;"></i> Configurações
                         </a>
                     </li>
+                    <li>
+                        <a class="dropdown-item d-flex align-items-center py-2 transition-hover"
+                           href="/notificacoes.php" style="color:var(--text-main);">
+                            <i class="bi bi-bell me-2" style="color:#60a5fa;"></i> Notificações
+                        </a>
+                    </li>
                     <?php if ($_ehRevendedor): ?>
                     <li>
                         <a class="dropdown-item d-flex align-items-center py-2 fw-semibold transition-hover"
@@ -552,6 +558,7 @@ $_carteiraParam = (!empty($_SESSION['ultima_carteira']))
                                 </li>
                                 <li><a class="dropdown-item text-light d-flex align-items-center py-2" href="/perfil.php"><i class="bi bi-person-circle me-2" style="color:#6366f1;"></i> Perfil</a></li>
                                 <li><a class="dropdown-item text-light d-flex align-items-center py-2" href="/configuracoes.php"><i class="bi bi-gear me-2" style="color:gold;"></i> Configurações</a></li>
+                                <li><a class="dropdown-item text-light d-flex align-items-center py-2" href="/notificacoes.php"><i class="bi bi-bell me-2" style="color:#60a5fa;"></i> Notificações</a></li>
                                 <?php if ($_ehRevendedor): ?>
                                 <li><a class="dropdown-item d-flex align-items-center py-2 fw-semibold" href="/revendedor/dashboard.php" style="color:#d4af37;"><i class="bi bi-people-fill me-2" style="color:#d4af37;"></i> Painel do Revendedor</a></li>
                                 <?php endif; ?>
