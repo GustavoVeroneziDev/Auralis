@@ -170,10 +170,61 @@ $_carteiraParam = (!empty($_SESSION['ultima_carteira']))
     ?>
     <link rel="stylesheet" href="/geral/temas/<?= htmlspecialchars($_temaAtual) ?>.css?v=<?= $_temaV ?>">
     <link rel="stylesheet" href="/geral/style.css?v=<?= $_cssV ?>">
+    <?php
+    // Cor de fundo real do tema atual — usada só na tela de carregamento do PWA instalado,
+    // pra não dar aquele "flash" entre o splash nativo (preto fixo) e o app de verdade.
+    $_coresTemaBg = [
+        'dark'    => '#121418',
+        'ambar'   => '#0e0c1a',
+        'aurora'  => '#0a0518',
+        'cosmos'  => '#0d0a1a',
+        'fortune' => '#0c0900',
+        'oceano'  => '#0d1230',
+        'white'   => '#f2f5f9',
+    ];
+    $_corSplash = $_coresTemaBg[$_temaAtual] ?? '#121418';
+    ?>
+    <style>
+        #auralisSplashLoading {
+            display: none;
+            position: fixed;
+            inset: 0;
+            z-index: 99999;
+            background: <?= $_corSplash ?>;
+            align-items: center;
+            justify-content: center;
+            flex-direction: column;
+            transition: opacity .25s ease;
+        }
+        @media all and (display-mode: standalone) {
+            #auralisSplashLoading { display: flex; }
+        }
+        #auralisSplashLoading img {
+            width: 88px;
+            height: 88px;
+            margin-bottom: 22px;
+        }
+        #auralisSplashLoading .auralis-spinner {
+            width: 30px;
+            height: 30px;
+            border: 3px solid rgba(212,175,55,0.25);
+            border-top-color: #d4af37;
+            border-radius: 50%;
+            animation: auralisSpin .8s linear infinite;
+        }
+        @keyframes auralisSpin {
+            to { transform: rotate(360deg); }
+        }
+    </style>
 </head>
 
 <?php if ($_useSidebar): ?>
 <body class="d-flex min-vh-100">
+
+    <div id="auralisSplashLoading">
+        <img src="/geral/img/icon-192.png" alt="Auralis">
+        <div class="auralis-spinner"></div>
+    </div>
 
     <!-- Overlay móvel -->
     <div id="sidebarOverlay" class="sidebar-overlay"></div>
@@ -473,6 +524,11 @@ $_carteiraParam = (!empty($_SESSION['ultima_carteira']))
 
 <?php else: ?>
 <body class="d-flex flex-column min-vh-100">
+
+    <div id="auralisSplashLoading">
+        <img src="/geral/img/icon-192.png" alt="Auralis">
+        <div class="auralis-spinner"></div>
+    </div>
 
     <nav class="navbar navbar-expand-lg border-bottom border-secondary-subtle sticky-top shadow-sm py-2">
         <div class="container-fluid px-3 px-xl-5" style="max-width:1500px;">

@@ -93,6 +93,26 @@ function parseBRL(val) {
 
 <script>
     // ─────────────────────────────────────────────────────────────
+    // Esconde a tela de carregamento (só existe/aparece no PWA instalado —
+    // ver CSS @media (display-mode: standalone) no header.php)
+    // ─────────────────────────────────────────────────────────────
+    (function () {
+        var splash = document.getElementById('auralisSplashLoading');
+        if (!splash) return;
+        var escondido = false;
+        function esconderSplash() {
+            if (escondido) return;
+            escondido = true;
+            splash.style.opacity = '0';
+            setTimeout(function () { splash.remove(); }, 250);
+        }
+        window.addEventListener('load', esconderSplash);
+        setTimeout(esconderSplash, 3000); // rede fraca/trava — não deixa preso pra sempre
+    })();
+</script>
+
+<script>
+    // ─────────────────────────────────────────────────────────────
     // PWA: Service Worker + detecção de plataforma + install prompt
     // ─────────────────────────────────────────────────────────────
     (function() {
