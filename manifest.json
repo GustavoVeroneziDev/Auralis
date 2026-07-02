@@ -4,7 +4,7 @@
   "description": "Gerencie suas finanças pessoais e familiares de forma simples, segura e inteligente.",
   "start_url": "/dashboard.php",
   "display": "standalone",
-  "background_color": "#121418",
+  "background_color": "#000000",
   "theme_color": "#d4af37",
   "lang": "pt-BR",
   "icons": [
@@ -19,7 +19,7 @@
       "type": "image/png"
     },
     {
-      "src": "/geral/img/icon-512.png",
+      "src": "/geral/img/icon-512-maskable.png",
       "sizes": "512x512",
       "type": "image/png",
       "purpose": "maskable"

@@ -189,7 +189,7 @@ if (isset($_GET['ajax']) && $_GET['acao'] === 'listar') {
         $totRecEfet = $totDesEfet = $totRecPend = $totDesPend = 0;
         foreach ($stmtS->fetchAll(PDO::FETCH_ASSOC) as $t) {
             $v = (float)$t['Valor'];
-            if ($t['TipoRegistro'] === 'receita') {
+            if ($t['TipoRegistro'] === 'receita' || $t['TipoRegistro'] === 'transferencia_entrada') {
                 $t['StatusRegistro'] === 'efetivado' ? $totRecEfet += $v : $totRecPend += $v;
             } else {
                 $t['StatusRegistro'] === 'efetivado' ? $totDesEfet += $v : $totDesPend += $v;
@@ -900,7 +900,7 @@ require_once 'geral/header.php';
 
     // ── Sidebar ───────────────────────────────────────────────────────────
     function itemSidebar(item) {
-        const isRec = item.tipo === 'receita';
+        const isRec = item.tipo === 'receita' || item.tipo === 'transferencia_entrada';
         const incomeColor = cssVar('--color-income-text') || '#6ee7c7';
         const expenseColor = cssVar('--color-expense-text') || '#f87171';
         const corValor = isRec ? incomeColor : expenseColor;
@@ -996,7 +996,7 @@ require_once 'geral/header.php';
             const cardColor = cssVar('--color-card-text') || '#a78bfa';
             const pendingColor = cssVar('--color-pending-text') || '#f5e2a0';
             body.innerHTML = transacoesDoDia.map(t => {
-                const isRec = t.tipo === 'receita';
+                const isRec = t.tipo === 'receita' || t.tipo === 'transferencia_entrada';
                 const corVal = isRec ? incomeColor : expenseColor;
                 const sinal = isRec ? '+' : '-';
                 const statusBadge = t.status === 'efetivado' ?
@@ -1115,7 +1115,7 @@ require_once 'geral/header.php';
             );
 
             transacoesDoDia.forEach(t => {
-                const isRec = t.tipo === 'receita';
+                const isRec = t.tipo === 'receita' || t.tipo === 'transferencia_entrada';
                 const cls = classEvento(t, dataStr);
 
                 const pill = document.createElement('div');

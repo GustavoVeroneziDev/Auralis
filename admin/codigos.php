@@ -4,11 +4,9 @@ if (!isset($_SESSION['usuario_id'])) { header("Location: /usuario/login.php"); e
 
 require_once '../config/conexao.php';
 require_once '../config/funcoes.php';
+require_once '../config/permissoes.php';
 
-$nivelSessao = strtolower($_SESSION['nivel_acesso'] ?? '');
-if (!in_array($nivelSessao, ['admin', 'supremo'])) {
-    header("Location: /dashboard.php?erro=sem_permissao"); exit;
-}
+exigirAdmin();
 
 $sucesso = $erro = null;
 $pageTitle = 'Códigos de Ativação — Admin';
@@ -94,7 +92,7 @@ require_once '../geral/header.php';
             <i class="bi bi-shield-fill-check" style="color:#E63946;"></i>
             Painel Administrativo
             <span style="font-size:0.65rem;background:rgba(230,57,70,.15);color:#f87171;border:1px solid rgba(230,57,70,.3);border-radius:999px;padding:2px 10px;font-weight:700;letter-spacing:.06em;">
-                <?= strtoupper($nivelSessao) ?>
+                <?= strtoupper(nivelAcessoAtual()) ?>
             </span>
         </h2>
         <a href="/dashboard.php" class="btn btn-outline-secondary btn-sm rounded-pill px-3 flex-shrink-0">
@@ -110,12 +108,14 @@ require_once '../geral/header.php';
                 <i class="bi bi-people me-1"></i> Usuários
             </a>
         </li>
+        <?php if (ehSupremo()): ?>
         <li class="nav-item">
             <a href="/admin/configuracoes_planos.php" class="nav-link rounded-pill"
                style="background:rgba(255,255,255,.05);color:#9ca3af;font-size:0.85rem;">
                 <i class="bi bi-sliders me-1"></i> Configurações de Planos
             </a>
         </li>
+        <?php endif; ?>
         <li class="nav-item">
             <a href="/admin/codigos.php" class="nav-link rounded-pill active"
                style="background:#d4af37;color:#000;font-size:0.85rem;">

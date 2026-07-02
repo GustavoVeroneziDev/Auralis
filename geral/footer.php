@@ -1,3 +1,4 @@
+<?php require_once __DIR__ . '/../config/vapid_keys.php'; ?>
 <hr class="border-secondary-subtle my-4">
 
 <div class="row align-items-center pb-3">
@@ -88,6 +89,26 @@ function parseBRL(val) {
         const elementosOcultos = document.querySelectorAll('.card-animado');
         elementosOcultos.forEach((el) => observer.observe(el));
     });
+</script>
+
+<script>
+    // ─────────────────────────────────────────────────────────────
+    // Esconde a tela de carregamento (só existe/aparece no PWA instalado —
+    // ver CSS @media (display-mode: standalone) no header.php)
+    // ─────────────────────────────────────────────────────────────
+    (function () {
+        var splash = document.getElementById('auralisSplashLoading');
+        if (!splash) return;
+        var escondido = false;
+        function esconderSplash() {
+            if (escondido) return;
+            escondido = true;
+            splash.style.opacity = '0';
+            setTimeout(function () { splash.remove(); }, 250);
+        }
+        window.addEventListener('load', esconderSplash);
+        setTimeout(esconderSplash, 3000); // rede fraca/trava — não deixa preso pra sempre
+    })();
 </script>
 
 <script>
@@ -224,6 +245,74 @@ function parseBRL(val) {
         };
     })();
 </script>
+
+<?php if (isset($_SESSION['usuario_id'])): ?>
+<script>
+    // ─────────────────────────────────────────────────────────────
+    // Prompt automático: "Ativar notificações" — 1x por navegador/dispositivo
+    // ─────────────────────────────────────────────────────────────
+    window.AURALIS_VAPID_PUBLIC_KEY = <?= json_encode($vapidPublicKey) ?>;
+
+    function auralisUrlBase64ToUint8Array(base64String) {
+        var padding = '='.repeat((4 - base64String.length % 4) % 4);
+        var base64  = (base64String + padding).replace(/-/g, '+').replace(/_/g, '/');
+        var raw     = atob(base64);
+        var arr     = new Uint8Array(raw.length);
+        for (var i = 0; i < raw.length; i++) arr[i] = raw.charCodeAt(i);
+        return arr;
+    }
+
+    window.auralisAtivarNotificacoes = function () {
+        var modalEl = document.getElementById('modalAtivarNotificacoes');
+        if (!window.Notification || !('serviceWorker' in navigator) || !('PushManager' in window)) return;
+
+        Notification.requestPermission().then(function (permissao) {
+            if (modalEl) {
+                var instancia = bootstrap.Modal.getInstance(modalEl);
+                if (instancia) instancia.hide();
+            }
+            if (permissao !== 'granted') return;
+
+            navigator.serviceWorker.ready.then(function (reg) {
+                return reg.pushManager.subscribe({
+                    userVisibleOnly: true,
+                    applicationServerKey: auralisUrlBase64ToUint8Array(window.AURALIS_VAPID_PUBLIC_KEY)
+                });
+            }).then(function (sub) {
+                return fetch('/notificacoes/salvar_subscription.php', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(sub.toJSON())
+                });
+            }).then(function () {
+                auralisToast('Notificações ativadas!');
+            }).catch(function () {});
+        });
+    };
+
+    (function () {
+        if (!('serviceWorker' in navigator) || !('PushManager' in window) || !window.Notification) return;
+        if (Notification.permission !== 'default') return; // já respondeu antes (aceitou ou negou) — não insiste
+        if (localStorage.getItem('auralis_notif_prompt_visto')) return;
+
+        var modalEl = document.getElementById('modalAtivarNotificacoes');
+        if (!modalEl) return;
+
+        navigator.serviceWorker.ready.then(function (reg) {
+            return reg.pushManager.getSubscription();
+        }).then(function (sub) {
+            if (sub) return; // já ativado nesse dispositivo
+
+            setTimeout(function () {
+                if (document.querySelector('.modal.show')) return; // outro modal já aberto (ex: instalar app) — não empilha
+                new bootstrap.Modal(modalEl).show();
+                localStorage.setItem('auralis_notif_prompt_visto', '1');
+            }, 4500);
+        }).catch(function () {});
+    })();
+</script>
+<?php endif; ?>
+
 <!-- Sidebar JS -->
 <?php if (isset($_useSidebar) && $_useSidebar): ?>
 <script>

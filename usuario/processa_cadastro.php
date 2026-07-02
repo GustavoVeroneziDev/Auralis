@@ -51,10 +51,10 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         // Insere com Status = 'pendente' e salva o Token
         $sql = "INSERT INTO Usuario (
                     IDUsuario, Nome, Email, Senha, TipoPessoa, NivelAcesso, StatusConta, TokenAtivacao,
-                    CodigoIndicacao, FKIndicadoPor
+                    CodigoIndicacao, FKIndicadoPor, NavTipo
                 ) VALUES (
                     :id_usuario, :nome, :email, :senha, 'PF', 'Titular', 'pendente', :token,
-                    :codigo, :fk_ind
+                    :codigo, :fk_ind, 'sidebar'
                 )";
 
         $stmt = $pdo->prepare($sql);

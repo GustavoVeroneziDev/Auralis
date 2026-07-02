@@ -157,6 +157,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && trim($_POST['tipo_registro'] ?? '')
     $dataCompra  = trim($_POST['data_registro'] ?? '');
     $categoriaId = trim($_POST['categoria_id'] ?? '') ?: null;
     $parcelado   = isset($_POST['parcelado_cc']) ? 1 : 0;
+    $recorrenteCC = isset($_POST['recorrente_cc']) ? 1 : 0;
     $numParcelas = $parcelado ? max(1, min(48, intval($_POST['num_parcelas_cc'] ?? 1))) : 1;
 
     $valorPost  = trim($_POST['valor'] ?? '');
@@ -173,6 +174,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && trim($_POST['tipo_registro'] ?? '')
     elseif (empty($dataCompra))               $erro = 'Selecione a data da compra.';
     elseif (empty($valorRaw) || !is_numeric($valorRaw)) $erro = 'Informe um valor numérico válido.';
     elseif (floatval($valorRaw) <= 0)         $erro = 'O valor deve ser maior que zero.';
+    elseif ($parcelado && $recorrenteCC)      $erro = 'Uma compra não pode ser parcelada E recorrente ao mesmo tempo.';
 
     if (!$erro) {
         $stmtCC = $pdo->prepare("SELECT * FROM CartaoCredito WHERE IDCartao = :id AND FKUsuario = :uid AND Ativo = 1");
@@ -182,21 +184,23 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && trim($_POST['tipo_registro'] ?? '')
     }
 
     if (!$erro) {
-        $grupoParcela = ($numParcelas > 1) ? gerarUuid() : null;
+        // Recorrente: repete o mesmo valor por N faturas futuras (mesmo limite de meses da recorrência normal)
+        $vezes        = $recorrenteCC ? 24 : $numParcelas;
+        $grupoParcela = ($vezes > 1) ? gerarUuid() : null;
         $mesRefBase   = _cc_mesRefAtual((int)$cartao['DiaFechamento'], (int)$cartao['DiaVencimento']);
         $valorTotal   = (float)$valorRaw;
-        $valorParcela = floor(($valorTotal / $numParcelas) * 100) / 100;
-        $resto        = $valorTotal - ($valorParcela * $numParcelas);
+        $valorParcela = $recorrenteCC ? $valorTotal : floor(($valorTotal / $numParcelas) * 100) / 100;
+        $resto        = $recorrenteCC ? 0 : ($valorTotal - ($valorParcela * $numParcelas));
 
         $sqlLanc = "INSERT INTO LancamentoCartao
             (IDLancamento, FKFatura, FKCartao, FKUsuario, Descricao, Valor, DataCompra, FKCategoria, GrupoParcelamento, ParcelaAtual, TotalParcelas)
             VALUES (:id, :fid, :cid, :uid, :desc, :val, :data, :cat, :grupo, :parc, :tot)";
         $stmtL = $pdo->prepare($sqlLanc);
 
-        for ($i = 0; $i < $numParcelas; $i++) {
+        for ($i = 0; $i < $vezes; $i++) {
             $mesRef = _cc_mesRefAdiante($mesRefBase, $i);
             $fatura = cartao_obterFaturaParaMesRef($pdo, $cartaoId, $usuario_id, $cartao, $mesRef);
-            $val    = ($i === 0) ? ($valorParcela + $resto) : $valorParcela;
+            $val    = $recorrenteCC ? $valorTotal : (($i === 0) ? ($valorParcela + $resto) : $valorParcela);
 
             $stmtL->execute([
                 ':id'    => gerarUuid(),
@@ -208,8 +212,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && trim($_POST['tipo_registro'] ?? '')
                 ':data'  => $dataCompra,
                 ':cat'   => $categoriaId,
                 ':grupo' => $grupoParcela,
-                ':parc'  => ($numParcelas > 1) ? ($i + 1) : null,
-                ':tot'   => ($numParcelas > 1) ? $numParcelas : null,
+                ':parc'  => (!$recorrenteCC && $numParcelas > 1) ? ($i + 1) : null,
+                ':tot'   => (!$recorrenteCC && $numParcelas > 1) ? $numParcelas : null,
             ]);
             cartao_sincronizarPreview($pdo, $fatura['IDFatura'], $usuario_id, $cartao);
         }
@@ -443,6 +447,11 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                     ";
                     $stmtP = $pdo->prepare($sqlParcela);
 
+                    // Base do vencimento — preserva o próprio dia-do-mês em cada parcela futura,
+                    // independente do dia de registro (ex: registro dia 10, vencimento dia 15 →
+                    // toda parcela futura registra dia 10 e vence dia 15 do seu mês).
+                    $dataVencBase = new DateTime($dataVencimento);
+
                     $primeiroIdParc = null;
                     for ($i = 0; $i < $numParcelas; $i++) {
                         $mesAlvo    = (int)$dataBase->format('m') + $i;
@@ -451,6 +460,13 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                         $diaAlvo    = (int)$dataBase->format('d');
                         $diaCorreto = min($diaAlvo, (int)date('t', strtotime(sprintf('%04d-%02d-01', $anoAlvo, $mesAlvo))));
                         $dataStr    = sprintf('%04d-%02d-%02d', $anoAlvo, $mesAlvo, $diaCorreto);
+
+                        $mesVenc     = (int)$dataVencBase->format('m') + $i;
+                        $anoVenc     = (int)$dataVencBase->format('Y') + (int)floor(($mesVenc - 1) / 12);
+                        $mesVenc     = (($mesVenc - 1) % 12) + 1;
+                        $diaVencAlvo = (int)$dataVencBase->format('d');
+                        $diaVencCorreto = min($diaVencAlvo, (int)date('t', strtotime(sprintf('%04d-%02d-01', $anoVenc, $mesVenc))));
+                        $dataVencStr = sprintf('%04d-%02d-%02d', $anoVenc, $mesVenc, $diaVencCorreto);
 
                         $valAtual = ($i === 0) ? ($valorParcela + $resto) : $valorParcela;
                         $statusP  = ($i === 0) ? $statusRegistro : 'pendente';
@@ -465,7 +481,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                             ':juros'     => $jurosPorParcela,
                             ':descricao' => $descricao,
                             ':momento'   => $dataStr,
-                            ':vencimento' => $dataStr,
+                            ':vencimento' => $dataVencStr,
                             ':status'    => $statusP,
                             ':carteira'  => $carteiraId,
                             ':usuario'   => $usuario_id,
@@ -727,17 +743,31 @@ require_once 'geral/header.php';
                                 </div>
                             </div>
 
-                            <!-- Parcelamento CC -->
+                            <!-- Parcelamento / Recorrência CC -->
                             <div class="accordion accordion-flush mb-5 border border-border-color rounded-3 overflow-hidden auralis-line-input" id="accordionCC">
                                 <div class="accordion-item bg-transparent">
                                     <h2 class="accordion-header">
                                         <button class="accordion-button collapsed bg-transparent text-secondary-analysis shadow-none py-2 px-3 small fs-7"
                                             type="button" data-bs-toggle="collapse" data-bs-target="#collapseCC">
-                                            <i class="bi bi-sliders me-2"></i> Parcelamento
+                                            <i class="bi bi-sliders me-2"></i> Parcelamento e recorrência
                                         </button>
                                     </h2>
                                     <div id="collapseCC" class="accordion-collapse collapse" data-bs-parent="#accordionCC">
                                         <div class="accordion-body border-top border-border-color pt-3 px-3 pb-4 bg-charcoal">
+                                            <div class="d-flex align-items-start justify-content-between gap-3 mb-3 pb-3 border-bottom border-border-color">
+                                                <div>
+                                                    <div class="text-light fw-semibold fs-7 mb-1 d-flex align-items-center gap-2">
+                                                        <i class="bi bi-arrow-repeat text-success"></i>
+                                                        Compra recorrente
+                                                    </div>
+                                                    <div class="text-secondary" style="font-size:0.75rem;">Lança o mesmo valor todo mês nas próximas faturas — assinaturas, streaming.</div>
+                                                </div>
+                                                <div class="form-check form-switch fs-4 mb-0 toggle-analysis flex-shrink-0 mt-1"
+                                                    style="--bs-form-check-bg:transparent;">
+                                                    <input class="form-check-input bg-dark border-border-color shadow-none"
+                                                        type="checkbox" name="recorrente_cc" id="toggle_recorrente_cc">
+                                                </div>
+                                            </div>
                                             <div class="d-flex align-items-start justify-content-between gap-3 mb-3">
                                                 <div>
                                                     <div class="text-light fw-semibold fs-7 mb-1 d-flex align-items-center gap-2">
@@ -837,7 +867,7 @@ require_once 'geral/header.php';
 
                                 <div class="col-6 d-flex align-items-center ps-3">
                                     <i class="bi bi-calendar3 text-secondary-analysis me-2 fs-7"></i>
-                                    <input type="date" name="data_registro" class="form-control bg-transparent border-0 text-light-analysis px-0 shadow-none fs-7 fw-bold"
+                                    <input type="date" name="data_registro" id="data_registro" class="form-control bg-transparent border-0 text-light-analysis px-0 shadow-none fs-7 fw-bold"
                                         value="<?= htmlspecialchars($val_data) ?>" required>
                                 </div>
                             </div>
@@ -1027,19 +1057,35 @@ require_once 'geral/header.php';
                                             <?php endif; ?>
 
                                             <!-- ── 3. DATA LIMITE PARA PAGAMENTO ─────────────────── -->
+                                            <?php $_temVencDiferente = !empty($val_venc) && $val_venc !== $val_data; ?>
                                             <div id="bloco-vencimento" class="pt-3 border-top border-border-color"
                                                 style="<?= $val_rec ? 'display:none;' : '' ?>">
-                                                <label class="text-light fw-semibold fs-7 mb-1 d-flex align-items-center gap-2">
-                                                    <i class="bi bi-calendar-x text-danger"></i>
-                                                    Data limite para pagamento
-                                                    <span class="badge bg-secondary fw-normal" style="font-size:0.62rem;">Opcional</span>
-                                                </label>
-                                                <div class="text-secondary mb-2" style="font-size:0.75rem;">
-                                                    Quando essa conta expira ou vence — ex: boleto, fatura de cartão.
+                                                <div class="d-flex align-items-start justify-content-between gap-3">
+                                                    <div>
+                                                        <div class="text-light fw-semibold fs-7 mb-1 d-flex align-items-center gap-2">
+                                                            <i class="bi bi-calendar-x text-danger"></i>
+                                                            Possui prazo de pagamento além do dia do registro?
+                                                        </div>
+                                                        <div class="text-secondary" style="font-size:0.75rem;">
+                                                            Ex: boleto ou fatura que vence alguns dias depois da compra.
+                                                        </div>
+                                                    </div>
+                                                    <div class="form-check form-switch fs-4 mb-0 toggle-analysis flex-shrink-0 mt-1">
+                                                        <input class="form-check-input bg-dark border-border-color shadow-none"
+                                                            type="checkbox" id="toggle_tem_vencimento"
+                                                            <?= $_temVencDiferente ? 'checked' : '' ?>>
+                                                    </div>
                                                 </div>
-                                                <input type="date" name="data_vencimento"
-                                                    class="form-control bg-dark border-border-color text-light-analysis fs-7"
-                                                    value="<?= htmlspecialchars($val_venc) ?>">
+
+                                                <div id="bloco_data_vencimento" style="display:<?= $_temVencDiferente ? 'block' : 'none' ?>;"
+                                                    class="mt-3 ps-3 border-start border-border-color">
+                                                    <label class="form-label text-secondary-analysis fs-7 mb-1">Vence em qual data?</label>
+                                                    <input type="date" name="data_vencimento" id="input_data_vencimento"
+                                                        class="form-control bg-dark border-border-color text-light-analysis form-control-sm fs-7"
+                                                        style="max-width:180px;"
+                                                        min="<?= htmlspecialchars($val_data) ?>"
+                                                        value="<?= htmlspecialchars($val_venc) ?>">
+                                                </div>
                                             </div>
 
                                         </div>
@@ -1336,6 +1382,37 @@ require_once 'geral/header.php';
             if (this.checked && toggleParcelado && toggleParcelado.checked) {
                 toggleParcelado.checked = false;
                 if (blocoParcelamento) blocoParcelamento.style.display = 'none';
+            }
+        });
+    }
+
+    // ==========================================
+    // LÓGICA DO SWITCH DE VENCIMENTO
+    // ==========================================
+    const toggleTemVencimento = document.getElementById('toggle_tem_vencimento');
+    const blocoDataVencimento = document.getElementById('bloco_data_vencimento');
+    const inputDataVencimento = document.getElementById('input_data_vencimento');
+    const inputDataRegistro = document.getElementById('data_registro');
+
+    if (toggleTemVencimento && inputDataVencimento) {
+        toggleTemVencimento.addEventListener('change', function() {
+            blocoDataVencimento.style.display = this.checked ? 'block' : 'none';
+            inputDataVencimento.required = this.checked;
+            if (!this.checked) {
+                inputDataVencimento.value = '';
+            } else if (!inputDataVencimento.value && inputDataRegistro) {
+                inputDataVencimento.value = inputDataRegistro.value;
+            }
+        });
+        inputDataVencimento.required = toggleTemVencimento.checked;
+    }
+
+    // Vencimento nunca pode ser antes da data de registro
+    if (inputDataRegistro && inputDataVencimento) {
+        inputDataRegistro.addEventListener('change', function() {
+            inputDataVencimento.min = this.value;
+            if (inputDataVencimento.value && inputDataVencimento.value < this.value) {
+                inputDataVencimento.value = this.value;
             }
         });
     }
@@ -1683,11 +1760,23 @@ require_once 'geral/header.php';
         const numCC = document.getElementById('num_parcelas_cc');
         const prevCC = document.getElementById('preview_parc_cc');
         const valCC = document.getElementById('valor');
+        const togRecCC = document.getElementById('toggle_recorrente_cc');
         if (!togCC) return;
         togCC.addEventListener('change', function() {
             blocoCC.style.display = this.checked ? 'block' : 'none';
+            if (this.checked && togRecCC && togRecCC.checked) {
+                togRecCC.checked = false;
+            }
             calcPreviewCC();
         });
+        if (togRecCC) {
+            togRecCC.addEventListener('change', function() {
+                if (this.checked && togCC.checked) {
+                    togCC.checked = false;
+                    blocoCC.style.display = 'none';
+                }
+            });
+        }
         if (numCC) numCC.addEventListener('input', calcPreviewCC);
         if (valCC) valCC.addEventListener('input', calcPreviewCC);
 

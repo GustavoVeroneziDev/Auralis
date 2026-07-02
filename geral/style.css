@@ -1145,6 +1145,7 @@ input[type="number"] {
 
 .auralis-sidebar.sidebar-collapsed .sidebar-item {
   justify-content: center;
+  gap: 0;
   padding: 9px;
 }
 

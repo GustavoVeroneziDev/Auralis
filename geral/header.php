@@ -2,6 +2,7 @@
 if (session_status() === PHP_SESSION_NONE) {
     session_start();
 }
+require_once __DIR__ . '/../config/permissoes.php';
 $paginaAtual = basename($_SERVER['PHP_SELF']);
 
 // Calcula horas de teste uma única vez — usado tanto no banner quanto nos badges do nav
@@ -169,10 +170,61 @@ $_carteiraParam = (!empty($_SESSION['ultima_carteira']))
     ?>
     <link rel="stylesheet" href="/geral/temas/<?= htmlspecialchars($_temaAtual) ?>.css?v=<?= $_temaV ?>">
     <link rel="stylesheet" href="/geral/style.css?v=<?= $_cssV ?>">
+    <?php
+    // Cor de fundo real do tema atual — usada só na tela de carregamento do PWA instalado,
+    // pra não dar aquele "flash" entre o splash nativo (preto fixo) e o app de verdade.
+    $_coresTemaBg = [
+        'dark'    => '#121418',
+        'ambar'   => '#0e0c1a',
+        'aurora'  => '#0a0518',
+        'cosmos'  => '#0d0a1a',
+        'fortune' => '#0c0900',
+        'oceano'  => '#0d1230',
+        'white'   => '#f2f5f9',
+    ];
+    $_corSplash = $_coresTemaBg[$_temaAtual] ?? '#121418';
+    ?>
+    <style>
+        #auralisSplashLoading {
+            display: none;
+            position: fixed;
+            inset: 0;
+            z-index: 99999;
+            background: <?= $_corSplash ?>;
+            align-items: center;
+            justify-content: center;
+            flex-direction: column;
+            transition: opacity .25s ease;
+        }
+        @media all and (display-mode: standalone) {
+            #auralisSplashLoading { display: flex; }
+        }
+        #auralisSplashLoading img {
+            width: 88px;
+            height: 88px;
+            margin-bottom: 22px;
+        }
+        #auralisSplashLoading .auralis-spinner {
+            width: 30px;
+            height: 30px;
+            border: 3px solid rgba(212,175,55,0.25);
+            border-top-color: #d4af37;
+            border-radius: 50%;
+            animation: auralisSpin .8s linear infinite;
+        }
+        @keyframes auralisSpin {
+            to { transform: rotate(360deg); }
+        }
+    </style>
 </head>
 
 <?php if ($_useSidebar): ?>
 <body class="d-flex min-vh-100">
+
+    <div id="auralisSplashLoading">
+        <img src="/geral/img/icon-192.png" alt="Auralis">
+        <div class="auralis-spinner"></div>
+    </div>
 
     <!-- Overlay móvel -->
     <div id="sidebarOverlay" class="sidebar-overlay"></div>
@@ -255,7 +307,7 @@ $_carteiraParam = (!empty($_SESSION['ultima_carteira']))
                 <span class="sidebar-label">Revendedor</span>
             </a>
             <?php endif; ?>
-            <?php if (in_array(strtolower($_SESSION['nivel_acesso'] ?? ''), ['admin', 'supremo'])): ?>
+            <?php if (ehAdmin()): ?>
             <a href="/admin/usuarios.php"
                class="sidebar-item <?= $paginaAtual === 'usuarios.php' ? 'active' : '' ?>"
                style="color:#E63946;">
@@ -311,6 +363,12 @@ $_carteiraParam = (!empty($_SESSION['ultima_carteira']))
                         <a class="dropdown-item d-flex align-items-center py-2 transition-hover"
                            href="/configuracoes.php" style="color:var(--text-main);">
                             <i class="bi bi-gear me-2" style="color:gold;"></i> Configurações
+                        </a>
+                    </li>
+                    <li>
+                        <a class="dropdown-item d-flex align-items-center py-2 transition-hover"
+                           href="/notificacoes.php" style="color:var(--text-main);">
+                            <i class="bi bi-bell me-2" style="color:#60a5fa;"></i> Notificações
                         </a>
                     </li>
                     <?php if ($_ehRevendedor): ?>
@@ -434,8 +492,43 @@ $_carteiraParam = (!empty($_SESSION['ultima_carteira']))
             </div>
         </div>
 
+        <!-- Modal: Ativar Notificações -->
+        <div class="modal fade" id="modalAtivarNotificacoes" tabindex="-1" aria-hidden="true">
+            <div class="modal-dialog modal-dialog-centered" style="max-width:440px;">
+                <div class="modal-content border-0 rounded-4 overflow-hidden position-relative"
+                     style="background-color:#181A1F;border:1px solid rgba(255,255,255,0.08) !important;box-shadow:0 25px 50px -12px rgba(0,0,0,0.7);">
+                    <div class="position-absolute top-0 start-0 w-100 h-100"
+                         style="background:radial-gradient(circle at top right,rgba(96,165,250,0.12),transparent 60%);pointer-events:none;"></div>
+                    <div class="modal-body p-5 text-center position-relative">
+                        <div class="mb-4 d-inline-flex justify-content-center align-items-center bg-dark border border-secondary-subtle rounded-circle shadow-lg"
+                             style="width:80px;height:80px;">
+                            <i class="bi bi-bell" style="font-size:2.2rem;color:#60a5fa;"></i>
+                        </div>
+                        <h4 class="text-light fw-bold mb-2">Ative as notificações</h4>
+                        <p class="text-secondary mb-4" style="font-size:0.9rem;line-height:1.6;">
+                            Receba um aviso na hora certa quando uma conta estiver vencendo — direto na tela do seu celular.
+                        </p>
+                        <button onclick="window.auralisAtivarNotificacoes()"
+                            class="btn w-100 fw-bold text-dark rounded-pill py-3 mb-3 shadow-lg"
+                            style="background:linear-gradient(135deg,#60a5fa,#3b82f6);font-size:0.95rem;">
+                            <i class="bi bi-bell me-2"></i> Ativar Notificações
+                        </button>
+                        <button type="button" class="btn btn-link text-secondary text-decoration-none w-100"
+                                data-bs-dismiss="modal" style="font-size:0.8rem;">
+                            Agora não
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+
 <?php else: ?>
 <body class="d-flex flex-column min-vh-100">
+
+    <div id="auralisSplashLoading">
+        <img src="/geral/img/icon-192.png" alt="Auralis">
+        <div class="auralis-spinner"></div>
+    </div>
 
     <nav class="navbar navbar-expand-lg border-bottom border-secondary-subtle sticky-top shadow-sm py-2">
         <div class="container-fluid px-3 px-xl-5" style="max-width:1500px;">
@@ -494,7 +587,7 @@ $_carteiraParam = (!empty($_SESSION['ultima_carteira']))
                             </a>
                         </li>
                         <?php endif; ?>
-                        <?php if (in_array(strtolower($_SESSION['nivel_acesso'] ?? ''), ['admin', 'supremo'])): ?>
+                        <?php if (ehAdmin()): ?>
                         <li class="nav-item">
                             <a class="nav-link custom-link py-3 py-lg-2 <?= $paginaAtual === 'usuarios.php' ? 'text-warning active' : '' ?>" href="/admin/usuarios.php">
                                 <i class="bi bi-shield-fill-check me-2" style="color:#E63946;"></i>
@@ -551,6 +644,7 @@ $_carteiraParam = (!empty($_SESSION['ultima_carteira']))
                                 </li>
                                 <li><a class="dropdown-item text-light d-flex align-items-center py-2" href="/perfil.php"><i class="bi bi-person-circle me-2" style="color:#6366f1;"></i> Perfil</a></li>
                                 <li><a class="dropdown-item text-light d-flex align-items-center py-2" href="/configuracoes.php"><i class="bi bi-gear me-2" style="color:gold;"></i> Configurações</a></li>
+                                <li><a class="dropdown-item text-light d-flex align-items-center py-2" href="/notificacoes.php"><i class="bi bi-bell me-2" style="color:#60a5fa;"></i> Notificações</a></li>
                                 <?php if ($_ehRevendedor): ?>
                                 <li><a class="dropdown-item d-flex align-items-center py-2 fw-semibold" href="/revendedor/dashboard.php" style="color:#d4af37;"><i class="bi bi-people-fill me-2" style="color:#d4af37;"></i> Painel do Revendedor</a></li>
                                 <?php endif; ?>
@@ -602,6 +696,25 @@ $_carteiraParam = (!empty($_SESSION['ultima_carteira']))
                             <i class="bi bi-download me-2"></i> Instalar Agora
                         </button>
                     </div>
+                    <button type="button" class="btn btn-link text-secondary text-decoration-none w-100" data-bs-dismiss="modal" style="font-size:0.8rem;">Agora não</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="modal fade" id="modalAtivarNotificacoes" tabindex="-1" aria-hidden="true">
+        <div class="modal-dialog modal-dialog-centered" style="max-width:440px;">
+            <div class="modal-content border-0 rounded-4 overflow-hidden position-relative" style="background-color:#181A1F;border:1px solid rgba(255,255,255,0.08) !important;">
+                <div class="modal-body p-5 text-center position-relative">
+                    <div class="mb-4 d-inline-flex justify-content-center align-items-center bg-dark border border-secondary-subtle rounded-circle shadow-lg" style="width:80px;height:80px;">
+                        <i class="bi bi-bell" style="font-size:2.2rem;color:#60a5fa;"></i>
+                    </div>
+                    <h4 class="text-light fw-bold mb-2">Ative as notificações</h4>
+                    <p class="text-secondary mb-4" style="font-size:0.9rem;">Receba um aviso na hora certa quando uma conta estiver vencendo — direto na tela do seu celular.</p>
+                    <button onclick="window.auralisAtivarNotificacoes()"
+                        class="btn w-100 fw-bold text-dark rounded-pill py-3 mb-3" style="background:linear-gradient(135deg,#60a5fa,#3b82f6);font-size:0.95rem;">
+                        <i class="bi bi-bell me-2"></i> Ativar Notificações
+                    </button>
                     <button type="button" class="btn btn-link text-secondary text-decoration-none w-100" data-bs-dismiss="modal" style="font-size:0.8rem;">Agora não</button>
                 </div>
             </div>
