@@ -227,10 +227,14 @@ require_once '../geral/header.php';
                                 </div>
                                 <div>
                                     <h5 class="fw-bold text-light mb-0 d-flex align-items-center gap-2">
+                                        <form method="POST" action="marcar_principal.php" class="m-0 d-inline-flex">
+                                            <input type="hidden" name="id_carteira" value="<?= htmlspecialchars($cart['IDCarteira']) ?>">
+                                            <button type="submit" class="btn-favoritar-carteira" style="color:#d4af37;"
+                                                title="<?= (int)$cart['Principal'] === 1 ? 'Remover como principal' : 'Marcar como principal' ?>">
+                                                <i class="bi <?= (int)$cart['Principal'] === 1 ? 'bi-star-fill' : 'bi-star' ?>"></i>
+                                            </button>
+                                        </form>
                                         <?= htmlspecialchars($cart['TipoCarteira']) ?>
-                                        <?php if ((int)$cart['Principal'] === 1): ?>
-                                            <i class="bi bi-star-fill" style="color:#d4af37;font-size:0.8rem;" title="Carteira principal"></i>
-                                        <?php endif; ?>
                                     </h5>
                                 </div>
                             </div>
@@ -240,16 +244,6 @@ require_once '../geral/header.php';
                                     <i class="bi bi-three-dots-vertical fs-5"></i>
                                 </button>
                                 <ul class="dropdown-menu dropdown-menu-end bg-dark border-secondary-subtle shadow-lg">
-                                    <li>
-                                        <form method="POST" action="marcar_principal.php" class="m-0">
-                                            <input type="hidden" name="id_carteira" value="<?= htmlspecialchars($cart['IDCarteira']) ?>">
-                                            <button type="submit" class="dropdown-item d-flex align-items-center transition-hover py-2"
-                                                style="color:#d4af37;">
-                                                <i class="bi <?= (int)$cart['Principal'] === 1 ? 'bi-star-fill' : 'bi-star' ?> me-2"></i>
-                                                <?= (int)$cart['Principal'] === 1 ? 'Remover como Principal' : 'Marcar como Principal' ?>
-                                            </button>
-                                        </form>
-                                    </li>
                                     <li>
                                         <button type="button" class="dropdown-item text-light d-flex align-items-center transition-hover py-2"
                                             onclick="abrirModalCarteira('<?= $cart['IDCarteira'] ?>', '<?= htmlspecialchars($cart['TipoCarteira'], ENT_QUOTES) ?>')">
@@ -389,6 +383,20 @@ require_once '../geral/header.php';
         transform: translateY(-4px);
         box-shadow: 0 12px 24px rgba(0, 0, 0, 0.4) !important;
         border-color: rgba(170, 140, 44, 0.3) !important;
+    }
+
+    .btn-favoritar-carteira {
+        background: none;
+        border: 0;
+        padding: 0;
+        line-height: 1;
+        font-size: 1rem;
+        cursor: pointer;
+        transition: transform 0.15s ease;
+    }
+
+    .btn-favoritar-carteira:hover {
+        transform: scale(1.15);
     }
 
     .auralis-add-card {
