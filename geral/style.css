@@ -1338,6 +1338,19 @@ input[type="number"] {
   tr    { page-break-inside: avoid; page-break-after: auto; }
   thead { display: table-header-group; }
 
+  /* Detalhamento de despesas/receitas em Análises — tinham max-height + overflow-auto
+     (rolagem interna), que na impressão simplesmente corta o conteúdo que passa da altura
+     fixa em vez de rolar. Libera a altura total e deixa cada item quebrar de página de
+     forma limpa (nunca no meio de uma linha). */
+  .analises-list {
+    max-height: none !important;
+    overflow: visible !important;
+  }
+  .analise-item {
+    break-inside: avoid;
+    page-break-inside: avoid;
+  }
+
   /* Canvas (Chart.js) — fundo branco para impressão */
   canvas { background: #fff !important; }
 
