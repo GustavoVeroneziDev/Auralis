@@ -317,12 +317,15 @@ function cartao_verificarFechamentos(PDO $pdo, string $uid): void
     $rodou = true;
 
     try {
+        // Estritamente < hoje (não <=): o dia do fechamento em si ainda pertence à fatura que
+        // está fechando — uma compra feita nesse mesmo dia (a qualquer hora) precisa cair nela.
+        // Só fecha de fato quando o dia seguinte começar.
         $hoje = date('Y-m-d');
         $stmt = $pdo->prepare(
             "SELECT f.*, c.DiaVencimento, c.FKCarteiraDebito, c.Nome AS NomeCartao
              FROM FaturaCartao f
              JOIN CartaoCredito c ON f.FKCartao = c.IDCartao
-             WHERE f.FKUsuario = :uid AND f.Status = 'aberta' AND f.DataFechamento <= :hoje"
+             WHERE f.FKUsuario = :uid AND f.Status = 'aberta' AND f.DataFechamento < :hoje"
         );
         $stmt->execute([':uid' => $uid, ':hoje' => $hoje]);
         foreach ($stmt->fetchAll(PDO::FETCH_ASSOC) as $fatura) {

@@ -249,7 +249,7 @@ if (isset($_GET['ajax']) && $_GET['acao'] === 'listar') {
 // ==============================================================================
 $carteiras = [];
 try {
-    $stmtCart = $pdo->prepare("SELECT IDCarteira, TipoCarteira FROM Carteira WHERE FKUsuarioDono = :uid ORDER BY TipoCarteira ASC");
+    $stmtCart = $pdo->prepare("SELECT IDCarteira, TipoCarteira, Principal FROM Carteira WHERE FKUsuarioDono = :uid ORDER BY Principal DESC, TipoCarteira ASC");
     $stmtCart->execute([':uid' => $usuario_id]);
     $carteiras = $stmtCart->fetchAll();
 } catch (PDOException $e) {
@@ -277,6 +277,13 @@ if ($carteira_selecionada !== 'todas') {
         }
     }
 }
+
+// Carteira usada nos atalhos de "+ Receita"/"+ Despesa": se um filtro específico estiver
+// ativo, usa ele; se estiver em "Todas", cai na carteira Principal (ou a primeira, se
+// nenhuma for principal) — em vez de deixar o formulário sem carteira pré-selecionada.
+$_carteiraNovoLancamento = ($carteira_selecionada !== 'todas')
+    ? $carteira_selecionada
+    : ($carteiras[0]['IDCarteira'] ?? '');
 
 require_once 'geral/header.php';
 ?>
@@ -796,6 +803,7 @@ require_once 'geral/header.php';
 
 <script>
     const carteiraAtual = "<?= htmlspecialchars($carteira_selecionada, ENT_QUOTES, 'UTF-8') ?>";
+    const carteiraNovoLancamento = "<?= htmlspecialchars($_carteiraNovoLancamento, ENT_QUOTES, 'UTF-8') ?>";
     const _temAcessoCompAgenda = <?= $_agendaTemAcessoComp ? 'true' : 'false' ?>;
     let anoAtual = new Date().getFullYear();
     let mesAtual = new Date().getMonth();
@@ -975,8 +983,9 @@ require_once 'geral/header.php';
         document.getElementById('modalDiaTitulo').textContent =
             `${diasLong[dt.getDay()]}, ${dt.getDate()} de ${mesesLong[dt.getMonth()]}`;
         document.getElementById('modalDiaSubtitulo').textContent = dt.getFullYear();
-        document.getElementById('modalDiaBtnReceita').href = `nova_transacao.php?tipo=receita&data=${dataStr}&voltar=agenda.php`;
-        document.getElementById('modalDiaBtnDespesa').href = `nova_transacao.php?tipo=despesa&data=${dataStr}&voltar=agenda.php`;
+        const _carteiraQS = carteiraNovoLancamento ? `&carteira_id=${encodeURIComponent(carteiraNovoLancamento)}` : '';
+        document.getElementById('modalDiaBtnReceita').href = `nova_transacao.php?tipo=receita&data=${dataStr}&voltar=agenda.php${_carteiraQS}`;
+        document.getElementById('modalDiaBtnDespesa').href = `nova_transacao.php?tipo=despesa&data=${dataStr}&voltar=agenda.php${_carteiraQS}`;
 
         // Reset de seleção ao abrir novo dia
         _agendaSelIds.clear();
@@ -1098,11 +1107,12 @@ require_once 'geral/header.php';
             // Botões de ação (aparecem no hover)
             const actionsDiv = document.createElement('div');
             actionsDiv.className = 'day-actions';
+            const _carteiraQSDia = carteiraNovoLancamento ? `&carteira_id=${encodeURIComponent(carteiraNovoLancamento)}` : '';
             actionsDiv.innerHTML = `
-                <a href="nova_transacao.php?tipo=receita&data=${dataStr}&voltar=agenda.php"
+                <a href="nova_transacao.php?tipo=receita&data=${dataStr}&voltar=agenda.php${_carteiraQSDia}"
                    class="day-action-btn receita-btn" title="Nova Receita"
                    onclick="event.stopPropagation()"><i class="bi bi-plus-lg"></i></a>
-                <a href="nova_transacao.php?tipo=despesa&data=${dataStr}&voltar=agenda.php"
+                <a href="nova_transacao.php?tipo=despesa&data=${dataStr}&voltar=agenda.php${_carteiraQSDia}"
                    class="day-action-btn despesa-btn" title="Nova Despesa"
                    onclick="event.stopPropagation()"><i class="bi bi-plus-lg"></i></a>`;
             cel.appendChild(actionsDiv);

@@ -26,12 +26,13 @@ try {
 
 // ── acao=criar ────────────────────────────────────────────────────────────────
 if ($acao === 'criar') {
-    $de     = trim($_POST['de']    ?? '');
-    $para   = trim($_POST['para']  ?? '');
-    $valor  = (float) str_replace(',', '.', $_POST['valor'] ?? '0');
-    $desc   = trim($_POST['desc']  ?? 'Transferência entre carteiras');
-    $data   = trim($_POST['data']  ?? date('Y-m-d'));
-    $status = in_array($_POST['status'] ?? '', ['pendente','efetivado']) ? $_POST['status'] : 'efetivado';
+    $de         = trim($_POST['de']    ?? '');
+    $para       = trim($_POST['para']  ?? '');
+    $valor      = (float) str_replace(',', '.', $_POST['valor'] ?? '0');
+    $desc       = trim($_POST['desc']  ?? 'Transferência entre carteiras');
+    $data       = trim($_POST['data']  ?? date('Y-m-d'));
+    $status     = in_array($_POST['status'] ?? '', ['pendente','efetivado']) ? $_POST['status'] : 'efetivado';
+    $categoria  = trim($_POST['categoria'] ?? '') ?: null;
 
     if ($de === $para)         { echo json_encode(['ok'=>false,'erro'=>'carteiras_iguais']); exit; }
     if ($valor <= 0)           { echo json_encode(['ok'=>false,'erro'=>'valor_invalido']);   exit; }
@@ -51,6 +52,19 @@ if ($acao === 'criar') {
         exit;
     }
 
+    // Confirma que a categoria (se enviada) pertence ao usuário — evita marcar com categoria de terceiros
+    if ($categoria !== null) {
+        try {
+            $chkCat = $pdo->prepare("SELECT COUNT(*) FROM Categoria WHERE IDCategoria = :id AND FKUsuario = :uid");
+            $chkCat->execute([':id' => $categoria, ':uid' => $uid]);
+            if ((int)$chkCat->fetchColumn() !== 1) {
+                $categoria = null;
+            }
+        } catch (PDOException $e) {
+            $categoria = null;
+        }
+    }
+
     $grupo   = gerarUuid();
     $idSaida = gerarUuid();
     $idEntr  = gerarUuid();
@@ -61,34 +75,36 @@ if ($acao === 'criar') {
         $stmt = $pdo->prepare("
             INSERT INTO Registro
               (IDRegistro, TipoRegistro, Valor, Descricao, MomentoRegistro, DataVencimento,
-               StatusRegistro, Recorrente, DiaVencimento, FKCarteira, FKUsuario, GrupoParcela)
+               StatusRegistro, Recorrente, DiaVencimento, FKCarteira, FKUsuario, GrupoParcela, FKCategoria)
             VALUES
               (:id, :tipo, :valor, :desc, :data, :data,
-               :status, 0, NULL, :carteira, :uid, :grupo)
+               :status, 0, NULL, :carteira, :uid, :grupo, :categoria)
         ");
 
         $stmt->execute([
-            ':id'       => $idSaida,
-            ':tipo'     => 'transferencia_saida',
-            ':valor'    => $valor,
-            ':desc'     => $desc,
-            ':data'     => $data,
-            ':status'   => $status,
-            ':carteira' => $de,
-            ':uid'      => $uid,
-            ':grupo'    => $grupo,
+            ':id'        => $idSaida,
+            ':tipo'      => 'transferencia_saida',
+            ':valor'     => $valor,
+            ':desc'      => $desc,
+            ':data'      => $data,
+            ':status'    => $status,
+            ':carteira'  => $de,
+            ':uid'       => $uid,
+            ':grupo'     => $grupo,
+            ':categoria' => $categoria,
         ]);
 
         $stmt->execute([
-            ':id'       => $idEntr,
-            ':tipo'     => 'transferencia_entrada',
-            ':valor'    => $valor,
-            ':desc'     => $desc,
-            ':data'     => $data,
-            ':status'   => $status,
-            ':carteira' => $para,
-            ':uid'      => $uid,
-            ':grupo'    => $grupo,
+            ':id'        => $idEntr,
+            ':tipo'      => 'transferencia_entrada',
+            ':valor'     => $valor,
+            ':desc'      => $desc,
+            ':data'      => $data,
+            ':status'    => $status,
+            ':carteira'  => $para,
+            ':uid'       => $uid,
+            ':grupo'     => $grupo,
+            ':categoria' => $categoria,
         ]);
 
         $pdo->commit();

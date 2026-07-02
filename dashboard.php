@@ -22,7 +22,8 @@ cartao_verificarFechamentos($pdo, $usuario_id);
 $carteiras  = [];
 
 try {
-    $sql  = "SELECT IDCarteira, TipoCarteira FROM Carteira WHERE FKUsuarioDono = :usuario_id ORDER BY TipoCarteira ASC";
+    // Principal primeiro — usada como fallback quando não há carteira escolhida na sessão/URL
+    $sql  = "SELECT IDCarteira, TipoCarteira, Principal FROM Carteira WHERE FKUsuarioDono = :usuario_id ORDER BY Principal DESC, TipoCarteira ASC";
     $stmt = $pdo->prepare($sql);
     $stmt->execute([':usuario_id' => $usuario_id]);
     $carteiras = $stmt->fetchAll();
@@ -31,6 +32,15 @@ try {
 }
 
 $totalCarteiras = count($carteiras);
+
+// Categorias pra transferência entre carteiras (reusa as de despesa, mesmo padrão do lançamento de cartão)
+try {
+    $stmtCatTransf = $pdo->prepare("SELECT IDCategoria, NomeCategoria FROM Categoria WHERE FKUsuario = :uid AND TipoCategoria = 'despesa' ORDER BY NomeCategoria ASC");
+    $stmtCatTransf->execute([':uid' => $usuario_id]);
+    $categoriasTransferencia = $stmtCatTransf->fetchAll();
+} catch (PDOException $e) {
+    $categoriasTransferencia = [];
+}
 
 // ==============================================================================
 // MOTOR DE RECORRÊNCIA AURALIS (Executado no carregamento do Dashboard)
@@ -1763,6 +1773,23 @@ require_once 'geral/header.php';
                         value="Transferência entre carteiras" maxlength="120">
                 </div>
 
+                <div class="mb-3">
+                    <label class="form-label text-secondary small fw-semibold text-uppercase mb-1">
+                        Categoria <span class="opacity-50 text-normal">(opcional)</span>
+                    </label>
+                    <select id="transf-categoria" class="form-select bg-body-tertiary border-secondary-subtle text-light">
+                        <option value="">Sem categoria</option>
+                        <?php foreach ($categoriasTransferencia as $cat): ?>
+                            <option value="<?php echo htmlspecialchars($cat['IDCategoria']) ?>">
+                                <?php echo htmlspecialchars($cat['NomeCategoria']) ?>
+                            </option>
+                        <?php endforeach; ?>
+                    </select>
+                    <div class="text-secondary mt-1" style="font-size:0.72rem;">
+                        Útil pra marcar, por exemplo, retirada de pró-labore/salário de uma carteira de empresa.
+                    </div>
+                </div>
+
                 <div class="row g-2">
                     <div class="col-7">
                         <label class="form-label text-secondary small fw-semibold text-uppercase mb-1">Data</label>
@@ -1980,6 +2007,7 @@ require_once 'geral/header.php';
             var desc   = document.getElementById('transf-desc').value.trim();
             var data   = document.getElementById('transf-data').value;
             var status = document.getElementById('transf-status').value;
+            var categoria = document.getElementById('transf-categoria').value;
             var erroEl = document.getElementById('transf-erro');
 
             erroEl.classList.add('d-none');
@@ -1998,6 +2026,7 @@ require_once 'geral/header.php';
             fd.append('desc',   desc || 'Transferência entre carteiras');
             fd.append('data',   data);
             fd.append('status', status);
+            fd.append('categoria', categoria);
 
             fetch('carteira/transferencia.php', { method: 'POST', body: fd })
                 .then(function(r) { return r.json(); })

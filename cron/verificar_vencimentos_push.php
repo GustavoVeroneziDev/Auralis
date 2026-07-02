@@ -58,7 +58,9 @@ foreach ($grupos as $grupo) {
     $ehDespesa  = $grupo[0]['TipoRegistro'] === 'despesa';
     $sinal      = $ehDespesa ? '-' : '+';
     $totalValor = array_sum(array_map(fn($c) => (float)$c['Valor'], $grupo));
-    $totalFmt   = $sinal . ' R$ ' . number_format($totalValor, 2, ',', '.');
+    // Parênteses em volta do valor evitam o "— -" grudado (traço separador + sinal de menos),
+    // que fica confuso de ler numa notificação.
+    $totalFmt   = '(' . $sinal . ' R$ ' . number_format($totalValor, 2, ',', '.') . ')';
 
     if (count($grupo) === 1) {
         $tipoLabel = $ehDespesa ? 'Conta' : 'Recebimento';
