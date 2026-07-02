@@ -45,7 +45,8 @@ $nome_mes = $meses_pt[$mes_atual];
 // ==============================================================================
 $carteiras = [];
 try {
-    $sqlCart = "SELECT IDCarteira, TipoCarteira FROM Carteira WHERE FKUsuarioDono = :usuario_id ORDER BY TipoCarteira ASC";
+    // Principal primeiro — usada como fallback quando não há carteira escolhida na sessão/URL
+    $sqlCart = "SELECT IDCarteira, TipoCarteira, Principal FROM Carteira WHERE FKUsuarioDono = :usuario_id ORDER BY Principal DESC, TipoCarteira ASC";
     $stmtCart = $pdo->prepare($sqlCart);
     $stmtCart->execute([':usuario_id' => $usuario_id]);
     $carteiras = $stmtCart->fetchAll();

@@ -85,12 +85,15 @@ if (isset($_GET['sucesso'])) {
     if ($_GET['sucesso'] === 'criada') $sucesso = "Nova carteira criada com sucesso!";
     if ($_GET['sucesso'] === 'editada') $sucesso = "Carteira atualizada com sucesso!";
     if ($_GET['sucesso'] === 'mesclada') $sucesso = "Carteiras mescladas com sucesso!";
+    if ($_GET['sucesso'] === 'principal_definida') $sucesso = "Carteira principal definida! É nela que o sistema vai entrar por padrão.";
+    if ($_GET['sucesso'] === 'principal_removida') $sucesso = "Carteira principal removida.";
 }
 if (isset($_GET['erro'])) {
     if ($_GET['erro'] === 'duplicada') $erro = "Já existe uma carteira com este nome exato.";
     if ($_GET['erro'] === 'vazio') $erro = "O nome da carteira não pode ficar vazio.";
     if ($_GET['erro'] === 'banco') $erro = "Ocorreu um erro interno ao salvar a carteira.";
     if ($_GET['erro'] === 'limite_plano') $erro = "Seu plano não permite criar mais carteiras. Faça upgrade para adicionar mais.";
+    if ($_GET['erro'] === 'carteira_invalida') $erro = "Carteira inválida.";
 }
 
 // --- BUSCA AS CARTEIRAS E CALCULA O SALDO DE CADA UMA ---
@@ -98,7 +101,7 @@ $carteiras = [];
 try {
     // SQL Inteligente: Já calcula o saldo exato de cada carteira direto no banco
     $sqlCarteiras = "
-        SELECT c.IDCarteira, c.TipoCarteira,
+        SELECT c.IDCarteira, c.TipoCarteira, c.Principal,
                COALESCE(SUM(CASE WHEN r.TipoRegistro = 'receita'               THEN  r.Valor ELSE 0 END), 0) +
                COALESCE(SUM(CASE WHEN r.TipoRegistro = 'cofrinho_retirada'     THEN  r.Valor ELSE 0 END), 0) +
                COALESCE(SUM(CASE WHEN r.TipoRegistro = 'transferencia_entrada' THEN  r.Valor ELSE 0 END), 0) -
@@ -108,8 +111,8 @@ try {
         FROM Carteira c
         LEFT JOIN Registro r ON c.IDCarteira = r.FKCarteira AND r.StatusRegistro = 'efetivado'
         WHERE c.FKUsuarioDono = :uid
-        GROUP BY c.IDCarteira, c.TipoCarteira
-        ORDER BY c.TipoCarteira ASC
+        GROUP BY c.IDCarteira, c.TipoCarteira, c.Principal
+        ORDER BY c.Principal DESC, c.TipoCarteira ASC
     ";
     $stmt = $pdo->prepare($sqlCarteiras);
     $stmt->execute([':uid' => $usuario_id]);
@@ -223,7 +226,12 @@ require_once '../geral/header.php';
                                     <i class="bi <?= $_cartBloqueada ? 'bi-lock-fill' : 'bi-bank' ?> fs-4" style="color: <?= $_cartBloqueada ? '#a78bfa' : 'var(--primary-gold-analysis)' ?> !important;"></i>
                                 </div>
                                 <div>
-                                    <h5 class="fw-bold text-light mb-0"><?= htmlspecialchars($cart['TipoCarteira']) ?></h5>
+                                    <h5 class="fw-bold text-light mb-0 d-flex align-items-center gap-2">
+                                        <?= htmlspecialchars($cart['TipoCarteira']) ?>
+                                        <?php if ((int)$cart['Principal'] === 1): ?>
+                                            <i class="bi bi-star-fill" style="color:#d4af37;font-size:0.8rem;" title="Carteira principal"></i>
+                                        <?php endif; ?>
+                                    </h5>
                                 </div>
                             </div>
 
@@ -232,6 +240,16 @@ require_once '../geral/header.php';
                                     <i class="bi bi-three-dots-vertical fs-5"></i>
                                 </button>
                                 <ul class="dropdown-menu dropdown-menu-end bg-dark border-secondary-subtle shadow-lg">
+                                    <li>
+                                        <form method="POST" action="marcar_principal.php" class="m-0">
+                                            <input type="hidden" name="id_carteira" value="<?= htmlspecialchars($cart['IDCarteira']) ?>">
+                                            <button type="submit" class="dropdown-item d-flex align-items-center transition-hover py-2"
+                                                style="color:#d4af37;">
+                                                <i class="bi <?= (int)$cart['Principal'] === 1 ? 'bi-star-fill' : 'bi-star' ?> me-2"></i>
+                                                <?= (int)$cart['Principal'] === 1 ? 'Remover como Principal' : 'Marcar como Principal' ?>
+                                            </button>
+                                        </form>
+                                    </li>
                                     <li>
                                         <button type="button" class="dropdown-item text-light d-flex align-items-center transition-hover py-2"
                                             onclick="abrirModalCarteira('<?= $cart['IDCarteira'] ?>', '<?= htmlspecialchars($cart['TipoCarteira'], ENT_QUOTES) ?>')">
