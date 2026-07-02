@@ -151,6 +151,8 @@ $_carteiraParam = (!empty($_SESSION['ultima_carteira']))
     <meta name="theme-color" content="<?= htmlspecialchars($_themeColor) ?>">
     <title>Auralis</title>
     <link rel="shortcut icon" href="/geral/img/icone.ico" type="image/x-icon">
+    <link rel="icon" type="image/png" sizes="192x192" href="/geral/img/icon-192.png">
+    <link rel="icon" type="image/png" sizes="512x512" href="/geral/img/icon-512.png">
     <link rel="manifest" href="/manifest.json">
     <meta name="mobile-web-app-capable" content="yes">
     <meta name="apple-mobile-web-app-capable" content="yes">
