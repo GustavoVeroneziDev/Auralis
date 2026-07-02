@@ -43,18 +43,35 @@ try {
 }
 
 $marcarProcessado = $pdo->prepare("UPDATE Registro SET PushNotificadoEm = NOW() WHERE IDRegistro = :id");
-$notificados = 0;
 
+// Agrupa por usuário — quem tem várias contas vencendo hoje recebe UMA notificação, não várias.
+$porUsuario = [];
 foreach ($contas as $c) {
-    $tipoLabel = ($c['TipoRegistro'] === 'receita') ? 'Recebimento' : 'Conta';
-    $valorFmt  = 'R$ ' . number_format((float)$c['Valor'], 2, ',', '.');
-    $titulo    = $tipoLabel . ' vence hoje';
-    $corpo     = $c['Descricao'] . ' — ' . $valorFmt;
+    $porUsuario[$c['FKUsuario']][] = $c;
+}
 
-    $enviados = enviarPushParaUsuario($pdo, $c['FKUsuario'], $titulo, $corpo, '/agenda.php');
-    $marcarProcessado->execute([':id' => $c['IDRegistro']]);
+$notificados = 0;
+foreach ($porUsuario as $usuarioId => $contasDoUsuario) {
+    if (count($contasDoUsuario) === 1) {
+        $c         = $contasDoUsuario[0];
+        $tipoLabel = ($c['TipoRegistro'] === 'receita') ? 'Recebimento' : 'Conta';
+        $valorFmt  = 'R$ ' . number_format((float)$c['Valor'], 2, ',', '.');
+        $titulo    = $tipoLabel . ' vence hoje';
+        $corpo     = $c['Descricao'] . ' — ' . $valorFmt;
+    } else {
+        $totalValor = array_sum(array_map(fn($c) => (float)$c['Valor'], $contasDoUsuario));
+        $descricoes = array_map(fn($c) => $c['Descricao'], $contasDoUsuario);
+        $listaDesc  = implode(', ', array_slice($descricoes, 0, 3)) . (count($descricoes) > 3 ? '…' : '');
+        $titulo     = count($contasDoUsuario) . ' contas vencem hoje';
+        $corpo      = $listaDesc . ' — R$ ' . number_format($totalValor, 2, ',', '.') . ' no total';
+    }
+
+    $enviados = enviarPushParaUsuario($pdo, $usuarioId, $titulo, $corpo, '/agenda.php');
+    foreach ($contasDoUsuario as $c) {
+        $marcarProcessado->execute([':id' => $c['IDRegistro']]);
+    }
     if ($enviados > 0) $notificados++;
 }
 
-$resumo = 'Verificação concluída: ' . count($contas) . ' conta(s) vencendo hoje, ' . $notificados . ' notificação(ões) push enviada(s).';
+$resumo = 'Verificação concluída: ' . count($contas) . ' conta(s) vencendo hoje, ' . $notificados . ' usuário(s) notificado(s) por push.';
 echo $resumo . PHP_EOL;
