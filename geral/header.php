@@ -441,6 +441,36 @@ $_carteiraParam = (!empty($_SESSION['ultima_carteira']))
             </div>
         </div>
 
+        <!-- Modal: Ativar Notificações -->
+        <div class="modal fade" id="modalAtivarNotificacoes" tabindex="-1" aria-hidden="true">
+            <div class="modal-dialog modal-dialog-centered" style="max-width:440px;">
+                <div class="modal-content border-0 rounded-4 overflow-hidden position-relative"
+                     style="background-color:#181A1F;border:1px solid rgba(255,255,255,0.08) !important;box-shadow:0 25px 50px -12px rgba(0,0,0,0.7);">
+                    <div class="position-absolute top-0 start-0 w-100 h-100"
+                         style="background:radial-gradient(circle at top right,rgba(96,165,250,0.12),transparent 60%);pointer-events:none;"></div>
+                    <div class="modal-body p-5 text-center position-relative">
+                        <div class="mb-4 d-inline-flex justify-content-center align-items-center bg-dark border border-secondary-subtle rounded-circle shadow-lg"
+                             style="width:80px;height:80px;">
+                            <i class="bi bi-bell" style="font-size:2.2rem;color:#60a5fa;"></i>
+                        </div>
+                        <h4 class="text-light fw-bold mb-2">Ative as notificações</h4>
+                        <p class="text-secondary mb-4" style="font-size:0.9rem;line-height:1.6;">
+                            Receba um aviso na hora certa quando uma conta estiver vencendo — direto na tela do seu celular.
+                        </p>
+                        <button onclick="window.auralisAtivarNotificacoes()"
+                            class="btn w-100 fw-bold text-dark rounded-pill py-3 mb-3 shadow-lg"
+                            style="background:linear-gradient(135deg,#60a5fa,#3b82f6);font-size:0.95rem;">
+                            <i class="bi bi-bell me-2"></i> Ativar Notificações
+                        </button>
+                        <button type="button" class="btn btn-link text-secondary text-decoration-none w-100"
+                                data-bs-dismiss="modal" style="font-size:0.8rem;">
+                            Agora não
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+
 <?php else: ?>
 <body class="d-flex flex-column min-vh-100">
 
@@ -610,6 +640,25 @@ $_carteiraParam = (!empty($_SESSION['ultima_carteira']))
                             <i class="bi bi-download me-2"></i> Instalar Agora
                         </button>
                     </div>
+                    <button type="button" class="btn btn-link text-secondary text-decoration-none w-100" data-bs-dismiss="modal" style="font-size:0.8rem;">Agora não</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="modal fade" id="modalAtivarNotificacoes" tabindex="-1" aria-hidden="true">
+        <div class="modal-dialog modal-dialog-centered" style="max-width:440px;">
+            <div class="modal-content border-0 rounded-4 overflow-hidden position-relative" style="background-color:#181A1F;border:1px solid rgba(255,255,255,0.08) !important;">
+                <div class="modal-body p-5 text-center position-relative">
+                    <div class="mb-4 d-inline-flex justify-content-center align-items-center bg-dark border border-secondary-subtle rounded-circle shadow-lg" style="width:80px;height:80px;">
+                        <i class="bi bi-bell" style="font-size:2.2rem;color:#60a5fa;"></i>
+                    </div>
+                    <h4 class="text-light fw-bold mb-2">Ative as notificações</h4>
+                    <p class="text-secondary mb-4" style="font-size:0.9rem;">Receba um aviso na hora certa quando uma conta estiver vencendo — direto na tela do seu celular.</p>
+                    <button onclick="window.auralisAtivarNotificacoes()"
+                        class="btn w-100 fw-bold text-dark rounded-pill py-3 mb-3" style="background:linear-gradient(135deg,#60a5fa,#3b82f6);font-size:0.95rem;">
+                        <i class="bi bi-bell me-2"></i> Ativar Notificações
+                    </button>
                     <button type="button" class="btn btn-link text-secondary text-decoration-none w-100" data-bs-dismiss="modal" style="font-size:0.8rem;">Agora não</button>
                 </div>
             </div>
