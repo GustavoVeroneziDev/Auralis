@@ -416,13 +416,21 @@ require_once 'geral/header.php';
         <div class="row g-4 mb-5">
             <div class="col-lg-6">
                 <div class="card shadow-sm rounded-4 h-100" style="background:var(--bg-card);border:1px solid var(--card-border-color);">
-                    <div class="card-header border-bottom border-secondary-subtle bg-transparent p-4">
+                    <div class="card-header border-bottom border-secondary-subtle bg-transparent p-4 d-flex justify-content-between align-items-center flex-wrap gap-2">
                         <h5 class="text-light fw-bold mb-0">Distribuição de Despesas</h5>
+                        <div class="btn-group btn-group-sm visual-toggle" role="group" aria-label="Tipo de gráfico" data-tipo="despesa">
+                            <button type="button" class="btn visual-toggle-btn" data-visual="pizza" title="Gráfico de pizza">
+                                <i class="bi bi-pie-chart-fill"></i>
+                            </button>
+                            <button type="button" class="btn visual-toggle-btn" data-visual="barra" title="Gráfico de barras">
+                                <i class="bi bi-bar-chart-line-fill"></i>
+                            </button>
+                        </div>
                     </div>
                     <div class="card-body p-4 d-flex justify-content-center align-items-center position-relative">
-                        <div class="position-relative d-flex justify-content-center align-items-center w-100 donut-wrapper" style="max-width: 320px; aspect-ratio: 1;">
+                        <div class="position-relative d-flex justify-content-center align-items-center w-100 donut-wrapper" id="wrapper-grafico-despesa" style="max-width: 320px; aspect-ratio: 1;">
                             <canvas id="graficoDespesas"></canvas>
-                            <div class="position-absolute text-center" style="pointer-events: none;">
+                            <div class="position-absolute text-center" id="total-overlay-despesa" style="pointer-events: none;">
                                 <span class="d-block text-secondary small">Total</span>
                                 <h5 class="text-light fw-bold mb-0">R$ <?php echo number_format($totalDespesas, 2, ',', '.') ?></h5>
                             </div>
@@ -452,13 +460,21 @@ require_once 'geral/header.php';
         <div class="row g-4 mb-5">
             <div class="col-lg-6">
                 <div class="card shadow-sm rounded-4 h-100" style="background:var(--bg-card);border:1px solid var(--card-border-color);">
-                    <div class="card-header border-bottom border-secondary-subtle bg-transparent p-4">
+                    <div class="card-header border-bottom border-secondary-subtle bg-transparent p-4 d-flex justify-content-between align-items-center flex-wrap gap-2">
                         <h5 class="text-light fw-bold mb-0">Distribuição de Receitas</h5>
+                        <div class="btn-group btn-group-sm visual-toggle" role="group" aria-label="Tipo de gráfico" data-tipo="receita">
+                            <button type="button" class="btn visual-toggle-btn" data-visual="pizza" title="Gráfico de pizza">
+                                <i class="bi bi-pie-chart-fill"></i>
+                            </button>
+                            <button type="button" class="btn visual-toggle-btn" data-visual="barra" title="Gráfico de barras">
+                                <i class="bi bi-bar-chart-line-fill"></i>
+                            </button>
+                        </div>
                     </div>
                     <div class="card-body p-4 d-flex justify-content-center align-items-center position-relative">
-                        <div class="position-relative d-flex justify-content-center align-items-center w-100 donut-wrapper" style="max-width: 320px; aspect-ratio: 1;">
+                        <div class="position-relative d-flex justify-content-center align-items-center w-100 donut-wrapper" id="wrapper-grafico-receita" style="max-width: 320px; aspect-ratio: 1;">
                             <canvas id="graficoReceitas"></canvas>
-                            <div class="position-absolute text-center" style="pointer-events: none;">
+                            <div class="position-absolute text-center" id="total-overlay-receita" style="pointer-events: none;">
                                 <span class="d-block text-secondary small">Total</span>
                                 <h5 class="text-light fw-bold mb-0">R$ <?php echo number_format($totalReceitas, 2, ',', '.') ?></h5>
                             </div>
@@ -763,6 +779,22 @@ require_once 'geral/header.php';
         letter-spacing: 0.05em;
     }
 
+    .visual-toggle-btn {
+        background: transparent;
+        border: 1px solid var(--card-border-color);
+        color: var(--text-muted);
+        line-height: 1;
+    }
+    .visual-toggle-btn:hover:not(.active) {
+        background: rgba(255,255,255,0.06);
+        color: var(--text-main);
+    }
+    .visual-toggle-btn.active {
+        background: rgba(212,175,55,0.15);
+        border-color: rgba(212,175,55,0.5);
+        color: var(--accent, #D4AF37);
+    }
+
     #lista-detalhes-despesa::-webkit-scrollbar,
     #lista-detalhes-receita::-webkit-scrollbar {
         width: 6px;
@@ -937,7 +969,37 @@ require_once 'geral/header.php';
         }
     };
 
-    function criarGrafico(canvasId, labels, valores, cores, tipo) {
+    // ── Plugin: labels no fim de cada barra (valor + %) ────────────────────────
+    const pluginLabelsBarras = {
+        id: 'labelsBarras',
+        afterDatasetsDraw(chart) {
+            const { ctx, data } = chart;
+            const total = data.datasets[0].data.reduce((a, b) => a + b, 0);
+            if (total === 0) return;
+            const meta = chart.getDatasetMeta(0);
+            const textMain = getComputedStyle(document.documentElement).getPropertyValue('--text-main').trim() || '#f8fafc';
+
+            ctx.save();
+            ctx.font = 'bold 11px Inter, sans-serif';
+            ctx.textAlign = 'left';
+            ctx.textBaseline = 'middle';
+            ctx.fillStyle = textMain;
+            data.datasets[0].data.forEach((valor, i) => {
+                const bar = meta.data[i];
+                if (!bar) return;
+                const pct = ((valor / total) * 100).toFixed(0);
+                const val = new Intl.NumberFormat('pt-BR', {
+                    style: 'currency',
+                    currency: 'BRL',
+                    maximumFractionDigits: 0
+                }).format(valor);
+                ctx.fillText(`${val} (${pct}%)`, bar.x + 8, bar.y);
+            });
+            ctx.restore();
+        }
+    };
+
+    function montarGraficoPizza(canvasId, labels, valores, cores, tipo) {
         const canvas = document.getElementById(canvasId);
         if (!canvas) return null;
 
@@ -1005,21 +1067,166 @@ require_once 'geral/header.php';
         return chart;
     }
 
-    const chartDespesas = criarGrafico(
-        'graficoDespesas',
+    function montarGraficoBarra(canvasId, labels, valores, cores, tipo) {
+        const canvas = document.getElementById(canvasId);
+        if (!canvas) return null;
+
+        // Ordena por valor decrescente (efeito "ranking"), preservando a cor original de cada categoria
+        const indices = valores.map((_, i) => i).sort((a, b) => valores[b] - valores[a]);
+        const labelsOrd = indices.map(i => labels[i]);
+        const valoresOrd = indices.map(i => valores[i]);
+        const coresOrd = indices.map(i => cores[i % cores.length]);
+
+        const style = getComputedStyle(document.documentElement);
+        const bgCard = style.getPropertyValue('--bg-card').trim() || '#1e2126';
+        const textMain = style.getPropertyValue('--text-main').trim() || '#f8fafc';
+        const textMuted = style.getPropertyValue('--text-muted').trim() || '#a1a1aa';
+        const accentRgb = style.getPropertyValue('--bs-primary-rgb').trim() || '212,175,55';
+
+        const chart = new Chart(canvas.getContext('2d'), {
+            type: 'bar',
+            data: {
+                labels: labelsOrd,
+                datasets: [{
+                    data: valoresOrd,
+                    backgroundColor: coresOrd,
+                    borderRadius: 6,
+                    borderSkipped: false,
+                    maxBarThickness: 28,
+                }]
+            },
+            options: {
+                indexAxis: 'y',
+                responsive: true,
+                maintainAspectRatio: false,
+                animation: {
+                    duration: 600
+                },
+                layout: {
+                    padding: { right: 90 }
+                },
+                scales: {
+                    x: {
+                        grid: { color: 'rgba(255,255,255,0.06)' },
+                        ticks: {
+                            color: textMuted,
+                            callback: v => new Intl.NumberFormat('pt-BR', {
+                                style: 'currency',
+                                currency: 'BRL',
+                                maximumFractionDigits: 0
+                            }).format(v)
+                        }
+                    },
+                    y: {
+                        grid: { display: false },
+                        ticks: { color: textMain, font: { weight: '600' } }
+                    }
+                },
+                plugins: {
+                    legend: { display: false },
+                    tooltip: {
+                        callbacks: {
+                            label(ctx) {
+                                const total = ctx.dataset.data.reduce((a, b) => a + b, 0);
+                                const pct = ((ctx.parsed.x / total) * 100).toFixed(1);
+                                const val = new Intl.NumberFormat('pt-BR', {
+                                    style: 'currency',
+                                    currency: 'BRL'
+                                }).format(ctx.parsed.x);
+                                return ` ${val} (${pct}%)`;
+                            }
+                        },
+                        backgroundColor: bgCard,
+                        borderColor: `rgba(${accentRgb},0.3)`,
+                        borderWidth: 1,
+                        titleColor: textMain,
+                        bodyColor: textMuted,
+                        padding: 10,
+                    }
+                },
+                onClick: (event, elements) => {
+                    if (elements.length > 0) {
+                        const categoriaClicada = chart.data.labels[elements[0].index];
+                        atualizarListaDetalhes(categoriaClicada, tipo);
+                    }
+                }
+            },
+            plugins: [pluginLabelsBarras]
+        });
+        return chart;
+    }
+
+    // ── Central de opções: alterna entre pizza e barra, lembrando a escolha ───
+    const chartsState = {};
+    const visualAtual = {
+        despesa: localStorage.getItem('analises_visual_despesa') || 'pizza',
+        receita: localStorage.getItem('analises_visual_receita') || 'pizza',
+    };
+
+    function ajustarWrapper(tipo, visual, numCategorias) {
+        const wrapper = document.getElementById(`wrapper-grafico-${tipo}`);
+        const totalOverlay = document.getElementById(`total-overlay-${tipo}`);
+        if (!wrapper) return;
+        if (visual === 'barra') {
+            wrapper.style.maxWidth = '100%';
+            wrapper.style.aspectRatio = 'auto';
+            wrapper.style.height = Math.max(220, numCategorias * 46) + 'px';
+            if (totalOverlay) totalOverlay.style.display = 'none';
+        } else {
+            wrapper.style.maxWidth = '320px';
+            wrapper.style.aspectRatio = '1';
+            wrapper.style.height = '';
+            if (totalOverlay) totalOverlay.style.display = '';
+        }
+    }
+
+    function renderGrafico(tipo) {
+        const info = chartsState[tipo];
+        if (!info) return;
+        const visual = visualAtual[tipo];
+        if (info.instance) {
+            info.instance.destroy();
+            info.instance = null;
+        }
+        ajustarWrapper(tipo, visual, info.labels.length);
+        info.instance = visual === 'barra' ?
+            montarGraficoBarra(info.canvasId, info.labels, info.valores, info.cores, tipo) :
+            montarGraficoPizza(info.canvasId, info.labels, info.valores, info.cores, tipo);
+    }
+
+    function registrarGrafico(tipo, canvasId, labels, valores, cores) {
+        if (!document.getElementById(canvasId)) return;
+        chartsState[tipo] = { canvasId, labels, valores, cores, instance: null };
+        renderGrafico(tipo);
+    }
+
+    registrarGrafico(
+        'despesa', 'graficoDespesas',
         <?php echo $dadosJsonLabelsDespesas ?>,
         <?php echo $dadosJsonValoresDespesas ?>,
-        coresDespesas,
-        'despesa'
+        coresDespesas
     );
 
-    const chartReceitas = criarGrafico(
-        'graficoReceitas',
+    registrarGrafico(
+        'receita', 'graficoReceitas',
         <?php echo $dadosJsonLabelsReceitas ?>,
         <?php echo $dadosJsonValoresReceitas ?>,
-        coresReceitas,
-        'receita'
+        coresReceitas
     );
+
+    document.querySelectorAll('.visual-toggle').forEach(group => {
+        const tipo = group.dataset.tipo;
+        group.querySelectorAll('.visual-toggle-btn').forEach(btn => {
+            btn.classList.toggle('active', btn.dataset.visual === visualAtual[tipo]);
+            btn.addEventListener('click', () => {
+                if (visualAtual[tipo] === btn.dataset.visual) return;
+                visualAtual[tipo] = btn.dataset.visual;
+                localStorage.setItem(`analises_visual_${tipo}`, btn.dataset.visual);
+                group.querySelectorAll('.visual-toggle-btn').forEach(b => b.classList.toggle('active', b === btn));
+                renderGrafico(tipo);
+            });
+        });
+    });
 
     function atualizarListaDetalhes(categoriaFiltro, tipo) {
         const containerLista = document.getElementById(`lista-detalhes-${tipo}`);
