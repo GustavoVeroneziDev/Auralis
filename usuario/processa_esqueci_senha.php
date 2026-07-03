@@ -1,9 +1,19 @@
 <?php
 // usuario/processa_esqueci_senha.php
 require_once '../config/conexao.php';
+require_once '../config/funcoes.php';
+require_once '../config/email.php';
 
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $email = trim($_POST['email']);
+
+    // Anti-abuso: no máx. 5 pedidos de reset por e-mail a cada 15 min (evita spam de
+    // inbox alheia e desacelera enumeração de contas via esse formulário)
+    if (contarTentativasSeguranca($pdo, 'reset_senha', $email, 15) >= 5) {
+        header("Location: esqueci_senha.php?status=enviado");
+        exit;
+    }
+    registrarTentativaSeguranca($pdo, 'reset_senha', $email);
 
     try {
         // Verifica se o usuário existe
@@ -13,8 +23,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $usuario = $stmt->fetch(PDO::FETCH_ASSOC);
 
         if (!$usuario) {
-            // E-mail não cadastrado
-            header("Location: esqueci_senha.php?erro=nao_encontrado");
+            // Mesma resposta de quando o e-mail existe — não dá pra descobrir quais
+            // e-mails têm conta no Auralis só testando esse formulário (anti-enumeração).
+            header("Location: esqueci_senha.php?status=enviado");
             exit;
         }
 
@@ -78,12 +89,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         </html>
         ";
 
-        $cabecalhos  = "MIME-Version: 1.0\r\n";
-        $cabecalhos .= "Content-type: text/html; charset=UTF-8\r\n";
-        $cabecalhos .= "From: Auralis <suporte@meuauralis.com>\r\n";
-        $cabecalhos .= "Reply-To: suporte@meuauralis.com\r\n";
-
-        mail($para, $assunto, $mensagemHTML, $cabecalhos);
+        enviarEmail($para, $assunto, $mensagemHTML);
 
         header("Location: esqueci_senha.php?status=enviado");
         exit;

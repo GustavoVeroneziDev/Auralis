@@ -2,47 +2,31 @@
 session_start();
 require_once '../config/conexao.php';
 require_once '../config/funcoes.php';
+require_once '../config/email.php';
 require_once 'chaves_google.php';
 
-// 1. O Google nos devolveu um código de autorização?
-if (isset($_GET['code'])) {
+// O Google Identity Services envia o ID token (JWT) via POST no campo 'credential'
+if ($_SERVER['REQUEST_METHOD'] === 'POST' && !empty($_POST['credential'])) {
 
-    // 2. Trocamos esse código por um "Access Token"
-    $tokenUrl = 'https://oauth2.googleapis.com/token';
-    $postData = [
-        'code' => $_GET['code'],
-        'client_id' => $clientID,
-        'client_secret' => $clientSecret,
-        'redirect_uri' => $redirectUri,
-        'grant_type' => 'authorization_code'
-    ];
-
+    // Valida o token direto no endpoint do Google (confere assinatura, expiração, issuer)
     $ch = curl_init();
-    curl_setopt($ch, CURLOPT_URL, $tokenUrl);
-    curl_setopt($ch, CURLOPT_POST, 1);
-    curl_setopt($ch, CURLOPT_POSTFIELDS, http_build_query($postData));
+    curl_setopt($ch, CURLOPT_URL, 'https://oauth2.googleapis.com/tokeninfo?id_token=' . urlencode($_POST['credential']));
     curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
-    $tokenResponse = curl_exec($ch);
+    $tokenInfoResponse = curl_exec($ch);
+    $httpCode = curl_getinfo($ch, CURLINFO_HTTP_CODE);
     curl_close($ch);
 
-    $tokenData = json_decode($tokenResponse, true);
+    $payload = $httpCode === 200 ? json_decode($tokenInfoResponse, true) : null;
 
-    if (isset($tokenData['access_token'])) {
+    $tokenValido = $payload
+        && ($payload['aud'] ?? '') === $clientID
+        && in_array($payload['iss'] ?? '', ['accounts.google.com', 'https://accounts.google.com'], true)
+        && ($payload['email_verified'] ?? 'false') === 'true'
+        && !empty($payload['email']);
 
-        // 3. Usamos o Access Token para pegar os dados (Nome e E-mail) da pessoa
-        $userInfoUrl = 'https://www.googleapis.com/oauth2/v2/userinfo';
-        $ch = curl_init();
-        curl_setopt($ch, CURLOPT_URL, $userInfoUrl);
-        curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
-        curl_setopt($ch, CURLOPT_HTTPHEADER, ['Authorization: Bearer ' . $tokenData['access_token']]);
-        $userInfoResponse = curl_exec($ch);
-        curl_close($ch);
-
-        $googleUser = json_decode($userInfoResponse, true);
-
-        if (isset($googleUser['email'])) {
-            $email = $googleUser['email'];
-            $nome = $googleUser['name'];
+    if ($tokenValido) {
+            $email = $payload['email'];
+            $nome = $payload['name'] ?? explode('@', $email)[0];
 
             // 4. Procura se esse e-mail já existe no Auralis
             // CORREÇÃO 1: Adicionado o 'Plano' no SELECT
@@ -159,12 +143,7 @@ if (isset($_GET['code'])) {
                 </html>
                 ";
 
-                $cabecalhos  = "MIME-Version: 1.0\r\n";
-                $cabecalhos .= "Content-type: text/html; charset=UTF-8\r\n";
-                $cabecalhos .= "From: Auralis <suporte@meuauralis.com>\r\n";
-                $cabecalhos .= "Reply-To: suporte@meuauralis.com\r\n";
-
-                mail($email, "Bem-vindo ao Auralis - Crie sua senha de acesso", $mensagemHTML, $cabecalhos);
+                enviarEmail($email, "Bem-vindo ao Auralis - Crie sua senha de acesso", $mensagemHTML);
 
                 // Loga o novo usuário e redireciona
                 session_regenerate_id(true);
@@ -180,7 +159,6 @@ if (isset($_GET['code'])) {
                 header("Location: ../dashboard.php");
                 exit;
             }
-        }
     }
 }
 

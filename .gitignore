@@ -1,5 +1,7 @@
 config/conexao.php
 config/vapid_keys.php
+config/mercadopago_keys.php
+config/smtp_keys.php
 usuario/chaves_google.php
 upgrade_manual_vip.sql
 upgrade_manual_pro.sql

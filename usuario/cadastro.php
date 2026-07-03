@@ -64,14 +64,14 @@ require_once '../geral/header.php';
                             <label for="senha" class="form-label text-light opacity-75 fw-semibold">Senha</label>
                             <input type="password"
                                 class="form-control form-control-lg bg-dark border-secondary text-light" id="senha"
-                                name="senha" required minlength="8" placeholder="Mínimo 8 caracteres">
+                                name="senha" required minlength="4" placeholder="Mínimo 4 caracteres">
                         </div>
                         <div class="col-md-6">
                             <label for="confirma_senha" class="form-label text-light opacity-75 fw-semibold">Confirmar
                                 Senha</label>
                             <input type="password"
                                 class="form-control form-control-lg bg-dark border-secondary text-light"
-                                id="confirma_senha" name="confirma_senha" required minlength="8"
+                                id="confirma_senha" name="confirma_senha" required minlength="4"
                                 placeholder="Repita a senha">
                             <div class="invalid-feedback fw-bold">
                                 As senhas não conferem!
@@ -96,9 +96,6 @@ require_once '../geral/header.php';
                         </button>
                     </div>
 
-                    <!-- ========================================== -->
-                    <!-- PREPARAÇÃO FUTURA: LOGIN COM GOOGLE        -->
-                    <!-- ========================================== -->
                     <div class="mt-4 mb-2">
                         <div class="d-flex align-items-center mb-4">
                             <hr class="flex-grow-1 border-secondary opacity-25">
@@ -107,14 +104,8 @@ require_once '../geral/header.php';
                             <hr class="flex-grow-1 border-secondary opacity-25">
                         </div>
 
-                        <!-- Botão desativado temporariamente. Vamos ativar quando fizermos a integração OAuth -->
-                        <a href="https://accounts.google.com/o/oauth2/auth?client_id=808511905880-4l0raul5fuf3rkukms9easdq65375o2t.apps.googleusercontent.com&redirect_uri=https://meuauralis.com/usuario/login_google.php&response_type=code&scope=email%20profile"
-                            class="btn btn-outline-secondary btn-lg w-100 d-flex align-items-center justify-content-center transition-hover border-secondary-subtle text-decoration-none">
-                            <i class="bi bi-google text-light me-3 fs-5"></i>
-                            <span class="text-light fw-semibold fs-6">Continuar com o Google</span>
-                        </a>
+                        <div id="googleBtnContainer" class="d-flex justify-content-center" style="color-scheme: light;"></div>
                     </div>
-                    <!-- ========================================== -->
 
                     <div class="text-center mt-5">
                         <p class="text-light opacity-75 mb-0">Já faz parte do Auralis?
@@ -130,7 +121,58 @@ require_once '../geral/header.php';
     </div>
 </main>
 
+<script src="https://accounts.google.com/gsi/client" async defer onload="iniciarBotaoGoogle()"></script>
 <script>
+    // Recebe o ID token (JWT) do Google Identity Services e envia pro backend via POST
+    function handleGoogleCredentialResponse(response) {
+        const form = document.createElement('form');
+        form.method = 'POST';
+        form.action = 'login_google.php';
+
+        const input = document.createElement('input');
+        input.type = 'hidden';
+        input.name = 'credential';
+        input.value = response.credential;
+
+        form.appendChild(input);
+        document.body.appendChild(form);
+        form.submit();
+    }
+
+    // Renderiza o botão via JS (em vez do atributo data-width fixo) pra calcular a
+    // largura real do container e recalcular no resize — o widget do Google não
+    // é responsivo por padrão, e um valor fixo quebra em telas pequenas.
+    function iniciarBotaoGoogle() {
+        google.accounts.id.initialize({
+            client_id: '808511905880-4l0raul5fuf3rkukms9easdq65375o2t.apps.googleusercontent.com',
+            callback: handleGoogleCredentialResponse
+        });
+
+        const container = document.getElementById('googleBtnContainer');
+
+        function desenharBotaoGoogle() {
+            container.innerHTML = '';
+            const largura = Math.max(200, Math.min(400, container.offsetWidth));
+            google.accounts.id.renderButton(container, {
+                type: 'standard',
+                shape: 'pill',
+                theme: 'filled_black',
+                text: 'signup_with',
+                size: 'large',
+                logo_alignment: 'left',
+                width: largura
+            });
+        }
+
+        desenharBotaoGoogle();
+
+        let resizeTimeout;
+        window.addEventListener('resize', function () {
+            clearTimeout(resizeTimeout);
+            resizeTimeout = setTimeout(desenharBotaoGoogle, 200);
+        });
+    }
+
     // Única Validação de Front-End necessária: Verificar se as senhas são iguais
     const formCadastro = document.getElementById('formCadastro');
     const inputSenha = document.getElementById('senha');

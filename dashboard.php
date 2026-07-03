@@ -866,7 +866,7 @@ require_once 'geral/header.php';
             </div>
         </div>
 
-        <!-- ── Seção Cofrinhos & Metas ───────────────────────────────────── -->
+        <!-- ── Seção Cofrinhos ─────────────────────────────────────────────── -->
         <?php if ($dashPrefs['cofrinhos'] && $qtdCofrinhos > 0): ?>
             <div class="d-flex align-items-center justify-content-between mb-3 mt-2">
                 <button class="d-flex align-items-center gap-2 btn p-0 border-0 bg-transparent" onclick="toggleSection('cofrinhos')">
@@ -1402,6 +1402,10 @@ require_once 'geral/header.php';
                 <?php if ($proxRegra['Descricao']): ?>
                 <div class="text-secondary mt-1" style="font-size:.7rem;"><?= htmlspecialchars($proxRegra['Descricao']) ?></div>
                 <?php endif; ?>
+            </div>
+            <?php else: ?>
+            <div class="text-secondary mt-3" style="font-size:.72rem;">
+                Compartilhe seu link — as recompensas por indicação aparecem aqui assim que forem configuradas.
             </div>
             <?php endif; ?>
         </div>

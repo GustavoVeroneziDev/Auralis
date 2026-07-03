@@ -23,7 +23,17 @@ try {
 
     // MP envia via query string (IPN) ou JSON body (Webhook)
     $type = $_GET['topic'] ?? $_GET['type'] ?? $data['type'] ?? $data['topic'] ?? '';
-    $id   = $_GET['id']    ?? $data['data']['id'] ?? $data['id'] ?? '';
+    $id   = $_GET['data_id'] ?? $_GET['id'] ?? $data['data']['id'] ?? $data['id'] ?? '';
+
+    // ── Verifica assinatura (se MP_WEBHOOK_SECRET estiver configurada) ─────────
+    $xSignature = $_SERVER['HTTP_X_SIGNATURE'] ?? null;
+    $xRequestId = $_SERVER['HTTP_X_REQUEST_ID'] ?? null;
+    if (!empty($id) && !mpVerificarAssinatura($xSignature, $xRequestId, (string)$id)) {
+        _mpLog("REJEITADO: assinatura invalida para id=[{$id}] (x-signature=[{$xSignature}])");
+        http_response_code(401);
+        echo 'Assinatura invalida';
+        exit;
+    }
 
     _mpLog("EVENTO: type=[{$type}] id=[{$id}]");
 

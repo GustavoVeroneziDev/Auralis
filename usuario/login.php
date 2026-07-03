@@ -28,6 +28,11 @@ require_once '../geral/header.php';
                             <i class="bi bi-exclamation-circle-fill me-3 fs-5"></i>
                             <div>Por favor, preencha todos os campos para entrar.</div>
                         </div>
+                    <?php elseif ($_GET['erro'] === 'muitas_tentativas'): ?>
+                        <div class="alert alert-warning d-flex align-items-center rounded-3 shadow-sm border-0 mb-4 bg-warning bg-opacity-10 text-warning" role="alert">
+                            <i class="bi bi-shield-lock-fill me-3 fs-5"></i>
+                            <div><strong>Muitas tentativas.</strong> Aguarde alguns minutos antes de tentar de novo.</div>
+                        </div>
                     <?php endif; ?>
                 <?php endif; ?>
 
@@ -104,11 +109,7 @@ require_once '../geral/header.php';
                     </div>
 
                     <div class="d-grid mb-4">
-                        <a href="https://accounts.google.com/o/oauth2/auth?client_id=808511905880-4l0raul5fuf3rkukms9easdq65375o2t.apps.googleusercontent.com&redirect_uri=https://meuauralis.com/usuario/login_google.php&response_type=code&scope=email%20profile" 
-                           class="btn btn-outline-secondary btn-lg d-flex align-items-center justify-content-center transition-hover border-secondary-subtle text-decoration-none">
-                            <i class="bi bi-google text-light me-3 fs-5"></i> 
-                            <span class="text-light fs-6">Entrar com o Google</span>
-                        </a>
+                        <div id="googleBtnContainer" class="d-flex justify-content-center" style="color-scheme: light;"></div>
                     </div>
                     <div class="text-center mt-5">
                         <p class="text-light opacity-75 mb-0">Ainda não tem uma conta? <a href="cadastro.php" class="text-primary text-decoration-none fw-semibold custom-link">Cadastre-se grátis</a></p>
@@ -121,7 +122,58 @@ require_once '../geral/header.php';
     </div>
 </main>
 
+<script src="https://accounts.google.com/gsi/client" async defer onload="iniciarBotaoGoogle()"></script>
 <script>
+    // Recebe o ID token (JWT) do Google Identity Services e envia pro backend via POST
+    function handleGoogleCredentialResponse(response) {
+        const form = document.createElement('form');
+        form.method = 'POST';
+        form.action = 'login_google.php';
+
+        const input = document.createElement('input');
+        input.type = 'hidden';
+        input.name = 'credential';
+        input.value = response.credential;
+
+        form.appendChild(input);
+        document.body.appendChild(form);
+        form.submit();
+    }
+
+    // Renderiza o botão via JS (em vez do atributo data-width fixo) pra calcular a
+    // largura real do container e recalcular no resize — o widget do Google não
+    // é responsivo por padrão, e um valor fixo quebra em telas pequenas.
+    function iniciarBotaoGoogle() {
+        google.accounts.id.initialize({
+            client_id: '808511905880-4l0raul5fuf3rkukms9easdq65375o2t.apps.googleusercontent.com',
+            callback: handleGoogleCredentialResponse
+        });
+
+        const container = document.getElementById('googleBtnContainer');
+
+        function desenharBotaoGoogle() {
+            container.innerHTML = '';
+            const largura = Math.max(200, Math.min(400, container.offsetWidth));
+            google.accounts.id.renderButton(container, {
+                type: 'standard',
+                shape: 'pill',
+                theme: 'filled_black',
+                text: 'signin_with',
+                size: 'large',
+                logo_alignment: 'left',
+                width: largura
+            });
+        }
+
+        desenharBotaoGoogle();
+
+        let resizeTimeout;
+        window.addEventListener('resize', function () {
+            clearTimeout(resizeTimeout);
+            resizeTimeout = setTimeout(desenharBotaoGoogle, 200);
+        });
+    }
+
     // Lógica para o botão de Mostrar/Ocultar Senha
     const btnMostrarSenha = document.getElementById('btnMostrarSenha');
     const inputSenha = document.getElementById('senha');

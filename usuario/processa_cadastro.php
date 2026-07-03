@@ -1,6 +1,7 @@
 <?php
 require_once '../config/conexao.php';
 require_once '../config/funcoes.php';
+require_once '../config/email.php';
 
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     
@@ -160,15 +161,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         </html>
         ";
 
-        // Headers essenciais para envio de HTML
-        $cabecalhos  = "MIME-Version: 1.0\r\n";
-        $cabecalhos .= "Content-type: text/html; charset=UTF-8\r\n";
-        $cabecalhos .= "From: Auralis <suporte@meuauralis.com>\r\n";
-        $cabecalhos .= "Reply-To: suporte@meuauralis.com\r\n";
-        $cabecalhos .= "X-Mailer: PHP/" . phpversion() . "\r\n";
-
         // Envia o e-mail HTML
-        mail($para, $assunto, $mensagemHTML, $cabecalhos);
+        enviarEmail($para, $assunto, $mensagemHTML);
 
         // Manda o usuário para a tela de aviso!
         header("Location: aviso_ativacao.php");

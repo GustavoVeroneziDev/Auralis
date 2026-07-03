@@ -1329,18 +1329,31 @@ require_once 'geral/header.php';
     function _agendaExcluirSelecionados() {
         const ids = [..._agendaSelIds];
         if (!ids.length) return;
-        if (!confirm(`Excluir ${ids.length} transaç${ids.length > 1 ? 'ões' : 'ão'}?\n\nEsta ação é irreversível.`)) return;
-        fetch('agenda.php', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-            body: `action=excluir_multiplos&ids=${encodeURIComponent(JSON.stringify(ids))}`
-        }).then(r => r.json()).then(d => {
-            if (d.ok) {
-                _agendaSairSel();
-                bootstrap.Modal.getInstance(document.getElementById('modalDia'))?.hide();
-                window.carregarMes(anoAtual, mesAtual);
-            } else alert('Erro ao excluir: ' + (d.erro || ''));
-        }).catch(() => alert('Erro de conexão.'));
+
+        const n = ids.length;
+        document.getElementById('modalExcluirSelecionadosAgendaTexto').textContent =
+            `Tem certeza que deseja excluir ${n} transaç${n > 1 ? 'ões selecionadas' : 'ão selecionada'}? Essa ação não pode ser desfeita.`;
+
+        const modalEl = document.getElementById('modalExcluirSelecionadosAgenda');
+        const modal = bootstrap.Modal.getOrCreateInstance(modalEl);
+        const btnConfirmar = document.getElementById('modalExcluirSelecionadosAgendaConfirmar');
+
+        btnConfirmar.onclick = () => {
+            modal.hide();
+            fetch('agenda.php', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+                body: `action=excluir_multiplos&ids=${encodeURIComponent(JSON.stringify(ids))}`
+            }).then(r => r.json()).then(d => {
+                if (d.ok) {
+                    _agendaSairSel();
+                    bootstrap.Modal.getInstance(document.getElementById('modalDia'))?.hide();
+                    window.carregarMes(anoAtual, mesAtual);
+                } else alert('Erro ao excluir: ' + (d.erro || ''));
+            }).catch(() => alert('Erro de conexão.'));
+        };
+
+        modal.show();
     }
 
     // Reset ao fechar o modal (DOMContentLoaded pois o HTML do modal vem após o script)
@@ -1584,6 +1597,29 @@ require_once 'geral/header.php';
                         Cancelar
                     </button>
                 </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- MODAL: CONFIRMAR EXCLUSÃO DE SELECIONADOS -->
+<div class="modal fade" id="modalExcluirSelecionadosAgenda" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered modal-sm" style="max-width: 400px;">
+        <div class="modal-content border-secondary-subtle shadow-lg rounded-4" style="background:var(--bg-card-analysis);">
+            <div class="modal-header border-bottom border-secondary-subtle p-3">
+                <h6 class="modal-title text-light fw-bold">
+                    <i class="bi bi-trash3-fill me-2 text-danger"></i> Excluir selecionados
+                </h6>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body p-4 text-center">
+                <p class="text-secondary mb-0" id="modalExcluirSelecionadosAgendaTexto">Tem certeza que deseja excluir as transações selecionadas? Essa ação não pode ser desfeita.</p>
+            </div>
+            <div class="modal-footer border-top border-secondary-subtle d-flex justify-content-between p-2">
+                <button type="button" class="btn btn-sm btn-link text-secondary text-decoration-none" data-bs-dismiss="modal">Cancelar</button>
+                <button type="button" id="modalExcluirSelecionadosAgendaConfirmar" class="btn btn-sm btn-danger fw-bold px-3 rounded-pill">
+                    Confirmar Exclusão
+                </button>
             </div>
         </div>
     </div>
