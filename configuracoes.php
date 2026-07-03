@@ -350,12 +350,12 @@ require_once 'geral/header.php';
 
                         <div class="mb-3">
                             <label for="nova_senha" class="form-label text-light fw-semibold mb-1">Nova Senha</label>
-                            <input type="password" name="nova_senha" id="nova_senha" class="form-control form-control-lg bg-transparent border-secondary-subtle text-light shadow-none" required minlength="8" placeholder="No mínimo 8 caracteres">
+                            <input type="password" name="nova_senha" id="nova_senha" class="form-control form-control-lg bg-transparent border-secondary-subtle text-light shadow-none" required minlength="4" placeholder="No mínimo 4 caracteres">
                         </div>
 
                         <div class="mb-4">
                             <label for="confirma_senha" class="form-label text-light fw-semibold mb-1">Confirmar Nova Senha</label>
-                            <input type="password" name="confirma_senha" id="confirma_senha" class="form-control form-control-lg bg-transparent border-secondary-subtle text-light shadow-none" required minlength="8" placeholder="Repita a nova senha">
+                            <input type="password" name="confirma_senha" id="confirma_senha" class="form-control form-control-lg bg-transparent border-secondary-subtle text-light shadow-none" required minlength="4" placeholder="Repita a nova senha">
                             <div class="invalid-feedback fw-bold">
                                 As novas senhas não conferem!
                             </div>

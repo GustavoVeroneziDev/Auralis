@@ -64,14 +64,14 @@ require_once '../geral/header.php';
                             <label for="senha" class="form-label text-light opacity-75 fw-semibold">Senha</label>
                             <input type="password"
                                 class="form-control form-control-lg bg-dark border-secondary text-light" id="senha"
-                                name="senha" required minlength="8" placeholder="Mínimo 8 caracteres">
+                                name="senha" required minlength="4" placeholder="Mínimo 4 caracteres">
                         </div>
                         <div class="col-md-6">
                             <label for="confirma_senha" class="form-label text-light opacity-75 fw-semibold">Confirmar
                                 Senha</label>
                             <input type="password"
                                 class="form-control form-control-lg bg-dark border-secondary text-light"
-                                id="confirma_senha" name="confirma_senha" required minlength="8"
+                                id="confirma_senha" name="confirma_senha" required minlength="4"
                                 placeholder="Repita a senha">
                             <div class="invalid-feedback fw-bold">
                                 As senhas não conferem!

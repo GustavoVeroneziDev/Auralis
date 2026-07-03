@@ -60,12 +60,12 @@ if (!empty($token)) {
 
             <div class="mb-3">
                 <label for="senha" class="form-label small text-secondary">Nova Senha</label>
-                <input type="password" name="senha" id="senha" class="form-control" required minlength="8">
+                <input type="password" name="senha" id="senha" class="form-control" required minlength="4">
             </div>
 
             <div class="mb-4">
                 <label for="confirma_senha" class="form-label small text-secondary">Confirmar Nova Senha</label>
-                <input type="password" name="confirma_senha" id="confirma_senha" class="form-control" required minlength="8">
+                <input type="password" name="confirma_senha" id="confirma_senha" class="form-control" required minlength="4">
             </div>
 
             <button type="submit" class="btn btn-primary w-100">Atualizar Senha</button>
