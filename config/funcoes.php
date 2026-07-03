@@ -5,6 +5,35 @@ if (!defined('AURALIS_COOKIE_SECRET')) {
     define('AURALIS_COOKIE_SECRET', 'Auralis2026_UltraSecretKey');
 }
 
+// ── Anti-força-bruta / throttling genérico (login, redefinição de senha, etc) ──
+// Requer migrations/add_tentativa_seguranca.sql. Se a tabela ainda não existir,
+// falha "aberta" (não bloqueia ninguém) — mesmo padrão defensivo usado em
+// outras checagens de schema do projeto.
+if (!function_exists('registrarTentativaSeguranca')) {
+    function registrarTentativaSeguranca(PDO $pdo, string $contexto, string $chave): void
+    {
+        try {
+            $pdo->prepare("INSERT INTO TentativaSeguranca (IDTentativa, Contexto, Chave) VALUES (:id, :ctx, :chave)")
+                ->execute([':id' => gerarUuid(), ':ctx' => $contexto, ':chave' => mb_strtolower($chave)]);
+        } catch (PDOException $e) {
+        }
+    }
+}
+
+if (!function_exists('contarTentativasSeguranca')) {
+    function contarTentativasSeguranca(PDO $pdo, string $contexto, string $chave, int $minutos): int
+    {
+        try {
+            $cutoff = date('Y-m-d H:i:s', time() - $minutos * 60);
+            $stmt = $pdo->prepare("SELECT COUNT(*) FROM TentativaSeguranca WHERE Contexto = :ctx AND Chave = :chave AND Momento > :cutoff");
+            $stmt->execute([':ctx' => $contexto, ':chave' => mb_strtolower($chave), ':cutoff' => $cutoff]);
+            return (int)$stmt->fetchColumn();
+        } catch (PDOException $e) {
+            return 0;
+        }
+    }
+}
+
 if (!function_exists('gerarUuid')) {
     function gerarUuid()
     {
@@ -367,10 +396,20 @@ if (!function_exists('recursosParaExibicao')) {
     }
 }
 
-// ── Constante central de credenciais MP ──────────────────────────────────
-// Usada pelo webhook e pelo sucesso_pagamento
+// ── Credenciais MP — arquivo separado, não versionado (config/mercadopago_keys.php) ──
+// Usada pelo webhook e pelo sucesso_pagamento. Carrega de forma defensiva: se o
+// arquivo ainda não existir nesse ambiente (ex: acabou de dar deploy e falta criar
+// o arquivo no servidor), o site continua no ar — só os recursos de pagamento MP
+// ficam inativos até o arquivo ser criado, em vez do site inteiro cair.
+$_mpKeysFile = __DIR__ . '/mercadopago_keys.php';
+if (file_exists($_mpKeysFile)) {
+    require_once $_mpKeysFile;
+}
 if (!defined('MP_ACCESS_TOKEN')) {
-    define('MP_ACCESS_TOKEN', 'APP_USR-3265675594930667-051414-05a766f55f35ec3d0b8749d7f65c0206-3401629357');
+    define('MP_ACCESS_TOKEN', '');
+}
+if (!defined('MP_WEBHOOK_SECRET')) {
+    define('MP_WEBHOOK_SECRET', '');
 }
 
 // Mapa de preapproval_plan_id → plano Auralis (fonte única da verdade)
@@ -396,6 +435,39 @@ if (!function_exists('mpConsultarApi')) {
         $resp     = curl_exec($ch);
         $httpCode = curl_getinfo($ch, CURLINFO_HTTP_CODE);
         return [$httpCode, json_decode($resp, true)];
+    }
+}
+
+// ── Helper MP: verifica a assinatura (header x-signature) de uma notificação ──
+// Segue o esquema oficial do Mercado Pago: manifest = "id:{id};request-id:{reqId};ts:{ts};",
+// HMAC-SHA256 com a chave secreta do webhook, comparado em tempo constante.
+// Retorna true se: (a) a assinatura bate, OU (b) MP_WEBHOOK_SECRET ainda não foi
+// configurada (pula a checagem — modo compatível, não quebra notificações antigas/IPN
+// que não têm esse header). Retorna false só quando a chave está configurada E a
+// assinatura enviada não bate — nesse caso é pra rejeitar a notificação.
+if (!function_exists('mpVerificarAssinatura')) {
+    function mpVerificarAssinatura(?string $xSignature, ?string $xRequestId, string $dataId): bool
+    {
+        if (empty(MP_WEBHOOK_SECRET)) {
+            return true; // Chave ainda não configurada — não bloqueia (ver mercadopago_keys.php)
+        }
+        if (empty($xSignature)) {
+            return true; // Notificação legada (IPN) não tem esse header — sem como verificar
+        }
+
+        $ts = null;
+        $v1 = null;
+        foreach (explode(',', $xSignature) as $parte) {
+            [$chave, $valor] = array_pad(explode('=', trim($parte), 2), 2, null);
+            if ($chave === 'ts') $ts = $valor;
+            if ($chave === 'v1') $v1 = $valor;
+        }
+        if (!$ts || !$v1) return false;
+
+        $manifest = "id:" . mb_strtolower($dataId) . ";request-id:" . ($xRequestId ?? '') . ";ts:" . $ts . ";";
+        $hashCalculado = hash_hmac('sha256', $manifest, MP_WEBHOOK_SECRET);
+
+        return hash_equals($hashCalculado, $v1);
     }
 }
 
@@ -884,6 +956,12 @@ function processarIndicacaoConversao(PDO $pdo, string $emailComprador, float $va
                 ':com'   => $valor,
                 ':plano' => $plano,
             ]);
+            criarNotificacaoSistema(
+                $pdo,
+                $indicadorId,
+                'Nova comissão de indicação!',
+                "Você ganhou R$ " . number_format($valor, 2, ',', '.') . " de comissão — alguém que você indicou assinou o plano " . strtoupper($plano) . ". Confira no seu painel de revendedor."
+            );
             return;
         }
 
@@ -948,6 +1026,13 @@ function processarIndicacaoConversao(PDO $pdo, string $emailComprador, float $va
             ':total' => $totalConversoes,
         ]);
         $pdo->commit();
+
+        criarNotificacaoSistema(
+            $pdo,
+            $indicadorId,
+            'Você ganhou uma recompensa por indicação!',
+            "Suas indicações renderam " . (int)$recompensa['DuracaoDias'] . " dias do plano " . strtoupper($recompensa['PlanoRecompensa']) . " — já está ativo na sua conta!"
+        );
 
     } catch (Exception $e) {
         if ($pdo->inTransaction()) $pdo->rollBack();
