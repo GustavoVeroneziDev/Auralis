@@ -109,11 +109,23 @@ require_once '../geral/header.php';
                     </div>
 
                     <div class="d-grid mb-4">
-                        <a href="https://accounts.google.com/o/oauth2/auth?client_id=808511905880-4l0raul5fuf3rkukms9easdq65375o2t.apps.googleusercontent.com&redirect_uri=https://meuauralis.com/usuario/login_google.php&response_type=code&scope=email%20profile" 
-                           class="btn btn-outline-secondary btn-lg d-flex align-items-center justify-content-center transition-hover border-secondary-subtle text-decoration-none">
-                            <i class="bi bi-google text-light me-3 fs-5"></i> 
-                            <span class="text-light fs-6">Entrar com o Google</span>
-                        </a>
+                        <div id="g_id_onload"
+                             data-client_id="808511905880-4l0raul5fuf3rkukms9easdq65375o2t.apps.googleusercontent.com"
+                             data-callback="handleGoogleCredentialResponse"
+                             data-auto_prompt="true"
+                             data-use_fedcm_for_prompt="true">
+                        </div>
+                        <div class="d-flex justify-content-center">
+                            <div class="g_id_signin"
+                                 data-type="standard"
+                                 data-shape="pill"
+                                 data-theme="filled_black"
+                                 data-text="signin_with"
+                                 data-size="large"
+                                 data-logo_alignment="left"
+                                 data-width="330">
+                            </div>
+                        </div>
                     </div>
                     <div class="text-center mt-5">
                         <p class="text-light opacity-75 mb-0">Ainda não tem uma conta? <a href="cadastro.php" class="text-primary text-decoration-none fw-semibold custom-link">Cadastre-se grátis</a></p>
@@ -126,7 +138,24 @@ require_once '../geral/header.php';
     </div>
 </main>
 
+<script src="https://accounts.google.com/gsi/client" async defer></script>
 <script>
+    // Recebe o ID token (JWT) do Google Identity Services e envia pro backend via POST
+    function handleGoogleCredentialResponse(response) {
+        const form = document.createElement('form');
+        form.method = 'POST';
+        form.action = 'login_google.php';
+
+        const input = document.createElement('input');
+        input.type = 'hidden';
+        input.name = 'credential';
+        input.value = response.credential;
+
+        form.appendChild(input);
+        document.body.appendChild(form);
+        form.submit();
+    }
+
     // Lógica para o botão de Mostrar/Ocultar Senha
     const btnMostrarSenha = document.getElementById('btnMostrarSenha');
     const inputSenha = document.getElementById('senha');

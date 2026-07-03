@@ -96,9 +96,6 @@ require_once '../geral/header.php';
                         </button>
                     </div>
 
-                    <!-- ========================================== -->
-                    <!-- PREPARAÇÃO FUTURA: LOGIN COM GOOGLE        -->
-                    <!-- ========================================== -->
                     <div class="mt-4 mb-2">
                         <div class="d-flex align-items-center mb-4">
                             <hr class="flex-grow-1 border-secondary opacity-25">
@@ -107,14 +104,22 @@ require_once '../geral/header.php';
                             <hr class="flex-grow-1 border-secondary opacity-25">
                         </div>
 
-                        <!-- Botão desativado temporariamente. Vamos ativar quando fizermos a integração OAuth -->
-                        <a href="https://accounts.google.com/o/oauth2/auth?client_id=808511905880-4l0raul5fuf3rkukms9easdq65375o2t.apps.googleusercontent.com&redirect_uri=https://meuauralis.com/usuario/login_google.php&response_type=code&scope=email%20profile"
-                            class="btn btn-outline-secondary btn-lg w-100 d-flex align-items-center justify-content-center transition-hover border-secondary-subtle text-decoration-none">
-                            <i class="bi bi-google text-light me-3 fs-5"></i>
-                            <span class="text-light fw-semibold fs-6">Continuar com o Google</span>
-                        </a>
+                        <div id="g_id_onload"
+                             data-client_id="808511905880-4l0raul5fuf3rkukms9easdq65375o2t.apps.googleusercontent.com"
+                             data-callback="handleGoogleCredentialResponse">
+                        </div>
+                        <div class="d-flex justify-content-center">
+                            <div class="g_id_signin"
+                                 data-type="standard"
+                                 data-shape="pill"
+                                 data-theme="filled_black"
+                                 data-text="signup_with"
+                                 data-size="large"
+                                 data-logo_alignment="left"
+                                 data-width="330">
+                            </div>
+                        </div>
                     </div>
-                    <!-- ========================================== -->
 
                     <div class="text-center mt-5">
                         <p class="text-light opacity-75 mb-0">Já faz parte do Auralis?
@@ -130,7 +135,24 @@ require_once '../geral/header.php';
     </div>
 </main>
 
+<script src="https://accounts.google.com/gsi/client" async defer></script>
 <script>
+    // Recebe o ID token (JWT) do Google Identity Services e envia pro backend via POST
+    function handleGoogleCredentialResponse(response) {
+        const form = document.createElement('form');
+        form.method = 'POST';
+        form.action = 'login_google.php';
+
+        const input = document.createElement('input');
+        input.type = 'hidden';
+        input.name = 'credential';
+        input.value = response.credential;
+
+        form.appendChild(input);
+        document.body.appendChild(form);
+        form.submit();
+    }
+
     // Única Validação de Front-End necessária: Verificar se as senhas são iguais
     const formCadastro = document.getElementById('formCadastro');
     const inputSenha = document.getElementById('senha');
