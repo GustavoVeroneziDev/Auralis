@@ -159,6 +159,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && trim($_POST['tipo_registro'] ?? '')
     $parcelado   = isset($_POST['parcelado_cc']) ? 1 : 0;
     $recorrenteCC = isset($_POST['recorrente_cc']) ? 1 : 0;
     $numParcelas = $parcelado ? max(1, min(48, intval($_POST['num_parcelas_cc'] ?? 1))) : 1;
+    // Compra que já vinha de antes do Auralis (ex: comprou em 6x, só começou a usar o
+    // app na 4ª) — gera só as parcelas restantes, mantendo o total/numeração corretos.
+    $parcelaInicial = $parcelado ? max(1, min($numParcelas, intval($_POST['parcela_inicial_cc'] ?? 1))) : 1;
 
     $valorPost  = trim($_POST['valor'] ?? '');
     $valorLimpo = preg_replace('/[^\d.,]/', '', $valorPost);
@@ -175,6 +178,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && trim($_POST['tipo_registro'] ?? '')
     elseif (empty($valorRaw) || !is_numeric($valorRaw)) $erro = 'Informe um valor numérico válido.';
     elseif (floatval($valorRaw) <= 0)         $erro = 'O valor deve ser maior que zero.';
     elseif ($parcelado && $recorrenteCC)      $erro = 'Uma compra não pode ser parcelada E recorrente ao mesmo tempo.';
+    elseif ($parcelado && intval($_POST['parcela_inicial_cc'] ?? 1) > $numParcelas) $erro = 'A parcela inicial não pode ser maior que o total de parcelas.';
 
     if (!$erro) {
         $stmtCC = $pdo->prepare("SELECT * FROM CartaoCredito WHERE IDCartao = :id AND FKUsuario = :uid AND Ativo = 1");
@@ -185,8 +189,10 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && trim($_POST['tipo_registro'] ?? '')
 
     if (!$erro) {
         // Recorrente: repete o mesmo valor por N faturas futuras (mesmo limite de meses da recorrência normal)
-        $vezes        = $recorrenteCC ? 24 : $numParcelas;
-        $grupoParcela = ($vezes > 1) ? gerarUuid() : null;
+        // Parcelado: se a compra já vinha de antes ($parcelaInicial > 1), gera só as parcelas
+        // que ainda faltam, a partir da fatura atual — sem duplicar as que já passaram.
+        $vezes        = $recorrenteCC ? 24 : ($numParcelas - $parcelaInicial + 1);
+        $grupoParcela = ($vezes > 1 || $parcelaInicial > 1) ? gerarUuid() : null;
         $mesRefBase   = _cc_mesRefAtual((int)$cartao['DiaFechamento'], (int)$cartao['DiaVencimento']);
         $valorTotal   = (float)$valorRaw;
         $valorParcela = $recorrenteCC ? $valorTotal : floor(($valorTotal / $numParcelas) * 100) / 100;
@@ -200,7 +206,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && trim($_POST['tipo_registro'] ?? '')
         for ($i = 0; $i < $vezes; $i++) {
             $mesRef = _cc_mesRefAdiante($mesRefBase, $i);
             $fatura = cartao_obterFaturaParaMesRef($pdo, $cartaoId, $usuario_id, $cartao, $mesRef);
-            $val    = $recorrenteCC ? $valorTotal : (($i === 0) ? ($valorParcela + $resto) : $valorParcela);
+            $val    = $recorrenteCC ? $valorTotal : (($i === 0 && $parcelaInicial === 1) ? ($valorParcela + $resto) : $valorParcela);
 
             $stmtL->execute([
                 ':id'    => gerarUuid(),
@@ -212,7 +218,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && trim($_POST['tipo_registro'] ?? '')
                 ':data'  => $dataCompra,
                 ':cat'   => $categoriaId,
                 ':grupo' => $grupoParcela,
-                ':parc'  => (!$recorrenteCC && $numParcelas > 1) ? ($i + 1) : null,
+                ':parc'  => (!$recorrenteCC && $numParcelas > 1) ? ($parcelaInicial + $i) : null,
                 ':tot'   => (!$recorrenteCC && $numParcelas > 1) ? $numParcelas : null,
             ]);
             cartao_sincronizarPreview($pdo, $fatura['IDFatura'], $usuario_id, $cartao);
@@ -255,6 +261,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $diaVencimento  = $recorrente ? intval($_POST['dia_vencimento'] ?? 0) : null;
     $parcelado      = isset($_POST['parcelado']) ? 1 : 0;
     $numParcelas    = $parcelado ? max(2, min(48, intval($_POST['num_parcelas'] ?? 2))) : 1;
+    // Compra/recebimento que já vinha de antes do Auralis — gera só as parcelas restantes.
+    $parcelaInicial = $parcelado ? max(1, min($numParcelas, intval($_POST['parcela_inicial'] ?? 1))) : 1;
 
     // Validações (agora usando o valorRaw limpo)
     if (!in_array($tipoRegistro, ['receita', 'despesa'])) $erro = "Tipo de registro inválido.";
@@ -268,6 +276,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     elseif ($recorrente && ($diaVencimento < 1 || $diaVencimento > 31)) $erro = "Dia de vencimento inválido (1 a 31).";
     elseif ($parcelado && intval($_POST['num_parcelas'] ?? 0) === 1) $erro = "O número de parcelas não pode ser 1. Se não quiser parcelar, desative a opção de parcelamento.";
     elseif ($parcelado && $recorrente) $erro = "Uma transação não pode ser parcelada E recorrente ao mesmo tempo.";
+    elseif ($parcelado && intval($_POST['parcela_inicial'] ?? 1) > $numParcelas) $erro = "A parcela inicial não pode ser maior que o total de parcelas.";
     elseif ($parcelado && !isset($_POST['id_editar']) && !$_testeNT) {
         $_limParcNT = limitesDoPlano()['parcelas_max'];
         if ($numParcelas > $_limParcNT) {
@@ -453,7 +462,10 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                     $dataVencBase = new DateTime($dataVencimento);
 
                     $primeiroIdParc = null;
-                    for ($i = 0; $i < $numParcelas; $i++) {
+                    // Se a compra já vinha de antes ($parcelaInicial > 1), gera só as parcelas
+                    // que ainda faltam a partir da data informada, sem duplicar as que já passaram.
+                    $vezesRestantes = $numParcelas - $parcelaInicial + 1;
+                    for ($i = 0; $i < $vezesRestantes; $i++) {
                         $mesAlvo    = (int)$dataBase->format('m') + $i;
                         $anoAlvo    = (int)$dataBase->format('Y') + (int)floor(($mesAlvo - 1) / 12);
                         $mesAlvo    = (($mesAlvo - 1) % 12) + 1;
@@ -468,7 +480,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                         $diaVencCorreto = min($diaVencAlvo, (int)date('t', strtotime(sprintf('%04d-%02d-01', $anoVenc, $mesVenc))));
                         $dataVencStr = sprintf('%04d-%02d-%02d', $anoVenc, $mesVenc, $diaVencCorreto);
 
-                        $valAtual = ($i === 0) ? ($valorParcela + $resto) : $valorParcela;
+                        $valAtual = ($i === 0 && $parcelaInicial === 1) ? ($valorParcela + $resto) : $valorParcela;
                         $statusP  = ($i === 0) ? $statusRegistro : 'pendente';
 
                         $idParcela = gerarUuid();
@@ -487,7 +499,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                             ':usuario'   => $usuario_id,
                             ':categoria' => $categoriaId,
                             ':grupo'     => $grupoParcela,
-                            ':parc_atual' => ($i + 1),
+                            ':parc_atual' => ($parcelaInicial + $i),
                             ':tot_parc'  => $numParcelas,
                         ]);
                     }
@@ -613,6 +625,7 @@ $val_rec    = isset($_POST['recorrente']) ? true : ($transacao_edit ? $transacao
 $val_dia        = $_POST['dia_vencimento'] ?? ($transacao_edit ? $transacao_edit['DiaVencimento'] : '');
 $val_parcelado  = isset($_POST['parcelado']) ? true : false;
 $val_num_parc   = $_POST['num_parcelas'] ?? 2;
+$val_parc_ini   = $_POST['parcela_inicial'] ?? 1;
 
 // Na edição, parcelamento não está disponível para evitar inconsistências
 $is_edicao      = !empty($id_editar);
@@ -784,11 +797,18 @@ require_once 'geral/header.php';
                                             </div>
                                             <div id="bloco_parc_cc" style="display:none;" class="ps-3 border-start border-border-color">
                                                 <label class="form-label text-secondary-analysis fs-7 mb-1">Em quantas vezes?</label>
-                                                <div class="d-flex align-items-center gap-3">
+                                                <div class="d-flex align-items-center gap-3 mb-3">
                                                     <input type="number" name="num_parcelas_cc" id="num_parcelas_cc"
                                                         class="form-control bg-dark border-border-color text-light-analysis form-control-sm no-spinners fs-7"
                                                         style="max-width:100px;" min="2" max="48" placeholder="Ex: 3" value="2">
                                                     <div id="preview_parc_cc" class="fs-7"></div>
+                                                </div>
+                                                <label class="form-label text-secondary-analysis fs-7 mb-1">Essa compra já vem de antes? Em qual parcela você está começando?</label>
+                                                <input type="number" name="parcela_inicial_cc" id="parcela_inicial_cc"
+                                                    class="form-control bg-dark border-border-color text-light-analysis form-control-sm no-spinners fs-7"
+                                                    style="max-width:100px;" min="1" max="48" placeholder="1" value="1">
+                                                <div class="text-secondary mt-1" style="font-size:0.7rem;">
+                                                    <i class="bi bi-info-circle me-1"></i>Deixe 1 se a compra é nova. Se já vinha de antes (ex: comprou em 6x mas só começou a usar o Auralis na 4ª), informe a parcela atual — só as parcelas futuras serão lançadas.
                                                 </div>
                                             </div>
                                         </div>
@@ -1002,6 +1022,15 @@ require_once 'geral/header.php';
                                                                 style="max-width:100px;" min="2" max="48" placeholder="Ex: 3"
                                                                 value="<?= htmlspecialchars($val_num_parc) ?>">
                                                             <div id="preview_parcela" class="fs-7"></div>
+                                                        </div>
+
+                                                        <label class="form-label text-secondary-analysis fs-7 mb-1">Já vem de antes? Em qual parcela você está começando?</label>
+                                                        <input type="number" name="parcela_inicial" id="parcela_inicial"
+                                                            class="form-control bg-dark border-border-color text-light-analysis form-control-sm no-spinners fs-7"
+                                                            style="max-width:100px;" min="1" max="48" placeholder="1"
+                                                            value="<?= htmlspecialchars($val_parc_ini) ?>">
+                                                        <div class="text-secondary mt-1 mb-3" style="font-size:0.7rem;">
+                                                            <i class="bi bi-info-circle me-1"></i>Deixe 1 se é nova. Se já vinha de antes, informe em qual parcela você está — só as parcelas futuras serão lançadas.
                                                         </div>
 
                                                         <?php
@@ -1533,6 +1562,16 @@ require_once 'geral/header.php';
     }
 
     if (inputParcelas) inputParcelas.addEventListener('input', atualizarPreviewParcela);
+
+    // A parcela inicial nunca pode passar do total de parcelas
+    const inputParcelaInicial = document.getElementById('parcela_inicial');
+    if (inputParcelas && inputParcelaInicial) {
+        inputParcelas.addEventListener('input', function() {
+            const n = parseInt(inputParcelas.value) || 1;
+            inputParcelaInicial.max = n;
+            if (parseInt(inputParcelaInicial.value) > n) inputParcelaInicial.value = n;
+        });
+    }
     if (inputValor) inputValor.addEventListener('input', atualizarPreviewParcela);
 
     atualizarPreviewParcela();
@@ -1761,6 +1800,7 @@ require_once 'geral/header.php';
         const prevCC = document.getElementById('preview_parc_cc');
         const valCC = document.getElementById('valor');
         const togRecCC = document.getElementById('toggle_recorrente_cc');
+        const parcIniCC = document.getElementById('parcela_inicial_cc');
         if (!togCC) return;
         togCC.addEventListener('change', function() {
             blocoCC.style.display = this.checked ? 'block' : 'none';
@@ -1779,6 +1819,15 @@ require_once 'geral/header.php';
         }
         if (numCC) numCC.addEventListener('input', calcPreviewCC);
         if (valCC) valCC.addEventListener('input', calcPreviewCC);
+
+        // A parcela inicial nunca pode passar do total de parcelas
+        if (numCC && parcIniCC) {
+            numCC.addEventListener('input', function() {
+                const n = parseInt(numCC.value) || 1;
+                parcIniCC.max = n;
+                if (parseInt(parcIniCC.value) > n) parcIniCC.value = n;
+            });
+        }
 
         function calcPreviewCC() {
             if (!togCC.checked || !prevCC) return;
