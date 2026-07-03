@@ -109,22 +109,7 @@ require_once '../geral/header.php';
                     </div>
 
                     <div class="d-grid mb-4">
-                        <div id="g_id_onload"
-                             data-client_id="808511905880-4l0raul5fuf3rkukms9easdq65375o2t.apps.googleusercontent.com"
-                             data-callback="handleGoogleCredentialResponse"
-                             data-auto_prompt="false">
-                        </div>
-                        <div class="d-flex justify-content-center">
-                            <div class="g_id_signin"
-                                 data-type="standard"
-                                 data-shape="pill"
-                                 data-theme="filled_black"
-                                 data-text="signin_with"
-                                 data-size="large"
-                                 data-logo_alignment="left"
-                                 data-width="400">
-                            </div>
-                        </div>
+                        <div id="googleBtnContainer" class="d-flex justify-content-center" style="color-scheme: light;"></div>
                     </div>
                     <div class="text-center mt-5">
                         <p class="text-light opacity-75 mb-0">Ainda não tem uma conta? <a href="cadastro.php" class="text-primary text-decoration-none fw-semibold custom-link">Cadastre-se grátis</a></p>
@@ -137,7 +122,7 @@ require_once '../geral/header.php';
     </div>
 </main>
 
-<script src="https://accounts.google.com/gsi/client" async defer></script>
+<script src="https://accounts.google.com/gsi/client" async defer onload="iniciarBotaoGoogle()"></script>
 <script>
     // Recebe o ID token (JWT) do Google Identity Services e envia pro backend via POST
     function handleGoogleCredentialResponse(response) {
@@ -153,6 +138,40 @@ require_once '../geral/header.php';
         form.appendChild(input);
         document.body.appendChild(form);
         form.submit();
+    }
+
+    // Renderiza o botão via JS (em vez do atributo data-width fixo) pra calcular a
+    // largura real do container e recalcular no resize — o widget do Google não
+    // é responsivo por padrão, e um valor fixo quebra em telas pequenas.
+    function iniciarBotaoGoogle() {
+        google.accounts.id.initialize({
+            client_id: '808511905880-4l0raul5fuf3rkukms9easdq65375o2t.apps.googleusercontent.com',
+            callback: handleGoogleCredentialResponse
+        });
+
+        const container = document.getElementById('googleBtnContainer');
+
+        function desenharBotaoGoogle() {
+            container.innerHTML = '';
+            const largura = Math.max(200, Math.min(400, container.offsetWidth));
+            google.accounts.id.renderButton(container, {
+                type: 'standard',
+                shape: 'pill',
+                theme: 'filled_black',
+                text: 'signin_with',
+                size: 'large',
+                logo_alignment: 'left',
+                width: largura
+            });
+        }
+
+        desenharBotaoGoogle();
+
+        let resizeTimeout;
+        window.addEventListener('resize', function () {
+            clearTimeout(resizeTimeout);
+            resizeTimeout = setTimeout(desenharBotaoGoogle, 200);
+        });
     }
 
     // Lógica para o botão de Mostrar/Ocultar Senha

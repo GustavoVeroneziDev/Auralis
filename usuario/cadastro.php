@@ -104,21 +104,7 @@ require_once '../geral/header.php';
                             <hr class="flex-grow-1 border-secondary opacity-25">
                         </div>
 
-                        <div id="g_id_onload"
-                             data-client_id="808511905880-4l0raul5fuf3rkukms9easdq65375o2t.apps.googleusercontent.com"
-                             data-callback="handleGoogleCredentialResponse">
-                        </div>
-                        <div class="d-flex justify-content-center">
-                            <div class="g_id_signin"
-                                 data-type="standard"
-                                 data-shape="pill"
-                                 data-theme="filled_black"
-                                 data-text="signup_with"
-                                 data-size="large"
-                                 data-logo_alignment="left"
-                                 data-width="400">
-                            </div>
-                        </div>
+                        <div id="googleBtnContainer" class="d-flex justify-content-center" style="color-scheme: light;"></div>
                     </div>
 
                     <div class="text-center mt-5">
@@ -135,7 +121,7 @@ require_once '../geral/header.php';
     </div>
 </main>
 
-<script src="https://accounts.google.com/gsi/client" async defer></script>
+<script src="https://accounts.google.com/gsi/client" async defer onload="iniciarBotaoGoogle()"></script>
 <script>
     // Recebe o ID token (JWT) do Google Identity Services e envia pro backend via POST
     function handleGoogleCredentialResponse(response) {
@@ -151,6 +137,40 @@ require_once '../geral/header.php';
         form.appendChild(input);
         document.body.appendChild(form);
         form.submit();
+    }
+
+    // Renderiza o botão via JS (em vez do atributo data-width fixo) pra calcular a
+    // largura real do container e recalcular no resize — o widget do Google não
+    // é responsivo por padrão, e um valor fixo quebra em telas pequenas.
+    function iniciarBotaoGoogle() {
+        google.accounts.id.initialize({
+            client_id: '808511905880-4l0raul5fuf3rkukms9easdq65375o2t.apps.googleusercontent.com',
+            callback: handleGoogleCredentialResponse
+        });
+
+        const container = document.getElementById('googleBtnContainer');
+
+        function desenharBotaoGoogle() {
+            container.innerHTML = '';
+            const largura = Math.max(200, Math.min(400, container.offsetWidth));
+            google.accounts.id.renderButton(container, {
+                type: 'standard',
+                shape: 'pill',
+                theme: 'filled_black',
+                text: 'signup_with',
+                size: 'large',
+                logo_alignment: 'left',
+                width: largura
+            });
+        }
+
+        desenharBotaoGoogle();
+
+        let resizeTimeout;
+        window.addEventListener('resize', function () {
+            clearTimeout(resizeTimeout);
+            resizeTimeout = setTimeout(desenharBotaoGoogle, 200);
+        });
     }
 
     // Única Validação de Front-End necessária: Verificar se as senhas são iguais
