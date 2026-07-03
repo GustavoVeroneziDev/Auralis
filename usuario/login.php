@@ -28,6 +28,11 @@ require_once '../geral/header.php';
                             <i class="bi bi-exclamation-circle-fill me-3 fs-5"></i>
                             <div>Por favor, preencha todos os campos para entrar.</div>
                         </div>
+                    <?php elseif ($_GET['erro'] === 'muitas_tentativas'): ?>
+                        <div class="alert alert-warning d-flex align-items-center rounded-3 shadow-sm border-0 mb-4 bg-warning bg-opacity-10 text-warning" role="alert">
+                            <i class="bi bi-shield-lock-fill me-3 fs-5"></i>
+                            <div><strong>Muitas tentativas.</strong> Aguarde alguns minutos antes de tentar de novo.</div>
+                        </div>
                     <?php endif; ?>
                 <?php endif; ?>
 

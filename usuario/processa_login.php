@@ -16,12 +16,21 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         exit;
     }
 
+    // ── Anti-força-bruta: bloqueia por e-mail e por IP antes de checar a senha ──
+    $ip = $_SERVER['REMOTE_ADDR'] ?? 'desconhecido';
+    $tentativasEmail = contarTentativasSeguranca($pdo, 'login', $email, 15);
+    $tentativasIp    = contarTentativasSeguranca($pdo, 'login_ip', $ip, 15);
+    if ($tentativasEmail >= 6 || $tentativasIp >= 20) {
+        header("Location: login.php?erro=muitas_tentativas");
+        exit;
+    }
+
     try {
         // CORREÇÃO: Adicionado o StatusConta na busca
         $sql = "SELECT IDUsuario, Nome, Email, Senha, NivelAcesso, StatusConta, Plano, Tema, NavTipo FROM Usuario WHERE Email = :email LIMIT 1";
         $stmt = $pdo->prepare($sql);
         $stmt->execute([':email' => $email]);
-        
+
         $usuario = $stmt->fetch();
 
         // Se o usuário existir e a senha bater...
@@ -53,10 +62,12 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 setcookie('auralis_remember', $conteudo_cookie, time() + (86400 * 30), "/");
             }
 
-            header("Location: ../dashboard.php"); 
+            header("Location: ../dashboard.php");
             exit;
         } else {
-            // E-mail ou senha errados
+            // E-mail ou senha errados — registra a tentativa falha (conta pro bloqueio acima)
+            registrarTentativaSeguranca($pdo, 'login', $email);
+            registrarTentativaSeguranca($pdo, 'login_ip', $ip);
             header("Location: login.php?erro=invalido");
             exit;
         }

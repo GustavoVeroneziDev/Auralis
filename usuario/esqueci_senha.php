@@ -67,13 +67,7 @@
 
     <?php if (isset($_GET['status']) && $_GET['status'] === 'enviado'): ?>
         <div class="alert alert-success border-0 text-center small" style="background-color: rgba(25, 135, 84, 0.1); color: #2ecc71;">
-            <i class="bi bi-check-circle-fill me-2"></i> Link enviado! Verifique sua caixa de entrada e de spam.
-        </div>
-    <?php endif; ?>
-
-    <?php if (isset($_GET['erro']) && $_GET['erro'] === 'nao_encontrado'): ?>
-        <div class="alert alert-danger border-0 text-center small" style="background-color: rgba(220, 53, 69, 0.1); color: #e74c3c;">
-            <i class="bi bi-exclamation-triangle-fill me-2"></i> E-mail não encontrado no sistema.
+            <i class="bi bi-check-circle-fill me-2"></i> Se esse e-mail estiver cadastrado no Auralis, enviamos um link de redefinição. Verifique sua caixa de entrada e de spam.
         </div>
     <?php endif; ?>
 
