@@ -116,7 +116,7 @@ require_once '../geral/header.php';
                                  data-text="signup_with"
                                  data-size="large"
                                  data-logo_alignment="left"
-                                 data-width="330">
+                                 data-width="400">
                             </div>
                         </div>
                     </div>
