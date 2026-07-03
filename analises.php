@@ -1495,11 +1495,15 @@ require_once 'geral/header.php';
         const totalOverlay = document.getElementById(`total-overlay-${tipo}`);
         if (!wrapper) return;
         if (visual === 'barra') {
+            // Tira o flex-center herdado do modo pizza — com ele, o canvas fica com largura
+            // "automática" e sobra espaço vazio dos dois lados em vez de ocupar o container todo.
+            wrapper.style.display = 'block';
             wrapper.style.maxWidth = '100%';
             wrapper.style.aspectRatio = 'auto';
             wrapper.style.height = Math.max(220, numCategorias * 46) + 'px';
             if (totalOverlay) totalOverlay.style.display = 'none';
         } else {
+            wrapper.style.display = '';
             wrapper.style.maxWidth = '320px';
             wrapper.style.aspectRatio = '1';
             wrapper.style.height = '';
