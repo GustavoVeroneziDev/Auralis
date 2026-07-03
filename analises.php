@@ -8,6 +8,7 @@ if (! isset($_SESSION['usuario_id'])) {
     exit;
 }
 require_once 'config/conexao.php';
+require_once 'config/funcoes.php';
 
 // Gate: acesso configurável via /admin/configuracoes_planos.php
 $_testeAnalises = function_exists('obterHorasRestantesTeste') && obterHorasRestantesTeste() > 0;
@@ -186,6 +187,84 @@ if ($carteira_selecionada) {
         }
     } catch (PDOException $e) {
     }
+}
+
+// ── Taxa de poupança (mês atual x mês anterior) ────────────────────────
+$totalDespesasAnt = array_sum($gastosPorCategoriaAnt);
+$totalReceitasAnt = array_sum($receitasPorCategoriaAnt);
+
+$taxaPoupancaAtual = $totalReceitas > 0 ? round((($totalReceitas - $totalDespesas) / $totalReceitas) * 100, 1) : null;
+$taxaPoupancaAnt    = $totalReceitasAnt > 0 ? round((($totalReceitasAnt - $totalDespesasAnt) / $totalReceitasAnt) * 100, 1) : null;
+
+// ── Evolução histórica (últimos 6 ou 12 meses) ──────────────────────────
+$_qtdMesesHist = (isset($_GET['hist']) && (int)$_GET['hist'] === 12) ? 12 : 6;
+$historicoMensal = [];
+
+if ($carteira_selecionada) {
+    try {
+        $dtInicioHist = new DateTime(sprintf('%04d-%02d-01', $ano_atual, $mes_atual));
+        $dtInicioHist->modify('-' . ($_qtdMesesHist - 1) . ' months');
+
+        $sqlHist = "
+            SELECT YEAR(r.MomentoRegistro) as ano, MONTH(r.MomentoRegistro) as mes,
+                   r.TipoRegistro, SUM(r.Valor) as total
+            FROM Registro r
+            WHERE r.FKUsuario = :uid
+              AND r.FKCarteira = :carteira_id
+              AND r.StatusRegistro = 'efetivado'
+              AND r.TipoRegistro IN ('receita','despesa')
+              AND r.MomentoRegistro >= :data_inicio
+            GROUP BY ano, mes, r.TipoRegistro
+        ";
+        $stmtHist = $pdo->prepare($sqlHist);
+        $stmtHist->execute([
+            ':uid'         => $usuario_id,
+            ':carteira_id' => $carteira_selecionada,
+            ':data_inicio' => $dtInicioHist->format('Y-m-01'),
+        ]);
+
+        $brutoHist = [];
+        foreach ($stmtHist->fetchAll(PDO::FETCH_ASSOC) as $row) {
+            $chave = $row['ano'] . '-' . str_pad($row['mes'], 2, '0', STR_PAD_LEFT);
+            $brutoHist[$chave][$row['TipoRegistro']] = (float)$row['total'];
+        }
+
+        $cursorHist = clone $dtInicioHist;
+        for ($i = 0; $i < $_qtdMesesHist; $i++) {
+            $chave = $cursorHist->format('Y-m');
+            $rec   = $brutoHist[$chave]['receita'] ?? 0;
+            $desp  = $brutoHist[$chave]['despesa'] ?? 0;
+            $historicoMensal[] = [
+                'label'    => mb_substr($meses_pt[(int)$cursorHist->format('n')], 0, 3) . '/' . $cursorHist->format('y'),
+                'receita'  => $rec,
+                'despesa'  => $desp,
+                'saldo'    => $rec - $desp,
+            ];
+            $cursorHist->modify('+1 month');
+        }
+    } catch (PDOException $e) {
+    }
+}
+
+// ── Categorias do usuário + metas/orçamento definidos ───────────────────
+garantirTabelaMetaCategoria($pdo);
+
+$categoriasUsuario = [];
+try {
+    $stmtCatU = $pdo->prepare("SELECT IDCategoria, NomeCategoria, TipoCategoria, IconeCategoria FROM Categoria WHERE FKUsuario = :uid ORDER BY NomeCategoria ASC");
+    $stmtCatU->execute([':uid' => $usuario_id]);
+    $categoriasUsuario = $stmtCatU->fetchAll(PDO::FETCH_ASSOC);
+} catch (PDOException $e) {
+}
+
+$metasPorCategoria = [];
+try {
+    $stmtMetas = $pdo->prepare("SELECT FKCategoria, ValorMeta FROM MetaCategoria WHERE FKUsuario = :uid");
+    $stmtMetas->execute([':uid' => $usuario_id]);
+    foreach ($stmtMetas->fetchAll(PDO::FETCH_ASSOC) as $m) {
+        $metasPorCategoria[$m['FKCategoria']] = (float)$m['ValorMeta'];
+    }
+} catch (PDOException $e) {
 }
 
 // ── Cofrinhos do usuário ──────────────────────────────────────────────
@@ -412,6 +491,86 @@ require_once 'geral/header.php';
         </div>
     </div>
 
+    <!-- ── Taxa de Poupança ────────────────────────────────────────────── -->
+    <div class="row g-4 mb-5">
+        <div class="col-12">
+            <div class="card rounded-4 shadow-sm" style="background:var(--bg-card);border:1px solid var(--card-border-color);">
+                <div class="card-body p-4 d-flex align-items-center flex-wrap gap-4">
+                    <div class="rounded-circle flex-shrink-0 d-flex justify-content-center align-items-center" style="width:70px;height:70px;background:rgba(96,165,250,0.18);">
+                        <i class="bi bi-piggy-bank fs-1 mb-0" style="color:#60a5fa;"></i>
+                    </div>
+                    <div class="flex-grow-1">
+                        <p class="small mb-1 text-uppercase fw-bold tracking-wide" style="color:#60a5fa;opacity:0.85;">Taxa de Poupança do Mês</p>
+                        <?php if ($taxaPoupancaAtual !== null): ?>
+                            <div class="d-flex align-items-center gap-2 flex-wrap">
+                                <h3 class="fw-bold mb-0" style="color:<?php echo $taxaPoupancaAtual >= 0 ? '#60a5fa' : 'var(--color-expense-text)'; ?>;">
+                                    <?php echo number_format($taxaPoupancaAtual, 1, ',', '.') ?>%
+                                </h3>
+                                <?php if ($taxaPoupancaAnt !== null):
+                                    $deltaPoup = $taxaPoupancaAtual - $taxaPoupancaAnt;
+                                    $absPoup   = abs(round($deltaPoup, 1));
+                                    if ($absPoup >= 0.5):
+                                        $bgPoup = $deltaPoup > 0 ? 'var(--color-income-bg)' : 'var(--color-expense-bg)';
+                                        $colPoup = $deltaPoup > 0 ? 'var(--color-income-text)' : 'var(--color-expense-text)';
+                                        $bordPoup = $deltaPoup > 0 ? 'var(--color-income-border)' : 'var(--color-expense-border)';
+                                        $iconPoup = $deltaPoup > 0 ? 'bi-arrow-up-short' : 'bi-arrow-down-short';
+                                ?>
+                                    <span style="display:inline-flex;align-items:center;background:<?php echo $bgPoup; ?>;color:<?php echo $colPoup; ?>;border:1px solid <?php echo $bordPoup; ?>;border-radius:999px;padding:1px 7px;font-size:0.68rem;font-weight:600;">
+                                        <i class="bi <?php echo $iconPoup; ?>"></i><?php echo $absPoup; ?> p.p.
+                                    </span>
+                                <?php endif; endif; ?>
+                            </div>
+                            <p class="text-secondary small mb-0 mt-1">
+                                <?php if ($taxaPoupancaAtual >= 0): ?>
+                                    Você guardou <?php echo number_format($taxaPoupancaAtual, 1, ',', '.') ?>% da sua renda em <?php echo $nome_mes ?>.
+                                <?php else: ?>
+                                    Você gastou <?php echo number_format(abs($taxaPoupancaAtual), 1, ',', '.') ?>% a mais do que recebeu em <?php echo $nome_mes ?>.
+                                <?php endif; ?>
+                            </p>
+                            <?php if ($taxaPoupancaAnt !== null): ?>
+                                <small class="text-secondary" style="font-size:0.7rem;">Mês anterior: <?php echo number_format($taxaPoupancaAnt, 1, ',', '.') ?>%</small>
+                            <?php endif; ?>
+                        <?php else: ?>
+                            <h5 class="text-secondary mb-0">Sem receita registrada este mês</h5>
+                        <?php endif; ?>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- ── Evolução Histórica ──────────────────────────────────────────── -->
+    <div class="row g-4 mb-5" id="evolucao-historica">
+        <div class="col-12">
+            <div class="card shadow-sm rounded-4" style="background:var(--bg-card);border:1px solid var(--card-border-color);">
+                <div class="card-header border-bottom border-secondary-subtle bg-transparent p-4 d-flex justify-content-between align-items-center flex-wrap gap-2">
+                    <h5 class="text-light fw-bold mb-0">Evolução Histórica</h5>
+                    <?php
+                        $_qsBase = "mes={$mes_atual}&ano={$ano_atual}" . ($carteira_selecionada ? "&carteira=" . urlencode($carteira_selecionada) : "");
+                    ?>
+                    <div class="btn-group btn-group-sm" role="group" aria-label="Período do histórico">
+                        <a href="?<?php echo $_qsBase ?>&hist=6#evolucao-historica"
+                           class="btn visual-toggle-btn <?php echo $_qtdMesesHist === 6 ? 'active' : '' ?>">6 meses</a>
+                        <a href="?<?php echo $_qsBase ?>&hist=12#evolucao-historica"
+                           class="btn visual-toggle-btn <?php echo $_qtdMesesHist === 12 ? 'active' : '' ?>">12 meses</a>
+                    </div>
+                </div>
+                <div class="card-body p-4">
+                    <?php if (!empty($historicoMensal)): ?>
+                        <div style="height:320px;">
+                            <canvas id="graficoHistorico"></canvas>
+                        </div>
+                    <?php else: ?>
+                        <div class="text-center text-secondary py-4">
+                            <i class="bi bi-graph-up fs-1 mb-2 d-block opacity-50"></i>
+                            Ainda não há dados suficientes pra mostrar a evolução.
+                        </div>
+                    <?php endif; ?>
+                </div>
+            </div>
+        </div>
+    </div>
+
     <?php if ($totalDespesas > 0): ?>
         <div class="row g-4 mb-5">
             <div class="col-lg-6">
@@ -507,6 +666,137 @@ require_once 'geral/header.php';
             <p class="text-secondary">Parece que a carteira "<?php echo htmlspecialchars($nome_carteira_atual); ?>" não tem transações efetivadas em <?php echo $nome_mes ?>.</p>
         </div>
     <?php endif; ?>
+
+    <!-- ══════════════════════════════════════════════════════════════════════ -->
+    <!-- ── Metas por Categoria (orçamento de despesa / meta de receita) ──── -->
+    <!-- ══════════════════════════════════════════════════════════════════════ -->
+    <div class="row g-4 mb-5" id="metas-categoria">
+        <?php
+            $_msgsMeta = [
+                'meta_salva'    => 'Meta salva com sucesso!',
+                'meta_removida' => 'Meta removida.',
+            ];
+            $_errosMeta = [
+                'categoria_invalida' => 'Categoria inválida.',
+                'valor_invalido'     => 'Informe um valor numérico maior que zero.',
+                'banco'              => 'Erro ao salvar no banco de dados.',
+            ];
+        ?>
+        <?php if (isset($_GET['sucesso_meta']) && isset($_msgsMeta[$_GET['sucesso_meta']])): ?>
+            <div class="col-12">
+                <div class="alert alert-success rounded-4 border-0 mb-0 py-2 px-3 small fw-semibold">
+                    <i class="bi bi-check-circle me-2"></i><?php echo htmlspecialchars($_msgsMeta[$_GET['sucesso_meta']]) ?>
+                </div>
+            </div>
+        <?php endif; ?>
+        <?php if (isset($_GET['erro_meta']) && isset($_errosMeta[$_GET['erro_meta']])): ?>
+            <div class="col-12">
+                <div class="alert rounded-4 border-0 mb-0 py-2 px-3 small fw-semibold" style="background:rgba(220,38,38,0.15);color:#fca5a5;">
+                    <i class="bi bi-exclamation-triangle me-2"></i><?php echo htmlspecialchars($_errosMeta[$_GET['erro_meta']]) ?>
+                </div>
+            </div>
+        <?php endif; ?>
+
+        <div class="col-lg-6">
+            <div class="card shadow-sm rounded-4 h-100" style="background:var(--bg-card);border:1px solid var(--card-border-color);">
+                <div class="card-header border-bottom border-secondary-subtle bg-transparent p-4">
+                    <h5 class="text-light fw-bold mb-0"><i class="bi bi-piggy-bank me-2 text-danger"></i>Orçamento por Categoria (Despesas)</h5>
+                    <p class="text-secondary small mb-0 mt-1">Defina um limite mensal e acompanhe se está estourando.</p>
+                </div>
+                <div class="card-body p-0">
+                    <?php
+                        $_catsDespesa = array_filter($categoriasUsuario, fn($c) => $c['TipoCategoria'] === 'despesa');
+                    ?>
+                    <?php if (empty($_catsDespesa)): ?>
+                        <div class="p-4 text-center text-secondary small">Nenhuma categoria de despesa cadastrada.</div>
+                    <?php else: ?>
+                        <?php foreach ($_catsDespesa as $cat):
+                            $gastoAtualCat = $gastosPorCategoria[$cat['NomeCategoria']] ?? 0;
+                            $metaCat       = $metasPorCategoria[$cat['IDCategoria']] ?? null;
+                            $pctCat        = ($metaCat && $metaCat > 0) ? round(($gastoAtualCat / $metaCat) * 100, 1) : null;
+                        ?>
+                        <div class="d-flex align-items-center justify-content-between px-4 py-3 border-bottom border-secondary-subtle">
+                            <div class="d-flex align-items-center gap-3 flex-grow-1 min-w-0">
+                                <i class="bi <?php echo htmlspecialchars($cat['IconeCategoria'] ?: 'bi-tag') ?> text-secondary fs-5 flex-shrink-0"></i>
+                                <div class="flex-grow-1 min-w-0">
+                                    <div class="text-light fw-semibold text-truncate"><?php echo htmlspecialchars($cat['NomeCategoria']) ?></div>
+                                    <?php if ($pctCat !== null): ?>
+                                        <div class="progress rounded-pill mt-1" style="height:6px;background:rgba(255,255,255,0.07);">
+                                            <div class="progress-bar rounded-pill"
+                                                 style="width:<?php echo min(100, $pctCat) ?>%;background:<?php echo $pctCat >= 100 ? 'var(--color-expense-text)' : '#60a5fa'; ?>;"></div>
+                                        </div>
+                                        <div class="d-flex justify-content-between mt-1">
+                                            <span class="text-secondary" style="font-size:0.72rem;">R$ <?php echo number_format($gastoAtualCat, 2, ',', '.') ?> / R$ <?php echo number_format($metaCat, 2, ',', '.') ?></span>
+                                            <?php if ($pctCat >= 100): ?>
+                                                <span class="fw-semibold text-danger" style="font-size:0.72rem;"><i class="bi bi-exclamation-triangle-fill me-1"></i>Estourou!</span>
+                                            <?php endif; ?>
+                                        </div>
+                                    <?php else: ?>
+                                        <span class="badge rounded-pill text-secondary border border-secondary-subtle mt-1" style="font-size:0.7rem;">Sem orçamento definido</span>
+                                    <?php endif; ?>
+                                </div>
+                            </div>
+                            <button type="button" class="btn btn-sm btn-outline-secondary rounded-pill flex-shrink-0 ms-2"
+                                    onclick="abrirModalMeta('<?php echo htmlspecialchars($cat['IDCategoria']) ?>','<?php echo htmlspecialchars(addslashes($cat['NomeCategoria'])) ?>','despesa',<?php echo $metaCat !== null ? $metaCat : 'null' ?>)">
+                                <i class="bi bi-pencil"></i>
+                            </button>
+                        </div>
+                        <?php endforeach; ?>
+                    <?php endif; ?>
+                </div>
+            </div>
+        </div>
+
+        <div class="col-lg-6">
+            <div class="card shadow-sm rounded-4 h-100" style="background:var(--bg-card);border:1px solid var(--card-border-color);">
+                <div class="card-header border-bottom border-secondary-subtle bg-transparent p-4">
+                    <h5 class="text-light fw-bold mb-0"><i class="bi bi-flag-fill me-2 text-success"></i>Meta por Categoria (Receitas)</h5>
+                    <p class="text-secondary small mb-0 mt-1">Defina uma meta mensal e acompanhe se já bateu.</p>
+                </div>
+                <div class="card-body p-0">
+                    <?php
+                        $_catsReceita = array_filter($categoriasUsuario, fn($c) => $c['TipoCategoria'] === 'receita');
+                    ?>
+                    <?php if (empty($_catsReceita)): ?>
+                        <div class="p-4 text-center text-secondary small">Nenhuma categoria de receita cadastrada.</div>
+                    <?php else: ?>
+                        <?php foreach ($_catsReceita as $cat):
+                            $receitaAtualCat = $receitasPorCategoria[$cat['NomeCategoria']] ?? 0;
+                            $metaCatR        = $metasPorCategoria[$cat['IDCategoria']] ?? null;
+                            $pctCatR         = ($metaCatR && $metaCatR > 0) ? round(($receitaAtualCat / $metaCatR) * 100, 1) : null;
+                        ?>
+                        <div class="d-flex align-items-center justify-content-between px-4 py-3 border-bottom border-secondary-subtle">
+                            <div class="d-flex align-items-center gap-3 flex-grow-1 min-w-0">
+                                <i class="bi <?php echo htmlspecialchars($cat['IconeCategoria'] ?: 'bi-tag') ?> text-secondary fs-5 flex-shrink-0"></i>
+                                <div class="flex-grow-1 min-w-0">
+                                    <div class="text-light fw-semibold text-truncate"><?php echo htmlspecialchars($cat['NomeCategoria']) ?></div>
+                                    <?php if ($pctCatR !== null): ?>
+                                        <div class="progress rounded-pill mt-1" style="height:6px;background:rgba(255,255,255,0.07);">
+                                            <div class="progress-bar rounded-pill"
+                                                 style="width:<?php echo min(100, $pctCatR) ?>%;background:#06D6A0;"></div>
+                                        </div>
+                                        <div class="d-flex justify-content-between mt-1">
+                                            <span class="text-secondary" style="font-size:0.72rem;">R$ <?php echo number_format($receitaAtualCat, 2, ',', '.') ?> / R$ <?php echo number_format($metaCatR, 2, ',', '.') ?></span>
+                                            <?php if ($pctCatR >= 100): ?>
+                                                <span class="fw-semibold" style="font-size:0.72rem;color:#06D6A0;"><i class="bi bi-check-circle-fill me-1"></i>Meta atingida!</span>
+                                            <?php endif; ?>
+                                        </div>
+                                    <?php else: ?>
+                                        <span class="badge rounded-pill text-secondary border border-secondary-subtle mt-1" style="font-size:0.7rem;">Sem meta definida</span>
+                                    <?php endif; ?>
+                                </div>
+                            </div>
+                            <button type="button" class="btn btn-sm btn-outline-secondary rounded-pill flex-shrink-0 ms-2"
+                                    onclick="abrirModalMeta('<?php echo htmlspecialchars($cat['IDCategoria']) ?>','<?php echo htmlspecialchars(addslashes($cat['NomeCategoria'])) ?>','receita',<?php echo $metaCatR !== null ? $metaCatR : 'null' ?>)">
+                                <i class="bi bi-pencil"></i>
+                            </button>
+                        </div>
+                        <?php endforeach; ?>
+                    <?php endif; ?>
+                </div>
+            </div>
+        </div>
+    </div>
 
     <!-- ══════════════════════════════════════════════════════════════════════ -->
     <!-- ── Seção Cofrinhos & Metas ─────────────────────────────────────── -->
@@ -1228,6 +1518,142 @@ require_once 'geral/header.php';
         });
     });
 
+    // ── Gráfico de evolução histórica (linha) ──────────────────────────────
+    (function() {
+        const canvas = document.getElementById('graficoHistorico');
+        if (!canvas) return;
+
+        const historico = <?php echo json_encode($historicoMensal) ?>;
+        const style = getComputedStyle(document.documentElement);
+        const textMain = style.getPropertyValue('--text-main').trim() || '#f8fafc';
+        const textMuted = style.getPropertyValue('--text-muted').trim() || '#a1a1aa';
+        const bgCard = style.getPropertyValue('--bg-card').trim() || '#1e2126';
+        const accentRgb = style.getPropertyValue('--bs-primary-rgb').trim() || '212,175,55';
+
+        new Chart(canvas.getContext('2d'), {
+            type: 'line',
+            data: {
+                labels: historico.map(h => h.label),
+                datasets: [{
+                        label: 'Receita',
+                        data: historico.map(h => h.receita),
+                        borderColor: '#06D6A0',
+                        backgroundColor: 'rgba(6,214,160,0.12)',
+                        tension: 0.3,
+                        fill: true,
+                        pointRadius: 3,
+                        pointBackgroundColor: '#06D6A0',
+                    },
+                    {
+                        label: 'Despesa',
+                        data: historico.map(h => h.despesa),
+                        borderColor: '#E63946',
+                        backgroundColor: 'rgba(230,57,70,0.12)',
+                        tension: 0.3,
+                        fill: true,
+                        pointRadius: 3,
+                        pointBackgroundColor: '#E63946',
+                    },
+                    {
+                        label: 'Saldo',
+                        data: historico.map(h => h.saldo),
+                        borderColor: '#60a5fa',
+                        borderDash: [5, 4],
+                        backgroundColor: 'transparent',
+                        tension: 0.3,
+                        fill: false,
+                        pointRadius: 3,
+                        pointBackgroundColor: '#60a5fa',
+                    },
+                ]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                interaction: {
+                    mode: 'index',
+                    intersect: false
+                },
+                scales: {
+                    x: {
+                        grid: {
+                            display: false
+                        },
+                        ticks: {
+                            color: textMuted
+                        }
+                    },
+                    y: {
+                        grid: {
+                            color: 'rgba(255,255,255,0.06)'
+                        },
+                        ticks: {
+                            color: textMuted,
+                            callback: v => new Intl.NumberFormat('pt-BR', {
+                                style: 'currency',
+                                currency: 'BRL',
+                                maximumFractionDigits: 0
+                            }).format(v)
+                        }
+                    }
+                },
+                plugins: {
+                    legend: {
+                        labels: {
+                            color: textMain,
+                            usePointStyle: true,
+                            pointStyle: 'circle'
+                        }
+                    },
+                    tooltip: {
+                        callbacks: {
+                            label(ctx) {
+                                const val = new Intl.NumberFormat('pt-BR', {
+                                    style: 'currency',
+                                    currency: 'BRL'
+                                }).format(ctx.parsed.y);
+                                return ` ${ctx.dataset.label}: ${val}`;
+                            }
+                        },
+                        backgroundColor: bgCard,
+                        borderColor: `rgba(${accentRgb},0.3)`,
+                        borderWidth: 1,
+                        titleColor: textMain,
+                        bodyColor: textMuted,
+                        padding: 10,
+                    }
+                }
+            }
+        });
+    })();
+
+    // ── Modal: Definir Meta/Orçamento por Categoria ─────────────────────────
+    function abrirModalMeta(categoriaId, nome, tipo, metaAtual) {
+        document.getElementById('metaCategoriaId').value = categoriaId;
+        document.getElementById('metaAcao').value = 'salvar';
+        document.getElementById('modalDefinirMetaTitulo').textContent = (tipo === 'despesa' ? 'Orçamento — ' : 'Meta — ') + nome;
+        document.getElementById('modalDefinirMetaLabel').textContent = tipo === 'despesa' ? 'Limite mensal para esta categoria' : 'Meta mensal para esta categoria';
+
+        const input = document.getElementById('metaValorInput');
+        input.value = metaAtual ? Number(metaAtual).toLocaleString('pt-BR', {
+            style: 'currency',
+            currency: 'BRL'
+        }) : '';
+
+        const btnRemover = document.getElementById('btnRemoverMeta');
+        if (metaAtual) {
+            btnRemover.style.display = '';
+            btnRemover.onclick = function() {
+                document.getElementById('metaAcao').value = 'remover';
+                document.getElementById('formDefinirMeta').submit();
+            };
+        } else {
+            btnRemover.style.display = 'none';
+        }
+
+        bootstrap.Modal.getOrCreateInstance(document.getElementById('modalDefinirMeta')).show();
+    }
+
     function atualizarListaDetalhes(categoriaFiltro, tipo) {
         const containerLista = document.getElementById(`lista-detalhes-${tipo}`);
         const badgeCategoria = document.getElementById(`badge-categoria-${tipo}`);
@@ -1440,6 +1866,42 @@ require_once 'geral/header.php';
                     <i class="bi bi-sliders me-1"></i> Reajustar saldo
                 </button>
             </div>
+        </div>
+    </div>
+</div>
+
+<!-- ── Modal: Definir Meta/Orçamento por Categoria ─────────────────────── -->
+<div class="modal fade" id="modalDefinirMeta" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered modal-sm">
+        <div class="modal-content bg-body-tertiary border-secondary-subtle rounded-4">
+            <div class="modal-header border-bottom border-secondary-subtle p-3">
+                <h6 class="modal-title text-light fw-bold mb-0" id="modalDefinirMetaTitulo">Definir meta</h6>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <form method="POST" action="salvar_meta_categoria.php" id="formDefinirMeta">
+                <input type="hidden" name="categoria_id" id="metaCategoriaId">
+                <input type="hidden" name="mes" value="<?php echo (int) $mes_atual ?>">
+                <input type="hidden" name="ano" value="<?php echo (int) $ano_atual ?>">
+                <input type="hidden" name="carteira" value="<?php echo htmlspecialchars($carteira_selecionada ?? '') ?>">
+                <input type="hidden" name="acao" id="metaAcao" value="salvar">
+                <div class="modal-body p-4">
+                    <label class="form-label text-secondary small mb-1" id="modalDefinirMetaLabel">Valor mensal</label>
+                    <div class="input-group">
+                        <span class="input-group-text bg-dark border-secondary-subtle text-secondary">R$</span>
+                        <input type="text" inputmode="numeric" name="valor_meta" id="metaValorInput"
+                               class="form-control bg-dark border-secondary-subtle text-light" placeholder="0,00"
+                               oninput="mascaraMoeda(this)" required>
+                    </div>
+                </div>
+                <div class="modal-footer border-top border-secondary-subtle d-flex justify-content-between p-2">
+                    <button type="button" class="btn btn-sm btn-link text-danger text-decoration-none" id="btnRemoverMeta" style="display:none;">
+                        Remover meta
+                    </button>
+                    <button type="submit" class="btn btn-sm btn-warning fw-bold px-3 rounded-pill ms-auto">
+                        Salvar
+                    </button>
+                </div>
+            </form>
         </div>
     </div>
 </div>

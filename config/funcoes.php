@@ -1038,3 +1038,23 @@ function processarIndicacaoConversao(PDO $pdo, string $emailComprador, float $va
         if ($pdo->inTransaction()) $pdo->rollBack();
     }
 }
+
+// Garante a tabela de metas/orçamento por categoria (auto-migração, sem precisar de SSH)
+function garantirTabelaMetaCategoria(PDO $pdo): void
+{
+    try {
+        $pdo->exec("
+            CREATE TABLE IF NOT EXISTS MetaCategoria (
+              IDMeta       CHAR(36) NOT NULL PRIMARY KEY,
+              FKUsuario    CHAR(36) NOT NULL,
+              FKCategoria  CHAR(36) NOT NULL,
+              ValorMeta    DECIMAL(12,2) NOT NULL,
+              CriadoEm     DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+              AtualizadoEm DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+              UNIQUE KEY uq_meta_usuario_categoria (FKUsuario, FKCategoria),
+              KEY idx_meta_usuario (FKUsuario)
+            ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4
+        ");
+    } catch (PDOException $e) {
+    }
+}
