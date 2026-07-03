@@ -24,6 +24,7 @@ require_once 'geral/header.php';
             <ul>
                 <li><strong>Dados de Conta:</strong> Nome, endereço de e-mail e credenciais de acesso (senhas são armazenadas com criptografia de ponta a ponta). Se optar pelo login via Google (SSO), receberemos apenas o seu nome e e-mail público.</li>
                 <li><strong>Dados Financeiros:</strong> Informações sobre receitas, despesas, carteiras, categorias e saldos que o utilizador insere voluntariamente no sistema.</li>
+                <li><strong>Dados de Notificação Push (opcional):</strong> Se você ativar as notificações do navegador/celular (em <em>Notificações</em>), armazenamos o identificador técnico da sua inscrição (endpoint e chaves de criptografia geradas pelo próprio navegador) e o tipo de navegador/dispositivo usado. Esses dados servem apenas para entregar as notificações — nunca são usados para te identificar fora do Auralis. Você pode desativar a qualquer momento, o que apaga essa inscrição imediatamente.</li>
             </ul>
 
             <h4 class="text-light fw-bold mt-4 mb-3 fs-5">2. Uso das Informações</h4>
@@ -31,7 +32,7 @@ require_once 'geral/header.php';
             <ul>
                 <li>Prestar o serviço de gestão financeira, gerar gráficos e projetar faturas recorrentes.</li>
                 <li>Processar pagamentos de assinaturas (PRO/VIP) de forma segura.</li>
-                <li>Enviar notificações essenciais sobre a sua conta (recuperação de senha, avisos de expiração).</li>
+                <li>Enviar notificações essenciais sobre a sua conta (recuperação de senha, avisos de expiração) e, caso ativado, avisos de contas a vencer via notificação push.</li>
             </ul>
             <p>O Auralis <strong>não partilha, não vende e não cede</strong> os seus dados financeiros a terceiros para fins publicitários.</p>
 
@@ -40,6 +41,7 @@ require_once 'geral/header.php';
             <ul>
                 <li><strong>Google:</strong> Para facilidade de autenticação (Single Sign-On).</li>
                 <li><strong>Mercado Pago:</strong> Para processamento de pagamentos. Nenhum dado de cartão de crédito passa ou é armazenado nos servidores do Auralis.</li>
+                <li><strong>Serviço de push do seu navegador (ex.: Google, Mozilla):</strong> Se as notificações estiverem ativadas, o próprio navegador usa o serviço de push do seu fornecedor para entregar a mensagem ao seu dispositivo — é uma peça padrão do funcionamento de notificações na Web, fora do controle do Auralis.</li>
             </ul>
 
             <h4 class="text-light fw-bold mt-4 mb-3 fs-5">4. Os Seus Direitos (LGPD)</h4>
