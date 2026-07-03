@@ -105,10 +105,51 @@ require_once '../geral/header.php';
         </div>
     </div>
 
-    <?php if ($revendedor['ChavePix']): ?>
-    <div class="rounded-3 px-3 py-2 mb-4 d-flex align-items-center gap-2" style="background:rgba(255,255,255,.04);border:1px solid rgba(255,255,255,.07);">
-        <i class="bi bi-key text-secondary"></i>
-        <span class="text-secondary small">Chave PIX cadastrada: <strong class="text-light"><?= htmlspecialchars($revendedor['ChavePix']) ?></strong></span>
+    <div class="rounded-3 px-3 py-2 mb-4 d-flex align-items-center justify-content-between gap-2 flex-wrap" style="background:rgba(255,255,255,.04);border:1px solid rgba(255,255,255,.07);">
+        <div class="d-flex align-items-center gap-2">
+            <i class="bi bi-key text-secondary"></i>
+            <?php if ($revendedor['ChavePix']): ?>
+                <span class="text-secondary small">Chave PIX cadastrada: <strong class="text-light"><?= htmlspecialchars($revendedor['ChavePix']) ?></strong></span>
+            <?php else: ?>
+                <span class="text-secondary small">Nenhuma chave PIX cadastrada ainda — sem ela, não conseguimos te pagar.</span>
+            <?php endif; ?>
+        </div>
+        <button type="button" class="btn btn-sm rounded-pill px-3" data-bs-toggle="modal" data-bs-target="#modalEditarPix"
+            style="background:rgba(255,255,255,.06);color:#94a3b8;border:1px solid rgba(255,255,255,.1);">
+            <i class="bi bi-pencil me-1"></i> <?= $revendedor['ChavePix'] ? 'Editar' : 'Cadastrar' ?>
+        </button>
+    </div>
+
+    <!-- Modal: Editar Chave PIX -->
+    <div class="modal fade" id="modalEditarPix" tabindex="-1" aria-hidden="true">
+        <div class="modal-dialog modal-dialog-centered">
+            <div class="modal-content border-secondary-subtle" style="background:#1a1d27;">
+                <form method="POST" action="editar_pix.php">
+                    <div class="modal-header border-secondary-subtle px-4 py-3">
+                        <h6 class="modal-title fw-bold text-light mb-0"><i class="bi bi-key me-2" style="color:#d4af37;"></i>Sua chave PIX</h6>
+                        <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+                    </div>
+                    <div class="modal-body px-4 py-3">
+                        <label class="form-label text-secondary small fw-semibold">Chave PIX (CPF, e-mail, telefone ou aleatória)</label>
+                        <input type="text" name="chave_pix" class="form-control bg-dark border-secondary-subtle text-light"
+                            value="<?= htmlspecialchars($revendedor['ChavePix'] ?? '') ?>" maxlength="140" required>
+                        <div class="text-secondary mt-2" style="font-size:.75rem;">É pra essa chave que suas comissões serão pagas.</div>
+                    </div>
+                    <div class="modal-footer border-secondary-subtle d-flex justify-content-between p-3">
+                        <button type="button" class="btn btn-sm btn-link text-secondary text-decoration-none" data-bs-dismiss="modal">Cancelar</button>
+                        <button type="submit" class="btn btn-sm fw-bold rounded-pill px-4"
+                            style="background:rgba(212,175,55,.15);color:#d4af37;border:1px solid rgba(212,175,55,.35);">
+                            <i class="bi bi-check-lg me-1"></i> Salvar
+                        </button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+
+    <?php if (isset($_GET['sucesso']) && $_GET['sucesso'] === 'pix_atualizado'): ?>
+    <div class="alert border-0 rounded-3 mb-4 py-2 px-3" style="background:rgba(34,197,94,.1);color:#86efac;">
+        <i class="bi bi-check-circle me-2"></i>Chave PIX atualizada com sucesso.
     </div>
     <?php endif; ?>
 
