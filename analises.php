@@ -196,6 +196,11 @@ $totalReceitasAnt = array_sum($receitasPorCategoriaAnt);
 $taxaPoupancaAtual = $totalReceitas > 0 ? round((($totalReceitas - $totalDespesas) / $totalReceitas) * 100, 1) : null;
 $taxaPoupancaAnt    = $totalReceitasAnt > 0 ? round((($totalReceitasAnt - $totalDespesasAnt) / $totalReceitasAnt) * 100, 1) : null;
 
+// Mês em andamento: receitas (ex: salário) costumam cair só no fim do mês, então a taxa
+// de poupança fica enganosa/alarmante enquanto o mês não fecha — melhor avisar em vez de mostrar.
+$_mesEmAndamento   = ($mes_atual == (int) date('m') && $ano_atual == (int) date('Y'));
+$_diasRestantesMes = $_mesEmAndamento ? ((int) date('t') - (int) date('d')) : 0;
+
 // ── Evolução histórica (últimos 6 ou 12 meses) ──────────────────────────
 $_qtdMesesHist = (isset($_GET['hist']) && (int)$_GET['hist'] === 12) ? 12 : 6;
 $historicoMensal = [];
@@ -501,7 +506,15 @@ require_once 'geral/header.php';
                     </div>
                     <div class="flex-grow-1">
                         <p class="small mb-1 text-uppercase fw-bold tracking-wide" style="color:#60a5fa;opacity:0.85;">Taxa de Poupança do Mês</p>
-                        <?php if ($taxaPoupancaAtual !== null): ?>
+                        <?php if ($_mesEmAndamento): ?>
+                            <h5 class="text-secondary mb-1"><i class="bi bi-hourglass-split me-2"></i>Mês em andamento</h5>
+                            <p class="text-secondary small mb-0">
+                                Esse indicador fica mais confiável quando <?php echo $nome_mes ?> fechar — receitas como salário costumam cair só no fim do mês.
+                                <?php if ($_diasRestantesMes > 0): ?>
+                                    Faltam <?php echo $_diasRestantesMes ?> dia<?php echo $_diasRestantesMes > 1 ? 's' : '' ?>.
+                                <?php endif; ?>
+                            </p>
+                        <?php elseif ($taxaPoupancaAtual !== null): ?>
                             <div class="d-flex align-items-center gap-2 flex-wrap">
                                 <h3 class="fw-bold mb-0" style="color:<?php echo $taxaPoupancaAtual >= 0 ? '#60a5fa' : 'var(--color-expense-text)'; ?>;">
                                     <?php echo number_format($taxaPoupancaAtual, 1, ',', '.') ?>%
