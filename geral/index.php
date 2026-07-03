@@ -361,7 +361,7 @@ $_pvV   = max(
                 [
                     'icon'  => 'bi-piggy-bank',
                     'color' => '#f59e0b',
-                    'title' => 'Cofrinhos & Metas',
+                    'title' => 'Cofrinhos',
                     'desc'  => 'Crie caixinhas de poupança vinculadas a uma carteira. Defina meta de valor, data limite e acompanhe o progresso. Depósitos debitam automaticamente do saldo da carteira.',
                 ],
                 [

@@ -15,7 +15,7 @@ $topicos = [
     'parcelamentos' => ['titulo' => 'Compras Parceladas',            'icone' => 'bi-list-ol',              'tag' => 'Transações'],
     'carteiras'     => ['titulo' => 'Conta Pessoal e Empresarial',   'icone' => 'bi-wallet2',              'tag' => 'Carteiras'],
     'transferencia' => ['titulo' => 'Transferência entre Carteiras', 'icone' => 'bi-arrow-left-right',    'tag' => 'Carteiras'],
-    'cofrinhos'     => ['titulo' => 'Cofrinhos & Metas',             'icone' => 'bi-piggy-bank',          'tag' => 'Planejamento'],
+    'cofrinhos'     => ['titulo' => 'Cofrinhos',                     'icone' => 'bi-piggy-bank',          'tag' => 'Planejamento'],
     'cartao'        => ['titulo' => 'Cartão de Crédito',             'icone' => 'bi-credit-card-2-front', 'tag' => 'Transações'],
     'agenda'        => ['titulo' => 'Agenda e Planejamento',         'icone' => 'bi-calendar3',           'tag' => 'Planejamento'],
     'categorias'    => ['titulo' => 'Categorias',                    'icone' => 'bi-tags',                'tag' => 'Organização'],
@@ -319,7 +319,7 @@ require_once 'geral/header.php';
                 </div>
 
                 <?php elseif ($topico === 'cofrinhos'): ?>
-                <!-- ═══ COFRINHOS & METAS ════════════════════════════════════ -->
+                <!-- ═══ COFRINHOS ═══════════════════════════════════════════ -->
                 <p class="text-secondary mb-4">Cofrinhos são reservas para objetivos específicos — viagem, computador novo, reserva de emergência. O dinheiro sai da carteira, fica guardado no cofrinho e pode ser retirado a qualquer momento.</p>
 
                 <h6 class="fw-bold text-light mb-3"><i class="bi bi-list-check me-2" style="color:var(--primary-gold-analysis);"></i>Como criar um cofrinho</h6>
@@ -484,7 +484,7 @@ require_once 'geral/header.php';
                     </div>
                     <div class="d-flex gap-3 p-3 rounded-3" style="background:var(--bg-body);">
                         <i class="bi bi-piggy-bank flex-shrink-0 mt-1" style="color:#f59e0b;"></i>
-                        <div><span class="fw-semibold text-light">Cofrinhos & Metas</span> <span class="text-secondary">— progresso de cada cofrinho com barra visual e percentual de conclusão.</span></div>
+                        <div><span class="fw-semibold text-light">Cofrinhos</span> <span class="text-secondary">— progresso de cada cofrinho com barra visual e percentual de conclusão.</span></div>
                     </div>
                 </div>
 

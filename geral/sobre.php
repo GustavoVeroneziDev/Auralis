@@ -115,7 +115,7 @@
                 [
                     'bi-piggy-bank',
                     '#f59e0b',
-                    'Cofrinhos & Metas',
+                    'Cofrinhos',
                     'Crie caixinhas de poupança vinculadas a uma carteira. Defina meta de valor, data limite e acompanhe o progresso com barra visual. Depósitos debitam automaticamente do saldo da carteira.'
                 ],
                 [

@@ -681,7 +681,7 @@ require_once 'geral/header.php';
                         <div class="d-flex flex-column gap-1">
                             <?php
                             $itensDash = [
-                                'cofrinhos'        => ['Cofrinhos & Metas',   'Exibe o resumo dos cofrinhos ativos'],
+                                'cofrinhos'        => ['Cofrinhos',           'Exibe o resumo dos cofrinhos ativos'],
                                 'cartoes'          => ['Cartões de Crédito',  'Exibe faturas e cartões em aberto'],
                                 'receita_pendente' => ['Receita pendente',    'Mostra "A receber" no card de receitas'],
                                 'despesa_pendente' => ['Despesa pendente',    'Mostra "A pagar" no card de despesas'],

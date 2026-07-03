@@ -812,13 +812,13 @@ require_once 'geral/header.php';
     </div>
 
     <!-- ══════════════════════════════════════════════════════════════════════ -->
-    <!-- ── Seção Cofrinhos & Metas ─────────────────────────────────────── -->
+    <!-- ── Seção Cofrinhos ──────────────────────────────────────────────── -->
     <!-- ══════════════════════════════════════════════════════════════════════ -->
     <div id="cofrinhos" class="mt-5 pt-2">
         <div class="d-flex align-items-center justify-content-between mb-4">
             <div class="d-flex align-items-center gap-2">
                 <i class="bi bi-piggy-bank fs-4" style="color:#f59e0b;"></i>
-                <h5 class="text-light fw-bold mb-0">Cofrinhos &amp; Metas</h5>
+                <h5 class="text-light fw-bold mb-0">Cofrinhos</h5>
             </div>
             <button class="btn btn-sm rounded-pill fw-semibold"
                     style="background:rgba(245,158,11,0.12);color:#f59e0b;border:1px solid rgba(245,158,11,0.3);"
@@ -1273,10 +1273,13 @@ require_once 'geral/header.php';
     };
 
     // ── Plugin: labels no fim de cada barra (valor + %) ────────────────────────
+    // Escreve o valor dentro da própria barra (alinhado à direita) quando ela é larga o
+    // suficiente — só cai pra fora se a barra for curta demais pro texto caber. Isso evita
+    // reservar uma faixa fixa de espaço à direita do gráfico, que sobrava demais no mobile.
     const pluginLabelsBarras = {
         id: 'labelsBarras',
         afterDatasetsDraw(chart) {
-            const { ctx, data } = chart;
+            const { ctx, data, chartArea } = chart;
             const total = data.datasets[0].data.reduce((a, b) => a + b, 0);
             if (total === 0) return;
             const meta = chart.getDatasetMeta(0);
@@ -1284,9 +1287,7 @@ require_once 'geral/header.php';
 
             ctx.save();
             ctx.font = 'bold 11px Inter, sans-serif';
-            ctx.textAlign = 'left';
             ctx.textBaseline = 'middle';
-            ctx.fillStyle = textMain;
             data.datasets[0].data.forEach((valor, i) => {
                 const bar = meta.data[i];
                 if (!bar) return;
@@ -1296,7 +1297,30 @@ require_once 'geral/header.php';
                     currency: 'BRL',
                     maximumFractionDigits: 0
                 }).format(valor);
-                ctx.fillText(`${val} (${pct}%)`, bar.x + 8, bar.y);
+                const texto = `${val} (${pct}%)`;
+                const larguraTexto = ctx.measureText(texto).width;
+                const larguraBarra = bar.x - bar.base;
+                const cabeDentro = larguraTexto + 16 <= larguraBarra;
+
+                if (cabeDentro) {
+                    ctx.textAlign = 'right';
+                    ctx.fillStyle = '#ffffff';
+                    ctx.shadowColor = 'rgba(0,0,0,0.4)';
+                    ctx.shadowBlur = 3;
+                    ctx.fillText(texto, bar.x - 8, bar.y);
+                    ctx.shadowColor = 'transparent';
+                    ctx.shadowBlur = 0;
+                } else {
+                    // Não cabe dentro: escreve fora, mas encolhe se for estourar a área do gráfico
+                    ctx.textAlign = 'left';
+                    ctx.fillStyle = textMain;
+                    const espacoFora = chartArea.right - bar.x;
+                    if (larguraTexto + 8 > espacoFora) {
+                        ctx.font = 'bold 9px Inter, sans-serif';
+                    }
+                    ctx.fillText(texto, bar.x + 6, bar.y);
+                    ctx.font = 'bold 11px Inter, sans-serif';
+                }
             });
             ctx.restore();
         }
@@ -1406,7 +1430,7 @@ require_once 'geral/header.php';
                     duration: 600
                 },
                 layout: {
-                    padding: { right: 90 }
+                    padding: { right: 12 }
                 },
                 scales: {
                     x: {

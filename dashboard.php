@@ -866,7 +866,7 @@ require_once 'geral/header.php';
             </div>
         </div>
 
-        <!-- ── Seção Cofrinhos & Metas ───────────────────────────────────── -->
+        <!-- ── Seção Cofrinhos ─────────────────────────────────────────────── -->
         <?php if ($dashPrefs['cofrinhos'] && $qtdCofrinhos > 0): ?>
             <div class="d-flex align-items-center justify-content-between mb-3 mt-2">
                 <button class="d-flex align-items-center gap-2 btn p-0 border-0 bg-transparent" onclick="toggleSection('cofrinhos')">
