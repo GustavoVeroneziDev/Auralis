@@ -112,8 +112,7 @@ require_once '../geral/header.php';
                         <div id="g_id_onload"
                              data-client_id="808511905880-4l0raul5fuf3rkukms9easdq65375o2t.apps.googleusercontent.com"
                              data-callback="handleGoogleCredentialResponse"
-                             data-auto_prompt="true"
-                             data-use_fedcm_for_prompt="true">
+                             data-auto_prompt="false">
                         </div>
                         <div class="d-flex justify-content-center">
                             <div class="g_id_signin"
