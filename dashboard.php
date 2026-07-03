@@ -1403,6 +1403,10 @@ require_once 'geral/header.php';
                 <div class="text-secondary mt-1" style="font-size:.7rem;"><?= htmlspecialchars($proxRegra['Descricao']) ?></div>
                 <?php endif; ?>
             </div>
+            <?php else: ?>
+            <div class="text-secondary mt-3" style="font-size:.72rem;">
+                Compartilhe seu link — as recompensas por indicação aparecem aqui assim que forem configuradas.
+            </div>
             <?php endif; ?>
         </div>
     </div>
