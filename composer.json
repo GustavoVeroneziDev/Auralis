@@ -1,5 +1,6 @@
 {
     "require": {
-        "minishlink/web-push": "^10.1"
+        "minishlink/web-push": "^10.1",
+        "phpmailer/phpmailer": "^7.1"
     }
 }

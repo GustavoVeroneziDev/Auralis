@@ -2,6 +2,7 @@
 session_start();
 require_once '../config/conexao.php';
 require_once '../config/funcoes.php';
+require_once '../config/email.php';
 require_once 'chaves_google.php';
 
 // 1. O Google nos devolveu um código de autorização?
@@ -159,12 +160,7 @@ if (isset($_GET['code'])) {
                 </html>
                 ";
 
-                $cabecalhos  = "MIME-Version: 1.0\r\n";
-                $cabecalhos .= "Content-type: text/html; charset=UTF-8\r\n";
-                $cabecalhos .= "From: Auralis <suporte@meuauralis.com>\r\n";
-                $cabecalhos .= "Reply-To: suporte@meuauralis.com\r\n";
-
-                mail($email, "Bem-vindo ao Auralis - Crie sua senha de acesso", $mensagemHTML, $cabecalhos);
+                enviarEmail($email, "Bem-vindo ao Auralis - Crie sua senha de acesso", $mensagemHTML);
 
                 // Loga o novo usuário e redireciona
                 session_regenerate_id(true);
