@@ -697,8 +697,15 @@ if (!function_exists('mpCancelarNoMP')) {
 
 // ── Helper MP: ativa plano no banco a partir de dados da assinatura ───────
 if (!function_exists('mpAtivarPlano')) {
-    function mpAtivarPlano(PDO $pdo, string $emailComprador, string $planId, string $gwId, float $valorPago = 0): string|false
+    function mpAtivarPlano(PDO $pdo, string $emailComprador, string $planId, string $gwId, float $valorPago = 0, ?string $paymentRef = null): string|false
     {
+        // Garante que a tabela PagamentoProcessado já existe antes de usá-la abaixo — numa
+        // instalação nova, sem isso o INSERT falharia por "tabela não existe" e seria
+        // confundido com "referência duplicada", bloqueando a própria primeira ativação.
+        if ($paymentRef !== null) {
+            garantirEstruturaComissaoRevendedor($pdo);
+        }
+
         $planos = MP_PLANOS;
         if (!isset($planos[$planId])) return false;
 
@@ -711,11 +718,39 @@ if (!function_exists('mpAtivarPlano')) {
         if (!$usuario) return false;
         $uid = $usuario['IDUsuario'];
 
-        // 2. Idempotência: se este gwId já está ativo, retorna o plano sem duplicar
-        $stmtIdem = $pdo->prepare("SELECT Plano FROM Assinatura WHERE IDAssinaturaGW = :gw AND Status = 'ativa' LIMIT 1");
+        // 1.5. Dedup por evento de pagamento específico (ex: uma renovação distinta da outra).
+        // Se já processamos essa referência antes (o webhook do MP pode reenviar o mesmo evento),
+        // não faz nada de novo — só devolve o plano atual.
+        if ($paymentRef !== null) {
+            try {
+                $pdo->prepare("INSERT INTO PagamentoProcessado (Referencia) VALUES (:ref)")
+                    ->execute([':ref' => $paymentRef]);
+            } catch (PDOException $e) {
+                $stmtAtualRef = $pdo->prepare("SELECT Plano FROM Assinatura WHERE FKUsuario = :uid AND Status = 'ativa' LIMIT 1");
+                $stmtAtualRef->execute([':uid' => $uid]);
+                return $stmtAtualRef->fetchColumn() ?: false;
+            }
+        }
+
+        // 2. Já existe assinatura ativa com esse MESMO gwId? Isso é uma RENOVAÇÃO (cartão
+        // recorrente cobrando de novo a mesma assinatura) — estende a expiração em vez de
+        // travar sem fazer nada. Só estende se vier uma referência de pagamento nova (acima),
+        // pra um simples reload da página de sucesso não esticar a data de novo.
+        $stmtIdem = $pdo->prepare("SELECT IDAssinatura, Plano, DataExpiracao FROM Assinatura WHERE IDAssinaturaGW = :gw AND Status = 'ativa' LIMIT 1");
         $stmtIdem->execute([':gw' => $gwId]);
-        $jaAtiva = $stmtIdem->fetchColumn();
-        if ($jaAtiva) return $jaAtiva;
+        $ativaExistente = $stmtIdem->fetch(PDO::FETCH_ASSOC);
+
+        if ($ativaExistente) {
+            if ($paymentRef !== null) {
+                $agora    = new DateTime();
+                $expAtual = new DateTime($ativaExistente['DataExpiracao']);
+                $base     = ($expAtual > $agora) ? $expAtual : $agora;
+                $novaExp  = (clone $base)->modify("+{$config['dias']} days")->format('Y-m-d H:i:s');
+                $pdo->prepare("UPDATE Assinatura SET DataExpiracao = :exp, ValorPago = :valor WHERE IDAssinatura = :id")
+                    ->execute([':exp' => $novaExp, ':valor' => $valorPago, ':id' => $ativaExistente['IDAssinatura']]);
+            }
+            return $ativaExistente['Plano'];
+        }
 
         // 3. Busca assinaturas ativas anteriores para crédito de dias e cancelamento no MP
         $stmtAntigas = $pdo->prepare("
@@ -915,13 +950,69 @@ function gerarCodigoIndicacao(PDO $pdo): string
 }
 
 /**
- * Chamado após mpAtivarPlano() confirmar uma conversão.
- * - Se o indicador é revendedor → cria registro de comissão monetária.
- * - Se o indicador é usuário comum → conta conversões e aplica recompensas configuradas.
+ * Decide (e trava pra sempre) qual % de comissão vale pra um cliente específico de um
+ * revendedor. Na comissão "fixa", é sempre o mesmo %. Na "em 2 partes", os N primeiros
+ * clientes distintos (por ordem de 1ª compra) ficam na faixa 1, o resto na faixa 2 — e
+ * essa decisão não muda depois, mesmo que o revendedor ganhe mais clientes com o tempo.
  */
-function processarIndicacaoConversao(PDO $pdo, string $emailComprador, float $valorPago, string $plano): void
+function determinarPercentualRevendedor(PDO $pdo, array $revendedor, string $compradorId): float
+{
+    $stmt = $pdo->prepare("SELECT PercentualAplicado FROM RevendedorCliente WHERE FKRevendedor = :rev AND FKUsuarioComprador = :comp LIMIT 1");
+    $stmt->execute([':rev' => $revendedor['IDRevendedor'], ':comp' => $compradorId]);
+    $percExistente = $stmt->fetchColumn();
+    if ($percExistente !== false) return (float)$percExistente;
+
+    // Primeira compra desse cliente com esse revendedor — decide a faixa agora e trava
+    if (($revendedor['TipoComissao'] ?? 'fixa') === 'duas_partes') {
+        $stmtOrdem = $pdo->prepare("SELECT COUNT(*) FROM RevendedorCliente WHERE FKRevendedor = :rev");
+        $stmtOrdem->execute([':rev' => $revendedor['IDRevendedor']]);
+        $numeroOrdem = (int)$stmtOrdem->fetchColumn() + 1;
+
+        $limite = (int)($revendedor['LimiteClientesParte1'] ?? 0);
+        $perc = ($numeroOrdem <= $limite)
+            ? (float)$revendedor['ComissaoPercentual']
+            : (float)$revendedor['ComissaoPercentualParte2'];
+    } else {
+        $numeroOrdem = 0;
+        $perc = (float)$revendedor['ComissaoPercentual'];
+    }
+
+    try {
+        $pdo->prepare(
+            "INSERT INTO RevendedorCliente (IDRevendedorCliente, FKRevendedor, FKUsuarioComprador, NumeroOrdem, PercentualAplicado)
+             VALUES (:id, :rev, :comp, :ordem, :perc)"
+        )->execute([
+            ':id'    => gerarUuid(),
+            ':rev'   => $revendedor['IDRevendedor'],
+            ':comp'  => $compradorId,
+            ':ordem' => $numeroOrdem,
+            ':perc'  => $perc,
+        ]);
+    } catch (PDOException $e) {
+        // Corrida rara (2 pagamentos simultâneos na 1ª compra) — usa o que já ficou gravado
+        $stmt2 = $pdo->prepare("SELECT PercentualAplicado FROM RevendedorCliente WHERE FKRevendedor = :rev AND FKUsuarioComprador = :comp LIMIT 1");
+        $stmt2->execute([':rev' => $revendedor['IDRevendedor'], ':comp' => $compradorId]);
+        $percRace = $stmt2->fetchColumn();
+        if ($percRace !== false) return (float)$percRace;
+    }
+
+    return $perc;
+}
+
+/**
+ * Chamado após mpAtivarPlano() confirmar uma conversão (1ª compra OU renovação).
+ * - Se o indicador é revendedor → cria registro de comissão monetária a cada pagamento
+ *   (recorrente — não só a 1ª venda), na faixa de % já travada pra esse cliente.
+ * - Se o indicador é usuário comum → conta conversões e aplica recompensas configuradas.
+ *
+ * $paymentRef identifica o pagamento específico (payment_id do MP) — evita gerar duas
+ * comissões pro mesmo evento se o webhook reenviar a notificação.
+ */
+function processarIndicacaoConversao(PDO $pdo, string $emailComprador, float $valorPago, string $plano, ?string $paymentRef = null): void
 {
     try {
+        garantirEstruturaComissaoRevendedor($pdo);
+
         // Encontra o comprador e quem o indicou
         $stmt = $pdo->prepare("SELECT IDUsuario, FKIndicadoPor FROM Usuario WHERE LOWER(Email) = LOWER(:e) LIMIT 1");
         $stmt->execute([':e' => $emailComprador]);
@@ -937,18 +1028,26 @@ function processarIndicacaoConversao(PDO $pdo, string $emailComprador, float $va
         $revendedor = $stmtRev->fetch(PDO::FETCH_ASSOC);
 
         if ($revendedor) {
-            // Idempotência: só uma comissão por comprador
-            $jaExiste = $pdo->prepare("SELECT 1 FROM ComissaoRevendedor WHERE FKUsuarioComprador = :uid LIMIT 1");
-            $jaExiste->execute([':uid' => $compradorId]);
+            // Idempotência por pagamento: cada compra/renovação gera sua própria comissão,
+            // mas o MESMO pagamento nunca gera duas. Chamadas antigas sem paymentRef caem no
+            // comportamento anterior (só 1 comissão por comprador, pra não quebrar nada).
+            if ($paymentRef === null) {
+                $jaExiste = $pdo->prepare("SELECT 1 FROM ComissaoRevendedor WHERE FKUsuarioComprador = :uid LIMIT 1");
+                $jaExiste->execute([':uid' => $compradorId]);
+            } else {
+                $jaExiste = $pdo->prepare("SELECT 1 FROM ComissaoRevendedor WHERE ReferenciaPagamento = :ref LIMIT 1");
+                $jaExiste->execute([':ref' => $paymentRef]);
+            }
             if ($jaExiste->fetchColumn()) return;
 
             concederConquistaParaUsuario($pdo, $indicadorId, 'indicou_amigo');
-            $perc  = (float)$revendedor['ComissaoPercentual'];
+
+            $perc  = determinarPercentualRevendedor($pdo, $revendedor, $compradorId);
             $valor = round($valorPago * $perc / 100, 2);
             $pdo->prepare(
                 "INSERT INTO ComissaoRevendedor
-                     (IDComissao, FKRevendedor, FKUsuarioComprador, ValorVenda, PercentualAplicado, ValorComissao, Plano)
-                 VALUES (:id, :rev, :comp, :venda, :perc, :com, :plano)"
+                     (IDComissao, FKRevendedor, FKUsuarioComprador, ValorVenda, PercentualAplicado, ValorComissao, Plano, ReferenciaPagamento)
+                 VALUES (:id, :rev, :comp, :venda, :perc, :com, :plano, :ref)"
             )->execute([
                 ':id'    => gerarUuid(),
                 ':rev'   => $revendedor['IDRevendedor'],
@@ -957,12 +1056,13 @@ function processarIndicacaoConversao(PDO $pdo, string $emailComprador, float $va
                 ':perc'  => $perc,
                 ':com'   => $valor,
                 ':plano' => $plano,
+                ':ref'   => $paymentRef,
             ]);
             criarNotificacaoSistema(
                 $pdo,
                 $indicadorId,
                 'Nova comissão de indicação!',
-                "Você ganhou R$ " . number_format($valor, 2, ',', '.') . " de comissão — alguém que você indicou assinou o plano " . strtoupper($plano) . ". Confira no seu painel de revendedor."
+                "Você ganhou R$ " . number_format($valor, 2, ',', '.') . " de comissão — alguém que você indicou pagou o plano " . strtoupper($plano) . ". Confira no seu painel de revendedor."
             );
             return;
         }
@@ -1055,6 +1155,75 @@ function garantirTabelaMetaCategoria(PDO $pdo): void
               AtualizadoEm DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
               UNIQUE KEY uq_meta_usuario_categoria (FKUsuario, FKCategoria),
               KEY idx_meta_usuario (FKUsuario)
+            ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4
+        ");
+    } catch (PDOException $e) {
+    }
+}
+
+// Garante o schema de comissão em 2 partes + comissão recorrente (auto-migração, sem SSH)
+function garantirEstruturaComissaoRevendedor(PDO $pdo): void
+{
+    // Colunas novas em Revendedor: tipo de comissão + parâmetros da faixa 2
+    try {
+        $chk = $pdo->query("
+            SELECT COLUMN_NAME FROM INFORMATION_SCHEMA.COLUMNS
+            WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'Revendedor'
+              AND COLUMN_NAME IN ('TipoComissao', 'ComissaoPercentualParte2', 'LimiteClientesParte1')
+        ")->fetchAll(PDO::FETCH_COLUMN);
+
+        if (!in_array('TipoComissao', $chk, true)) {
+            $pdo->exec("ALTER TABLE Revendedor ADD COLUMN TipoComissao ENUM('fixa','duas_partes') NOT NULL DEFAULT 'fixa' AFTER ComissaoPercentual");
+        }
+        if (!in_array('ComissaoPercentualParte2', $chk, true)) {
+            $pdo->exec("ALTER TABLE Revendedor ADD COLUMN ComissaoPercentualParte2 DECIMAL(5,2) NULL AFTER TipoComissao");
+        }
+        if (!in_array('LimiteClientesParte1', $chk, true)) {
+            $pdo->exec("ALTER TABLE Revendedor ADD COLUMN LimiteClientesParte1 INT NULL AFTER ComissaoPercentualParte2");
+        }
+    } catch (PDOException $e) {
+    }
+
+    // Trava de qual faixa (%) cada cliente indicado ficou — decidido na 1ª compra e vale
+    // pra sempre, mesmo em compras/renovações futuras (não muda se o revendedor ganhar mais clientes depois)
+    try {
+        $pdo->exec("
+            CREATE TABLE IF NOT EXISTS RevendedorCliente (
+              IDRevendedorCliente CHAR(36) NOT NULL PRIMARY KEY,
+              FKRevendedor        CHAR(36) NOT NULL,
+              FKUsuarioComprador  CHAR(36) NOT NULL,
+              NumeroOrdem         INT NOT NULL,
+              PercentualAplicado  DECIMAL(5,2) NOT NULL,
+              CriadoEm            DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+              UNIQUE KEY uq_revendedor_comprador (FKRevendedor, FKUsuarioComprador),
+              KEY idx_revendedor (FKRevendedor)
+            ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4
+        ");
+    } catch (PDOException $e) {
+    }
+
+    // ComissaoRevendedor passa a ter 1 linha por COMPRA/RENOVAÇÃO (não só a 1ª) — precisa de
+    // uma referência única do pagamento pra nunca duplicar comissão do mesmo evento
+    try {
+        $chkCom = $pdo->query("
+            SELECT COLUMN_NAME FROM INFORMATION_SCHEMA.COLUMNS
+            WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'ComissaoRevendedor'
+              AND COLUMN_NAME = 'ReferenciaPagamento'
+        ")->fetchColumn();
+        if (!$chkCom) {
+            $pdo->exec("ALTER TABLE ComissaoRevendedor ADD COLUMN ReferenciaPagamento VARCHAR(64) NULL AFTER Plano");
+            $pdo->exec("ALTER TABLE ComissaoRevendedor ADD UNIQUE KEY uq_comissao_referencia (ReferenciaPagamento)");
+        }
+    } catch (PDOException $e) {
+    }
+
+    // Dedup genérico de eventos de pagamento já processados — usado tanto pra extensão de
+    // assinatura em renovações por cartão quanto pra evitar comissão duplicada
+    try {
+        $pdo->exec("
+            CREATE TABLE IF NOT EXISTS PagamentoProcessado (
+              Referencia   VARCHAR(64) NOT NULL PRIMARY KEY,
+              ProcessadoEm DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP
             ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4
         ");
     } catch (PDOException $e) {

@@ -60,14 +60,15 @@ try {
         $mpStatus = $info['status']             ?? '';
         $planId   = $info['preapproval_plan_id'] ?? '';
         $email    = $info['payer_email']          ?? '';
+        $valor    = $info['auto_recurring']['transaction_amount'] ?? 0;
 
         _mpLog("Assinatura: status=[{$mpStatus}] plan=[{$planId}] email=[{$email}]");
 
         if (in_array($mpStatus, ['authorized', 'active'])) {
-            $resultado = mpAtivarPlano($pdo, $email, $planId, $id);
+            $resultado = mpAtivarPlano($pdo, $email, $planId, $id, $valor, $id);
             _mpLog($resultado ? "ATIVADO: {$email} → {$resultado}" : "FALHOU ativação para {$email}");
             if ($resultado) {
-                processarIndicacaoConversao($pdo, $email, 0.0, $resultado);
+                processarIndicacaoConversao($pdo, $email, (float)$valor, $resultado, $id);
             }
 
         } elseif (in_array($mpStatus, ['cancelled', 'paused', 'pending'])) {
@@ -107,12 +108,19 @@ try {
                 ?? '';
 
             if ($preapprovalId) {
+                // Assinatura por cartão — o $id aqui é o payment_id da cobrança específica
+                // (diferente a cada mês), então serve tanto pra estender a assinatura numa
+                // renovação quanto pra gerar uma comissão de indicação NOVA a cada cobrança
+                // (comissão agora é recorrente, não só na primeira venda).
                 list($code2, $assinatura) = mpConsultarApi("https://api.mercadopago.com/preapproval/{$preapprovalId}");
                 if ($code2 === 200 && !empty($assinatura)) {
                     $planId = $assinatura['preapproval_plan_id'] ?? '';
                     $valor  = $pagamento['transaction_amount'] ?? 0;
-                    $resultado = mpAtivarPlano($pdo, $email, $planId, $preapprovalId, $valor);
+                    $resultado = mpAtivarPlano($pdo, $email, $planId, $preapprovalId, $valor, $id);
                     _mpLog($resultado ? "ATIVADO via payment: {$email} → {$resultado}" : "FALHOU via payment para {$email}");
+                    if ($resultado) {
+                        processarIndicacaoConversao($pdo, $email, (float)$valor, $resultado, $id);
+                    }
                 }
             } elseif (isset(MP_PLANOS[$pagamento['external_reference'] ?? ''])) {
                 // Link de pagamento fixo (planos.php "Pagar com Pix") — sem preapproval,
@@ -123,10 +131,10 @@ try {
                 // é idempotente, então processar aqui de novo não duplica nada).
                 $planId    = $pagamento['external_reference'];
                 $valor     = $pagamento['transaction_amount'] ?? 0;
-                $resultado = mpAtivarPlano($pdo, $email, $planId, "pix_{$id}", $valor);
+                $resultado = mpAtivarPlano($pdo, $email, $planId, "pix_{$id}", $valor, $id);
                 _mpLog($resultado ? "ATIVADO via link de pagamento: {$email} → {$resultado}" : "FALHOU via link de pagamento para {$email}");
                 if ($resultado) {
-                    processarIndicacaoConversao($pdo, $email, (float)$valor, $resultado);
+                    processarIndicacaoConversao($pdo, $email, (float)$valor, $resultado, $id);
                 }
             } else {
                 _mpLog("Pagamento aprovado mas sem preapproval_id nem external_reference de plano. Email: {$email}");

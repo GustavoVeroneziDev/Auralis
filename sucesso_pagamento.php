@@ -69,12 +69,12 @@ if ($preapprovalId && $status === 'authorized') {
         $valor    = $pagamento['transaction_amount'] ?? 0;
 
         if ($mpStatus === 'approved') {
-            $resultado = mpAtivarPlano($pdo, $email, $externalRef, "pix_{$paymentId}", $valor);
+            $resultado = mpAtivarPlano($pdo, $email, $externalRef, "pix_{$paymentId}", $valor, $paymentId);
             if ($resultado) {
                 $planoAtivado = $resultado;
                 $_SESSION['plano'] = $resultado;
                 unset($_SESSION['expiracao_verificada']);
-                processarIndicacaoConversao($pdo, $email, (float)$valor, $resultado);
+                processarIndicacaoConversao($pdo, $email, (float)$valor, $resultado, $paymentId);
             } else {
                 $erro = 'plano_nao_mapeado';
             }

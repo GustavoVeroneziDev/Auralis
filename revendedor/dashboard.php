@@ -4,6 +4,8 @@ if (!isset($_SESSION['usuario_id'])) { header("Location: /usuario/login.php"); e
 require_once '../config/conexao.php';
 require_once '../config/funcoes.php';
 
+garantirEstruturaComissaoRevendedor($pdo);
+
 $uid = $_SESSION['usuario_id'];
 
 // Verifica se este usuário é revendedor ativo
@@ -77,7 +79,11 @@ require_once '../geral/header.php';
                     </button>
                 </div>
                 <p class="text-secondary mb-0 mt-2" style="font-size:.78rem;">
-                    Compartilhe este link. Quando alguém se cadastrar por ele e assinar um plano, você ganha <strong class="text-light"><?= number_format($revendedor['ComissaoPercentual'], 0) ?>%</strong> de comissão.
+                    <?php if (($revendedor['TipoComissao'] ?? 'fixa') === 'duas_partes'): ?>
+                        Compartilhe este link. Você ganha <strong class="text-light"><?= number_format($revendedor['ComissaoPercentual'], 0) ?>%</strong> de comissão nos seus <?= (int)$revendedor['LimiteClientesParte1'] ?> primeiros clientes e <strong class="text-light"><?= number_format($revendedor['ComissaoPercentualParte2'], 0) ?>%</strong> nos seguintes — em <strong class="text-light">toda</strong> compra ou renovação que eles fizerem, não só na primeira.
+                    <?php else: ?>
+                        Compartilhe este link. Quando alguém se cadastrar por ele e assinar um plano, você ganha <strong class="text-light"><?= number_format($revendedor['ComissaoPercentual'], 0) ?>%</strong> de comissão — em <strong class="text-light">toda</strong> compra ou renovação que essa pessoa fizer, não só na primeira.
+                    <?php endif; ?>
                 </p>
             </div>
         </div>
