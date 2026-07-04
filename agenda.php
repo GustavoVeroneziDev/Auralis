@@ -640,12 +640,6 @@ require_once 'geral/header.php';
         outline: 2px dashed var(--accent);
         outline-offset: -2px;
     }
-    /* Arrastar com o botão direito (mover/copiar) — cor diferente do drag normal */
-    .calendar-day.drag-over-right {
-        background: rgba(110,231,199,0.12) !important;
-        outline: 2px dashed #6ee7c7;
-        outline-offset: -2px;
-    }
 
     .calendar-event.evento-pago {
         background-color: var(--color-income-bg);
@@ -1210,13 +1204,10 @@ require_once 'geral/header.php';
                         e.stopPropagation();
                         window.location.href = `nova_transacao.php?voltar=agenda.php&editar=${encodeURIComponent(t.id)}`;
                     };
-                    // O menu de contexto (editar/duplicar/excluir) agora é sempre disparado
-                    // pelo mouseup do arrasto com botão direito (veja mais abaixo) — decide
-                    // sozinho se foi clique simples ou arrasto, sem depender da ordem em que
-                    // o navegador dispara este evento nativo (inconsistente entre navegadores).
                     pill.addEventListener('contextmenu', (e) => {
                         e.preventDefault();
                         e.stopPropagation();
+                        window._mostrarMenuPill(e.clientX, e.clientY, t);
                     });
                     // Drag-and-drop (botão esquerdo = mover)
                     pill.draggable = true;
@@ -1231,20 +1222,6 @@ require_once 'geral/header.php';
                         pill.classList.remove('drag-arrastando', 'drag-ghost');
                         document.querySelectorAll('.calendar-day.drag-over').forEach(c => c.classList.remove('drag-over'));
                     });
-                    // Arrastar com o botão direito → pergunta se quer mover ou copiar.
-                    // Usa Pointer Events + setPointerCapture: assim os eventos de mover/soltar
-                    // continuam chegando NESTE elemento garantidamente, mesmo que o navegador
-                    // tente "roubar" o gesto pra iniciar seu próprio menu de contexto nativo
-                    // (é exatamente isso que fazia o drag ficar preso até um segundo clique).
-                    pill.addEventListener('pointerdown', (e) => {
-                        if (e.button !== 2) return;
-                        e.preventDefault();
-                        pill.setPointerCapture(e.pointerId);
-                        window._iniciarRightDrag(e, t, pill, dataStr);
-                    });
-                    pill.addEventListener('pointermove', (e) => window._moverRightDrag(e));
-                    pill.addEventListener('pointerup', (e) => window._finalizarRightDrag(e));
-                    pill.addEventListener('pointercancel', (e) => window._finalizarRightDrag(e));
                     const arrow = isRec ?
                         `<i class="bi bi-arrow-up-short" style="color:#6ee7c7;font-size:0.95rem;flex-shrink:0;line-height:1;"></i>` :
                         `<i class="bi bi-arrow-down-short" style="color:#f87171;font-size:0.95rem;flex-shrink:0;line-height:1;"></i>`;
@@ -1381,106 +1358,6 @@ require_once 'geral/header.php';
             else alert('Erro ao duplicar transação.');
         } catch { alert('Erro de conexão.'); }
     };
-
-    // ── Arrastar com o botão direito do mouse → pergunta "Mover" ou "Copiar" ──
-    // (o Drag-and-Drop nativo do navegador só existe pro botão esquerdo; aqui é
-    // um "drag" manual via mousedown/mousemove/mouseup pra suportar o direito.)
-    (function() {
-        const menuMC = document.createElement('div');
-        menuMC.id = 'ctx-mover-copiar';
-        menuMC.style.cssText = 'position:fixed;z-index:10002;display:none;background:var(--bg-card-analysis);border:1px solid var(--border-color-analysis);border-radius:10px;box-shadow:0 8px 28px rgba(0,0,0,.35);min-width:172px;overflow:hidden;';
-        menuMC.innerHTML = `
-            <div id="mc-mover"   class="ctx-item"><i class="bi bi-arrow-right-circle" style="color:#60a5fa;"></i> Mover pra cá</div>
-            <div id="mc-copiar"  class="ctx-item"><i class="bi bi-copy" style="color:#6ee7c7;"></i> Copiar pra cá</div>`;
-        document.body.appendChild(menuMC);
-
-        function fecharMC() { menuMC.style.display = 'none'; }
-        document.addEventListener('click', fecharMC);
-        document.addEventListener('keydown', e => e.key === 'Escape' && fecharMC());
-        menuMC.addEventListener('click', e => e.stopPropagation());
-
-        function mostrarMenuMoverCopiar(x, y, transacaoId, novaData) {
-            document.getElementById('mc-mover').onclick = () => {
-                fecharMC();
-                window._moverTransacaoParaDia(transacaoId, novaData);
-            };
-            document.getElementById('mc-copiar').onclick = () => {
-                fecharMC();
-                window._duplicarTransacao(transacaoId, novaData);
-            };
-            menuMC.style.display = 'block';
-            const mw = menuMC.offsetWidth, mh = menuMC.offsetHeight;
-            const vw = window.innerWidth, vh = window.innerHeight;
-            menuMC.style.left = (x + mw > vw ? x - mw : x) + 'px';
-            menuMC.style.top  = (y + mh > vh ? y - mh : y) + 'px';
-        }
-
-        let rd = null; // { transacao, pill, pointerId, origemDia, startX, startY, dragging, ghost }
-
-        // Usa Pointer Events + setPointerCapture (feito no pointerdown do pill) em vez de
-        // mousemove/mouseup soltos no document — capturar garante que os eventos de mover e
-        // soltar continuem chegando neste elemento mesmo se o navegador tentar "roubar" o
-        // gesto pra iniciar seu próprio menu de contexto nativo no meio do caminho (era isso
-        // que fazia o drag ficar preso até um segundo clique).
-        window._iniciarRightDrag = function(e, t, pill, origemDia) {
-            rd = { transacao: t, pill, pointerId: e.pointerId, origemDia, startX: e.clientX, startY: e.clientY, dragging: false, ghost: null };
-            window._suprimirContextMenuPill = true;
-        };
-
-        window._moverRightDrag = function(e) {
-            if (!rd || e.pointerId !== rd.pointerId) return;
-            const dx = e.clientX - rd.startX, dy = e.clientY - rd.startY;
-            if (!rd.dragging && (Math.abs(dx) > 6 || Math.abs(dy) > 6)) {
-                rd.dragging = true;
-                const ghost = rd.pill.cloneNode(true);
-                ghost.style.cssText = `position:fixed;z-index:10001;pointer-events:none;opacity:0.85;box-shadow:0 6px 18px rgba(0,0,0,.4);width:${rd.pill.offsetWidth}px;`;
-                document.body.appendChild(ghost);
-                rd.ghost = ghost;
-                rd.pill.style.opacity = '0.35';
-            }
-            if (rd.dragging && rd.ghost) {
-                rd.ghost.style.left = (e.clientX + 14) + 'px';
-                rd.ghost.style.top  = (e.clientY + 14) + 'px';
-                document.querySelectorAll('.calendar-day.drag-over-right').forEach(c => c.classList.remove('drag-over-right'));
-                const alvo = document.elementFromPoint(e.clientX, e.clientY)?.closest('.calendar-day');
-                if (alvo && alvo.dataset.data) alvo.classList.add('drag-over-right');
-            }
-        };
-
-        window._finalizarRightDrag = function(e) {
-            if (!rd || e.pointerId !== rd.pointerId) return;
-            const estado = rd;
-            rd = null;
-            try { estado.pill.releasePointerCapture(estado.pointerId); } catch {}
-            if (estado.ghost) estado.ghost.remove();
-            estado.pill.style.opacity = '';
-            document.querySelectorAll('.calendar-day.drag-over-right').forEach(c => c.classList.remove('drag-over-right'));
-
-            if (estado.dragging) {
-                const alvo = document.elementFromPoint(e.clientX, e.clientY)?.closest('.calendar-day');
-                const novaData = alvo?.dataset?.data;
-                // Mostra o menu em qualquer box válida — mesmo se for o próprio dia de origem
-                // ("Copiar pra cá" nesse caso é igual ao "Duplicar" do menu de contexto).
-                if (novaData) {
-                    mostrarMenuMoverCopiar(e.clientX, e.clientY, estado.transacao.id, novaData);
-                }
-            } else {
-                // Não arrastou de verdade — foi um clique direito normal, mostra o menu de sempre
-                window._mostrarMenuPill(e.clientX, e.clientY, estado.transacao);
-            }
-
-            // Mantém o contextmenu nativo suprimido por mais um instante — cobre o caso do
-            // Chrome, onde o "contextmenu" nativo dispara DEPOIS desse mouseup/pointerup.
-            setTimeout(() => { window._suprimirContextMenuPill = false; }, 80);
-        };
-
-        // Suprime o menu NATIVO do navegador sempre que um clique/arrasto com o botão
-        // direito estiver em jogo — em fase de captura, pra agir antes de qualquer coisa
-        // (inclusive antes do próprio pointerup, caso do Firefox).
-        document.addEventListener('contextmenu', (e) => {
-            if (window._suprimirContextMenuPill) e.preventDefault();
-        }, true);
-    })();
 
     // ── Seleção múltipla de itens no modal de dia ─────────────────────────
     let _agendaSelMode = false;
