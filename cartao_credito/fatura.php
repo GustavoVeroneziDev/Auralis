@@ -132,6 +132,17 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         if ($faturaId && $novoTotal >= 0) {
             $pdo->prepare("UPDATE FaturaCartao SET ValorTotal = :v WHERE IDFatura = :id AND FKUsuario = :uid AND Status != 'aberta'")
                 ->execute([':v' => $novoTotal, ':id' => $faturaId, ':uid' => $uid]);
+
+            // Mantém sincronizado o lançamento que representa essa fatura na agenda —
+            // sem isso, o valor mudava aqui mas continuava o antigo lá.
+            $stmtReg = $pdo->prepare("SELECT FKRegistroPagamento FROM FaturaCartao WHERE IDFatura = :id AND FKUsuario = :uid");
+            $stmtReg->execute([':id' => $faturaId, ':uid' => $uid]);
+            $registroId = $stmtReg->fetchColumn();
+            if ($registroId) {
+                $pdo->prepare("UPDATE Registro SET Valor = :v WHERE IDRegistro = :rid AND FKUsuario = :uid")
+                    ->execute([':v' => $novoTotal, ':rid' => $registroId, ':uid' => $uid]);
+            }
+
             $sucesso = 'Valor da fatura ajustado.';
         }
     }
