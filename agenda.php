@@ -968,6 +968,10 @@ require_once 'geral/header.php';
     }
 
     // ── Sidebar ───────────────────────────────────────────────────────────
+    // Guarda os itens por ID pra o menu de contexto (editar/excluir) achar o objeto
+    // completo sem precisar serializar tudo dentro do HTML.
+    window._sidebarItemsPorId = {};
+
     function itemSidebar(item) {
         const isRec = item.tipo === 'receita' || item.tipo === 'transferencia_entrada';
         const incomeColor = cssVar('--color-income-text') || '#6ee7c7';
@@ -978,10 +982,20 @@ require_once 'geral/header.php';
             `<i class="bi bi-arrow-up-short" style="color:${incomeColor};font-size:1.15rem;flex-shrink:0;"></i>` :
             `<i class="bi bi-arrow-down-short" style="color:${expenseColor};font-size:1.15rem;flex-shrink:0;"></i>`;
 
-        const clickSb = item.fatura_id ?
+        const isCC = !!item.fatura_id;
+        const clickSb = isCC ?
             `abrirModalFaturaCC('${item.fatura_id}','${item.cartao_id}')` :
             `window.location.href='nova_transacao.php?voltar=agenda.php&editar=${encodeURIComponent(item.id)}'`;
-        return `<div class="sidebar-item" onclick="${clickSb}">
+
+        // Itens de fatura de cartão não têm editar/excluir direto (igual no calendário) —
+        // só os lançamentos normais ganham o menu de contexto.
+        let ctxAttr = '';
+        if (!isCC) {
+            window._sidebarItemsPorId[item.id] = item;
+            ctxAttr = `oncontextmenu="event.preventDefault();event.stopPropagation();window._ctxSidebarItem(event,'${item.id}')"`;
+        }
+
+        return `<div class="sidebar-item" onclick="${clickSb}" ${ctxAttr}>
             <div class="d-flex align-items-center gap-2" style="min-width:0;">
                 ${arrow}
                 <div style="min-width:0;">
@@ -992,6 +1006,12 @@ require_once 'geral/header.php';
             <span class="fw-bold flex-shrink-0 ms-3" style="font-size:0.83rem;color:${corValor};">${sinal}${formatarMoeda(item.valor)}</span>
         </div>`;
     }
+
+    window._ctxSidebarItem = function(e, id) {
+        const item = window._sidebarItemsPorId[id];
+        if (!item) return;
+        window._mostrarMenuPill(e.clientX, e.clientY, item);
+    };
 
     function renderizarSidebar(sidebar) {
         const pares = [{
