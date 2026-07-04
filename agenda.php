@@ -1303,21 +1303,7 @@ require_once 'geral/header.php';
             }
             document.getElementById('ctx-excluir').onclick = () => {
                 fechar();
-                const desc = t.titulo.length > 40 ? t.titulo.slice(0, 40) + '…' : t.titulo;
-                if (!confirm(`Excluir "${desc}"?\n\nEsta ação é irreversível.`)) return;
-                fetch('agenda.php', {
-                        method: 'POST',
-                        headers: {
-                            'Content-Type': 'application/x-www-form-urlencoded'
-                        },
-                        body: `action=excluir_rapido&registro_id=${encodeURIComponent(t.id)}`
-                    })
-                    .then(r => r.json())
-                    .then(d => {
-                        if (d.ok) window.carregarMes(anoAtual, mesAtual);
-                        else alert('Erro ao excluir.');
-                    })
-                    .catch(() => alert('Erro de conexão.'));
+                window._confirmarExcluirItemAgenda(t.id, t.titulo, () => window.carregarMes(anoAtual, mesAtual));
             };
 
             // Posiciona sem sair da viewport
@@ -1357,6 +1343,32 @@ require_once 'geral/header.php';
             if (json.ok) window.carregarMes(anoAtual, mesAtual);
             else alert('Erro ao duplicar transação.');
         } catch { alert('Erro de conexão.'); }
+    };
+
+    // Modal de confirmação de exclusão de um único item (menu de contexto do pill e do
+    // modal de dia) — substitui o confirm() nativo do navegador.
+    window._confirmarExcluirItemAgenda = function(id, titulo, aoConcluir) {
+        const desc = (titulo || '').length > 40 ? titulo.slice(0, 40) + '…' : (titulo || 'este item');
+        document.getElementById('modalExcluirItemAgendaTexto').textContent =
+            `Tem certeza que deseja excluir "${desc}"? Essa ação não pode ser desfeita.`;
+
+        const modalEl = document.getElementById('modalExcluirItemAgenda');
+        const modal = bootstrap.Modal.getOrCreateInstance(modalEl);
+        const btnConfirmar = document.getElementById('modalExcluirItemAgendaConfirmar');
+
+        btnConfirmar.onclick = () => {
+            modal.hide();
+            fetch('agenda.php', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+                body: `action=excluir_rapido&registro_id=${encodeURIComponent(id)}`
+            }).then(r => r.json()).then(d => {
+                if (d.ok) { if (aoConcluir) aoConcluir(); }
+                else alert('Erro ao excluir.');
+            }).catch(() => alert('Erro de conexão.'));
+        };
+
+        modal.show();
     };
 
     // ── Seleção múltipla de itens no modal de dia ─────────────────────────
@@ -1483,16 +1495,11 @@ require_once 'geral/header.php';
             };
             document.getElementById('ctx-m-del').onclick = () => {
                 fecharM();
-                const desc = titulo.length > 40 ? titulo.slice(0, 40) + '…' : titulo;
-                if (!confirm(`Excluir "${desc}"?\n\nEsta ação é irreversível.`)) return;
-                fetch('agenda.php', {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-                    body: `action=excluir_rapido&registro_id=${encodeURIComponent(id)}`
-                }).then(r => r.json()).then(d => {
-                    if (d.ok) { _agendaSairSel(); window.carregarMes(anoAtual, mesAtual); bootstrap.Modal.getInstance(document.getElementById('modalDia'))?.hide(); }
-                    else alert('Erro ao excluir.');
-                }).catch(() => alert('Erro de conexão.'));
+                window._confirmarExcluirItemAgenda(id, titulo, () => {
+                    _agendaSairSel();
+                    window.carregarMes(anoAtual, mesAtual);
+                    bootstrap.Modal.getInstance(document.getElementById('modalDia'))?.hide();
+                });
             };
 
             const delSelBtn = document.getElementById('ctx-m-delsel');
@@ -1683,6 +1690,29 @@ require_once 'geral/header.php';
                         Cancelar
                     </button>
                 </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- MODAL: CONFIRMAR EXCLUSÃO DE UM ITEM -->
+<div class="modal fade" id="modalExcluirItemAgenda" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered modal-sm" style="max-width: 400px;">
+        <div class="modal-content border-secondary-subtle shadow-lg rounded-4" style="background:var(--bg-card-analysis);">
+            <div class="modal-header border-bottom border-secondary-subtle p-3">
+                <h6 class="modal-title text-light fw-bold">
+                    <i class="bi bi-trash3-fill me-2 text-danger"></i> Excluir transação
+                </h6>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body p-4 text-center">
+                <p class="text-secondary mb-0" id="modalExcluirItemAgendaTexto">Tem certeza que deseja excluir este item? Essa ação não pode ser desfeita.</p>
+            </div>
+            <div class="modal-footer border-top border-secondary-subtle d-flex justify-content-between p-2">
+                <button type="button" class="btn btn-sm btn-link text-secondary text-decoration-none" data-bs-dismiss="modal">Cancelar</button>
+                <button type="button" id="modalExcluirItemAgendaConfirmar" class="btn btn-sm btn-danger fw-bold px-3 rounded-pill">
+                    Confirmar Exclusão
+                </button>
             </div>
         </div>
     </div>
