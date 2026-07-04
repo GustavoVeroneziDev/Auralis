@@ -551,7 +551,6 @@ require_once 'geral/header.php';
     (function() {
         const modalEl = document.getElementById('modalPagarPix');
         if (!modalEl) return;
-        const modal = new bootstrap.Modal(modalEl);
 
         const etapaDocumento  = document.getElementById('pixEtapaDocumento');
         const etapaCarregando = document.getElementById('pixEtapaCarregando');
@@ -599,7 +598,7 @@ require_once 'geral/header.php';
                 document.getElementById('pixDocErro').style.display = 'none';
                 pararPolling();
                 mostrarEtapa(etapaDocumento);
-                modal.show();
+                bootstrap.Modal.getOrCreateInstance(modalEl).show();
             });
         });
 
