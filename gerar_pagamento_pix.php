@@ -70,9 +70,9 @@ $nomeLabel = [
 ][$config['plano']] ?? 'Auralis';
 $cicloLabel = $config['ciclo'] === 'anual' ? 'Anual' : 'Mensal';
 
-// O MP rejeita offset com dois pontos (-03:00) — o formato aceito, conforme o
-// próprio exemplo oficial deles, é UTC simples terminado em "Z" (sem milissegundos).
-$expiraEm = new DateTime('+60 minutes', new DateTimeZone('UTC'));
+// Formato exigido pelo MP: ISO 8601 COM milissegundos + offset (ex: 2020-05-30T23:59:59.000-04:00).
+// Faltavam os milissegundos na primeira tentativa — só "Z" (UTC) ou só o offset sem ".000" o MP rejeita.
+$expiraEm = new DateTime('+60 minutes', new DateTimeZone('America/Sao_Paulo'));
 
 $primeiroNome = trim(explode(' ', trim($usuario['Nome']))[0] ?? 'Cliente');
 
@@ -81,7 +81,7 @@ $payload = [
     'description'        => "{$nomeLabel} - {$cicloLabel}",
     'payment_method_id'  => 'pix',
     'external_reference' => $planId,
-    'date_of_expiration' => $expiraEm->format('Y-m-d\TH:i:s\\Z'),
+    'date_of_expiration' => $expiraEm->format('Y-m-d\TH:i:s.000P'),
     'payer' => [
         'email'      => $usuario['Email'],
         'first_name' => $primeiroNome,
