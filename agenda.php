@@ -1210,11 +1210,13 @@ require_once 'geral/header.php';
                         e.stopPropagation();
                         window.location.href = `nova_transacao.php?voltar=agenda.php&editar=${encodeURIComponent(t.id)}`;
                     };
+                    // O menu de contexto (editar/duplicar/excluir) agora é sempre disparado
+                    // pelo mouseup do arrasto com botão direito (veja mais abaixo) — decide
+                    // sozinho se foi clique simples ou arrasto, sem depender da ordem em que
+                    // o navegador dispara este evento nativo (inconsistente entre navegadores).
                     pill.addEventListener('contextmenu', (e) => {
                         e.preventDefault();
                         e.stopPropagation();
-                        if (window._rightDragOcorreu) return;
-                        window._mostrarMenuPill(e.clientX, e.clientY, t);
                     });
                     // Drag-and-drop (botão esquerdo = mover)
                     pill.draggable = true;
@@ -1405,8 +1407,14 @@ require_once 'geral/header.php';
 
         let rd = null; // { transacao, pill, origemDia, startX, startY, dragging, ghost }
 
+        // O evento "contextmenu" nativo não tem ordem consistente com o "mouseup" do botão
+        // direito entre navegadores (no Firefox ele chega ANTES do mouseup; no Chrome pode
+        // vir depois e travar num loop interno que engole o mouseup seguinte). Por isso a
+        // decisão de "foi clique normal ou arrasto" agora é 100% nossa, feita no mouseup —
+        // o contextmenu nativo é sempre suprimido enquanto isso está em jogo.
         window._iniciarRightDrag = function(e, t, pill, origemDia) {
             rd = { transacao: t, pill, origemDia, startX: e.clientX, startY: e.clientY, dragging: false, ghost: null };
+            window._suprimirContextMenuPill = true;
         };
 
         document.addEventListener('mousemove', (e) => {
@@ -1445,16 +1453,21 @@ require_once 'geral/header.php';
                 if (novaData) {
                     mostrarMenuMoverCopiar(e.clientX, e.clientY, estado.transacao.id, novaData);
                 }
-                window._rightDragOcorreu = true;
-                setTimeout(() => { window._rightDragOcorreu = false; }, 80);
+            } else {
+                // Não arrastou de verdade — foi um clique direito normal, mostra o menu de sempre
+                window._mostrarMenuPill(e.clientX, e.clientY, estado.transacao);
             }
+
+            // Mantém o contextmenu nativo suprimido por mais um instante — cobre o caso do
+            // Chrome, onde o "contextmenu" nativo dispara DEPOIS desse mouseup.
+            setTimeout(() => { window._suprimirContextMenuPill = false; }, 80);
         });
 
-        // Sem isso, soltar o botão direito depois de arrastar também dispara o menu
-        // NATIVO do navegador (Inspecionar, Voltar...) por cima de qualquer coisa —
-        // não só em cima dos pills. Roda em fase de captura pra agir antes de tudo.
+        // Suprime o menu NATIVO do navegador sempre que um clique/arrasto com o botão
+        // direito estiver em jogo — em fase de captura, pra agir antes de qualquer coisa
+        // (inclusive antes do próprio mouseup, caso do Firefox).
         document.addEventListener('contextmenu', (e) => {
-            if (window._rightDragOcorreu) e.preventDefault();
+            if (window._suprimirContextMenuPill) e.preventDefault();
         }, true);
     })();
 
