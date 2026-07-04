@@ -104,6 +104,67 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && ($_POST['action'] ?? '') === 'mover
     exit;
 }
 
+// Duplicar transação — via menu de contexto ("Duplicar") ou arrastar com o botão
+// direito ("Copiar pra cá"). Se vier nova_data, aplica no mesmo campo que o "mover"
+// já usa (DataVencimento se existir, senão MomentoRegistro); sem nova_data, duplica
+// no mesmo dia. Não copia vínculo de parcelamento nem recorrência — a cópia nasce avulsa.
+if ($_SERVER['REQUEST_METHOD'] === 'POST' && ($_POST['action'] ?? '') === 'duplicar_rapido') {
+    ob_clean();
+    header('Content-Type: application/json; charset=utf-8');
+    $id       = trim($_POST['registro_id'] ?? '');
+    $novaData = trim($_POST['nova_data'] ?? '');
+    if ($novaData !== '' && !preg_match('/^\d{4}-\d{2}-\d{2}$/', $novaData)) {
+        echo json_encode(['ok' => false, 'erro' => 'Data inválida']); exit;
+    }
+    if (!$id) {
+        echo json_encode(['ok' => false, 'erro' => 'ID inválido']); exit;
+    }
+    try {
+        $stmt = $pdo->prepare("SELECT * FROM Registro WHERE IDRegistro = :id AND FKUsuario = :uid");
+        $stmt->execute([':id' => $id, ':uid' => $usuario_id]);
+        $original = $stmt->fetch(PDO::FETCH_ASSOC);
+        if (!$original) {
+            echo json_encode(['ok' => false, 'erro' => 'Registro não encontrado']); exit;
+        }
+
+        $momento    = $original['MomentoRegistro'];
+        $vencimento = $original['DataVencimento'];
+
+        if ($novaData !== '') {
+            if ($vencimento !== null) {
+                $vencimento = $novaData;
+            } else {
+                $hora    = date('H:i:s', strtotime($momento));
+                $momento = $novaData . ' ' . $hora;
+            }
+        }
+
+        $novoId = gerarUuid();
+        $pdo->prepare("
+            INSERT INTO Registro
+                (IDRegistro, TipoRegistro, Valor, Descricao, MomentoRegistro, DataVencimento,
+                 StatusRegistro, Recorrente, DiaVencimento, FKCarteira, FKUsuario, FKCategoria)
+            VALUES (:id, :tipo, :valor, :desc, :momento, :venc, :status, 0, NULL, :cart, :uid, :cat)
+        ")->execute([
+            ':id'      => $novoId,
+            ':tipo'    => $original['TipoRegistro'],
+            ':valor'   => $original['Valor'],
+            ':desc'    => $original['Descricao'],
+            ':momento' => $momento,
+            ':venc'    => $vencimento,
+            ':status'  => $original['StatusRegistro'],
+            ':cart'    => $original['FKCarteira'],
+            ':uid'     => $usuario_id,
+            ':cat'     => $original['FKCategoria'],
+        ]);
+
+        echo json_encode(['ok' => true, 'novo_id' => $novoId]);
+    } catch (PDOException $e) {
+        echo json_encode(['ok' => false, 'erro' => $e->getMessage()]);
+    }
+    exit;
+}
+
 // Detalhe de fatura de cartão para o modal da agenda
 if (isset($_GET['ajax']) && $_GET['acao'] === 'fatura_detalhe') {
     ob_clean();
@@ -577,6 +638,12 @@ require_once 'geral/header.php';
     .calendar-day.drag-over {
         background: rgba(212,175,55,0.12) !important;
         outline: 2px dashed var(--accent);
+        outline-offset: -2px;
+    }
+    /* Arrastar com o botão direito (mover/copiar) — cor diferente do drag normal */
+    .calendar-day.drag-over-right {
+        background: rgba(110,231,199,0.12) !important;
+        outline: 2px dashed #6ee7c7;
         outline-offset: -2px;
     }
 
@@ -1098,6 +1165,7 @@ require_once 'geral/header.php';
 
             const cel = document.createElement('div');
             cel.className = `calendar-day${isHoje ? ' today' : ''}`;
+            cel.dataset.data = dataStr;
 
             const num = document.createElement('div');
             num.className = 'day-number';
@@ -1145,9 +1213,10 @@ require_once 'geral/header.php';
                     pill.addEventListener('contextmenu', (e) => {
                         e.preventDefault();
                         e.stopPropagation();
+                        if (window._rightDragOcorreu) return;
                         window._mostrarMenuPill(e.clientX, e.clientY, t);
                     });
-                    // Drag-and-drop
+                    // Drag-and-drop (botão esquerdo = mover)
                     pill.draggable = true;
                     pill.addEventListener('dragstart', (e) => {
                         e.stopPropagation();
@@ -1159,6 +1228,10 @@ require_once 'geral/header.php';
                     pill.addEventListener('dragend', () => {
                         pill.classList.remove('drag-arrastando', 'drag-ghost');
                         document.querySelectorAll('.calendar-day.drag-over').forEach(c => c.classList.remove('drag-over'));
+                    });
+                    // Arrastar com o botão direito → pergunta se quer mover ou copiar
+                    pill.addEventListener('mousedown', (e) => {
+                        if (e.button === 2) window._iniciarRightDrag(e, t, pill, dataStr);
                     });
                     const arrow = isRec ?
                         `<i class="bi bi-arrow-up-short" style="color:#6ee7c7;font-size:0.95rem;flex-shrink:0;line-height:1;"></i>` :
@@ -1182,16 +1255,7 @@ require_once 'geral/header.php';
                 cel.classList.remove('drag-over');
                 const id = e.dataTransfer.getData('text/plain');
                 if (!id) return;
-                const fd = new FormData();
-                fd.append('action', 'mover_dia');
-                fd.append('registro_id', id);
-                fd.append('nova_data', dataStr);
-                try {
-                    const res = await fetch('agenda.php', { method: 'POST', body: fd });
-                    const json = await res.json();
-                    if (json.ok) window.carregarMes(anoAtual, mesAtual);
-                    else alert('Erro ao mover transação.');
-                } catch { alert('Erro de conexão.'); }
+                window._moverTransacaoParaDia(id, dataStr);
             });
 
             // Clique no fundo do dia → modal de detalhes
@@ -1207,10 +1271,11 @@ require_once 'geral/header.php';
         menu.id = 'ctx-pill';
         menu.style.cssText = 'position:fixed;z-index:9999;display:none;background:var(--bg-card-analysis);border:1px solid var(--border-color-analysis);border-radius:10px;box-shadow:0 8px 28px rgba(0,0,0,.25);min-width:168px;overflow:hidden;';
         menu.innerHTML = `
-            <div id="ctx-editar"  class="ctx-item"><i class="bi bi-pencil-square" style="color:#f5c542;"></i> Editar</div>
-            <div id="ctx-comp"    class="ctx-item" style="display:none;"><i class="bi bi-eye" style="color:#38bdf8;"></i> Ver comprovante</div>
+            <div id="ctx-editar"    class="ctx-item"><i class="bi bi-pencil-square" style="color:#f5c542;"></i> Editar</div>
+            <div id="ctx-duplicar"  class="ctx-item"><i class="bi bi-copy" style="color:#6ee7c7;"></i> Duplicar</div>
+            <div id="ctx-comp"      class="ctx-item" style="display:none;"><i class="bi bi-eye" style="color:#38bdf8;"></i> Ver comprovante</div>
             <div class="ctx-sep"></div>
-            <div id="ctx-excluir" class="ctx-item ctx-danger"><i class="bi bi-trash3"></i> Excluir</div>`;
+            <div id="ctx-excluir"   class="ctx-item ctx-danger"><i class="bi bi-trash3"></i> Excluir</div>`;
         document.body.appendChild(menu);
 
         const style = document.createElement('style');
@@ -1232,6 +1297,10 @@ require_once 'geral/header.php';
             document.getElementById('ctx-editar').onclick = () => {
                 fechar();
                 window.location.href = `nova_transacao.php?voltar=agenda.php&editar=${encodeURIComponent(t.id)}`;
+            };
+            document.getElementById('ctx-duplicar').onclick = () => {
+                fechar();
+                window._duplicarTransacao(t.id);
             };
             const btnComp = document.getElementById('ctx-comp');
             if (_temAcessoCompAgenda && t.tem_comprovante > 0) {
@@ -1271,6 +1340,113 @@ require_once 'geral/header.php';
             menu.style.left = (x + mw > vw ? x - mw : x) + 'px';
             menu.style.top = (y + mh > vh ? y - mh : y) + 'px';
         };
+    })();
+
+    // ── Duplicar / mover transação (compartilhado pelo menu de contexto e pelo
+    //    arrastar com o botão direito) ──────────────────────────────────────
+    window._moverTransacaoParaDia = async function(id, novaData) {
+        const fd = new FormData();
+        fd.append('action', 'mover_dia');
+        fd.append('registro_id', id);
+        fd.append('nova_data', novaData);
+        try {
+            const res = await fetch('agenda.php', { method: 'POST', body: fd });
+            const json = await res.json();
+            if (json.ok) window.carregarMes(anoAtual, mesAtual);
+            else alert('Erro ao mover transação.');
+        } catch { alert('Erro de conexão.'); }
+    };
+
+    window._duplicarTransacao = async function(id, novaData) {
+        const fd = new FormData();
+        fd.append('action', 'duplicar_rapido');
+        fd.append('registro_id', id);
+        if (novaData) fd.append('nova_data', novaData);
+        try {
+            const res = await fetch('agenda.php', { method: 'POST', body: fd });
+            const json = await res.json();
+            if (json.ok) window.carregarMes(anoAtual, mesAtual);
+            else alert('Erro ao duplicar transação.');
+        } catch { alert('Erro de conexão.'); }
+    };
+
+    // ── Arrastar com o botão direito do mouse → pergunta "Mover" ou "Copiar" ──
+    // (o Drag-and-Drop nativo do navegador só existe pro botão esquerdo; aqui é
+    // um "drag" manual via mousedown/mousemove/mouseup pra suportar o direito.)
+    (function() {
+        const menuMC = document.createElement('div');
+        menuMC.id = 'ctx-mover-copiar';
+        menuMC.style.cssText = 'position:fixed;z-index:10002;display:none;background:var(--bg-card-analysis);border:1px solid var(--border-color-analysis);border-radius:10px;box-shadow:0 8px 28px rgba(0,0,0,.35);min-width:172px;overflow:hidden;';
+        menuMC.innerHTML = `
+            <div id="mc-mover"   class="ctx-item"><i class="bi bi-arrow-right-circle" style="color:#60a5fa;"></i> Mover pra cá</div>
+            <div id="mc-copiar"  class="ctx-item"><i class="bi bi-copy" style="color:#6ee7c7;"></i> Copiar pra cá</div>`;
+        document.body.appendChild(menuMC);
+
+        function fecharMC() { menuMC.style.display = 'none'; }
+        document.addEventListener('click', fecharMC);
+        document.addEventListener('keydown', e => e.key === 'Escape' && fecharMC());
+        menuMC.addEventListener('click', e => e.stopPropagation());
+
+        function mostrarMenuMoverCopiar(x, y, transacaoId, novaData) {
+            document.getElementById('mc-mover').onclick = () => {
+                fecharMC();
+                window._moverTransacaoParaDia(transacaoId, novaData);
+            };
+            document.getElementById('mc-copiar').onclick = () => {
+                fecharMC();
+                window._duplicarTransacao(transacaoId, novaData);
+            };
+            menuMC.style.display = 'block';
+            const mw = menuMC.offsetWidth, mh = menuMC.offsetHeight;
+            const vw = window.innerWidth, vh = window.innerHeight;
+            menuMC.style.left = (x + mw > vw ? x - mw : x) + 'px';
+            menuMC.style.top  = (y + mh > vh ? y - mh : y) + 'px';
+        }
+
+        let rd = null; // { transacao, pill, origemDia, startX, startY, dragging, ghost }
+
+        window._iniciarRightDrag = function(e, t, pill, origemDia) {
+            rd = { transacao: t, pill, origemDia, startX: e.clientX, startY: e.clientY, dragging: false, ghost: null };
+        };
+
+        document.addEventListener('mousemove', (e) => {
+            if (!rd) return;
+            const dx = e.clientX - rd.startX, dy = e.clientY - rd.startY;
+            if (!rd.dragging && (Math.abs(dx) > 6 || Math.abs(dy) > 6)) {
+                rd.dragging = true;
+                const ghost = rd.pill.cloneNode(true);
+                ghost.style.cssText = `position:fixed;z-index:10001;pointer-events:none;opacity:0.85;box-shadow:0 6px 18px rgba(0,0,0,.4);width:${rd.pill.offsetWidth}px;`;
+                document.body.appendChild(ghost);
+                rd.ghost = ghost;
+                rd.pill.style.opacity = '0.35';
+            }
+            if (rd.dragging && rd.ghost) {
+                rd.ghost.style.left = (e.clientX + 14) + 'px';
+                rd.ghost.style.top  = (e.clientY + 14) + 'px';
+                document.querySelectorAll('.calendar-day.drag-over-right').forEach(c => c.classList.remove('drag-over-right'));
+                const alvo = document.elementFromPoint(e.clientX, e.clientY)?.closest('.calendar-day');
+                if (alvo && alvo.dataset.data) alvo.classList.add('drag-over-right');
+            }
+        });
+
+        document.addEventListener('mouseup', (e) => {
+            if (!rd || e.button !== 2) return;
+            const estado = rd;
+            rd = null;
+            if (estado.ghost) estado.ghost.remove();
+            estado.pill.style.opacity = '';
+            document.querySelectorAll('.calendar-day.drag-over-right').forEach(c => c.classList.remove('drag-over-right'));
+
+            if (estado.dragging) {
+                const alvo = document.elementFromPoint(e.clientX, e.clientY)?.closest('.calendar-day');
+                const novaData = alvo?.dataset?.data;
+                if (novaData && novaData !== estado.origemDia) {
+                    mostrarMenuMoverCopiar(e.clientX, e.clientY, estado.transacao.id, novaData);
+                }
+                window._rightDragOcorreu = true;
+                setTimeout(() => { window._rightDragOcorreu = false; }, 80);
+            }
+        });
     })();
 
     // ── Seleção múltipla de itens no modal de dia ─────────────────────────
