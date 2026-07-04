@@ -10,38 +10,36 @@ require_once 'config/funcoes.php';
 $usuario_id = $_SESSION['usuario_id'];
 
 if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
-    header("Location: analises.php");
+    header("Location: gerenciar_categorias.php");
     exit;
 }
 
 garantirTabelaMetaCategoria($pdo);
 
 $categoriaId = trim($_POST['categoria_id'] ?? '');
-$mes         = intval($_POST['mes'] ?? date('m'));
-$ano         = intval($_POST['ano'] ?? date('Y'));
-$carteira    = trim($_POST['carteira'] ?? '');
 $acao        = trim($_POST['acao'] ?? 'salvar');
 
-$voltar = "analises.php?mes={$mes}&ano={$ano}" . ($carteira !== '' ? "&carteira=" . urlencode($carteira) : "") . "#metas-categoria";
-
 if (empty($categoriaId)) {
-    header("Location: {$voltar}&erro_meta=categoria_invalida");
+    header("Location: gerenciar_categorias.php?erro_meta=categoria_invalida");
     exit;
 }
 
-// Confirma que a categoria pertence mesmo ao usuário logado
-$stmtCat = $pdo->prepare("SELECT IDCategoria FROM Categoria WHERE IDCategoria = :id AND FKUsuario = :uid");
+// Confirma que a categoria pertence mesmo ao usuário logado (e pega o tipo, pra saber pra qual lista voltar)
+$stmtCat = $pdo->prepare("SELECT IDCategoria, TipoCategoria FROM Categoria WHERE IDCategoria = :id AND FKUsuario = :uid");
 $stmtCat->execute([':id' => $categoriaId, ':uid' => $usuario_id]);
-if (!$stmtCat->fetch()) {
-    header("Location: {$voltar}&erro_meta=categoria_invalida");
+$categoria = $stmtCat->fetch(PDO::FETCH_ASSOC);
+if (!$categoria) {
+    header("Location: gerenciar_categorias.php?erro_meta=categoria_invalida");
     exit;
 }
+
+$ancora = $categoria['TipoCategoria'] === 'receita' ? 'lista-receitas' : 'lista-despesas';
 
 try {
     if ($acao === 'remover') {
         $pdo->prepare("DELETE FROM MetaCategoria WHERE FKUsuario = :uid AND FKCategoria = :cat")
             ->execute([':uid' => $usuario_id, ':cat' => $categoriaId]);
-        header("Location: {$voltar}&sucesso_meta=meta_removida");
+        header("Location: gerenciar_categorias.php?sucesso_meta=meta_removida#{$ancora}");
         exit;
     }
 
@@ -55,7 +53,7 @@ try {
     }
 
     if (empty($valorRaw) || !is_numeric($valorRaw) || (float)$valorRaw <= 0) {
-        header("Location: {$voltar}&erro_meta=valor_invalido");
+        header("Location: gerenciar_categorias.php?erro_meta=valor_invalido#{$ancora}");
         exit;
     }
 
@@ -71,9 +69,9 @@ try {
         ':valor2' => (float)$valorRaw,
     ]);
 
-    header("Location: {$voltar}&sucesso_meta=meta_salva");
+    header("Location: gerenciar_categorias.php?sucesso_meta=meta_salva#{$ancora}");
     exit;
 } catch (PDOException $e) {
-    header("Location: {$voltar}&erro_meta=banco");
+    header("Location: gerenciar_categorias.php?erro_meta=banco#{$ancora}");
     exit;
 }
