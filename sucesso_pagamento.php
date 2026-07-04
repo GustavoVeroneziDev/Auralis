@@ -2,9 +2,14 @@
 /**
  * AURALIS — Página de sucesso após pagamento no Mercado Pago
  *
- * O MP redireciona para cá com: ?preapproval_id=XXX&status=authorized
- * Esta página consulta a API do MP de forma ativa (saída do servidor)
- * e ativa o plano imediatamente — sem depender de webhook.
+ * Dois fluxos possíveis de retorno:
+ * 1. Cartão/assinatura (Checkout Pro): ?preapproval_id=XXX&status=authorized
+ * 2. Link de pagamento fixo (Pix avulso, planos.php): ?payment_id=XXX&external_reference=XXX
+ *    (o external_reference é o código de referência configurado no próprio link do MP,
+ *    igual ao plan_id de MP_PLANOS)
+ *
+ * Em ambos os casos, consulta a API do MP de forma ativa (saída do servidor) e ativa
+ * o plano imediatamente — sem depender só do webhook.
  */
 session_start();
 require_once 'config/conexao.php';
@@ -16,8 +21,10 @@ $erro          = '';
 
 $preapprovalId = $_GET['preapproval_id'] ?? '';
 $status        = $_GET['status']         ?? '';
+$paymentId     = $_GET['payment_id']     ?? $_GET['collection_id'] ?? '';
+$externalRef   = $_GET['external_reference'] ?? '';
 
-// ── Tenta ativar o plano via consulta direta à API do MP ─────────────────
+// ── Fluxo 1: assinatura via cartão (consulta direta à API do MP) ─────────
 if ($preapprovalId && $status === 'authorized') {
 
     list($httpCode, $info) = mpConsultarApi(
@@ -38,6 +45,35 @@ if ($preapprovalId && $status === 'authorized') {
                 $_SESSION['plano'] = $resultado;
                 unset($_SESSION['expiracao_verificada']);
                 // Processa comissão do revendedor ou recompensa por indicação
+                processarIndicacaoConversao($pdo, $email, (float)$valor, $resultado);
+            } else {
+                $erro = 'plano_nao_mapeado';
+            }
+        } else {
+            $erro = 'status_pendente';
+        }
+    } else {
+        $erro = 'api_falhou';
+    }
+
+// ── Fluxo 2: link de pagamento fixo — Pix avulso (sem preapproval) ───────
+} elseif ($paymentId && $externalRef && isset(MP_PLANOS[$externalRef])) {
+
+    list($httpCode, $pagamento) = mpConsultarApi(
+        "https://api.mercadopago.com/v1/payments/{$paymentId}"
+    );
+
+    if ($httpCode === 200 && !empty($pagamento)) {
+        $mpStatus = $pagamento['status']            ?? '';
+        $email    = $pagamento['payer']['email']    ?? '';
+        $valor    = $pagamento['transaction_amount'] ?? 0;
+
+        if ($mpStatus === 'approved') {
+            $resultado = mpAtivarPlano($pdo, $email, $externalRef, "pix_{$paymentId}", $valor);
+            if ($resultado) {
+                $planoAtivado = $resultado;
+                $_SESSION['plano'] = $resultado;
+                unset($_SESSION['expiracao_verificada']);
                 processarIndicacaoConversao($pdo, $email, (float)$valor, $resultado);
             } else {
                 $erro = 'plano_nao_mapeado';

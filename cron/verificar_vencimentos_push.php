@@ -58,20 +58,19 @@ foreach ($grupos as $grupo) {
     $ehDespesa  = $grupo[0]['TipoRegistro'] === 'despesa';
     $sinal      = $ehDespesa ? '-' : '+';
     $totalValor = array_sum(array_map(fn($c) => (float)$c['Valor'], $grupo));
-    // Parênteses em volta do valor evitam o "— -" grudado (traço separador + sinal de menos),
-    // que fica confuso de ler numa notificação.
+    // Parênteses em volta do valor evitam confundir o sinal (+/-) com um traço separador.
     $totalFmt   = '(' . $sinal . ' R$ ' . number_format($totalValor, 2, ',', '.') . ')';
 
     if (count($grupo) === 1) {
         $tipoLabel = $ehDespesa ? 'Conta' : 'Recebimento';
         $titulo    = $tipoLabel . ' vence hoje';
-        $corpo     = $grupo[0]['Descricao'] . ' — ' . $totalFmt;
+        $corpo     = $grupo[0]['Descricao'] . ' ' . $totalFmt;
     } else {
         $tipoLabel  = $ehDespesa ? 'contas' : 'recebimentos';
         $descricoes = array_map(fn($c) => $c['Descricao'], $grupo);
         $listaDesc  = implode(', ', array_slice($descricoes, 0, 3)) . (count($descricoes) > 3 ? '…' : '');
         $titulo     = count($grupo) . ' ' . $tipoLabel . ' vencem hoje';
-        $corpo      = $listaDesc . ' — ' . $totalFmt . ' no total';
+        $corpo      = $listaDesc . ' ' . $totalFmt . ' no total';
     }
 
     $enviados = enviarPushParaUsuario($pdo, $usuarioId, $titulo, $corpo, '/agenda.php');

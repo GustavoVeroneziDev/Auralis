@@ -231,6 +231,8 @@ require_once 'geral/header.php';
                 'btn_a_style' => 'background:#7c3aed;color:#fff;border:none;',
                 'btn_m_href'  => 'https://www.mercadopago.com.br/subscriptions/checkout?preapproval_plan_id=9c7869b02a884962a185a44dee6c16f8',
                 'btn_a_href'  => 'https://www.mercadopago.com.br/subscriptions/checkout?preapproval_plan_id=98c6343b478e4efcad77ab56fe6f5948',
+                'link_pix_m'  => 'https://mpago.la/17rLRGi',
+                'link_pix_a'  => 'https://mpago.la/1E55gtV',
             ],
             'vip' => [
                 'topo_bg'     => 'linear-gradient(90deg,#AA8C2C,#d4af37)',
@@ -253,6 +255,8 @@ require_once 'geral/header.php';
                 'btn_a_style' => 'background:linear-gradient(90deg,#AA8C2C,#d4af37);color:#fff;border:none;font-weight:800;',
                 'btn_m_href'  => 'https://www.mercadopago.com.br/subscriptions/checkout?preapproval_plan_id=55856961da8d49d09b4ccded59a56810',
                 'btn_a_href'  => 'https://www.mercadopago.com.br/subscriptions/checkout?preapproval_plan_id=3ed445df740c439884e8ebc71ddbdb69',
+                'link_pix_m'  => 'https://mpago.la/1b7H1k2',
+                'link_pix_a'  => 'https://mpago.la/1tZ5d8W',
             ],
         ];
 
@@ -333,6 +337,20 @@ require_once 'geral/header.php';
                                     style="<?= $c['btn_a_style'] ?>">
                                     <?= htmlspecialchars($c['btn_a_text']) ?>
                                 </a>
+
+                                <a href="<?= htmlspecialchars($c['link_pix_m']) ?>" target="_blank"
+                                    class="btn w-100 rounded-pill fw-semibold preco-mensal"
+                                    style="background:rgba(6,214,160,.12);color:#06D6A0;border:1px solid rgba(6,214,160,.35);">
+                                    <i class="bi bi-qr-code me-1"></i> Pagar com Pix
+                                </a>
+                                <a href="<?= htmlspecialchars($c['link_pix_a']) ?>" target="_blank"
+                                    class="btn w-100 rounded-pill fw-semibold preco-anual d-none"
+                                    style="background:rgba(6,214,160,.12);color:#06D6A0;border:1px solid rgba(6,214,160,.35);">
+                                    <i class="bi bi-qr-code me-1"></i> Pagar com Pix
+                                </a>
+                                <p class="text-secondary text-center mb-0" style="font-size:0.7rem;">
+                                    <i class="bi bi-info-circle me-1"></i>Pix não renova automaticamente — avisamos antes de vencer.
+                                </p>
                             </div>
                         <?php endif; ?>
                     </div>

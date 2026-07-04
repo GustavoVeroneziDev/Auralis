@@ -682,39 +682,20 @@ require_once 'geral/header.php';
 
     <!-- ══════════════════════════════════════════════════════════════════════ -->
     <!-- ── Metas por Categoria (orçamento de despesa / meta de receita) ──── -->
+    <!-- Só visualização aqui — a configuração (definir/editar/remover valor) -->
+    <!-- fica centralizada em Categorias, junto com o resto do cadastro. -->
     <!-- ══════════════════════════════════════════════════════════════════════ -->
     <div class="row g-4 mb-5" id="metas-categoria">
-        <?php
-            $_msgsMeta = [
-                'meta_salva'    => 'Meta salva com sucesso!',
-                'meta_removida' => 'Meta removida.',
-            ];
-            $_errosMeta = [
-                'categoria_invalida' => 'Categoria inválida.',
-                'valor_invalido'     => 'Informe um valor numérico maior que zero.',
-                'banco'              => 'Erro ao salvar no banco de dados.',
-            ];
-        ?>
-        <?php if (isset($_GET['sucesso_meta']) && isset($_msgsMeta[$_GET['sucesso_meta']])): ?>
-            <div class="col-12">
-                <div class="alert alert-success rounded-4 border-0 mb-0 py-2 px-3 small fw-semibold">
-                    <i class="bi bi-check-circle me-2"></i><?php echo htmlspecialchars($_msgsMeta[$_GET['sucesso_meta']]) ?>
-                </div>
-            </div>
-        <?php endif; ?>
-        <?php if (isset($_GET['erro_meta']) && isset($_errosMeta[$_GET['erro_meta']])): ?>
-            <div class="col-12">
-                <div class="alert rounded-4 border-0 mb-0 py-2 px-3 small fw-semibold" style="background:rgba(220,38,38,0.15);color:#fca5a5;">
-                    <i class="bi bi-exclamation-triangle me-2"></i><?php echo htmlspecialchars($_errosMeta[$_GET['erro_meta']]) ?>
-                </div>
-            </div>
-        <?php endif; ?>
-
         <div class="col-lg-6">
             <div class="card shadow-sm rounded-4 h-100" style="background:var(--bg-card);border:1px solid var(--card-border-color);">
-                <div class="card-header border-bottom border-secondary-subtle bg-transparent p-4">
-                    <h5 class="text-light fw-bold mb-0"><i class="bi bi-piggy-bank me-2 text-danger"></i>Orçamento por Categoria (Despesas)</h5>
-                    <p class="text-secondary small mb-0 mt-1">Defina um limite mensal e acompanhe se está estourando.</p>
+                <div class="card-header border-bottom border-secondary-subtle bg-transparent p-4 d-flex justify-content-between align-items-start flex-wrap gap-2">
+                    <div>
+                        <h5 class="text-light fw-bold mb-0"><i class="bi bi-piggy-bank me-2 text-danger"></i>Orçamento por Categoria (Despesas)</h5>
+                        <p class="text-secondary small mb-0 mt-1">Acompanhe se está estourando o limite mensal.</p>
+                    </div>
+                    <a href="gerenciar_categorias.php#lista-despesas" class="btn btn-sm btn-outline-secondary rounded-pill flex-shrink-0" style="font-size:0.75rem;">
+                        <i class="bi bi-gear me-1"></i>Configurar
+                    </a>
                 </div>
                 <div class="card-body p-0">
                     <?php
@@ -728,31 +709,25 @@ require_once 'geral/header.php';
                             $metaCat       = $metasPorCategoria[$cat['IDCategoria']] ?? null;
                             $pctCat        = ($metaCat && $metaCat > 0) ? round(($gastoAtualCat / $metaCat) * 100, 1) : null;
                         ?>
-                        <div class="d-flex align-items-center justify-content-between px-4 py-3 border-bottom border-secondary-subtle">
-                            <div class="d-flex align-items-center gap-3 flex-grow-1 min-w-0">
-                                <i class="bi <?php echo htmlspecialchars($cat['IconeCategoria'] ?: 'bi-tag') ?> text-secondary fs-5 flex-shrink-0"></i>
-                                <div class="flex-grow-1 min-w-0">
-                                    <div class="text-light fw-semibold text-truncate"><?php echo htmlspecialchars($cat['NomeCategoria']) ?></div>
-                                    <?php if ($pctCat !== null): ?>
-                                        <div class="progress rounded-pill mt-1" style="height:6px;background:rgba(255,255,255,0.07);">
-                                            <div class="progress-bar rounded-pill"
-                                                 style="width:<?php echo min(100, $pctCat) ?>%;background:<?php echo $pctCat >= 100 ? 'var(--color-expense-text)' : '#60a5fa'; ?>;"></div>
-                                        </div>
-                                        <div class="d-flex justify-content-between mt-1">
-                                            <span class="text-secondary" style="font-size:0.72rem;">R$ <?php echo number_format($gastoAtualCat, 2, ',', '.') ?> / R$ <?php echo number_format($metaCat, 2, ',', '.') ?></span>
-                                            <?php if ($pctCat >= 100): ?>
-                                                <span class="fw-semibold text-danger" style="font-size:0.72rem;"><i class="bi bi-exclamation-triangle-fill me-1"></i>Estourou!</span>
-                                            <?php endif; ?>
-                                        </div>
-                                    <?php else: ?>
-                                        <span class="badge rounded-pill text-secondary border border-secondary-subtle mt-1" style="font-size:0.7rem;">Sem orçamento definido</span>
-                                    <?php endif; ?>
-                                </div>
+                        <div class="d-flex align-items-center gap-3 px-4 py-3 border-bottom border-secondary-subtle">
+                            <i class="bi <?php echo htmlspecialchars($cat['IconeCategoria'] ?: 'bi-tag') ?> text-secondary fs-5 flex-shrink-0"></i>
+                            <div class="flex-grow-1 min-w-0">
+                                <div class="text-light fw-semibold text-truncate"><?php echo htmlspecialchars($cat['NomeCategoria']) ?></div>
+                                <?php if ($pctCat !== null): ?>
+                                    <div class="progress rounded-pill mt-1" style="height:6px;background:rgba(255,255,255,0.07);">
+                                        <div class="progress-bar rounded-pill"
+                                             style="width:<?php echo min(100, $pctCat) ?>%;background:<?php echo $pctCat >= 100 ? 'var(--color-expense-text)' : '#60a5fa'; ?>;"></div>
+                                    </div>
+                                    <div class="d-flex justify-content-between mt-1">
+                                        <span class="text-secondary" style="font-size:0.72rem;">R$ <?php echo number_format($gastoAtualCat, 2, ',', '.') ?> / R$ <?php echo number_format($metaCat, 2, ',', '.') ?></span>
+                                        <?php if ($pctCat >= 100): ?>
+                                            <span class="fw-semibold text-danger" style="font-size:0.72rem;"><i class="bi bi-exclamation-triangle-fill me-1"></i>Estourou!</span>
+                                        <?php endif; ?>
+                                    </div>
+                                <?php else: ?>
+                                    <span class="badge rounded-pill text-secondary border border-secondary-subtle mt-1" style="font-size:0.7rem;">Sem orçamento definido</span>
+                                <?php endif; ?>
                             </div>
-                            <button type="button" class="btn btn-sm btn-outline-secondary rounded-pill flex-shrink-0 ms-2"
-                                    onclick="abrirModalMeta('<?php echo htmlspecialchars($cat['IDCategoria']) ?>','<?php echo htmlspecialchars(addslashes($cat['NomeCategoria'])) ?>','despesa',<?php echo $metaCat !== null ? $metaCat : 'null' ?>)">
-                                <i class="bi bi-pencil"></i>
-                            </button>
                         </div>
                         <?php endforeach; ?>
                     <?php endif; ?>
@@ -762,9 +737,14 @@ require_once 'geral/header.php';
 
         <div class="col-lg-6">
             <div class="card shadow-sm rounded-4 h-100" style="background:var(--bg-card);border:1px solid var(--card-border-color);">
-                <div class="card-header border-bottom border-secondary-subtle bg-transparent p-4">
-                    <h5 class="text-light fw-bold mb-0"><i class="bi bi-flag-fill me-2 text-success"></i>Meta por Categoria (Receitas)</h5>
-                    <p class="text-secondary small mb-0 mt-1">Defina uma meta mensal e acompanhe se já bateu.</p>
+                <div class="card-header border-bottom border-secondary-subtle bg-transparent p-4 d-flex justify-content-between align-items-start flex-wrap gap-2">
+                    <div>
+                        <h5 class="text-light fw-bold mb-0"><i class="bi bi-flag-fill me-2 text-success"></i>Meta por Categoria (Receitas)</h5>
+                        <p class="text-secondary small mb-0 mt-1">Acompanhe se já bateu a meta mensal.</p>
+                    </div>
+                    <a href="gerenciar_categorias.php#lista-receitas" class="btn btn-sm btn-outline-secondary rounded-pill flex-shrink-0" style="font-size:0.75rem;">
+                        <i class="bi bi-gear me-1"></i>Configurar
+                    </a>
                 </div>
                 <div class="card-body p-0">
                     <?php
@@ -778,31 +758,25 @@ require_once 'geral/header.php';
                             $metaCatR        = $metasPorCategoria[$cat['IDCategoria']] ?? null;
                             $pctCatR         = ($metaCatR && $metaCatR > 0) ? round(($receitaAtualCat / $metaCatR) * 100, 1) : null;
                         ?>
-                        <div class="d-flex align-items-center justify-content-between px-4 py-3 border-bottom border-secondary-subtle">
-                            <div class="d-flex align-items-center gap-3 flex-grow-1 min-w-0">
-                                <i class="bi <?php echo htmlspecialchars($cat['IconeCategoria'] ?: 'bi-tag') ?> text-secondary fs-5 flex-shrink-0"></i>
-                                <div class="flex-grow-1 min-w-0">
-                                    <div class="text-light fw-semibold text-truncate"><?php echo htmlspecialchars($cat['NomeCategoria']) ?></div>
-                                    <?php if ($pctCatR !== null): ?>
-                                        <div class="progress rounded-pill mt-1" style="height:6px;background:rgba(255,255,255,0.07);">
-                                            <div class="progress-bar rounded-pill"
-                                                 style="width:<?php echo min(100, $pctCatR) ?>%;background:#06D6A0;"></div>
-                                        </div>
-                                        <div class="d-flex justify-content-between mt-1">
-                                            <span class="text-secondary" style="font-size:0.72rem;">R$ <?php echo number_format($receitaAtualCat, 2, ',', '.') ?> / R$ <?php echo number_format($metaCatR, 2, ',', '.') ?></span>
-                                            <?php if ($pctCatR >= 100): ?>
-                                                <span class="fw-semibold" style="font-size:0.72rem;color:#06D6A0;"><i class="bi bi-check-circle-fill me-1"></i>Meta atingida!</span>
-                                            <?php endif; ?>
-                                        </div>
-                                    <?php else: ?>
-                                        <span class="badge rounded-pill text-secondary border border-secondary-subtle mt-1" style="font-size:0.7rem;">Sem meta definida</span>
-                                    <?php endif; ?>
-                                </div>
+                        <div class="d-flex align-items-center gap-3 px-4 py-3 border-bottom border-secondary-subtle">
+                            <i class="bi <?php echo htmlspecialchars($cat['IconeCategoria'] ?: 'bi-tag') ?> text-secondary fs-5 flex-shrink-0"></i>
+                            <div class="flex-grow-1 min-w-0">
+                                <div class="text-light fw-semibold text-truncate"><?php echo htmlspecialchars($cat['NomeCategoria']) ?></div>
+                                <?php if ($pctCatR !== null): ?>
+                                    <div class="progress rounded-pill mt-1" style="height:6px;background:rgba(255,255,255,0.07);">
+                                        <div class="progress-bar rounded-pill"
+                                             style="width:<?php echo min(100, $pctCatR) ?>%;background:#06D6A0;"></div>
+                                    </div>
+                                    <div class="d-flex justify-content-between mt-1">
+                                        <span class="text-secondary" style="font-size:0.72rem;">R$ <?php echo number_format($receitaAtualCat, 2, ',', '.') ?> / R$ <?php echo number_format($metaCatR, 2, ',', '.') ?></span>
+                                        <?php if ($pctCatR >= 100): ?>
+                                            <span class="fw-semibold" style="font-size:0.72rem;color:#06D6A0;"><i class="bi bi-check-circle-fill me-1"></i>Meta atingida!</span>
+                                        <?php endif; ?>
+                                    </div>
+                                <?php else: ?>
+                                    <span class="badge rounded-pill text-secondary border border-secondary-subtle mt-1" style="font-size:0.7rem;">Sem meta definida</span>
+                                <?php endif; ?>
                             </div>
-                            <button type="button" class="btn btn-sm btn-outline-secondary rounded-pill flex-shrink-0 ms-2"
-                                    onclick="abrirModalMeta('<?php echo htmlspecialchars($cat['IDCategoria']) ?>','<?php echo htmlspecialchars(addslashes($cat['NomeCategoria'])) ?>','receita',<?php echo $metaCatR !== null ? $metaCatR : 'null' ?>)">
-                                <i class="bi bi-pencil"></i>
-                            </button>
                         </div>
                         <?php endforeach; ?>
                     <?php endif; ?>
@@ -1668,33 +1642,6 @@ require_once 'geral/header.php';
         });
     })();
 
-    // ── Modal: Definir Meta/Orçamento por Categoria ─────────────────────────
-    function abrirModalMeta(categoriaId, nome, tipo, metaAtual) {
-        document.getElementById('metaCategoriaId').value = categoriaId;
-        document.getElementById('metaAcao').value = 'salvar';
-        document.getElementById('modalDefinirMetaTitulo').textContent = (tipo === 'despesa' ? 'Orçamento — ' : 'Meta — ') + nome;
-        document.getElementById('modalDefinirMetaLabel').textContent = tipo === 'despesa' ? 'Limite mensal para esta categoria' : 'Meta mensal para esta categoria';
-
-        const input = document.getElementById('metaValorInput');
-        input.value = metaAtual ? Number(metaAtual).toLocaleString('pt-BR', {
-            style: 'currency',
-            currency: 'BRL'
-        }) : '';
-
-        const btnRemover = document.getElementById('btnRemoverMeta');
-        if (metaAtual) {
-            btnRemover.style.display = '';
-            btnRemover.onclick = function() {
-                document.getElementById('metaAcao').value = 'remover';
-                document.getElementById('formDefinirMeta').submit();
-            };
-        } else {
-            btnRemover.style.display = 'none';
-        }
-
-        bootstrap.Modal.getOrCreateInstance(document.getElementById('modalDefinirMeta')).show();
-    }
-
     function atualizarListaDetalhes(categoriaFiltro, tipo) {
         const containerLista = document.getElementById(`lista-detalhes-${tipo}`);
         const badgeCategoria = document.getElementById(`badge-categoria-${tipo}`);
@@ -1907,42 +1854,6 @@ require_once 'geral/header.php';
                     <i class="bi bi-sliders me-1"></i> Reajustar saldo
                 </button>
             </div>
-        </div>
-    </div>
-</div>
-
-<!-- ── Modal: Definir Meta/Orçamento por Categoria ─────────────────────── -->
-<div class="modal fade" id="modalDefinirMeta" tabindex="-1" aria-hidden="true">
-    <div class="modal-dialog modal-dialog-centered modal-sm">
-        <div class="modal-content bg-body-tertiary border-secondary-subtle rounded-4">
-            <div class="modal-header border-bottom border-secondary-subtle p-3">
-                <h6 class="modal-title text-light fw-bold mb-0" id="modalDefinirMetaTitulo">Definir meta</h6>
-                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
-            </div>
-            <form method="POST" action="salvar_meta_categoria.php" id="formDefinirMeta">
-                <input type="hidden" name="categoria_id" id="metaCategoriaId">
-                <input type="hidden" name="mes" value="<?php echo (int) $mes_atual ?>">
-                <input type="hidden" name="ano" value="<?php echo (int) $ano_atual ?>">
-                <input type="hidden" name="carteira" value="<?php echo htmlspecialchars($carteira_selecionada ?? '') ?>">
-                <input type="hidden" name="acao" id="metaAcao" value="salvar">
-                <div class="modal-body p-4">
-                    <label class="form-label text-secondary small mb-1" id="modalDefinirMetaLabel">Valor mensal</label>
-                    <div class="input-group">
-                        <span class="input-group-text bg-dark border-secondary-subtle text-secondary">R$</span>
-                        <input type="text" inputmode="numeric" name="valor_meta" id="metaValorInput"
-                               class="form-control bg-dark border-secondary-subtle text-light" placeholder="0,00"
-                               oninput="mascaraMoeda(this)" required>
-                    </div>
-                </div>
-                <div class="modal-footer border-top border-secondary-subtle d-flex justify-content-between p-2">
-                    <button type="button" class="btn btn-sm btn-link text-danger text-decoration-none" id="btnRemoverMeta" style="display:none;">
-                        Remover meta
-                    </button>
-                    <button type="submit" class="btn btn-sm btn-warning fw-bold px-3 rounded-pill ms-auto">
-                        Salvar
-                    </button>
-                </div>
-            </form>
         </div>
     </div>
 </div>

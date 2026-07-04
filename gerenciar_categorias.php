@@ -118,6 +118,19 @@ if (isset($_GET['sucesso'])) {
     if ($_GET['sucesso'] === 'editada')    $sucesso = "Categoria atualizada com sucesso!";
 }
 
+// Mensagens de sucesso/erro da meta/orçamento por categoria (salvar_meta_categoria.php)
+$msgsMeta = [
+    'meta_salva'    => 'Meta salva com sucesso!',
+    'meta_removida' => 'Meta removida.',
+];
+$errosMeta = [
+    'categoria_invalida' => 'Categoria inválida.',
+    'valor_invalido'     => 'Informe um valor numérico maior que zero.',
+    'banco'              => 'Erro ao salvar no banco de dados.',
+];
+$sucessoMeta = ($_GET['sucesso_meta'] ?? null);
+$erroMeta    = ($_GET['erro_meta'] ?? null);
+
 // --- 1.4 BUSCA AS CATEGORIAS SEPARANDO POR TIPO ---
 $categorias_receita = [];
 $categorias_despesa = [];
@@ -165,6 +178,18 @@ try {
     }
 } catch (PDOException $e) {
     $erro = "Erro ao buscar categorias.";
+}
+
+// ── Metas/orçamento por categoria ────────────────────────────────────────
+garantirTabelaMetaCategoria($pdo);
+$metasPorCategoria = [];
+try {
+    $stmtMetas = $pdo->prepare("SELECT FKCategoria, ValorMeta FROM MetaCategoria WHERE FKUsuario = :uid");
+    $stmtMetas->execute([':uid' => $usuario_id]);
+    foreach ($stmtMetas->fetchAll(PDO::FETCH_ASSOC) as $m) {
+        $metasPorCategoria[$m['FKCategoria']] = (float) $m['ValorMeta'];
+    }
+} catch (PDOException $e) {
 }
 
 require_once 'geral/header.php';
@@ -224,6 +249,16 @@ $listaIcones = [
 
     <?php if ($sucesso): ?>
         <script>window._pendingToast = <?= json_encode($sucesso) ?>;</script>
+    <?php endif; ?>
+
+    <?php if ($sucessoMeta && isset($msgsMeta[$sucessoMeta])): ?>
+        <script>window._pendingToast = <?= json_encode($msgsMeta[$sucessoMeta]) ?>;</script>
+    <?php endif; ?>
+
+    <?php if ($erroMeta && isset($errosMeta[$erroMeta])): ?>
+        <div class="alert d-flex align-items-center gap-2 rounded-3 shadow-sm border-0 fw-semibold mb-3" style="background:var(--color-expense-bg);color:var(--color-expense-text);border:1px solid var(--color-expense-border) !important;">
+            <i class="bi bi-exclamation-triangle-fill"></i> <span><?= htmlspecialchars($errosMeta[$erroMeta]) ?></span>
+        </div>
     <?php endif; ?>
 
     <?php if ($erro): ?>
@@ -342,7 +377,7 @@ $listaIcones = [
 
         <div class="col-md-7 col-lg-8">
 
-            <div class="card bg-dark border-secondary-subtle shadow-sm rounded-4 overflow-hidden mb-4">
+            <div class="card bg-dark border-secondary-subtle shadow-sm rounded-4 overflow-hidden mb-4" id="lista-despesas">
                 <div class="card-header bg-charcoal-analysis border-secondary-subtle py-3 d-flex align-items-center">
                     <div class="bg-danger bg-opacity-10 rounded-circle me-3 d-flex align-items-center justify-content-center" style="width: 36px; height: 36px; flex-shrink: 0;">
                         <i class="bi bi-arrow-down-short text-danger fs-5"></i>
@@ -378,6 +413,19 @@ $listaIcones = [
                                         </td>
                                         <td class="py-3 border-secondary-subtle text-secondary small text-center fs-7">
                                             <?= $cat['total_usos'] ?> registro(s)
+                                        </td>
+                                        <td class="py-3 border-secondary-subtle text-center fs-7" style="min-width:150px;">
+                                            <?php $metaCat = $metasPorCategoria[$cat['IDCategoria']] ?? null; ?>
+                                            <button type="button"
+                                                class="btn btn-sm rounded-pill <?= $metaCat !== null ? 'btn-outline-info' : 'btn-outline-secondary' ?>"
+                                                style="font-size:0.72rem;"
+                                                onclick="abrirModalMeta('<?= $cat['IDCategoria'] ?>','<?= htmlspecialchars(addslashes($cat['NomeCategoria'])) ?>','despesa',<?= $metaCat !== null ? $metaCat : 'null' ?>)">
+                                                <?php if ($metaCat !== null): ?>
+                                                    <i class="bi bi-piggy-bank me-1"></i>R$ <?= number_format($metaCat, 2, ',', '.') ?>
+                                                <?php else: ?>
+                                                    <i class="bi bi-plus-lg me-1"></i>Orçamento
+                                                <?php endif; ?>
+                                            </button>
                                         </td>
                                         <td class="text-end pe-3 pe-md-4 py-3 border-secondary-subtle">
                                             <div class="d-flex align-items-center justify-content-end gap-2">
@@ -418,7 +466,7 @@ $listaIcones = [
                 </div>
             </div>
 
-            <div class="card bg-dark border-secondary-subtle shadow-sm rounded-4 overflow-hidden">
+            <div class="card bg-dark border-secondary-subtle shadow-sm rounded-4 overflow-hidden" id="lista-receitas">
                 <div class="card-header bg-charcoal-analysis border-secondary-subtle py-3 d-flex align-items-center">
                     <div class="bg-success bg-opacity-10 rounded-circle me-3 d-flex align-items-center justify-content-center" style="width: 36px; height: 36px; flex-shrink: 0;">
                         <i class="bi bi-arrow-up-short text-success fs-5"></i>
@@ -454,6 +502,19 @@ $listaIcones = [
                                         </td>
                                         <td class="py-3 border-secondary-subtle text-secondary small text-center fs-7">
                                             <?= $cat['total_usos'] ?> registro(s)
+                                        </td>
+                                        <td class="py-3 border-secondary-subtle text-center fs-7" style="min-width:150px;">
+                                            <?php $metaCat = $metasPorCategoria[$cat['IDCategoria']] ?? null; ?>
+                                            <button type="button"
+                                                class="btn btn-sm rounded-pill <?= $metaCat !== null ? 'btn-outline-info' : 'btn-outline-secondary' ?>"
+                                                style="font-size:0.72rem;"
+                                                onclick="abrirModalMeta('<?= $cat['IDCategoria'] ?>','<?= htmlspecialchars(addslashes($cat['NomeCategoria'])) ?>','receita',<?= $metaCat !== null ? $metaCat : 'null' ?>)">
+                                                <?php if ($metaCat !== null): ?>
+                                                    <i class="bi bi-flag-fill me-1"></i>R$ <?= number_format($metaCat, 2, ',', '.') ?>
+                                                <?php else: ?>
+                                                    <i class="bi bi-plus-lg me-1"></i>Meta
+                                                <?php endif; ?>
+                                            </button>
                                         </td>
                                         <td class="text-end pe-3 pe-md-4 py-3 border-secondary-subtle">
                                             <div class="d-flex align-items-center justify-content-end gap-2">
@@ -685,6 +746,39 @@ $listaIcones = [
         </div>
     </div>
 </div>
+
+<!-- ── Modal: Definir Meta/Orçamento por Categoria ─────────────────────── -->
+<div class="modal fade" id="modalDefinirMeta" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered modal-sm">
+        <div class="modal-content border-secondary-subtle shadow-lg rounded-4">
+            <div class="modal-header border-bottom border-secondary-subtle p-3">
+                <h6 class="modal-title text-light fw-bold mb-0" id="modalDefinirMetaTitulo">Definir meta</h6>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <form method="POST" action="salvar_meta_categoria.php" id="formDefinirMeta">
+                <input type="hidden" name="categoria_id" id="metaCategoriaId">
+                <input type="hidden" name="acao" id="metaAcao" value="salvar">
+                <div class="modal-body p-4">
+                    <label class="form-label text-secondary small mb-1" id="modalDefinirMetaLabel">Valor mensal</label>
+                    <div class="input-group">
+                        <span class="input-group-text bg-dark border-secondary-subtle text-secondary">R$</span>
+                        <input type="text" inputmode="numeric" name="valor_meta" id="metaValorInput"
+                               class="form-control bg-dark border-secondary-subtle text-light" placeholder="0,00"
+                               oninput="mascaraMoeda(this)" required>
+                    </div>
+                </div>
+                <div class="modal-footer border-top border-secondary-subtle d-flex justify-content-between p-2">
+                    <button type="button" class="btn btn-sm btn-link text-danger text-decoration-none" id="btnRemoverMeta" style="display:none;">
+                        Remover meta
+                    </button>
+                    <button type="submit" class="btn btn-sm btn-warning fw-bold px-3 rounded-pill ms-auto">
+                        Salvar
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
 <?php require_once 'geral/footer.php'; ?>
 <script>
     document.addEventListener("DOMContentLoaded", function() {
@@ -726,4 +820,31 @@ $listaIcones = [
             });
         }
     });
+
+    // ── Modal: Definir Meta/Orçamento por Categoria ─────────────────────────
+    function abrirModalMeta(categoriaId, nome, tipo, metaAtual) {
+        document.getElementById('metaCategoriaId').value = categoriaId;
+        document.getElementById('metaAcao').value = 'salvar';
+        document.getElementById('modalDefinirMetaTitulo').textContent = (tipo === 'despesa' ? 'Orçamento — ' : 'Meta — ') + nome;
+        document.getElementById('modalDefinirMetaLabel').textContent = tipo === 'despesa' ? 'Limite mensal para esta categoria' : 'Meta mensal para esta categoria';
+
+        const input = document.getElementById('metaValorInput');
+        input.value = metaAtual ? Number(metaAtual).toLocaleString('pt-BR', {
+            style: 'currency',
+            currency: 'BRL'
+        }) : '';
+
+        const btnRemover = document.getElementById('btnRemoverMeta');
+        if (metaAtual) {
+            btnRemover.style.display = '';
+            btnRemover.onclick = function() {
+                document.getElementById('metaAcao').value = 'remover';
+                document.getElementById('formDefinirMeta').submit();
+            };
+        } else {
+            btnRemover.style.display = 'none';
+        }
+
+        bootstrap.Modal.getOrCreateInstance(document.getElementById('modalDefinirMeta')).show();
+    }
 </script>

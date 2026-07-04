@@ -413,12 +413,14 @@ if (!defined('MP_WEBHOOK_SECRET')) {
 }
 
 // Mapa de preapproval_plan_id → plano Auralis (fonte única da verdade)
+// 'valor' é usado pelo fluxo de Pix avulso (gerar_pagamento_pix.php), que não tem
+// preapproval — precisa saber quanto cobrar a partir só do ID do plano.
 if (!defined('MP_PLANOS')) {
     define('MP_PLANOS', [
-        '9c7869b02a884962a185a44dee6c16f8' => ['plano' => 'pro', 'ciclo' => 'mensal', 'dias' => 32],
-        '98c6343b478e4efcad77ab56fe6f5948' => ['plano' => 'pro', 'ciclo' => 'anual',  'dias' => 370],
-        '55856961da8d49d09b4ccded59a56810' => ['plano' => 'vip', 'ciclo' => 'mensal', 'dias' => 32],
-        '3ed445df740c439884e8ebc71ddbdb69' => ['plano' => 'vip', 'ciclo' => 'anual',  'dias' => 370],
+        '9c7869b02a884962a185a44dee6c16f8' => ['plano' => 'pro', 'ciclo' => 'mensal', 'dias' => 32,  'valor' => 19.90],
+        '98c6343b478e4efcad77ab56fe6f5948' => ['plano' => 'pro', 'ciclo' => 'anual',  'dias' => 370, 'valor' => 179.90],
+        '55856961da8d49d09b4ccded59a56810' => ['plano' => 'vip', 'ciclo' => 'mensal', 'dias' => 32,  'valor' => 29.90],
+        '3ed445df740c439884e8ebc71ddbdb69' => ['plano' => 'vip', 'ciclo' => 'anual',  'dias' => 370, 'valor' => 239.90],
     ]);
 }
 
