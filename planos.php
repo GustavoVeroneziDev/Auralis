@@ -231,6 +231,10 @@ require_once 'geral/header.php';
                 'btn_a_style' => 'background:#7c3aed;color:#fff;border:none;',
                 'btn_m_href'  => 'https://www.mercadopago.com.br/subscriptions/checkout?preapproval_plan_id=9c7869b02a884962a185a44dee6c16f8',
                 'btn_a_href'  => 'https://www.mercadopago.com.br/subscriptions/checkout?preapproval_plan_id=98c6343b478e4efcad77ab56fe6f5948',
+                'plan_id_m'   => '9c7869b02a884962a185a44dee6c16f8',
+                'plan_id_a'   => '98c6343b478e4efcad77ab56fe6f5948',
+                'valor_pix_m' => 'R$ 19,90',
+                'valor_pix_a' => 'R$ 179,90',
             ],
             'vip' => [
                 'topo_bg'     => 'linear-gradient(90deg,#AA8C2C,#d4af37)',
@@ -253,6 +257,10 @@ require_once 'geral/header.php';
                 'btn_a_style' => 'background:linear-gradient(90deg,#AA8C2C,#d4af37);color:#fff;border:none;font-weight:800;',
                 'btn_m_href'  => 'https://www.mercadopago.com.br/subscriptions/checkout?preapproval_plan_id=55856961da8d49d09b4ccded59a56810',
                 'btn_a_href'  => 'https://www.mercadopago.com.br/subscriptions/checkout?preapproval_plan_id=3ed445df740c439884e8ebc71ddbdb69',
+                'plan_id_m'   => '55856961da8d49d09b4ccded59a56810',
+                'plan_id_a'   => '3ed445df740c439884e8ebc71ddbdb69',
+                'valor_pix_m' => 'R$ 29,90',
+                'valor_pix_a' => 'R$ 239,90',
             ],
         ];
 
@@ -333,6 +341,26 @@ require_once 'geral/header.php';
                                     style="<?= $c['btn_a_style'] ?>">
                                     <?= htmlspecialchars($c['btn_a_text']) ?>
                                 </a>
+
+                                <button type="button"
+                                    class="btn w-100 rounded-pill fw-semibold preco-mensal btn-pagar-pix"
+                                    style="background:rgba(6,214,160,.12);color:#06D6A0;border:1px solid rgba(6,214,160,.35);"
+                                    data-plan-id="<?= htmlspecialchars($c['plan_id_m']) ?>"
+                                    data-valor="<?= htmlspecialchars($c['valor_pix_m']) ?>"
+                                    data-nome="<?= htmlspecialchars($c['nome']) ?> — Mensal">
+                                    <i class="bi bi-qr-code me-1"></i> Pagar com Pix
+                                </button>
+                                <button type="button"
+                                    class="btn w-100 rounded-pill fw-semibold preco-anual d-none btn-pagar-pix"
+                                    style="background:rgba(6,214,160,.12);color:#06D6A0;border:1px solid rgba(6,214,160,.35);"
+                                    data-plan-id="<?= htmlspecialchars($c['plan_id_a']) ?>"
+                                    data-valor="<?= htmlspecialchars($c['valor_pix_a']) ?>"
+                                    data-nome="<?= htmlspecialchars($c['nome']) ?> — Anual">
+                                    <i class="bi bi-qr-code me-1"></i> Pagar com Pix
+                                </button>
+                                <p class="text-secondary text-center mb-0" style="font-size:0.7rem;">
+                                    <i class="bi bi-info-circle me-1"></i>Pix não renova automaticamente — avisamos antes de vencer.
+                                </p>
                             </div>
                         <?php endif; ?>
                     </div>
@@ -426,6 +454,84 @@ require_once 'geral/header.php';
 
 </main>
 
+<!-- ── Modal: Pagar com Pix ─────────────────────────────────────────────── -->
+<div class="modal fade" id="modalPagarPix" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content border-secondary-subtle shadow-lg rounded-4" style="background:var(--bg-card);">
+            <div class="modal-header border-bottom border-secondary-subtle p-4">
+                <h5 class="modal-title text-light fw-bold mb-0">
+                    <i class="bi bi-qr-code me-2" style="color:#06D6A0;"></i>Pagar com Pix
+                </h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body p-4">
+
+                <!-- Etapa 1: CPF/CNPJ -->
+                <div id="pixEtapaDocumento">
+                    <p class="text-secondary small mb-3">
+                        Pra gerar o Pix de <strong id="pixDocNomePlano" class="text-light"></strong>
+                        (<span id="pixDocValor" class="text-light fw-bold"></span>), informe seu CPF ou CNPJ:
+                    </p>
+                    <input type="text" id="pixInputDocumento"
+                        class="form-control bg-dark border-secondary-subtle text-light mb-3"
+                        placeholder="000.000.000-00" inputmode="numeric" maxlength="18">
+                    <div id="pixDocErro" class="text-danger small mb-3" style="display:none;"></div>
+                    <button type="button" id="pixBtnGerar" class="btn w-100 rounded-pill fw-bold"
+                        style="background:#06D6A0;color:#03251c;">
+                        Gerar código Pix
+                    </button>
+                </div>
+
+                <!-- Etapa 2: carregando -->
+                <div id="pixEtapaCarregando" style="display:none;" class="text-center py-4">
+                    <div class="spinner-border" style="color:#06D6A0;" role="status"></div>
+                    <p class="text-secondary mt-3 mb-0">Gerando seu código Pix...</p>
+                </div>
+
+                <!-- Etapa 3: QR code -->
+                <div id="pixEtapaQrcode" style="display:none;" class="text-center">
+                    <img id="pixQrImg" src="" alt="QR Code Pix" class="mb-3 rounded-3"
+                        style="max-width:220px;width:100%;background:#fff;padding:8px;">
+                    <p class="text-secondary small mb-2">Escaneie com o app do seu banco ou copie o código abaixo:</p>
+                    <div class="input-group mb-3">
+                        <input type="text" id="pixCopiaCola" class="form-control bg-dark border-secondary-subtle text-light"
+                            readonly style="font-size:0.72rem;">
+                        <button type="button" id="pixBtnCopiar" class="btn btn-outline-secondary">
+                            <i class="bi bi-clipboard"></i>
+                        </button>
+                    </div>
+                    <div class="d-flex align-items-center justify-content-center gap-2 text-secondary small">
+                        <div class="spinner-border spinner-border-sm" style="color:#06D6A0;" role="status"></div>
+                        Aguardando pagamento...
+                    </div>
+                    <p class="text-secondary mt-2 mb-0" style="font-size:0.7rem;">O código expira em 60 minutos.</p>
+                </div>
+
+                <!-- Etapa 4: aprovado -->
+                <div id="pixEtapaAprovado" style="display:none;" class="text-center py-4">
+                    <i class="bi bi-check-circle-fill text-success mb-3" style="font-size:3.5rem;"></i>
+                    <h5 class="text-light fw-bold mb-2">Pagamento confirmado!</h5>
+                    <p class="text-secondary mb-4">Seu plano já foi ativado.</p>
+                    <a href="dashboard.php" class="btn w-100 rounded-pill fw-bold" style="background:#06D6A0;color:#03251c;">
+                        Ir para o Dashboard
+                    </a>
+                </div>
+
+                <!-- Etapa 5: expirado/erro -->
+                <div id="pixEtapaErro" style="display:none;" class="text-center py-4">
+                    <i class="bi bi-exclamation-triangle-fill text-warning mb-3" style="font-size:3rem;"></i>
+                    <p class="text-secondary mb-3" id="pixErroMsg">O código expirou.</p>
+                    <button type="button" id="pixBtnTentarNovamente" class="btn w-100 rounded-pill fw-bold"
+                        style="background:#06D6A0;color:#03251c;">
+                        Gerar novo código
+                    </button>
+                </div>
+
+            </div>
+        </div>
+    </div>
+</div>
+
 <script>
     const toggle = document.getElementById('toggleAnual');
     const mensal = document.querySelectorAll('.preco-mensal');
@@ -438,6 +544,144 @@ require_once 'geral/header.php';
         anual.forEach(el => el.classList.toggle('d-none', !isAnual));
         anualInfo.forEach(el => el.classList.toggle('d-none', !isAnual));
     });
+</script>
+
+<script>
+    // ── Pagar com Pix (avulso, sem recorrência) ─────────────────────────────
+    (function() {
+        const modalEl = document.getElementById('modalPagarPix');
+        if (!modalEl) return;
+        const modal = new bootstrap.Modal(modalEl);
+
+        const etapaDocumento  = document.getElementById('pixEtapaDocumento');
+        const etapaCarregando = document.getElementById('pixEtapaCarregando');
+        const etapaQrcode     = document.getElementById('pixEtapaQrcode');
+        const etapaAprovado   = document.getElementById('pixEtapaAprovado');
+        const etapaErro       = document.getElementById('pixEtapaErro');
+        const todasEtapas     = [etapaDocumento, etapaCarregando, etapaQrcode, etapaAprovado, etapaErro];
+
+        let planoAtual = null;
+        let pollTimer  = null;
+
+        function mostrarEtapa(etapa) {
+            todasEtapas.forEach(e => e.style.display = 'none');
+            etapa.style.display = '';
+        }
+
+        function pararPolling() {
+            if (pollTimer) {
+                clearInterval(pollTimer);
+                pollTimer = null;
+            }
+        }
+
+        function mensagemErroPix(codigo) {
+            const msgs = {
+                plano_invalido: 'Plano inválido.',
+                documento_invalido: 'CPF/CNPJ inválido.',
+                usuario_invalido: 'Não foi possível identificar seu usuário. Faça login novamente.',
+                mp_falhou: 'Não foi possível gerar o Pix agora. Tente novamente em instantes.',
+                sem_qrcode: 'Erro ao gerar o QR Code. Tente novamente.',
+            };
+            return msgs[codigo] || 'Erro ao gerar o Pix. Tente novamente.';
+        }
+
+        document.querySelectorAll('.btn-pagar-pix').forEach(btn => {
+            btn.addEventListener('click', function() {
+                planoAtual = {
+                    planId: this.dataset.planId,
+                    valor: this.dataset.valor,
+                    nome: this.dataset.nome,
+                };
+                document.getElementById('pixDocNomePlano').textContent = planoAtual.nome;
+                document.getElementById('pixDocValor').textContent = planoAtual.valor;
+                document.getElementById('pixInputDocumento').value = '';
+                document.getElementById('pixDocErro').style.display = 'none';
+                pararPolling();
+                mostrarEtapa(etapaDocumento);
+                modal.show();
+            });
+        });
+
+        document.getElementById('pixInputDocumento').addEventListener('input', function() {
+            let v = this.value.replace(/\D/g, '').slice(0, 14);
+            if (v.length <= 11) {
+                v = v.replace(/(\d{3})(\d)/, '$1.$2').replace(/(\d{3})(\d)/, '$1.$2').replace(/(\d{3})(\d{1,2})$/, '$1-$2');
+            } else {
+                v = v.replace(/(\d{2})(\d)/, '$1.$2').replace(/(\d{3})(\d)/, '$1.$2').replace(/(\d{3})(\d)/, '$1/$2').replace(/(\d{4})(\d{1,2})$/, '$1-$2');
+            }
+            this.value = v;
+        });
+
+        document.getElementById('pixBtnGerar').addEventListener('click', function() {
+            const doc = document.getElementById('pixInputDocumento').value.replace(/\D/g, '');
+            const erroEl = document.getElementById('pixDocErro');
+            if (doc.length !== 11 && doc.length !== 14) {
+                erroEl.textContent = 'Informe um CPF (11 dígitos) ou CNPJ (14 dígitos) válido.';
+                erroEl.style.display = '';
+                return;
+            }
+            erroEl.style.display = 'none';
+            mostrarEtapa(etapaCarregando);
+
+            fetch('gerar_pagamento_pix.php', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+                body: `plan_id=${encodeURIComponent(planoAtual.planId)}&documento=${encodeURIComponent(doc)}`
+            }).then(r => r.json()).then(d => {
+                if (!d.ok) {
+                    document.getElementById('pixErroMsg').textContent = mensagemErroPix(d.erro);
+                    mostrarEtapa(etapaErro);
+                    return;
+                }
+                document.getElementById('pixQrImg').src = 'data:image/png;base64,' + d.qr_code_base64;
+                document.getElementById('pixCopiaCola').value = d.qr_code;
+                mostrarEtapa(etapaQrcode);
+                iniciarPolling(d.payment_id);
+            }).catch(() => {
+                document.getElementById('pixErroMsg').textContent = 'Erro de conexão. Tente novamente.';
+                mostrarEtapa(etapaErro);
+            });
+        });
+
+        document.getElementById('pixBtnCopiar').addEventListener('click', function() {
+            const input = document.getElementById('pixCopiaCola');
+            navigator.clipboard.writeText(input.value).then(() => {
+                const icone = this.querySelector('i');
+                icone.className = 'bi bi-check-lg';
+                setTimeout(() => { icone.className = 'bi bi-clipboard'; }, 1500);
+            });
+        });
+
+        document.getElementById('pixBtnTentarNovamente').addEventListener('click', function() {
+            document.getElementById('pixInputDocumento').value = '';
+            mostrarEtapa(etapaDocumento);
+        });
+
+        function iniciarPolling(paymentId) {
+            pararPolling();
+            pollTimer = setInterval(() => {
+                fetch(`verificar_pix_assinatura.php?payment_id=${encodeURIComponent(paymentId)}`)
+                    .then(r => r.json())
+                    .then(d => {
+                        if (d.status === 'aprovado' || d.status === 'aprovado_pendente_ativacao') {
+                            pararPolling();
+                            mostrarEtapa(etapaAprovado);
+                        } else if (d.status === 'expirado' || d.status === 'rejected' || d.status === 'cancelled') {
+                            pararPolling();
+                            document.getElementById('pixErroMsg').textContent = d.status === 'expirado'
+                                ? 'O código Pix expirou.'
+                                : 'O pagamento não foi concluído.';
+                            mostrarEtapa(etapaErro);
+                        }
+                        // status 'pendente' — continua esperando
+                    })
+                    .catch(() => {});
+            }, 4000);
+        }
+
+        modalEl.addEventListener('hidden.bs.modal', pararPolling);
+    })();
 </script>
 
 <?php if ($resgatado): ?>

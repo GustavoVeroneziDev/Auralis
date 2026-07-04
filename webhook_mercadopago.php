@@ -114,8 +114,20 @@ try {
                     $resultado = mpAtivarPlano($pdo, $email, $planId, $preapprovalId, $valor);
                     _mpLog($resultado ? "ATIVADO via payment: {$email} → {$resultado}" : "FALHOU via payment para {$email}");
                 }
+            } elseif (($pagamento['payment_method_id'] ?? '') === 'pix' && isset(MP_PLANOS[$pagamento['external_reference'] ?? ''])) {
+                // Pix avulso (gerar_pagamento_pix.php) — sem preapproval, o plano vem no
+                // external_reference. Camada de segurança: a ativação principal já
+                // costuma ter acontecido via verificar_pix_assinatura.php (polling do
+                // front-end); mpAtivarPlano é idempotente, então rodar de novo aqui não duplica.
+                $planId    = $pagamento['external_reference'];
+                $valor     = $pagamento['transaction_amount'] ?? 0;
+                $resultado = mpAtivarPlano($pdo, $email, $planId, "pix_{$id}", $valor);
+                _mpLog($resultado ? "ATIVADO via pix avulso: {$email} → {$resultado}" : "FALHOU via pix avulso para {$email}");
+                if ($resultado) {
+                    processarIndicacaoConversao($pdo, $email, (float)$valor, $resultado);
+                }
             } else {
-                _mpLog("Pagamento aprovado mas sem preapproval_id nos metadados. Email: {$email}");
+                _mpLog("Pagamento aprovado mas sem preapproval_id nem external_reference de plano. Email: {$email}");
             }
         }
 
