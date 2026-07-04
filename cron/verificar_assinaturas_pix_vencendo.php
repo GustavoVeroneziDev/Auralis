@@ -1,10 +1,10 @@
 <?php
 // cron/verificar_assinaturas_pix_vencendo.php
 //
-// Assinaturas pagas via Pix avulso (gerar_pagamento_pix.php) não renovam
-// sozinhas — diferente do cartão, que é cobrado automaticamente pelo MP.
-// Esse cron avisa a pessoa 3 dias e 1 dia antes de vencer, pra ela renovar
-// manualmente a tempo. Roda 1x por dia.
+// Assinaturas pagas via link de pagamento fixo (planos.php "Pagar com Pix")
+// não renovam sozinhas — diferente do cartão, que é cobrado automaticamente
+// pelo MP. Esse cron avisa a pessoa 3 dias e 1 dia antes de vencer, pra ela
+// renovar manualmente a tempo. Roda 1x por dia.
 //
 // Configurar no cPanel > Trabalhos Cron, junto com o de vencimentos de contas:
 //   Minuto=0  Hora=12  Dia=*  Mês=*  Dia da semana=*
