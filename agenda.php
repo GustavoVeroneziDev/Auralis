@@ -1447,6 +1447,13 @@ require_once 'geral/header.php';
                 setTimeout(() => { window._rightDragOcorreu = false; }, 80);
             }
         });
+
+        // Sem isso, soltar o botão direito depois de arrastar também dispara o menu
+        // NATIVO do navegador (Inspecionar, Voltar...) por cima de qualquer coisa —
+        // não só em cima dos pills. Roda em fase de captura pra agir antes de tudo.
+        document.addEventListener('contextmenu', (e) => {
+            if (window._rightDragOcorreu) e.preventDefault();
+        }, true);
     })();
 
     // ── Seleção múltipla de itens no modal de dia ─────────────────────────
