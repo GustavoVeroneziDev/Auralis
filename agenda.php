@@ -1440,7 +1440,9 @@ require_once 'geral/header.php';
             if (estado.dragging) {
                 const alvo = document.elementFromPoint(e.clientX, e.clientY)?.closest('.calendar-day');
                 const novaData = alvo?.dataset?.data;
-                if (novaData && novaData !== estado.origemDia) {
+                // Mostra o menu em qualquer box válida — mesmo se for o próprio dia de origem
+                // ("Copiar pra cá" nesse caso é igual ao "Duplicar" do menu de contexto).
+                if (novaData) {
                     mostrarMenuMoverCopiar(e.clientX, e.clientY, estado.transacao.id, novaData);
                 }
                 window._rightDragOcorreu = true;
