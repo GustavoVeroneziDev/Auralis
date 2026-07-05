@@ -1448,9 +1448,14 @@ function carteiraPapelDoUsuario(PDO $pdo, string $carteiraId, string $usuarioId)
     }
 }
 
-// Plano ativo de quem é dono da carteira — usado pra aplicar o teto de plano (parcelas,
+// Plano de quem é dono da carteira — usado pra aplicar o teto de plano (parcelas,
 // categorias, membros) a convidados dentro de uma carteira compartilhada, já que eles
 // operam sob o plano de quem criou a carteira, não o próprio, enquanto estão nela.
+// Lê direto de Usuario.Plano (mesma fonte de verdade usada em toda a aplicação via
+// $_SESSION['plano'] no login) — NÃO da tabela Assinatura, porque planos atribuídos
+// manualmente (admin/supremo, cortesia) não têm necessariamente uma linha de Assinatura
+// com Status='ativa', o que fazia essa função sempre cair no fallback 'free' pra essas
+// contas e bloquear o convite com "limite de pessoas do plano atingido" incorretamente.
 function planoEfetivoDaCarteira(PDO $pdo, string $carteiraId): string
 {
     $stmt = $pdo->prepare("SELECT FKUsuarioDono FROM Carteira WHERE IDCarteira = :cid");
@@ -1458,9 +1463,9 @@ function planoEfetivoDaCarteira(PDO $pdo, string $carteiraId): string
     $donoId = $stmt->fetchColumn();
     if (!$donoId) return 'free';
 
-    $stmtPlano = $pdo->prepare("SELECT Plano FROM Assinatura WHERE FKUsuario = :uid AND Status = 'ativa' LIMIT 1");
+    $stmtPlano = $pdo->prepare("SELECT Plano FROM Usuario WHERE IDUsuario = :uid");
     $stmtPlano->execute([':uid' => $donoId]);
-    return $stmtPlano->fetchColumn() ?: 'free';
+    return strtolower($stmtPlano->fetchColumn() ?: 'free');
 }
 
 // Confere o limite de membros (dono + convidados pendentes/ativos) contra o limite

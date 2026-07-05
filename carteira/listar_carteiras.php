@@ -207,7 +207,8 @@ try {
 $carteirasComoConvidado = [];
 try {
     $stmtConv = $pdo->prepare("
-        SELECT c.IDCarteira, c.TipoCarteira, u.Nome AS NomeDono,
+        SELECT c.IDCarteira, c.TipoCarteira, u.Nome AS NomeDono, u.Plano AS PlanoDono,
+               (SELECT COUNT(*) FROM MembroCarteira mc2 WHERE mc2.FKCarteira = c.IDCarteira AND mc2.StatusConvite = 1) as QtdMembros,
                COALESCE(SUM(CASE WHEN r.TipoRegistro = 'receita'               THEN  r.Valor ELSE 0 END), 0) +
                COALESCE(SUM(CASE WHEN r.TipoRegistro = 'cofrinho_retirada'     THEN  r.Valor ELSE 0 END), 0) +
                COALESCE(SUM(CASE WHEN r.TipoRegistro = 'transferencia_entrada' THEN  r.Valor ELSE 0 END), 0) -
@@ -219,7 +220,7 @@ try {
         JOIN Usuario u ON u.IDUsuario = c.FKUsuarioDono
         LEFT JOIN Registro r ON c.IDCarteira = r.FKCarteira AND r.StatusRegistro = 'efetivado'
         WHERE mc.FKUsuario = :uid AND mc.StatusConvite = 1
-        GROUP BY c.IDCarteira, c.TipoCarteira, u.Nome
+        GROUP BY c.IDCarteira, c.TipoCarteira, u.Nome, u.Plano
         ORDER BY c.TipoCarteira ASC
     ");
     $stmtConv->execute([':uid' => $usuario_id]);
@@ -370,11 +371,14 @@ require_once '../geral/header.php';
                 <div class="card bg-body-tertiary border-secondary-subtle shadow-sm h-100 rounded-4 auralis-wallet-card position-relative overflow-hidden"
                     <?= $_cartBloqueada ? 'style="opacity:0.55;border-color:rgba(124,58,237,0.35) !important;"' : '' ?>>
 
-                    <?php if ($_cartCompart): ?>
+                    <?php if ($_cartCompart):
+                        $_cartAtual = (int)($cart['QtdMembros'] ?? 0) + 1;
+                        $_cartMax   = $_limiteMembrosPlano === PHP_INT_MAX ? '∞' : (int)$_limiteMembrosPlano;
+                    ?>
                         <span class="position-absolute top-0 start-0 m-2 d-flex align-items-center gap-1"
                               style="background:rgba(96,165,250,0.18);color:#60a5fa;border:1px solid rgba(96,165,250,0.4);border-radius:999px;padding:2px 8px;font-size:0.6rem;font-weight:700;z-index:2;"
                               title="Carteira compartilhada">
-                            <i class="bi bi-people-fill" style="font-size:0.6rem;"></i> <?= (int)($cart['QtdMembros'] ?? 0) + 1 ?> pessoa(s)
+                            <i class="bi bi-people-fill" style="font-size:0.6rem;"></i> <?= $_cartAtual ?>/<?= $_cartMax ?> pessoas
                         </span>
                     <?php endif; ?>
 
@@ -393,8 +397,12 @@ require_once '../geral/header.php';
                     <div class="card-body p-4 position-relative z-1 d-flex flex-column">
                         <div class="d-flex justify-content-between align-items-start mb-4">
                             <div class="d-flex align-items-center gap-3">
+                                <?php
+                                    $_cartIcone    = $_cartBloqueada ? 'bi-lock-fill' : ($_cartCompart ? 'bi-people-fill' : 'bi-bank');
+                                    $_cartIconeCor = $_cartBloqueada ? '#a78bfa' : ($_cartCompart ? '#60a5fa' : 'var(--primary-gold-analysis)');
+                                ?>
                                 <div class="icon-circle bg-primary bg-opacity-10 d-flex justify-content-center align-items-center rounded-3 shadow-sm" style="width: 48px; height: 48px;">
-                                    <i class="bi <?= $_cartBloqueada ? 'bi-lock-fill' : 'bi-bank' ?> fs-4" style="color: <?= $_cartBloqueada ? '#a78bfa' : 'var(--primary-gold-analysis)' ?> !important;"></i>
+                                    <i class="bi <?= $_cartIcone ?> fs-4" style="color: <?= $_cartIconeCor ?> !important;"></i>
                                 </div>
                                 <div>
                                     <h5 class="fw-bold text-light mb-0 d-flex align-items-center gap-2">
@@ -456,20 +464,25 @@ require_once '../geral/header.php';
             </div>
         <?php endforeach; ?>
 
-        <?php foreach ($carteirasComoConvidado as $cart): ?>
+        <?php foreach ($carteirasComoConvidado as $cart):
+            $_convAtual   = (int)($cart['QtdMembros'] ?? 0) + 1;
+            $_convLimites = limitesDoPlano(strtolower($cart['PlanoDono'] ?? 'free'));
+            $_convMaxRaw  = $_convLimites['carteiras_compartilhadas_membros'] ?? 0;
+            $_convMax     = $_convMaxRaw === PHP_INT_MAX ? '∞' : (int)$_convMaxRaw;
+        ?>
             <div class="col-md-6 col-lg-4">
                 <div class="card bg-body-tertiary border-secondary-subtle shadow-sm h-100 rounded-4 auralis-wallet-card position-relative overflow-hidden">
                     <span class="position-absolute top-0 start-0 m-2 d-flex align-items-center gap-1"
                           style="background:rgba(96,165,250,0.18);color:#60a5fa;border:1px solid rgba(96,165,250,0.4);border-radius:999px;padding:2px 8px;font-size:0.6rem;font-weight:700;z-index:2;"
-                          title="Carteira compartilhada">
-                        <i class="bi bi-people-fill" style="font-size:0.6rem;"></i> Convidado(a)
+                          title="Carteira compartilhada &mdash; você é convidado(a)">
+                        <i class="bi bi-people-fill" style="font-size:0.6rem;"></i> <?= $_convAtual ?>/<?= $_convMax ?> pessoas
                     </span>
 
                     <div class="card-body p-4 position-relative z-1 d-flex flex-column">
                         <div class="d-flex justify-content-between align-items-start mb-4">
                             <div class="d-flex align-items-center gap-3">
                                 <div class="icon-circle bg-primary bg-opacity-10 d-flex justify-content-center align-items-center rounded-3 shadow-sm" style="width: 48px; height: 48px;">
-                                    <i class="bi bi-bank fs-4" style="color: var(--primary-gold-analysis) !important;"></i>
+                                    <i class="bi bi-people-fill fs-4" style="color: #60a5fa !important;"></i>
                                 </div>
                                 <div>
                                     <h5 class="fw-bold text-light mb-0"><?= htmlspecialchars($cart['TipoCarteira']) ?></h5>
