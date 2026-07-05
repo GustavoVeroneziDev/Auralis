@@ -14,7 +14,7 @@ $pageTitle = 'Cartões de Crédito — Auralis';
 // Carteiras para seleção de débito
 $carteiras = [];
 try {
-    $s = $pdo->prepare("SELECT IDCarteira, TipoCarteira FROM Carteira WHERE FKUsuarioDono = :uid ORDER BY TipoCarteira ASC");
+    $s = $pdo->prepare("SELECT IDCarteira, TipoCarteira FROM Carteira WHERE FKUsuarioDono = :uid ORDER BY Principal DESC, TipoCarteira ASC");
     $s->execute([':uid' => $uid]);
     $carteiras = $s->fetchAll(PDO::FETCH_ASSOC);
 } catch (PDOException $e) {}
@@ -248,6 +248,14 @@ require_once '../geral/header.php';
                     <span class="position-absolute top-0 end-0 m-2 d-flex align-items-center gap-1 px-2 py-1"
                           style="background:rgba(124,58,237,0.18);color:#a78bfa;border:1px solid rgba(124,58,237,0.4);border-radius:999px;font-size:0.6rem;font-weight:700;z-index:10;">
                         <i class="bi bi-lock-fill"></i> PRO
+                    </span>
+                <?php endif; ?>
+
+                <?php if (empty($c['FKCarteiraDebito'])): ?>
+                    <span class="position-absolute top-0 start-0 m-2 d-flex align-items-center gap-1 px-2 py-1"
+                          style="background:rgba(245,158,11,0.18);color:#fbbf24;border:1px solid rgba(245,158,11,0.4);border-radius:999px;font-size:0.6rem;font-weight:700;z-index:10;"
+                          title="Sem carteira de pagamento definida — a fatura não aparece na agenda nem debita o saldo quando fechar.">
+                        <i class="bi bi-exclamation-triangle-fill"></i> Sem carteira vinculada
                     </span>
                 <?php endif; ?>
 
@@ -523,7 +531,11 @@ function abrirModalNovo() {
     document.getElementById('mc_fech').value    = '1';
     document.getElementById('mc_venc').value    = '10';
     document.getElementById('mc_limite').value  = '';
-    document.getElementById('mc_carteira').value = '';
+    // Cartão novo já vem com a 1ª carteira (a principal, se houver) pré-selecionada em vez
+    // de "— Não definido —" — deixar em branco silenciosamente é o que faz a fatura nunca
+    // gerar o lançamento de cobrança (não aparece na agenda, não debita o saldo).
+    var mcCart = document.getElementById('mc_carteira');
+    mcCart.selectedIndex = mcCart.options.length > 1 ? 1 : 0;
     document.getElementById('mc_titulo').textContent = 'Novo Cartão';
     document.getElementById('mc_aviso_datas').classList.add('d-none');
 }
