@@ -876,21 +876,20 @@ require_once '../geral/header.php';
     }
 
     // O dropdown de 3 pontos ficava cortado pelo overflow-hidden do card (usado pra
-    // arredondar cantos e conter o selo "N pessoa(s)"), e mesmo com strategy:'fixed'
-    // continuava aparecendo por baixo de outros cards — cada card tem seu próprio
-    // "stacking context", e um z-index alto dentro de um card não vence um card
-    // seguinte no HTML. A solução (igual painel de camadas do Canva, um overlay que
-    // sempre fica por cima de tudo): quando o menu abre, ele é fisicamente movido pra
-    // ser filho direto do <body> — some de dentro do card, então nada nele consegue
-    // mais cortar ou cobrir o menu — e volta pro lugar original quando fecha (o Popper
-    // continua ancorando a posição nos 3 pontos normalmente, isso não muda).
+    // arredondar cantos e conter o selo "N pessoa(s)"), e mesmo escapando disso continuava
+    // aparecendo por baixo de outros cards — cada card cria seu próprio "stacking context",
+    // e um z-index alto dentro de um card não vence um card seguinte no HTML.
+    //
+    // Solução tipo painel de camadas do Canva: o menu vira filho direto do <body> enquanto
+    // aberto (some de dentro do card, nada mais consegue cortar/cobrir ele) e volta pro
+    // lugar original ao fechar. A posição é calculada manualmente a partir do retângulo do
+    // botão dos 3 pontos (em vez de deixar o Popper recalcular depois de mover no DOM —
+    // ele não recalcula sozinho numa reparentagem manual, o que fazia o menu "pular" pro
+    // canto da tela). Por isso aqui o dropdown roda em modo "static" (sem Popper) e a gente
+    // mesmo posiciona, sempre ancorado nos 3 pontos.
     document.addEventListener('DOMContentLoaded', function() {
         document.querySelectorAll('.js-dropdown-carteira').forEach(function(toggleEl) {
-            new bootstrap.Dropdown(toggleEl, {
-                popperConfig: function(defaultConfig) {
-                    return Object.assign({}, defaultConfig, { strategy: 'fixed' });
-                }
-            });
+            new bootstrap.Dropdown(toggleEl, { display: 'static' });
 
             const menu = toggleEl.nextElementSibling;
             if (!menu || !menu.classList.contains('dropdown-menu')) return;
@@ -898,15 +897,22 @@ require_once '../geral/header.php';
             const placeholder = document.createComment('dropdown-lugar-original');
             let movido = false;
 
-            // Precisa ser "shown" (depois que o Bootstrap termina de abrir), não "show" —
-            // o Bootstrap ainda procura o menu como "próximo irmão" do botão logo depois
-            // do evento "show" disparar, então mover cedo demais quebra a abertura.
+            function posicionar() {
+                const rect = toggleEl.getBoundingClientRect();
+                menu.style.position = 'fixed';
+                menu.style.top = (rect.bottom + 4) + 'px';
+                menu.style.left = 'auto';
+                menu.style.right = (window.innerWidth - rect.right) + 'px';
+                menu.style.margin = '0';
+                menu.style.zIndex = '3000';
+            }
+
             toggleEl.addEventListener('shown.bs.dropdown', function() {
                 if (movido) return;
                 menu.parentNode.insertBefore(placeholder, menu);
                 document.body.appendChild(menu);
-                menu.style.zIndex = '3000';
                 movido = true;
+                posicionar();
             });
 
             toggleEl.addEventListener('hidden.bs.dropdown', function() {
@@ -915,6 +921,10 @@ require_once '../geral/header.php';
                 placeholder.remove();
                 movido = false;
             });
+
+            // Reancora se a página rolar ou a janela for redimensionada com o menu aberto
+            window.addEventListener('scroll', function() { if (movido) posicionar(); }, true);
+            window.addEventListener('resize', function() { if (movido) posicionar(); });
         });
     });
 </script>
