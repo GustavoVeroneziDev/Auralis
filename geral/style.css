@@ -1287,7 +1287,8 @@ input[type="number"] {
   nav, .navbar, footer, .modal, .offcanvas,
   .btn, .dropdown-menu, .toast-container,
   .no-print, #installModal, [data-bs-toggle]:not(tr):not(td),
-  .alert-dismissible .btn-close {
+  .alert-dismissible .btn-close,
+  #notif-container {
     display: none !important;
   }
 
@@ -1400,6 +1401,19 @@ input[type="number"] {
   .meta-cat-row {
     break-inside: avoid;
     page-break-inside: avoid;
+  }
+
+  /* Cards com listas de tamanho variável (Orçamento/Meta por Categoria, Detalhamento de
+     despesas/receitas) podem facilmente ficar mais altos que uma página inteira. O
+     break-inside:avoid genérico de ".card" (acima) força o navegador a tentar não quebrar
+     um bloco que não cabe de jeito nenhum numa página só — o resultado, na prática, é
+     conteúdo sobreposto entre páginas em vez de uma quebra limpa. Aqui liberamos a quebra
+     só nesses cards especificamente; as linhas de dentro já têm proteção própria
+     (.meta-cat-row acima, .analise-item mais abaixo). */
+  .card:has(.analises-list),
+  #metas-categoria .card {
+    break-inside: auto;
+    page-break-inside: auto;
   }
 
   /* No papel sobra espaço horizontal — nomes de categoria não devem truncar com "..." */

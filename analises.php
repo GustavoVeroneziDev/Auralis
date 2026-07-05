@@ -1659,6 +1659,16 @@ require_once 'geral/header.php';
         window.print();
     }
 
+    // Chart.js dimensiona o canvas com base no tamanho na tela — sem recalcular antes de
+    // imprimir, a legenda/rótulos podem ficar cortados ou fora da área do gráfico no PDF.
+    // Cobre tanto o botão "PDF" quanto Ctrl+P direto do navegador.
+    window.addEventListener('beforeprint', () => {
+        if (typeof Chart === 'undefined' || !Chart.instances) return;
+        Object.values(Chart.instances).forEach(c => {
+            try { c.resize(); } catch (e) {}
+        });
+    });
+
     function atualizarListaDetalhes(categoriaFiltro, tipo) {
         const containerLista = document.getElementById(`lista-detalhes-${tipo}`);
         const badgeCategoria = document.getElementById(`badge-categoria-${tipo}`);
