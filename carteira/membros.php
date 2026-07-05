@@ -73,7 +73,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && ($_POST['action'] ?? '') === 'convi
                 }
             }
         } catch (PDOException $e) {
-            $erro = "Erro ao enviar o convite.";
+            $erro = "Erro ao enviar o convite. [debug temporário: " . $e->getMessage() . "]";
         }
     }
 }
