@@ -1161,6 +1161,21 @@ function garantirTabelaMetaCategoria(PDO $pdo): void
     }
 }
 
+// Garante a tabela de configuração financeira (percentual de poupança mensal do usuário)
+function garantirTabelaConfiguracaoFinanceira(PDO $pdo): void
+{
+    try {
+        $pdo->exec("
+            CREATE TABLE IF NOT EXISTS ConfiguracaoFinanceira (
+              FKUsuario          CHAR(36) NOT NULL PRIMARY KEY,
+              PercentualPoupanca DECIMAL(5,2) NOT NULL DEFAULT 0,
+              AtualizadoEm       DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
+            ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4
+        ");
+    } catch (PDOException $e) {
+    }
+}
+
 // Garante o schema de comissão em 2 partes + comissão recorrente (auto-migração, sem SSH)
 function garantirEstruturaComissaoRevendedor(PDO $pdo): void
 {

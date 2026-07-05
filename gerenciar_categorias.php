@@ -192,6 +192,42 @@ try {
 } catch (PDOException $e) {
 }
 
+// ── Relação Entrada/Saída (percentual de poupança mensal + saldo pra distribuir) ──
+garantirTabelaConfiguracaoFinanceira($pdo);
+$percentualPoupanca = null;
+try {
+    $stmtPoup = $pdo->prepare("SELECT PercentualPoupanca FROM ConfiguracaoFinanceira WHERE FKUsuario = :uid");
+    $stmtPoup->execute([':uid' => $usuario_id]);
+    $poup = $stmtPoup->fetch(PDO::FETCH_ASSOC);
+    if ($poup !== false) {
+        $percentualPoupanca = (float) $poup['PercentualPoupanca'];
+    }
+} catch (PDOException $e) {
+}
+
+$totalMetaReceita = 0;
+foreach ($categorias_receita as $cat) {
+    $totalMetaReceita += $metasPorCategoria[$cat['IDCategoria']] ?? 0;
+}
+$totalOrcamentoDespesa = 0;
+foreach ($categorias_despesa as $cat) {
+    $totalOrcamentoDespesa += $metasPorCategoria[$cat['IDCategoria']] ?? 0;
+}
+$valorPoupancaMensal = ($percentualPoupanca !== null) ? $totalMetaReceita * $percentualPoupanca / 100 : 0;
+$disponivelOrcamentos = $totalMetaReceita - $valorPoupancaMensal;
+$saldoDistribuir       = $disponivelOrcamentos - $totalOrcamentoDespesa;
+
+// Mensagens de sucesso/erro da poupança mensal (salvar_poupanca_mensal.php)
+$msgsPoupanca = [
+    '1' => 'Poupança mensal atualizada!',
+];
+$errosPoupanca = [
+    'valor_invalido' => 'Informe uma porcentagem entre 0 e 100.',
+    'banco'          => 'Erro ao salvar no banco de dados.',
+];
+$sucessoPoupanca = ($_GET['sucesso_poupanca'] ?? null);
+$erroPoupanca    = ($_GET['erro_poupanca'] ?? null);
+
 require_once 'geral/header.php';
 
 // Lista de ícones disponíveis
@@ -254,6 +290,81 @@ $listaIcones = [
     <?php if ($sucessoMeta && isset($msgsMeta[$sucessoMeta])): ?>
         <script>window._pendingToast = <?= json_encode($msgsMeta[$sucessoMeta]) ?>;</script>
     <?php endif; ?>
+
+    <?php if ($sucessoPoupanca && isset($msgsPoupanca[$sucessoPoupanca])): ?>
+        <script>window._pendingToast = <?= json_encode($msgsPoupanca[$sucessoPoupanca]) ?>;</script>
+    <?php endif; ?>
+
+    <?php if ($erroPoupanca && isset($errosPoupanca[$erroPoupanca])): ?>
+        <div class="alert d-flex align-items-center gap-2 rounded-3 shadow-sm border-0 fw-semibold mb-3" style="background:var(--color-expense-bg);color:var(--color-expense-text);border:1px solid var(--color-expense-border) !important;">
+            <i class="bi bi-exclamation-triangle-fill"></i> <span><?= htmlspecialchars($errosPoupanca[$erroPoupanca]) ?></span>
+        </div>
+    <?php endif; ?>
+
+    <!-- ══════════════════════════════════════════════════════════════════════ -->
+    <!-- ── Relação Entrada/Saída ─────────────────────────────────────────── -->
+    <!-- ══════════════════════════════════════════════════════════════════════ -->
+    <div class="row g-4 mb-4" id="relacao-entrada-saida">
+        <div class="col-12">
+            <div class="card shadow-sm rounded-4" style="background:var(--bg-card);border:1px solid var(--card-border-color);">
+                <div class="card-header border-bottom border-secondary-subtle bg-transparent p-4 d-flex justify-content-between align-items-start flex-wrap gap-2">
+                    <div>
+                        <h5 class="text-light fw-bold mb-0"><i class="bi bi-arrow-left-right me-2" style="color:var(--primary-gold-analysis);"></i>Relação Entrada/Saída</h5>
+                        <p class="text-secondary small mb-0 mt-1">Quanto sobra pra distribuir entre os orçamentos, depois de guardar sua poupança mensal.</p>
+                    </div>
+                    <button type="button" class="btn btn-sm btn-outline-secondary rounded-pill flex-shrink-0" style="font-size:0.75rem;" data-bs-toggle="modal" data-bs-target="#modalPoupancaMensal">
+                        <i class="bi bi-gear me-1"></i><?= $percentualPoupanca !== null ? 'Editar %' : 'Definir poupança' ?>
+                    </button>
+                </div>
+                <div class="card-body p-4">
+                    <?php if ($totalMetaReceita <= 0): ?>
+                        <div class="text-center text-secondary small py-2">
+                            <i class="bi bi-info-circle me-1"></i>Defina metas de receita nas categorias abaixo pra habilitar esse painel.
+                        </div>
+                    <?php elseif ($percentualPoupanca === null): ?>
+                        <div class="d-flex align-items-center justify-content-center gap-2 flex-wrap text-center py-2">
+                            <span class="text-secondary small"><i class="bi bi-piggy-bank me-1"></i>Você ainda não definiu quanto quer guardar por mês.</span>
+                            <button type="button" class="btn btn-sm btn-warning fw-bold rounded-pill" data-bs-toggle="modal" data-bs-target="#modalPoupancaMensal">Definir agora</button>
+                        </div>
+                    <?php else: ?>
+                        <div class="row g-3 text-center">
+                            <div class="col-6 col-md-3">
+                                <div class="text-secondary small">Entrada (metas)</div>
+                                <div class="fw-bold text-light fs-5">R$ <?= number_format($totalMetaReceita, 2, ',', '.') ?></div>
+                            </div>
+                            <div class="col-6 col-md-3">
+                                <div class="text-secondary small">Poupança (<?= rtrim(rtrim(number_format($percentualPoupanca, 1, ',', '.'), '0'), ',') ?>%)</div>
+                                <div class="fw-bold fs-5" style="color:#f59e0b;">R$ <?= number_format($valorPoupancaMensal, 2, ',', '.') ?></div>
+                            </div>
+                            <div class="col-6 col-md-3">
+                                <div class="text-secondary small">Disponível p/ orçamentos</div>
+                                <div class="fw-bold fs-5" style="color:#60a5fa;">R$ <?= number_format($disponivelOrcamentos, 2, ',', '.') ?></div>
+                            </div>
+                            <div class="col-6 col-md-3">
+                                <div class="text-secondary small">Já alocado</div>
+                                <div class="fw-bold fs-5 <?= $saldoDistribuir < 0 ? '' : 'text-light' ?>" style="<?= $saldoDistribuir < 0 ? 'color:var(--color-expense-text);' : '' ?>">R$ <?= number_format($totalOrcamentoDespesa, 2, ',', '.') ?></div>
+                            </div>
+                        </div>
+                        <?php
+                            $_pctAlocado = $disponivelOrcamentos > 0
+                                ? round(($totalOrcamentoDespesa / $disponivelOrcamentos) * 100, 1)
+                                : ($totalOrcamentoDespesa > 0 ? 100 : 0);
+                        ?>
+                        <div class="progress rounded-pill mt-3" style="height:8px;background:rgba(255,255,255,0.07);">
+                            <div class="progress-bar rounded-pill" style="width:<?= min(100, $_pctAlocado) ?>%;background:<?= $saldoDistribuir < 0 ? 'var(--color-expense-text)' : '#60a5fa'; ?>;"></div>
+                        </div>
+                        <?php if ($saldoDistribuir < 0): ?>
+                            <div class="alert d-flex align-items-center gap-2 rounded-3 border-0 mt-3 mb-0 py-2 px-3 small fw-semibold" style="background:var(--color-expense-bg);color:var(--color-expense-text);border:1px solid var(--color-expense-border) !important;">
+                                <i class="bi bi-exclamation-triangle-fill"></i> Seus orçamentos somam R$ <?= number_format(abs($saldoDistribuir), 2, ',', '.') ?> a mais do que você tem disponível. Ajuste alguma categoria abaixo.
+                            </div>
+                        <?php else: ?>
+                            <div class="text-secondary small mt-2"><i class="bi bi-check-circle me-1" style="color:#06D6A0;"></i>Ainda sobram R$ <?= number_format($saldoDistribuir, 2, ',', '.') ?> pra distribuir entre os orçamentos.</div>
+                        <?php endif; ?>
+                    <?php endif; ?>
+                </div>
+            </div>
+        </div>
+    </div>
 
     <?php if ($erroMeta && isset($errosMeta[$erroMeta])): ?>
         <div class="alert d-flex align-items-center gap-2 rounded-3 shadow-sm border-0 fw-semibold mb-3" style="background:var(--color-expense-bg);color:var(--color-expense-text);border:1px solid var(--color-expense-border) !important;">
@@ -771,6 +882,35 @@ $listaIcones = [
                     <button type="button" class="btn btn-sm btn-link text-danger text-decoration-none" id="btnRemoverMeta" style="display:none;">
                         Remover meta
                     </button>
+                    <button type="submit" class="btn btn-sm btn-warning fw-bold px-3 rounded-pill ms-auto">
+                        Salvar
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+<!-- ── Modal: Poupança mensal (% guardado antes de distribuir os orçamentos) ── -->
+<div class="modal fade" id="modalPoupancaMensal" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered modal-sm">
+        <div class="modal-content border-secondary-subtle shadow-lg rounded-4">
+            <div class="modal-header border-bottom border-secondary-subtle p-3">
+                <h6 class="modal-title text-light fw-bold mb-0"><i class="bi bi-piggy-bank me-2"></i>Poupança mensal</h6>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <form method="POST" action="salvar_poupanca_mensal.php">
+                <div class="modal-body p-4">
+                    <label class="form-label text-secondary small mb-1">Quanto você quer guardar por mês?</label>
+                    <div class="input-group">
+                        <input type="number" step="0.1" min="0" max="100" name="percentual"
+                               class="form-control bg-dark border-secondary-subtle text-light" placeholder="20"
+                               value="<?= $percentualPoupanca !== null ? htmlspecialchars((string) $percentualPoupanca) : '' ?>" required>
+                        <span class="input-group-text bg-dark border-secondary-subtle text-secondary">%</span>
+                    </div>
+                    <p class="text-secondary small mt-2 mb-0">Esse percentual é descontado da sua entrada (soma das metas de receita) antes de calcular quanto sobra pra dividir entre os orçamentos de despesa.</p>
+                </div>
+                <div class="modal-footer border-top border-secondary-subtle p-2">
                     <button type="submit" class="btn btn-sm btn-warning fw-bold px-3 rounded-pill ms-auto">
                         Salvar
                     </button>
