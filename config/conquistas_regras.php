@@ -37,6 +37,10 @@
  *
  *  metabatida   → concedida em processa_cofrinho.php quando SaldoCofrinho >= ValorMeta
  *  sempendencias→ concedida em acao_registro.php quando todos os pendentes do mês são efetivados
+ *  carteira_comp→ concedida via verificarConquistaCarteiraCompartilhada() (config/funcoes.php)
+ *                 quando o usuário é dono ou convidado aceito de uma carteira compartilhada
+ *                 com >= 2 pessoas. Disparado em carteira/listar_carteiras.php: a cada
+ *                 carregamento da página (retroativo) e ao aceitar um convite (pros dois lados).
  */
 
 return [

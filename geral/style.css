@@ -1123,6 +1123,34 @@ input[type="number"] {
   transition: opacity 0.15s;
 }
 
+/* Selo numérico ancorado no canto do ícone (ex.: convites pendentes) — ao contrário do
+   .sidebar-badge de texto (que só faz sentido ao lado do label), esse continua visível
+   mesmo com a sidebar colapsada, igual um badge de notificação de app. */
+.sidebar-icon-badge-wrap {
+  position: relative;
+  display: inline-flex;
+  flex-shrink: 0;
+}
+
+.sidebar-icon-badge {
+  position: absolute;
+  top: -6px;
+  right: -8px;
+  min-width: 15px;
+  height: 15px;
+  padding: 0 3px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 999px;
+  background: #60a5fa;
+  color: #06111f;
+  border: 2px solid var(--bg-card);
+  font-size: 0.6rem;
+  font-weight: 800;
+  line-height: 1;
+}
+
 .auralis-sidebar.sidebar-collapsed .sidebar-label,
 .auralis-sidebar.sidebar-collapsed .sidebar-badge {
   opacity: 0;
@@ -1287,8 +1315,17 @@ input[type="number"] {
   nav, .navbar, footer, .modal, .offcanvas,
   .btn, .dropdown-menu, .toast-container,
   .no-print, #installModal, [data-bs-toggle]:not(tr):not(td),
-  .alert-dismissible .btn-close {
+  .alert-dismissible .btn-close,
+  #notif-container,
+  .auralis-sidebar, #sidebarOverlay {
     display: none !important;
+  }
+
+  /* A sidebar (position:fixed, 240px) some acima, mas o conteúdo ainda reserva o espaço
+     dela via margin-left — sem isso sobra uma barra em branco à esquerda de toda página,
+     e o logo/menu da sidebar aparecia por cima do conteúdo em cada página impressa. */
+  .auralis-content {
+    margin-left: 0 !important;
   }
 
   /* Forçar fundo branco e texto escuro */
@@ -1363,5 +1400,68 @@ input[type="number"] {
   /* Remover padding excessivo de container */
   main.container { padding: 0 !important; max-width: 100% !important; }
   .container     { max-width: 100% !important; padding: 0 12px !important; }
+
+  /* Paleta semântica fixa pro papel — o app tem vários temas (dark, cosmos, aurora...) e
+     essas variáveis (usadas via var(--color-x) em toda a página, inclusive inline) refletem
+     a cor do tema ativo na tela. Sem isso, um tema mais saturado imprime cores erradas/
+     ilegíveis no PDF. Sobrescrevendo aqui, cobre todo mundo que usa var(--color-x) de uma vez. */
+  :root {
+    --color-income-text:     #166534;
+    --color-income-bg:       #dcfce7;
+    --color-income-border:   #86efac;
+    --color-expense-text:    #991b1b;
+    --color-expense-bg:      #fee2e2;
+    --color-expense-border:  #fca5a5;
+    --color-pending-text:    #1e40af;
+    --color-pending-bg:      #dbeafe;
+    --color-today-text:      #92400e;
+    --color-today-bg:        #fef3c7;
+    --color-card-text:       #5b21b6;
+    --color-card-bg:         #ede9fe;
+    --color-card-border:     #c4b5fd;
+    --primary-gold-analysis: #b8860b;
+    --accent:                #b8860b;
+  }
+
+  /* Força a impressão de cores de fundo (barra de progresso, badges) mesmo quando o
+     navegador não tem "imprimir gráficos de fundo" marcado — sem isso a barra de
+     progresso das metas/orçamento por categoria simplesmente some no PDF. */
+  * {
+    -webkit-print-color-adjust: exact !important;
+    print-color-adjust: exact !important;
+    color-adjust: exact !important;
+  }
+
+  /* Cada linha de categoria em "Orçamento/Meta por Categoria" não pode ser cortada
+     ao meio entre duas páginas do PDF. */
+  .meta-cat-row {
+    break-inside: avoid;
+    page-break-inside: avoid;
+  }
+
+  /* Cards com listas de tamanho variável (Orçamento/Meta por Categoria, Detalhamento de
+     despesas/receitas) podem facilmente ficar mais altos que uma página inteira. O
+     break-inside:avoid genérico de ".card" (acima) força o navegador a tentar não quebrar
+     um bloco que não cabe de jeito nenhum numa página só — o resultado, na prática, é
+     conteúdo sobreposto entre páginas em vez de uma quebra limpa. Aqui liberamos a quebra
+     só nesses cards especificamente; as linhas de dentro já têm proteção própria
+     (.meta-cat-row acima, .analise-item mais abaixo). */
+  .card:has(.analises-list),
+  #metas-categoria .card {
+    break-inside: auto;
+    page-break-inside: auto;
+  }
+
+  /* No papel sobra espaço horizontal — nomes de categoria não devem truncar com "..." */
+  .text-truncate {
+    white-space: normal !important;
+    overflow: visible !important;
+    text-overflow: unset !important;
+  }
+
+  /* Margem consistente pro PDF gerado via "Salvar como PDF" do navegador */
+  @page {
+    margin: 14mm 12mm;
+  }
 }
 

@@ -15,11 +15,17 @@ $topicos = [
     'parcelamentos' => ['titulo' => 'Compras Parceladas',            'icone' => 'bi-list-ol',              'tag' => 'Transações'],
     'carteiras'     => ['titulo' => 'Conta Pessoal e Empresarial',   'icone' => 'bi-wallet2',              'tag' => 'Carteiras'],
     'transferencia' => ['titulo' => 'Transferência entre Carteiras', 'icone' => 'bi-arrow-left-right',    'tag' => 'Carteiras'],
-    'cofrinhos'     => ['titulo' => 'Cofrinhos',                     'icone' => 'bi-piggy-bank',          'tag' => 'Planejamento'],
+    'compartilhadas'=> ['titulo' => 'Carteiras Compartilhadas',      'icone' => 'bi-people-fill',          'tag' => 'Carteiras'],
     'cartao'        => ['titulo' => 'Cartão de Crédito',             'icone' => 'bi-credit-card-2-front', 'tag' => 'Transações'],
-    'agenda'        => ['titulo' => 'Agenda e Planejamento',         'icone' => 'bi-calendar3',           'tag' => 'Planejamento'],
     'categorias'    => ['titulo' => 'Categorias',                    'icone' => 'bi-tags',                'tag' => 'Organização'],
     'analises'      => ['titulo' => 'Análises e Gráficos',           'icone' => 'bi-graph-up-arrow',      'tag' => 'Organização'],
+    'agenda'        => ['titulo' => 'Agenda e Planejamento',         'icone' => 'bi-calendar3',           'tag' => 'Planejamento'],
+    'cofrinhos'     => ['titulo' => 'Cofrinhos',                     'icone' => 'bi-piggy-bank',          'tag' => 'Planejamento'],
+    'metas'         => ['titulo' => 'Metas e Orçamento por Categoria','icone' => 'bi-bullseye',            'tag' => 'Planejamento'],
+    'empreendedores'=> ['titulo' => 'Empreendedores',                'icone' => 'bi-briefcase',           'tag' => 'Recomendações'],
+    'freelancers'   => ['titulo' => 'Freelancers e Autônomos',       'icone' => 'bi-laptop',               'tag' => 'Recomendações'],
+    'familia'       => ['titulo' => 'Casais e Família',              'icone' => 'bi-people',              'tag' => 'Recomendações'],
+    'estudantes'    => ['titulo' => 'Estudantes',                    'icone' => 'bi-mortarboard',         'tag' => 'Recomendações'],
 ];
 
 if (!array_key_exists($topico, $topicos)) $topico = 'inicio';
@@ -62,17 +68,19 @@ require_once 'geral/header.php';
                     foreach ($topicos as $key => $t) {
                         $grupos[$t['tag']][] = ['key' => $key, 'titulo' => $t['titulo'], 'icone' => $t['icone']];
                     }
+                    $_primeiroGrupo = true;
                     foreach ($grupos as $tag => $items): ?>
-                        <div class="mb-3">
-                            <div class="text-uppercase fw-bold mb-1 ps-2"
-                                style="font-size:0.6rem;letter-spacing:.08em;color:var(--text-muted);">
+                        <div class="<?= $_primeiroGrupo ? 'mb-4' : 'mt-4 mb-4 pt-4' ?>"
+                            style="<?= $_primeiroGrupo ? '' : 'border-top:1px solid var(--card-border-color);' ?>">
+                            <div class="text-uppercase fw-bold mb-2"
+                                style="font-size:0.78rem;letter-spacing:.06em;color:var(--primary-gold-analysis);">
                                 <?= htmlspecialchars($tag) ?>
                             </div>
                             <?php foreach ($items as $item):
                                 $isAtivo = $item['key'] === $topico;
                             ?>
                             <a href="?topico=<?= $item['key'] ?>"
-                                class="d-flex align-items-center gap-2 px-2 py-2 rounded-3 text-decoration-none mb-1 transition-hover"
+                                class="d-flex align-items-center gap-2 px-2 py-2 ms-2 rounded-3 text-decoration-none mb-1 transition-hover"
                                 style="font-size:0.82rem;
                                        <?= $isAtivo
                                            ? 'background:var(--primary-gold-analysis)18;color:var(--primary-gold-analysis);font-weight:600;'
@@ -82,7 +90,7 @@ require_once 'geral/header.php';
                             </a>
                             <?php endforeach; ?>
                         </div>
-                    <?php endforeach; ?>
+                    <?php $_primeiroGrupo = false; endforeach; ?>
                 </div>
             </div>
         </div>
@@ -318,6 +326,52 @@ require_once 'geral/header.php';
                     </div>
                 </div>
 
+                <?php elseif ($topico === 'compartilhadas'): ?>
+                <!-- ═══ CARTEIRAS COMPARTILHADAS ═════════════════════════════ -->
+                <p class="text-secondary mb-4">Convide outras pessoas pra ver e lançar transações numa mesma carteira — ideal pra casal, família ou sócios que dividem uma conta. Disponível nos planos <strong class="text-light">Pro</strong> (até 2 pessoas) e <strong class="text-light">VIP</strong> (até 8 pessoas).</p>
+
+                <h6 class="fw-bold text-light mb-3"><i class="bi bi-list-check me-2" style="color:var(--primary-gold-analysis);"></i>Como criar e convidar</h6>
+                <ol class="ps-3 text-secondary mb-4" style="line-height:2;">
+                    <li>Em <strong class="text-light">Carteiras</strong>, clique em <strong class="text-light">"+ Nova Carteira"</strong> e marque <strong class="text-light">"Carteira compartilhada?"</strong> — só dá pra decidir isso na criação. Ela já nasce com o mesmo kit de categorias prontas de uma conta nova.</li>
+                    <li>Peça pra pessoa abrir <strong class="text-light">Configurações</strong> e te passar o código dela (tipo "USR-AB12CD").</li>
+                    <li>Clique na própria carteira (ou no menu de 3 pontos) pra abrir <strong class="text-light">"Administrar Carteira"</strong> e cole o código na aba <strong class="text-light">Membros</strong> pra enviar o convite.</li>
+                    <li>A pessoa vê o convite direto na página <strong class="text-light">Carteiras</strong> (com um selinho de aviso na barra lateral) e precisa aceitar pra entrar — nada acontece automaticamente sem a confirmação dela.</li>
+                </ol>
+
+                <h6 class="fw-bold text-light mb-3"><i class="bi bi-diagram-2 me-2" style="color:var(--primary-gold-analysis);"></i>Como funciona a hierarquia</h6>
+                <div class="mb-4">
+                    <div class="d-flex gap-3 mb-2 p-3 rounded-3" style="background:var(--bg-body);">
+                        <i class="bi bi-star-fill flex-shrink-0 mt-1" style="color:var(--primary-gold-analysis);"></i>
+                        <div><span class="fw-semibold text-light">Dono</span> <span class="text-secondary">— quem criou a carteira. Gerencia membros, categorias da carteira, define permissões (ex: se convidado pode excluir lançamento livremente) e pode editar ou excluir o lançamento de qualquer pessoa.</span></div>
+                    </div>
+                    <div class="d-flex gap-3 p-3 rounded-3" style="background:var(--bg-body);">
+                        <i class="bi bi-person flex-shrink-0 mt-1" style="color:#60a5fa;"></i>
+                        <div><span class="fw-semibold text-light">Convidado</span> <span class="text-secondary">— vê tudo (sem privacidade seletiva), lança transações normalmente, edita o que ele mesmo lançou, e exclui também — a não ser que o dono tenha desligado isso em Permissões. Categorias da carteira só o dono cria ou edita.</span></div>
+                    </div>
+                </div>
+
+                <h6 class="fw-bold text-light mb-3"><i class="bi bi-eye me-2" style="color:var(--primary-gold-analysis);"></i>O que muda no dia a dia</h6>
+                <div class="mb-4">
+                    <div class="d-flex gap-3 mb-2 p-3 rounded-3" style="background:var(--bg-body);">
+                        <i class="bi bi-person-fill flex-shrink-0 mt-1" style="color:#60a5fa;"></i>
+                        <div><span class="fw-semibold text-light">Quem lançou</span> <span class="text-secondary">— cada transação mostra um selinho com o nome de quem lançou, no Dashboard e na Agenda.</span></div>
+                    </div>
+                    <div class="d-flex gap-3 p-3 rounded-3" style="background:var(--bg-body);">
+                        <i class="bi bi-clock-history flex-shrink-0 mt-1" style="color:#60a5fa;"></i>
+                        <div><span class="fw-semibold text-light">Atividade</span> <span class="text-secondary">— em "Administrar Carteira", a aba Atividade mostra quem criou, editou, excluiu, efetivou ou transferiu cada lançamento, além de convites/entradas/saídas. Filtra por "Tudo", "Movimentações na Carteira" (lançamentos) ou "Movimentações de Membro" (convite, entrou, saiu).</span></div>
+                    </div>
+                </div>
+
+                <div class="rounded-3 p-3" style="background:rgba(245,158,11,0.08);border:1px solid rgba(245,158,11,0.25);">
+                    <div class="d-flex gap-2">
+                        <i class="bi bi-lightbulb-fill flex-shrink-0 mt-1" style="color:#f59e0b;"></i>
+                        <div>
+                            <div class="fw-semibold" style="color:#f59e0b;">Dica</div>
+                            <div class="text-secondary small mt-1">Sair da carteira (ou ser removido) não apaga nada — suas transações já lançadas continuam lá, você só perde o acesso a partir daquele momento.</div>
+                        </div>
+                    </div>
+                </div>
+
                 <?php elseif ($topico === 'cofrinhos'): ?>
                 <!-- ═══ COFRINHOS ═══════════════════════════════════════════ -->
                 <p class="text-secondary mb-4">Cofrinhos são reservas para objetivos específicos — viagem, computador novo, reserva de emergência. O dinheiro sai da carteira, fica guardado no cofrinho e pode ser retirado a qualquer momento.</p>
@@ -345,6 +399,34 @@ require_once 'geral/header.php';
                         <div>
                             <div class="fw-semibold" style="color:#f59e0b;">Como aparece no Dashboard</div>
                             <div class="text-secondary small mt-1">Os cofrinhos com saldo aparecem como cards na tela inicial, mostrando o valor guardado e o percentual de conclusão da meta. Clique em "Ver tudo" para ir direto para Análises.</div>
+                        </div>
+                    </div>
+                </div>
+
+                <?php elseif ($topico === 'metas'): ?>
+                <!-- ═══ METAS E ORÇAMENTO POR CATEGORIA ═════════════════════ -->
+                <p class="text-secondary mb-4">Defina um limite mensal para cada categoria de despesa (orçamento) ou um alvo para cada categoria de receita (meta), e o Auralis avisa automaticamente se você estourou o limite ou bateu a meta — comparando com o que foi lançado no mês.</p>
+
+                <h6 class="fw-bold text-light mb-3"><i class="bi bi-list-check me-2" style="color:var(--primary-gold-analysis);"></i>Como definir um orçamento ou meta</h6>
+                <ol class="ps-3 text-secondary mb-4" style="line-height:2;">
+                    <li>Na sidebar, clique em <strong class="text-light">Categorias</strong>.</li>
+                    <li>Na linha da categoria desejada, clique em <strong class="text-light">"+ Orçamento"</strong> (despesa) ou <strong class="text-light">"+ Meta"</strong> (receita).</li>
+                    <li>Informe o valor mensal (ex.: R$ 200,00 para Assinaturas).</li>
+                    <li>Salve. O valor vale todo mês, até você editar ou remover.</li>
+                </ol>
+
+                <h6 class="fw-bold text-light mb-3"><i class="bi bi-graph-up me-2" style="color:var(--primary-gold-analysis);"></i>Onde acompanhar o progresso</h6>
+                <p class="text-secondary mb-4">Em <strong class="text-light">Análises</strong>, os cards <strong class="text-light">"Orçamento por Categoria"</strong> e <strong class="text-light">"Meta por Categoria"</strong> mostram uma barra de progresso por categoria, comparando o gasto/recebido do mês selecionado com o valor definido. Se uma despesa passar de 100%, aparece <strong class="text-light">"Estourou X%!"</strong>; se uma receita passar de 100%, aparece <strong class="text-light">"Parabéns! +X%"</strong>.</p>
+
+                <h6 class="fw-bold text-light mb-3"><i class="bi bi-arrow-left-right me-2" style="color:var(--primary-gold-analysis);"></i>Relação Entrada/Saída</h6>
+                <p class="text-secondary mb-4">Ainda em <strong class="text-light">Categorias</strong>, o card no topo da página soma todas as suas metas de receita (entrada) e aplica um percentual de poupança mensal que você define — o restante é o quanto sobra pra distribuir entre os orçamentos de despesa. Se a soma dos orçamentos passar do que sobra, o painel avisa em destaque.</p>
+
+                <div class="rounded-3 p-3" style="background:rgba(245,158,11,0.08);border:1px solid rgba(245,158,11,0.25);">
+                    <div class="d-flex gap-2">
+                        <i class="bi bi-lightbulb-fill flex-shrink-0 mt-1" style="color:#f59e0b;"></i>
+                        <div>
+                            <div class="fw-semibold" style="color:#f59e0b;">Dica</div>
+                            <div class="text-secondary small mt-1">Comece definindo o percentual de poupança em "Relação Entrada/Saída" antes de distribuir os orçamentos — assim você já desconta a reserva antes de decidir quanto cada categoria pode gastar.</div>
                         </div>
                     </div>
                 </div>
@@ -494,6 +576,150 @@ require_once 'geral/header.php';
                         <div>
                             <div class="fw-semibold" style="color:#f59e0b;">Filtrando por carteira</div>
                             <div class="text-secondary small mt-1">No topo de Análises, você pode selecionar uma carteira específica. Assim os gráficos mostram apenas os dados daquela conta — útil para separar pessoal de empresarial.</div>
+                        </div>
+                    </div>
+                </div>
+
+                <?php elseif ($topico === 'empreendedores'): ?>
+                <!-- ═══ RECOMENDAÇÃO: EMPREENDEDORES ═════════════════════════ -->
+                <p class="text-secondary mb-4">Para quem tem um negócio próprio (CNPJ ou informal) e precisa parar de misturar o dinheiro da empresa com o pessoal. Combinação de recursos recomendada:</p>
+
+                <div class="mb-4">
+                    <div class="d-flex gap-3 mb-2 p-3 rounded-3" style="background:var(--bg-body);">
+                        <i class="bi bi-wallet2 flex-shrink-0 mt-1" style="color:#60a5fa;"></i>
+                        <div><span class="fw-semibold text-light">Carteira separada por conta</span> <span class="text-secondary">— crie uma <a href="?topico=carteiras" class="text-decoration-none fw-semibold" style="color:var(--primary-gold-analysis);">"Carteira Empresa"</a> e mantenha a pessoal separada. Nunca lance venda ou despesa do negócio na carteira pessoal.</span></div>
+                    </div>
+                    <div class="d-flex gap-3 mb-2 p-3 rounded-3" style="background:var(--bg-body);">
+                        <i class="bi bi-arrow-left-right flex-shrink-0 mt-1" style="color:#60a5fa;"></i>
+                        <div><span class="fw-semibold text-light">Pró-labore por transferência</span> <span class="text-secondary">— retire seu salário fazendo uma <a href="?topico=transferencia" class="text-decoration-none fw-semibold" style="color:var(--primary-gold-analysis);">Transferência</a> da carteira da empresa pra pessoal, num valor fixo mensal (ideal como recorrente).</span></div>
+                    </div>
+                    <div class="d-flex gap-3 mb-2 p-3 rounded-3" style="background:var(--bg-body);">
+                        <i class="bi bi-tags flex-shrink-0 mt-1" style="color:#f59e0b;"></i>
+                        <div><span class="fw-semibold text-light">Categorias como centro de custo</span> <span class="text-secondary">— crie <a href="?topico=categorias" class="text-decoration-none fw-semibold" style="color:var(--primary-gold-analysis);">categorias</a> tipo "Fornecedores", "Marketing", "Impostos" pra saber exatamente onde o dinheiro do negócio está indo.</span></div>
+                    </div>
+                    <div class="d-flex gap-3 mb-2 p-3 rounded-3" style="background:var(--bg-body);">
+                        <i class="bi bi-bullseye flex-shrink-0 mt-1" style="color:#22c55e;"></i>
+                        <div><span class="fw-semibold text-light">Orçamento nas despesas fixas</span> <span class="text-secondary">— defina <a href="?topico=metas" class="text-decoration-none fw-semibold" style="color:var(--primary-gold-analysis);">orçamentos por categoria</a> pras contas fixas do negócio e veja na hora quando alguma estourar.</span></div>
+                    </div>
+                    <div class="d-flex gap-3 p-3 rounded-3" style="background:var(--bg-body);">
+                        <i class="bi bi-piggy-bank flex-shrink-0 mt-1" style="color:#f59e0b;"></i>
+                        <div><span class="fw-semibold text-light">Reserva de impostos</span> <span class="text-secondary">— crie um <a href="?topico=cofrinhos" class="text-decoration-none fw-semibold" style="color:var(--primary-gold-analysis);">cofrinho</a> e guarde uma porcentagem de cada venda ali, pra nunca ser pego de surpresa no vencimento do imposto.</span></div>
+                    </div>
+                </div>
+
+                <div class="rounded-3 p-3" style="background:rgba(245,158,11,0.08);border:1px solid rgba(245,158,11,0.25);">
+                    <div class="d-flex gap-2">
+                        <i class="bi bi-lightbulb-fill flex-shrink-0 mt-1" style="color:#f59e0b;"></i>
+                        <div>
+                            <div class="fw-semibold" style="color:#f59e0b;">Dica</div>
+                            <div class="text-secondary small mt-1">Em Análises, filtre pela carteira da empresa pra ver a margem real do negócio — sem o pró-labore e as despesas pessoais misturados no gráfico.</div>
+                        </div>
+                    </div>
+                </div>
+
+                <?php elseif ($topico === 'freelancers'): ?>
+                <!-- ═══ RECOMENDAÇÃO: FREELANCERS E AUTÔNOMOS ════════════════ -->
+                <p class="text-secondary mb-4">Para quem vive de renda variável — sem salário fixo, com meses bons e meses fracos. O foco aqui é enxergar tendência e criar fôlego pros períodos de pouco trabalho.</p>
+
+                <div class="mb-4">
+                    <div class="d-flex gap-3 mb-2 p-3 rounded-3" style="background:var(--bg-body);">
+                        <i class="bi bi-bullseye flex-shrink-0 mt-1" style="color:#22c55e;"></i>
+                        <div><span class="fw-semibold text-light">Meta por cliente ou categoria de receita</span> <span class="text-secondary">— crie uma categoria por cliente fixo e defina uma <a href="?topico=metas" class="text-decoration-none fw-semibold" style="color:var(--primary-gold-analysis);">meta mensal</a>, pra saber se está batendo o mínimo que precisa faturar.</span></div>
+                    </div>
+                    <div class="d-flex gap-3 mb-2 p-3 rounded-3" style="background:var(--bg-body);">
+                        <i class="bi bi-piggy-bank flex-shrink-0 mt-1" style="color:#f59e0b;"></i>
+                        <div><span class="fw-semibold text-light">Reserva de entressafra</span> <span class="text-secondary">— num <a href="?topico=cofrinhos" class="text-decoration-none fw-semibold" style="color:var(--primary-gold-analysis);">cofrinho</a>, guarde uma % de cada recebimento nos meses bons pra cobrir os meses fracos sem sufoco.</span></div>
+                    </div>
+                    <div class="d-flex gap-3 mb-2 p-3 rounded-3" style="background:var(--bg-body);">
+                        <i class="bi bi-arrow-repeat flex-shrink-0 mt-1" style="color:#f59e0b;"></i>
+                        <div><span class="fw-semibold text-light">Assinaturas e ferramentas como recorrente</span> <span class="text-secondary">— lance suas <a href="?topico=recorrentes" class="text-decoration-none fw-semibold" style="color:var(--primary-gold-analysis);">contas recorrentes</a> (softwares, plataformas) uma vez só e não esqueça mais delas.</span></div>
+                    </div>
+                    <div class="d-flex gap-3 mb-2 p-3 rounded-3" style="background:var(--bg-body);">
+                        <i class="bi bi-graph-up flex-shrink-0 mt-1" style="color:#60a5fa;"></i>
+                        <div><span class="fw-semibold text-light">Evolução mensal</span> <span class="text-secondary">— em <a href="?topico=analises" class="text-decoration-none fw-semibold" style="color:var(--primary-gold-analysis);">Análises</a>, olhe a tendência dos últimos meses, não só o mês isolado — renda variável engana quando vista mês a mês.</span></div>
+                    </div>
+                    <div class="d-flex gap-3 p-3 rounded-3" style="background:var(--bg-body);">
+                        <i class="bi bi-graph-up-arrow flex-shrink-0 mt-1" style="color:#a78bfa;"></i>
+                        <div><span class="fw-semibold text-light">Orçamento de despesa mais apertado</span> <span class="text-secondary">— como a entrada varia, controlar o teto de gasto fixo importa ainda mais. Defina orçamento nas categorias de despesa recorrentes.</span></div>
+                    </div>
+                </div>
+
+                <div class="rounded-3 p-3" style="background:rgba(245,158,11,0.08);border:1px solid rgba(245,158,11,0.25);">
+                    <div class="d-flex gap-2">
+                        <i class="bi bi-lightbulb-fill flex-shrink-0 mt-1" style="color:#f59e0b;"></i>
+                        <div>
+                            <div class="fw-semibold" style="color:#f59e0b;">Dica</div>
+                            <div class="text-secondary small mt-1">Some pelo menos 3 meses de histórico antes de confiar na "Evolução Mensal" — renda de autônomo costuma ter picos e vales que só fazem sentido olhados em conjunto.</div>
+                        </div>
+                    </div>
+                </div>
+
+                <?php elseif ($topico === 'familia'): ?>
+                <!-- ═══ RECOMENDAÇÃO: CASAIS E FAMÍLIA ═══════════════════════ -->
+                <p class="text-secondary mb-4">Para dividir contas da casa sem perder a visão do que é gasto individual — cada um mantém a carteira pessoal, e uma carteira compartilhada de verdade cuida do que é comum.</p>
+
+                <div class="mb-4">
+                    <div class="d-flex gap-3 mb-2 p-3 rounded-3" style="background:var(--bg-body);">
+                        <i class="bi bi-people-fill flex-shrink-0 mt-1" style="color:#60a5fa;"></i>
+                        <div><span class="fw-semibold text-light">Carteira da casa compartilhada de verdade</span> <span class="text-secondary">— crie uma <a href="?topico=compartilhadas" class="text-decoration-none fw-semibold" style="color:var(--primary-gold-analysis);">carteira compartilhada</a> (Pro ou VIP) só pras despesas do lar, e convide seu par pelo código dele. Os dois veem e lançam nela, sem precisar ficar transferindo nada.</span></div>
+                    </div>
+                    <div class="d-flex gap-3 mb-2 p-3 rounded-3" style="background:var(--bg-body);">
+                        <i class="bi bi-arrow-left-right flex-shrink-0 mt-1" style="color:#60a5fa;"></i>
+                        <div><span class="fw-semibold text-light">Contribuição mensal por transferência</span> <span class="text-secondary">— se preferir cada um "depositar" um valor fixo na carteira da casa em vez de lançar direto, use <a href="?topico=transferencia" class="text-decoration-none fw-semibold" style="color:var(--primary-gold-analysis);">transferência</a> da conta pessoal (ideal como recorrente).</span></div>
+                    </div>
+                    <div class="d-flex gap-3 mb-2 p-3 rounded-3" style="background:var(--bg-body);">
+                        <i class="bi bi-tags flex-shrink-0 mt-1" style="color:#f59e0b;"></i>
+                        <div><span class="fw-semibold text-light">Categorias da casa</span> <span class="text-secondary">— "Mercado", "Filhos", "Contas da Casa" já nascem <a href="?topico=categorias" class="text-decoration-none fw-semibold" style="color:var(--primary-gold-analysis);">na própria carteira compartilhada</a> (quem cria é o dono), pra saber onde o orçamento comum está sendo gasto.</span></div>
+                    </div>
+                    <div class="d-flex gap-3 mb-2 p-3 rounded-3" style="background:var(--bg-body);">
+                        <i class="bi bi-bullseye flex-shrink-0 mt-1" style="color:#22c55e;"></i>
+                        <div><span class="fw-semibold text-light">Orçamento combinado</span> <span class="text-secondary">— defina <a href="?topico=metas" class="text-decoration-none fw-semibold" style="color:var(--primary-gold-analysis);">orçamentos</a> nas categorias da casa pra não estourar o que foi combinado entre vocês.</span></div>
+                    </div>
+                    <div class="d-flex gap-3 p-3 rounded-3" style="background:var(--bg-body);">
+                        <i class="bi bi-piggy-bank flex-shrink-0 mt-1" style="color:#f59e0b;"></i>
+                        <div><span class="fw-semibold text-light">Metas em conjunto</span> <span class="text-secondary">— um <a href="?topico=cofrinhos" class="text-decoration-none fw-semibold" style="color:var(--primary-gold-analysis);">cofrinho</a> pra viagem em família ou reforma, alimentado pelos dois.</span></div>
+                    </div>
+                </div>
+
+                <div class="rounded-3 p-3" style="background:rgba(245,158,11,0.08);border:1px solid rgba(245,158,11,0.25);">
+                    <div class="d-flex gap-2">
+                        <i class="bi bi-lightbulb-fill flex-shrink-0 mt-1" style="color:#f59e0b;"></i>
+                        <div>
+                            <div class="fw-semibold" style="color:#f59e0b;">Dica</div>
+                            <div class="text-secondary small mt-1">Cada transação na carteira da casa mostra quem lançou — dá pra ver o extrato completo sem perder de vista quem pagou o quê, sem precisar de planilha à parte.</div>
+                        </div>
+                    </div>
+                </div>
+
+                <?php elseif ($topico === 'estudantes'): ?>
+                <!-- ═══ RECOMENDAÇÃO: ESTUDANTES ═════════════════════════════ -->
+                <p class="text-secondary mb-4">Para quem vive de mesada, bolsa ou os primeiros freelas — pouco volume de dinheiro, mas o momento certo de criar o hábito de acompanhar cada real.</p>
+
+                <div class="mb-4">
+                    <div class="d-flex gap-3 mb-2 p-3 rounded-3" style="background:var(--bg-body);">
+                        <i class="bi bi-tags flex-shrink-0 mt-1" style="color:#f59e0b;"></i>
+                        <div><span class="fw-semibold text-light">Categorias simples</span> <span class="text-secondary">— comece só com o essencial em <a href="?topico=categorias" class="text-decoration-none fw-semibold" style="color:var(--primary-gold-analysis);">Categorias</a>: Alimentação, Transporte, Lazer, Estudos.</span></div>
+                    </div>
+                    <div class="d-flex gap-3 mb-2 p-3 rounded-3" style="background:var(--bg-body);">
+                        <i class="bi bi-bullseye flex-shrink-0 mt-1" style="color:#22c55e;"></i>
+                        <div><span class="fw-semibold text-light">Orçamento pra não estourar a mesada</span> <span class="text-secondary">— defina um <a href="?topico=metas" class="text-decoration-none fw-semibold" style="color:var(--primary-gold-analysis);">limite mensal</a> pra Lazer e Alimentação fora de casa, as categorias que mais pegam no fim do mês.</span></div>
+                    </div>
+                    <div class="d-flex gap-3 mb-2 p-3 rounded-3" style="background:var(--bg-body);">
+                        <i class="bi bi-piggy-bank flex-shrink-0 mt-1" style="color:#f59e0b;"></i>
+                        <div><span class="fw-semibold text-light">Metas pequenas em cofrinho</span> <span class="text-secondary">— celular novo, curso, viagem de formatura: um <a href="?topico=cofrinhos" class="text-decoration-none fw-semibold" style="color:var(--primary-gold-analysis);">cofrinho</a> com meta e data ajuda a visualizar o progresso.</span></div>
+                    </div>
+                    <div class="d-flex gap-3 p-3 rounded-3" style="background:var(--bg-body);">
+                        <i class="bi bi-calendar3 flex-shrink-0 mt-1" style="color:#60a5fa;"></i>
+                        <div><span class="fw-semibold text-light">Agenda pra fechar o mês</span> <span class="text-secondary">— antes de gastar o que sobrou, confira a <a href="?topico=agenda" class="text-decoration-none fw-semibold" style="color:var(--primary-gold-analysis);">Agenda</a> pra ver o que ainda falta pagar até o fim do mês.</span></div>
+                    </div>
+                </div>
+
+                <div class="rounded-3 p-3" style="background:rgba(245,158,11,0.08);border:1px solid rgba(245,158,11,0.25);">
+                    <div class="d-flex gap-2">
+                        <i class="bi bi-lightbulb-fill flex-shrink-0 mt-1" style="color:#f59e0b;"></i>
+                        <div>
+                            <div class="fw-semibold" style="color:#f59e0b;">Dica</div>
+                            <div class="text-secondary small mt-1">Não precisa criar categoria pra tudo. Comece com poucas, bem usadas — dá pra criar novas categorias a qualquer momento conforme sentir necessidade.</div>
                         </div>
                     </div>
                 </div>

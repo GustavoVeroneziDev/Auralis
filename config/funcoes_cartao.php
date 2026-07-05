@@ -288,6 +288,55 @@ function cartao_fecharFatura(PDO $pdo, array $fatura, string $uid, ?float $valor
 }
 
 /**
+ * Repara uma fatura "órfã": fechada/paga sem carteira de pagamento definida na hora do
+ * fechamento, então cartao_fecharFatura() nunca criou o Registro de cobrança — a fatura
+ * fica invisível na agenda e não debita o saldo, mesmo já estando fechada ou marcada paga.
+ * Se agora o cartão já tem FKCarteiraDebito definido, cria o Registro retroativamente e
+ * vincula. Sem isso, uma fatura que já virou "paga" fica sem nenhuma ação disponível pra
+ * corrigir (os botões de marcar paga/reabrir somem nesse status).
+ * Retorna true se reparou algo, false se não havia nada a reparar (ou faltava a carteira).
+ */
+function cartao_repararRegistroPagamento(PDO $pdo, string $faturaId, string $uid): bool
+{
+    $stmt = $pdo->prepare("
+        SELECT f.IDFatura, f.Status, f.ValorTotal, f.DataVencimento, f.FKRegistroPagamento,
+               c.FKCarteiraDebito, c.Nome AS NomeCartao
+        FROM FaturaCartao f
+        JOIN CartaoCredito c ON c.IDCartao = f.FKCartao
+        WHERE f.IDFatura = :id AND f.FKUsuario = :uid
+    ");
+    $stmt->execute([':id' => $faturaId, ':uid' => $uid]);
+    $fatura = $stmt->fetch(PDO::FETCH_ASSOC);
+
+    if (!$fatura) return false;
+    if (!empty($fatura['FKRegistroPagamento'])) return false; // já tem, nada a reparar
+    if (empty($fatura['FKCarteiraDebito'])) return false;      // ainda sem carteira — não dá pra reparar
+    if (!in_array($fatura['Status'], ['fechada', 'paga'], true)) return false;
+    if ((float)$fatura['ValorTotal'] <= 0) return false;
+
+    $rid = gerarUuid();
+    $statusReg = $fatura['Status'] === 'paga' ? 'efetivado' : 'pendente';
+    $pdo->prepare("
+        INSERT INTO Registro
+            (IDRegistro, TipoRegistro, Valor, Descricao, MomentoRegistro, DataVencimento,
+             StatusRegistro, Recorrente, FKCarteira, FKUsuario)
+        VALUES (:id, 'despesa', :val, :desc, :venc, :venc, :status, 0, :cart, :uid)
+    ")->execute([
+        ':id'     => $rid,
+        ':val'    => $fatura['ValorTotal'],
+        ':desc'   => 'Fatura ' . $fatura['NomeCartao'],
+        ':venc'   => $fatura['DataVencimento'],
+        ':status' => $statusReg,
+        ':cart'   => $fatura['FKCarteiraDebito'],
+        ':uid'    => $uid,
+    ]);
+    $pdo->prepare("UPDATE FaturaCartao SET FKRegistroPagamento = :rid WHERE IDFatura = :id")
+        ->execute([':rid' => $rid, ':id' => $faturaId]);
+
+    return true;
+}
+
+/**
  * Reabre uma fatura fechada: remove o lembrete de pagamento pendente e restaura status aberta.
  */
 function cartao_reabrirFatura(PDO $pdo, array $fatura, string $uid, array $cartao): void

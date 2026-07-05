@@ -6,8 +6,27 @@ require_once '../config/funcoes.php';
 require_once '../config/permissoes.php';
 
 exigirAdmin();
+garantirEstruturaComissaoRevendedor($pdo);
 
 $sucesso = $erro = null;
+
+// Lê e valida os campos de comissão (fixa ou em 2 partes) — compartilhado por atribuir/editar
+function _lerCamposComissao(array $post): array
+{
+    $tipo = ($post['tipo_comissao'] ?? 'fixa') === 'duas_partes' ? 'duas_partes' : 'fixa';
+    $perc = max(1, min(100, (float)str_replace(',', '.', $post['comissao'] ?? '20')));
+    $pix  = trim($post['chave_pix'] ?? '');
+    $obs  = trim($post['observacoes'] ?? '');
+
+    $perc2  = null;
+    $limite = null;
+    if ($tipo === 'duas_partes') {
+        $perc2  = max(1, min(100, (float)str_replace(',', '.', $post['comissao_parte2'] ?? '0')));
+        $limite = max(1, (int)($post['limite_parte1'] ?? 0));
+    }
+
+    return [$tipo, $perc, $perc2, $limite, $pix, $obs];
+}
 
 // ── POST HANDLERS ─────────────────────────────────────────────────────────────
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
@@ -15,19 +34,19 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
     // Atribuir revendedor
     if ($action === 'atribuir') {
-        $uid   = trim($_POST['usuario_id'] ?? '');
-        $perc  = max(1, min(100, (float)str_replace(',', '.', $_POST['comissao'] ?? '20')));
-        $pix   = trim($_POST['chave_pix'] ?? '');
-        $obs   = trim($_POST['observacoes'] ?? '');
+        $uid = trim($_POST['usuario_id'] ?? '');
+        [$tipo, $perc, $perc2, $limite, $pix, $obs] = _lerCamposComissao($_POST);
         if ($uid) {
             $pdo->prepare(
-                "INSERT INTO Revendedor (IDRevendedor, FKUsuario, ComissaoPercentual, ChavePix, Observacoes)
-                 VALUES (:id, :uid, :perc, :pix, :obs)
-                 ON DUPLICATE KEY UPDATE ComissaoPercentual = :perc2, ChavePix = :pix2, Observacoes = :obs2, Ativo = 1"
+                "INSERT INTO Revendedor (IDRevendedor, FKUsuario, ComissaoPercentual, TipoComissao, ComissaoPercentualParte2, LimiteClientesParte1, ChavePix, Observacoes)
+                 VALUES (:id, :uid, :perc, :tipo, :perc2, :limite, :pix, :obs)
+                 ON DUPLICATE KEY UPDATE ComissaoPercentual = :perc3, TipoComissao = :tipo2, ComissaoPercentualParte2 = :perc4, LimiteClientesParte1 = :limite2, ChavePix = :pix2, Observacoes = :obs2, Ativo = 1"
             )->execute([
                 ':id' => gerarUuid(), ':uid' => $uid,
-                ':perc' => $perc, ':pix' => $pix ?: null, ':obs' => $obs ?: null,
-                ':perc2' => $perc, ':pix2' => $pix ?: null, ':obs2' => $obs ?: null,
+                ':perc' => $perc, ':tipo' => $tipo, ':perc2' => $perc2, ':limite' => $limite,
+                ':pix' => $pix ?: null, ':obs' => $obs ?: null,
+                ':perc3' => $perc, ':tipo2' => $tipo, ':perc4' => $perc2, ':limite2' => $limite,
+                ':pix2' => $pix ?: null, ':obs2' => $obs ?: null,
             ]);
             $sucesso = 'Revendedor configurado com sucesso.';
         }
@@ -35,14 +54,15 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
     // Editar revendedor existente
     if ($action === 'editar') {
-        $rid  = trim($_POST['revendedor_id'] ?? '');
-        $perc = max(1, min(100, (float)str_replace(',', '.', $_POST['comissao'] ?? '20')));
-        $pix  = trim($_POST['chave_pix'] ?? '');
-        $obs  = trim($_POST['observacoes'] ?? '');
+        $rid = trim($_POST['revendedor_id'] ?? '');
+        [$tipo, $perc, $perc2, $limite, $pix, $obs] = _lerCamposComissao($_POST);
         if ($rid) {
             $pdo->prepare(
-                "UPDATE Revendedor SET ComissaoPercentual = :perc, ChavePix = :pix, Observacoes = :obs WHERE IDRevendedor = :id"
-            )->execute([':perc' => $perc, ':pix' => $pix ?: null, ':obs' => $obs ?: null, ':id' => $rid]);
+                "UPDATE Revendedor SET ComissaoPercentual = :perc, TipoComissao = :tipo, ComissaoPercentualParte2 = :perc2, LimiteClientesParte1 = :limite, ChavePix = :pix, Observacoes = :obs WHERE IDRevendedor = :id"
+            )->execute([
+                ':perc' => $perc, ':tipo' => $tipo, ':perc2' => $perc2, ':limite' => $limite,
+                ':pix' => $pix ?: null, ':obs' => $obs ?: null, ':id' => $rid,
+            ]);
             $sucesso = 'Revendedor atualizado.';
         }
     }
@@ -243,6 +263,13 @@ require_once '../geral/header.php';
                     <h5 class="text-light fw-bold mb-0"><?= htmlspecialchars($revSelecionado['Nome']) ?></h5>
                     <p class="text-secondary mb-0 small"><?= htmlspecialchars($revSelecionado['Email']) ?></p>
                     <code class="small" style="color:var(--accent);"><?= htmlspecialchars($revSelecionado['CodigoIndicacao']) ?></code>
+                    <p class="text-secondary mb-0 mt-1" style="font-size:.78rem;">
+                        <?php if (($revSelecionado['TipoComissao'] ?? 'fixa') === 'duas_partes'): ?>
+                            <i class="bi bi-layers me-1"></i>Em 2 partes: <?= number_format($revSelecionado['ComissaoPercentual'], 0) ?>% (1º–<?= (int)$revSelecionado['LimiteClientesParte1'] ?>º cliente) → <?= number_format($revSelecionado['ComissaoPercentualParte2'], 0) ?>% (depois)
+                        <?php else: ?>
+                            <i class="bi bi-percent me-1"></i>Comissão fixa: <?= number_format($revSelecionado['ComissaoPercentual'], 0) ?>%
+                        <?php endif; ?>
+                    </p>
                 </div>
             </div>
             <div class="d-flex gap-2">
@@ -251,6 +278,9 @@ require_once '../geral/header.php';
                     data-bs-toggle="modal" data-bs-target="#modalEditar"
                     data-rid="<?= $revSelecionado['IDRevendedor'] ?>"
                     data-perc="<?= $revSelecionado['ComissaoPercentual'] ?>"
+                    data-tipo="<?= htmlspecialchars($revSelecionado['TipoComissao'] ?? 'fixa') ?>"
+                    data-perc2="<?= htmlspecialchars($revSelecionado['ComissaoPercentualParte2'] ?? '') ?>"
+                    data-limite="<?= htmlspecialchars($revSelecionado['LimiteClientesParte1'] ?? '') ?>"
                     data-pix="<?= htmlspecialchars($revSelecionado['ChavePix'] ?? '') ?>"
                     data-obs="<?= htmlspecialchars($revSelecionado['Observacoes'] ?? '') ?>">
                     <i class="bi bi-pencil me-1"></i> Editar
@@ -314,7 +344,7 @@ require_once '../geral/header.php';
                         <th class="py-2 px-3 border-0">Comprador</th>
                         <th class="py-2 px-3 border-0">Plano</th>
                         <th class="py-2 px-3 border-0">Venda</th>
-                        <th class="py-2 px-3 border-0">Comissão (<?= $revSelecionado['ComissaoPercentual'] ?>%)</th>
+                        <th class="py-2 px-3 border-0">Comissão</th>
                         <th class="py-2 px-3 border-0">Data</th>
                         <th class="py-2 px-3 border-0">Status</th>
                         <th class="py-2 px-3 border-0"></th>
@@ -333,7 +363,10 @@ require_once '../geral/header.php';
                             </span>
                         </td>
                         <td class="py-2 px-3 border-0 text-light">R$ <?= number_format($c['ValorVenda'], 2, ',', '.') ?></td>
-                        <td class="py-2 px-3 border-0 fw-semibold" style="color:#fbbf24;">R$ <?= number_format($c['ValorComissao'], 2, ',', '.') ?></td>
+                        <td class="py-2 px-3 border-0 fw-semibold" style="color:#fbbf24;">
+                            R$ <?= number_format($c['ValorComissao'], 2, ',', '.') ?>
+                            <span class="text-secondary fw-normal" style="font-size:.7rem;">(<?= number_format($c['PercentualAplicado'], 0) ?>%)</span>
+                        </td>
                         <td class="py-2 px-3 border-0 text-secondary"><?= date('d/m/Y', strtotime($c['CriadaEm'])) ?></td>
                         <td class="py-2 px-3 border-0">
                             <span class="badge rounded-pill badge-<?= $c['Status'] ?>"><?= $c['Status'] === 'paga' ? 'Paga' : 'Pendente' ?></span>
@@ -397,7 +430,14 @@ require_once '../geral/header.php';
                         <td class="py-3 px-3 border-0">
                             <code style="color:var(--accent);font-size:.8rem;"><?= htmlspecialchars($r['CodigoIndicacao']) ?></code>
                         </td>
-                        <td class="py-3 px-3 border-0 fw-semibold text-light"><?= number_format($r['ComissaoPercentual'], 0) ?>%</td>
+                        <td class="py-3 px-3 border-0 fw-semibold text-light">
+                            <?php if (($r['TipoComissao'] ?? 'fixa') === 'duas_partes'): ?>
+                                <?= number_format($r['ComissaoPercentual'], 0) ?>%→<?= number_format($r['ComissaoPercentualParte2'], 0) ?>%
+                                <div class="text-secondary fw-normal" style="font-size:.7rem;">após <?= (int)$r['LimiteClientesParte1'] ?> clientes</div>
+                            <?php else: ?>
+                                <?= number_format($r['ComissaoPercentual'], 0) ?>%
+                            <?php endif; ?>
+                        </td>
                         <td class="py-3 px-3 border-0 text-secondary"><?= $r['total_vendas'] ?></td>
                         <td class="py-3 px-3 border-0 fw-semibold" style="color:#fbbf24;">
                             R$ <?= number_format($r['saldo_pendente'], 2, ',', '.') ?>
@@ -469,14 +509,36 @@ require_once '../geral/header.php';
                             O usuário usará seu código <code style="color:var(--accent);">CodigoIndicacao</code> para divulgar.
                         </div>
                     </div>
+                    <div class="mb-3">
+                        <label class="form-label text-secondary small fw-semibold d-block">Tipo de comissão</label>
+                        <div class="d-flex gap-2">
+                            <input type="radio" class="btn-check" name="tipo_comissao" id="atr_tipo_fixa" value="fixa" checked>
+                            <label class="btn btn-outline-secondary flex-grow-1" for="atr_tipo_fixa">Fixa</label>
+                            <input type="radio" class="btn-check" name="tipo_comissao" id="atr_tipo_2partes" value="duas_partes">
+                            <label class="btn btn-outline-secondary flex-grow-1" for="atr_tipo_2partes">Em 2 partes</label>
+                        </div>
+                    </div>
                     <div class="row g-3">
                         <div class="col-6">
-                            <label class="form-label text-secondary small fw-semibold">Comissão (%)</label>
+                            <label class="form-label text-secondary small fw-semibold" id="atr_label_comissao">Comissão (%)</label>
                             <input type="number" name="comissao" class="form-control" value="20" min="1" max="100" step="0.5" required>
                         </div>
                         <div class="col-6">
                             <label class="form-label text-secondary small fw-semibold">Chave PIX</label>
                             <input type="text" name="chave_pix" class="form-control" placeholder="CPF, email ou telefone">
+                        </div>
+                    </div>
+                    <div class="row g-3 mt-0 d-none" id="atr_bloco_parte2">
+                        <div class="col-6">
+                            <label class="form-label text-secondary small fw-semibold">Limite de clientes na 1ª faixa</label>
+                            <input type="number" name="limite_parte1" class="form-control" value="10" min="1" step="1">
+                        </div>
+                        <div class="col-6">
+                            <label class="form-label text-secondary small fw-semibold">Comissão após o limite (%)</label>
+                            <input type="number" name="comissao_parte2" class="form-control" value="10" min="1" max="100" step="0.5">
+                        </div>
+                        <div class="form-text text-secondary" style="font-size:.75rem;">
+                            Os N primeiros clientes distintos indicados por essa pessoa ficam na 1ª faixa pra sempre (mesmo em compras futuras); do N+1º cliente em diante, vale a 2ª faixa.
                         </div>
                     </div>
                     <div class="mt-3">
@@ -508,9 +570,18 @@ require_once '../geral/header.php';
                     <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
                 </div>
                 <div class="modal-body px-4 py-3">
-                    <div class="row g-3 mb-3">
+                    <div class="mb-3">
+                        <label class="form-label text-secondary small fw-semibold d-block">Tipo de comissão</label>
+                        <div class="d-flex gap-2">
+                            <input type="radio" class="btn-check" name="tipo_comissao" id="edit_tipo_fixa" value="fixa">
+                            <label class="btn btn-outline-secondary flex-grow-1" for="edit_tipo_fixa">Fixa</label>
+                            <input type="radio" class="btn-check" name="tipo_comissao" id="edit_tipo_2partes" value="duas_partes">
+                            <label class="btn btn-outline-secondary flex-grow-1" for="edit_tipo_2partes">Em 2 partes</label>
+                        </div>
+                    </div>
+                    <div class="row g-3 mb-0">
                         <div class="col-6">
-                            <label class="form-label text-secondary small fw-semibold">Comissão (%)</label>
+                            <label class="form-label text-secondary small fw-semibold" id="edit_label_comissao">Comissão (%)</label>
                             <input type="number" name="comissao" id="editarComissao" class="form-control" min="1" max="100" step="0.5" required>
                         </div>
                         <div class="col-6">
@@ -518,7 +589,20 @@ require_once '../geral/header.php';
                             <input type="text" name="chave_pix" id="editarPix" class="form-control">
                         </div>
                     </div>
-                    <div>
+                    <div class="row g-3 mt-0 d-none" id="edit_bloco_parte2">
+                        <div class="col-6">
+                            <label class="form-label text-secondary small fw-semibold">Limite de clientes na 1ª faixa</label>
+                            <input type="number" name="limite_parte1" id="editarLimite" class="form-control" min="1" step="1">
+                        </div>
+                        <div class="col-6">
+                            <label class="form-label text-secondary small fw-semibold">Comissão após o limite (%)</label>
+                            <input type="number" name="comissao_parte2" id="editarComissaoParte2" class="form-control" min="1" max="100" step="0.5">
+                        </div>
+                        <div class="form-text text-secondary" style="font-size:.75rem;">
+                            Clientes que já ficaram travados numa faixa não mudam ao editar isso — só afeta clientes novos daqui pra frente.
+                        </div>
+                    </div>
+                    <div class="mt-3">
                         <label class="form-label text-secondary small fw-semibold">Observações</label>
                         <textarea name="observacoes" id="editarObs" class="form-control" rows="2"></textarea>
                     </div>
@@ -564,12 +648,36 @@ require_once '../geral/header.php';
 </div>
 
 <script>
+// Alterna os campos da faixa 2 conforme o tipo de comissão escolhido (fixa / em 2 partes)
+function _configurarToggleComissao(prefixo) {
+    const radios = document.querySelectorAll(`input[name="tipo_comissao"]#${prefixo}_tipo_fixa, input[name="tipo_comissao"]#${prefixo}_tipo_2partes`);
+    const bloco  = document.getElementById(`${prefixo}_bloco_parte2`);
+    const label  = document.getElementById(`${prefixo}_label_comissao`);
+    if (!bloco) return;
+    function atualizar() {
+        const emDuasPartes = document.getElementById(`${prefixo}_tipo_2partes`).checked;
+        bloco.classList.toggle('d-none', !emDuasPartes);
+        if (label) label.textContent = emDuasPartes ? 'Comissão até o limite (%)' : 'Comissão (%)';
+    }
+    radios.forEach(r => r.addEventListener('change', atualizar));
+    atualizar();
+}
+_configurarToggleComissao('atr');
+_configurarToggleComissao('edit');
+
 document.querySelectorAll('[data-bs-target="#modalEditar"]').forEach(function(btn) {
     btn.addEventListener('click', function() {
         document.getElementById('editarRevId').value    = this.dataset.rid;
         document.getElementById('editarComissao').value = this.dataset.perc;
         document.getElementById('editarPix').value      = this.dataset.pix;
         document.getElementById('editarObs').value      = this.dataset.obs;
+
+        const ehDuasPartes = this.dataset.tipo === 'duas_partes';
+        document.getElementById(ehDuasPartes ? 'edit_tipo_2partes' : 'edit_tipo_fixa').checked = true;
+        document.getElementById('editarComissaoParte2').value = this.dataset.perc2 || '';
+        document.getElementById('editarLimite').value         = this.dataset.limite || '';
+        document.getElementById('edit_bloco_parte2').classList.toggle('d-none', !ehDuasPartes);
+        document.getElementById('edit_label_comissao').textContent = ehDuasPartes ? 'Comissão até o limite (%)' : 'Comissão (%)';
     });
 });
 document.querySelectorAll('[data-bs-target="#modalDesativar"]').forEach(function(btn) {

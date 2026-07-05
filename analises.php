@@ -46,13 +46,14 @@ $nome_mes = $meses_pt[$mes_atual];
 // ==============================================================================
 $carteiras = [];
 try {
-    // Principal primeiro — usada como fallback quando não há carteira escolhida na sessão/URL
-    $sqlCart = "SELECT IDCarteira, TipoCarteira, Principal FROM Carteira WHERE FKUsuarioDono = :usuario_id ORDER BY Principal DESC, TipoCarteira ASC";
-    $stmtCart = $pdo->prepare($sqlCart);
-    $stmtCart->execute([':usuario_id' => $usuario_id]);
-    $carteiras = $stmtCart->fetchAll();
+    garantirEstruturaCarteirasCompartilhadas($pdo);
+    $carteiras = carteirasAcessiveisPorUsuario($pdo, $usuario_id);
 } catch (PDOException $e) {
 }
+
+// Só as que o usuário é DONO — usada no menu "Transferir pra outra carteira" (transferência
+// continua exigindo posse das duas, mesmo com carteiras compartilhadas envolvidas).
+$carteirasProprias = array_values(array_filter($carteiras, fn($c) => ($c['papel'] ?? 'dono') === 'dono'));
 
 // Descobre qual carteira está selecionada na URL (ou restaura da sessão)
 $_carteiraIdsAn = array_column($carteiras, 'IDCarteira');
@@ -104,8 +105,7 @@ if ($carteira_selecionada) {
                     COALESCE(c.IconeCategoria, 'bi-tag') as Icone
                 FROM Registro r
                 LEFT JOIN Categoria c ON r.FKCategoria = c.IDCategoria
-                WHERE r.FKUsuario = :uid
-                  AND r.FKCarteira = :carteira_id
+                WHERE r.FKCarteira = :carteira_id
                   AND r.StatusRegistro = 'efetivado'
                   AND r.TipoRegistro IN ('receita','despesa')
                   AND MONTH(r.MomentoRegistro) = :mes
@@ -114,7 +114,6 @@ if ($carteira_selecionada) {
             ";
         $stmt = $pdo->prepare($sql);
         $stmt->execute([
-            ':uid' => $usuario_id,
             ':carteira_id' => $carteira_selecionada,
             ':mes' => $mes_atual,
             ':ano' => $ano_atual
@@ -163,8 +162,7 @@ if ($carteira_selecionada) {
                     COALESCE(c.NomeCategoria, 'Sem Categoria') as Categoria
                 FROM Registro r
                 LEFT JOIN Categoria c ON r.FKCategoria = c.IDCategoria
-                WHERE r.FKUsuario   = :uid
-                  AND r.FKCarteira  = :carteira_id
+                WHERE r.FKCarteira  = :carteira_id
                   AND r.StatusRegistro = 'efetivado'
                   AND r.TipoRegistro IN ('receita','despesa')
                   AND MONTH(r.MomentoRegistro) = :mes
@@ -172,7 +170,6 @@ if ($carteira_selecionada) {
             ";
         $stmtAnt = $pdo->prepare($sqlAnt);
         $stmtAnt->execute([
-            ':uid'         => $usuario_id,
             ':carteira_id' => $carteira_selecionada,
             ':mes'         => $mes_ant,
             ':ano'         => $ano_ant,
@@ -214,8 +211,7 @@ if ($carteira_selecionada) {
             SELECT YEAR(r.MomentoRegistro) as ano, MONTH(r.MomentoRegistro) as mes,
                    r.TipoRegistro, SUM(r.Valor) as total
             FROM Registro r
-            WHERE r.FKUsuario = :uid
-              AND r.FKCarteira = :carteira_id
+            WHERE r.FKCarteira = :carteira_id
               AND r.StatusRegistro = 'efetivado'
               AND r.TipoRegistro IN ('receita','despesa')
               AND r.MomentoRegistro >= :data_inicio
@@ -223,7 +219,6 @@ if ($carteira_selecionada) {
         ";
         $stmtHist = $pdo->prepare($sqlHist);
         $stmtHist->execute([
-            ':uid'         => $usuario_id,
             ':carteira_id' => $carteira_selecionada,
             ':data_inicio' => $dtInicioHist->format('Y-m-01'),
         ]);
@@ -352,7 +347,10 @@ require_once 'geral/header.php';
 
 <div class="print-header" style="display:none;">
     <div class="print-header-logo">Auralis</div>
-    <div class="print-header-meta">Análises de <?= $nome_mes . ' ' . $ano_atual ?> &mdash; <?= htmlspecialchars($nome_carteira_atual ?? 'Todas as carteiras') ?></div>
+    <div class="print-header-meta">
+        Análises de <?= $nome_mes . ' ' . $ano_atual ?> &mdash; <?= htmlspecialchars($nome_carteira_atual ?? 'Todas as carteiras') ?>
+        <br><span style="font-size:0.7rem;opacity:0.75;">Gerado em <?= date('d/m/Y \à\s H:i') ?></span>
+    </div>
 </div>
 
 <main class="container-fluid py-4 mt-2 flex-grow-1" style="max-width: 1500px; padding-inline: var(--space-page-x); min-height: 100vh;">
@@ -400,6 +398,9 @@ require_once 'geral/header.php';
                                             <?php echo htmlspecialchars($cart['TipoCarteira']); ?>
                                         </span>
                                     <?php endif; ?>
+                                    <?php if ((int)($cart['Compartilhada'] ?? 0) === 1): ?>
+                                        <i class="bi bi-people-fill ms-1 flex-shrink-0" style="color:#60a5fa;font-size:0.75rem;" title="Carteira compartilhada"></i>
+                                    <?php endif; ?>
 
                                 </a>
                             </li>
@@ -432,7 +433,7 @@ require_once 'geral/header.php';
                     <i class="bi bi-filetype-csv" style="color:var(--accent);font-size:0.9rem;"></i>
                     <span class="d-none d-sm-inline">CSV</span>
                 </a>
-                <button onclick="window.print()"
+                <button onclick="exportarAnalisesPDF()"
                     class="btn btn-sm d-flex align-items-center gap-1 rounded-3 flex-shrink-0 no-print"
                     style="background:var(--bg-card);border:1px solid var(--card-border-color);color:var(--text-main);font-size:0.78rem;"
                     title="Exportar análises em PDF">
@@ -709,7 +710,7 @@ require_once 'geral/header.php';
                             $metaCat       = $metasPorCategoria[$cat['IDCategoria']] ?? null;
                             $pctCat        = ($metaCat && $metaCat > 0) ? round(($gastoAtualCat / $metaCat) * 100, 1) : null;
                         ?>
-                        <div class="d-flex align-items-center gap-3 px-4 py-3 border-bottom border-secondary-subtle">
+                        <div class="meta-cat-row d-flex align-items-center gap-3 px-4 py-3 border-bottom border-secondary-subtle">
                             <i class="bi <?php echo htmlspecialchars($cat['IconeCategoria'] ?: 'bi-tag') ?> text-secondary fs-5 flex-shrink-0"></i>
                             <div class="flex-grow-1 min-w-0">
                                 <div class="text-light fw-semibold text-truncate"><?php echo htmlspecialchars($cat['NomeCategoria']) ?></div>
@@ -720,8 +721,10 @@ require_once 'geral/header.php';
                                     </div>
                                     <div class="d-flex justify-content-between mt-1">
                                         <span class="text-secondary" style="font-size:0.72rem;">R$ <?php echo number_format($gastoAtualCat, 2, ',', '.') ?> / R$ <?php echo number_format($metaCat, 2, ',', '.') ?></span>
-                                        <?php if ($pctCat >= 100): ?>
-                                            <span class="fw-semibold text-danger" style="font-size:0.72rem;"><i class="bi bi-exclamation-triangle-fill me-1"></i>Estourou!</span>
+                                        <?php if ($pctCat >= 100):
+                                            $_excedenteCat = round($pctCat - 100, 1);
+                                        ?>
+                                            <span class="fw-bold" style="font-size:0.72rem;color:var(--color-expense-text);"><i class="bi bi-exclamation-triangle-fill me-1"></i>Estourou <?php echo number_format($_excedenteCat, $_excedenteCat == (int)$_excedenteCat ? 0 : 1, ',', '.') ?>%!</span>
                                         <?php endif; ?>
                                     </div>
                                 <?php else: ?>
@@ -758,7 +761,7 @@ require_once 'geral/header.php';
                             $metaCatR        = $metasPorCategoria[$cat['IDCategoria']] ?? null;
                             $pctCatR         = ($metaCatR && $metaCatR > 0) ? round(($receitaAtualCat / $metaCatR) * 100, 1) : null;
                         ?>
-                        <div class="d-flex align-items-center gap-3 px-4 py-3 border-bottom border-secondary-subtle">
+                        <div class="meta-cat-row d-flex align-items-center gap-3 px-4 py-3 border-bottom border-secondary-subtle">
                             <i class="bi <?php echo htmlspecialchars($cat['IconeCategoria'] ?: 'bi-tag') ?> text-secondary fs-5 flex-shrink-0"></i>
                             <div class="flex-grow-1 min-w-0">
                                 <div class="text-light fw-semibold text-truncate"><?php echo htmlspecialchars($cat['NomeCategoria']) ?></div>
@@ -769,8 +772,10 @@ require_once 'geral/header.php';
                                     </div>
                                     <div class="d-flex justify-content-between mt-1">
                                         <span class="text-secondary" style="font-size:0.72rem;">R$ <?php echo number_format($receitaAtualCat, 2, ',', '.') ?> / R$ <?php echo number_format($metaCatR, 2, ',', '.') ?></span>
-                                        <?php if ($pctCatR >= 100): ?>
-                                            <span class="fw-semibold" style="font-size:0.72rem;color:#06D6A0;"><i class="bi bi-check-circle-fill me-1"></i>Meta atingida!</span>
+                                        <?php if ($pctCatR >= 100):
+                                            $_excedenteCatR = round($pctCatR - 100, 1);
+                                        ?>
+                                            <span class="fw-bold" style="font-size:0.72rem;color:#06D6A0;"><i class="bi bi-emoji-laughing-fill me-1"></i><?php echo $_excedenteCatR > 0 ? ('Parabéns! +' . number_format($_excedenteCatR, $_excedenteCatR == (int)$_excedenteCatR ? 0 : 1, ',', '.') . '%') : 'Meta atingida!' ?></span>
                                         <?php endif; ?>
                                     </div>
                                 <?php else: ?>
@@ -1018,7 +1023,7 @@ require_once 'geral/header.php';
         <i class="bi bi-chevron-down text-secondary" id="ctxTransferirChevron" style="font-size:.7rem;transition:transform .15s;"></i>
     </div>
     <div id="ctxTransferirSubmenu" style="display:none;border-top:1px solid var(--card-border-color);">
-        <?php foreach ($carteiras as $cart): ?>
+        <?php foreach ($carteirasProprias as $cart): ?>
             <?php if ($cart['IDCarteira'] != $carteira_selecionada): ?>
                 <div onclick="ctxTransferir('<?= htmlspecialchars($cart['IDCarteira'], ENT_QUOTES) ?>', '<?= htmlspecialchars($cart['TipoCarteira'], ENT_QUOTES) ?>')"
                      style="padding:9px 16px 9px 28px;cursor:pointer;display:flex;align-items:center;gap:10px;font-size:.85rem;color:var(--text-main);"
@@ -1641,6 +1646,26 @@ require_once 'geral/header.php';
             }
         });
     })();
+
+    // Troca o título da página antes de imprimir/exportar em PDF — vira o nome sugerido
+    // ao "Salvar como PDF" e aparece no cabeçalho/rodapé nativo do navegador em cada página.
+    function exportarAnalisesPDF() {
+        const tituloOriginal = document.title;
+        document.title = <?= json_encode('Auralis - Analises - ' . str_replace(' ', '-', $nome_mes) . '-' . $ano_atual) ?>;
+        const restaurar = () => { document.title = tituloOriginal; window.removeEventListener('afterprint', restaurar); };
+        window.addEventListener('afterprint', restaurar);
+        window.print();
+    }
+
+    // Chart.js dimensiona o canvas com base no tamanho na tela — sem recalcular antes de
+    // imprimir, a legenda/rótulos podem ficar cortados ou fora da área do gráfico no PDF.
+    // Cobre tanto o botão "PDF" quanto Ctrl+P direto do navegador.
+    window.addEventListener('beforeprint', () => {
+        if (typeof Chart === 'undefined' || !Chart.instances) return;
+        Object.values(Chart.instances).forEach(c => {
+            try { c.resize(); } catch (e) {}
+        });
+    });
 
     function atualizarListaDetalhes(categoriaFiltro, tipo) {
         const containerLista = document.getElementById(`lista-detalhes-${tipo}`);

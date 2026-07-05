@@ -16,6 +16,9 @@ require_once '../config/permissoes.php';
 // Configuração de planos é restrita ao Supremo — afeta preços/limites de todos os usuários.
 exigirSupremo();
 
+// Garante a coluna de limite de membros por carteira compartilhada antes de ler/salvar
+garantirEstruturaCarteirasCompartilhadas($pdo);
+
 $sucesso = $erro = null;
 
 // ── Helper: normaliza texto para slug ───────────────────────────────────────
@@ -39,7 +42,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     if ($action === 'salvar_limites') {
         try {
             $planos = ['free', 'pro', 'vip'];
-            $campos = ['transacoes_mes', 'carteiras', 'cartoes', 'categorias', 'parcelas_max', 'horas_teste'];
+            $campos = ['transacoes_mes', 'carteiras', 'cartoes', 'categorias', 'parcelas_max', 'horas_teste', 'carteiras_compartilhadas_membros'];
 
             $stmt = $pdo->prepare("
                 UPDATE config_limites_plano
@@ -48,7 +51,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                     cartoes        = :cartoes,
                     categorias     = :categorias,
                     parcelas_max   = :parcelas_max,
-                    horas_teste    = :horas_teste
+                    horas_teste    = :horas_teste,
+                    carteiras_compartilhadas_membros = :carteiras_compartilhadas_membros
                 WHERE plano = :plano
             ");
 
@@ -58,6 +62,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                     $ilimitado = isset($_POST['ilimitado'][$pl][$campo]);
                     $valor     = $ilimitado ? -1 : (int)($_POST['limites'][$pl][$campo] ?? 0);
                     if ($campo === 'horas_teste' && $pl !== 'free') $valor = 0;
+                    if ($campo === 'carteiras_compartilhadas_membros' && $pl === 'free') $valor = 0;
                     $dados[':' . $campo] = $valor;
                 }
                 $stmt->execute($dados);
@@ -293,6 +298,7 @@ require_once '../geral/header.php';
                     'categorias'     => 'Categorias',
                     'parcelas_max'   => 'Parcelas máx.',
                     'horas_teste'    => 'Horas de teste',
+                    'carteiras_compartilhadas_membros' => 'Membros por carteira compartilhada',
                 ];
                 $planosLabel = [
                     'free' => ['label' => 'Free', 'cor' => '#9ca3af'],
@@ -319,9 +325,10 @@ require_once '../geral/header.php';
                                     $val    = $limitesDB[$pl][$campo] ?? 0;
                                     $isIlim = ($val == -1);
                                     $isFreeOnly = ($campo === 'horas_teste' && $pl !== 'free');
+                                    $isPagoOnly = ($campo === 'carteiras_compartilhadas_membros' && $pl === 'free');
                                 ?>
                                 <td class="text-center">
-                                    <?php if ($isFreeOnly): ?>
+                                    <?php if ($isFreeOnly || $isPagoOnly): ?>
                                         <span class="text-secondary" style="font-size:0.8rem;">—</span>
                                     <?php else: ?>
                                         <div class="d-flex flex-column align-items-center gap-1">

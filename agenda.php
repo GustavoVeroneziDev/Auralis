@@ -31,6 +31,10 @@ if (!$_testeAgenda && !recursoDisponivelParaPlano('agenda')) {
 
 $usuario_id = $_SESSION['usuario_id'];
 
+// Quem lançou o registro pode mexer nele; o dono da carteira compartilhada onde ele está
+// também pode — reaproveitado em todo UPDATE/DELETE de Registro feito por esta página.
+$_whereRegPermitido = "(FKUsuario = :uid OR FKCarteira IN (SELECT IDCarteira FROM Carteira WHERE FKUsuarioDono = :uid2))";
+
 // ==============================================================================
 // AJAX
 // ==============================================================================
@@ -41,9 +45,14 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && ($_POST['action'] ?? '') === 'exclu
     header('Content-Type: application/json; charset=utf-8');
     $id = trim($_POST['registro_id'] ?? '');
     if ($id) {
+        if (!podeExcluirRegistro($pdo, $id, $usuario_id)) {
+            echo json_encode(['ok' => false, 'erro' => 'O dono desligou a exclusão livre pra convidados nessa carteira.']);
+            exit;
+        }
         try {
-            $pdo->prepare("DELETE FROM Registro WHERE IDRegistro = :id AND FKUsuario = :uid")
-                ->execute([':id' => $id, ':uid' => $usuario_id]);
+            logAtividadeRegistroSeCompartilhada($pdo, $id, $usuario_id, 'lancamento_excluido');
+            $pdo->prepare("DELETE FROM Registro WHERE IDRegistro = :id AND $_whereRegPermitido")
+                ->execute([':id' => $id, ':uid' => $usuario_id, ':uid2' => $usuario_id]);
             echo json_encode(['ok' => true]);
         } catch (PDOException $e) {
             echo json_encode(['ok' => false, 'erro' => $e->getMessage()]);
@@ -68,10 +77,18 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && ($_POST['action'] ?? '') === 'exclu
         echo json_encode(['ok' => false, 'erro' => 'IDs inválidos']);
         exit;
     }
+    $ids = array_values(array_filter($ids, fn($id) => podeExcluirRegistro($pdo, $id, $usuario_id)));
+    if (empty($ids)) {
+        echo json_encode(['ok' => false, 'erro' => 'O dono desligou a exclusão livre pra convidados nessa carteira.']);
+        exit;
+    }
     try {
+        foreach ($ids as $id) {
+            logAtividadeRegistroSeCompartilhada($pdo, $id, $usuario_id, 'lancamento_excluido');
+        }
         $ph   = implode(',', array_fill(0, count($ids), '?'));
-        $stmt = $pdo->prepare("DELETE FROM Registro WHERE IDRegistro IN ($ph) AND FKUsuario = ?");
-        $stmt->execute(array_merge($ids, [$usuario_id]));
+        $stmt = $pdo->prepare("DELETE FROM Registro WHERE IDRegistro IN ($ph) AND (FKUsuario = ? OR FKCarteira IN (SELECT IDCarteira FROM Carteira WHERE FKUsuarioDono = ?))");
+        $stmt->execute(array_merge($ids, [$usuario_id, $usuario_id]));
         echo json_encode(['ok' => true, 'deletados' => $stmt->rowCount()]);
     } catch (PDOException $e) {
         echo json_encode(['ok' => false, 'erro' => $e->getMessage()]);
@@ -95,9 +112,70 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && ($_POST['action'] ?? '') === 'mover
                 MomentoRegistro = CASE WHEN DataVencimento IS NULL
                                        THEN CONCAT(:nd2, ' ', TIME(MomentoRegistro))
                                        ELSE MomentoRegistro END
-            WHERE IDRegistro = :id AND FKUsuario = :uid
-        ")->execute([':nd1' => $novaData, ':nd2' => $novaData, ':id' => $id, ':uid' => $usuario_id]);
+            WHERE IDRegistro = :id AND $_whereRegPermitido
+        ")->execute([':nd1' => $novaData, ':nd2' => $novaData, ':id' => $id, ':uid' => $usuario_id, ':uid2' => $usuario_id]);
         echo json_encode(['ok' => true]);
+    } catch (PDOException $e) {
+        echo json_encode(['ok' => false, 'erro' => $e->getMessage()]);
+    }
+    exit;
+}
+
+// Duplicar transação — via menu de contexto ("Duplicar") ou arrastar com o botão
+// direito ("Copiar pra cá"). Se vier nova_data, aplica no mesmo campo que o "mover"
+// já usa (DataVencimento se existir, senão MomentoRegistro); sem nova_data, duplica
+// no mesmo dia. Não copia vínculo de parcelamento nem recorrência — a cópia nasce avulsa.
+if ($_SERVER['REQUEST_METHOD'] === 'POST' && ($_POST['action'] ?? '') === 'duplicar_rapido') {
+    ob_clean();
+    header('Content-Type: application/json; charset=utf-8');
+    $id       = trim($_POST['registro_id'] ?? '');
+    $novaData = trim($_POST['nova_data'] ?? '');
+    if ($novaData !== '' && !preg_match('/^\d{4}-\d{2}-\d{2}$/', $novaData)) {
+        echo json_encode(['ok' => false, 'erro' => 'Data inválida']); exit;
+    }
+    if (!$id) {
+        echo json_encode(['ok' => false, 'erro' => 'ID inválido']); exit;
+    }
+    try {
+        $stmt = $pdo->prepare("SELECT * FROM Registro WHERE IDRegistro = :id AND $_whereRegPermitido");
+        $stmt->execute([':id' => $id, ':uid' => $usuario_id, ':uid2' => $usuario_id]);
+        $original = $stmt->fetch(PDO::FETCH_ASSOC);
+        if (!$original) {
+            echo json_encode(['ok' => false, 'erro' => 'Registro não encontrado']); exit;
+        }
+
+        $momento    = $original['MomentoRegistro'];
+        $vencimento = $original['DataVencimento'];
+
+        if ($novaData !== '') {
+            if ($vencimento !== null) {
+                $vencimento = $novaData;
+            } else {
+                $hora    = date('H:i:s', strtotime($momento));
+                $momento = $novaData . ' ' . $hora;
+            }
+        }
+
+        $novoId = gerarUuid();
+        $pdo->prepare("
+            INSERT INTO Registro
+                (IDRegistro, TipoRegistro, Valor, Descricao, MomentoRegistro, DataVencimento,
+                 StatusRegistro, Recorrente, DiaVencimento, FKCarteira, FKUsuario, FKCategoria)
+            VALUES (:id, :tipo, :valor, :desc, :momento, :venc, :status, 0, NULL, :cart, :uid, :cat)
+        ")->execute([
+            ':id'      => $novoId,
+            ':tipo'    => $original['TipoRegistro'],
+            ':valor'   => $original['Valor'],
+            ':desc'    => $original['Descricao'],
+            ':momento' => $momento,
+            ':venc'    => $vencimento,
+            ':status'  => $original['StatusRegistro'],
+            ':cart'    => $original['FKCarteira'],
+            ':uid'     => $usuario_id,
+            ':cat'     => $original['FKCategoria'],
+        ]);
+
+        echo json_encode(['ok' => true, 'novo_id' => $novoId]);
     } catch (PDOException $e) {
         echo json_encode(['ok' => false, 'erro' => $e->getMessage()]);
     }
@@ -153,14 +231,36 @@ if (isset($_GET['ajax']) && $_GET['acao'] === 'listar') {
     $mes_alvo = (int)date('m', strtotime($mes_str . '-01'));
     $ano_alvo = (int)date('Y', strtotime($mes_str . '-01'));
 
-    $whereGrelha   = "r.FKUsuario = :uid AND MONTH(COALESCE(r.DataVencimento, r.MomentoRegistro)) = :mes AND YEAR(COALESCE(r.DataVencimento, r.MomentoRegistro)) = :ano";
-    $carteiraFilter = '';
-    $params = [':uid' => $usuario_id, ':mes' => $mes_alvo, ':ano' => $ano_alvo];
+    $modoCarteiraUnica = ($carteira !== 'todas' && $carteira !== '');
+    $carteiraEhCompartilhada = false;
 
-    if ($carteira !== 'todas' && $carteira !== '') {
-        $whereGrelha   .= " AND r.FKCarteira = :cid";
-        $carteiraFilter = " AND r.FKCarteira = :cid";
-        $params[':cid'] = $carteira;
+    if ($modoCarteiraUnica) {
+        // Sem essa checagem, bastava passar qualquer ID de carteira na URL da AJAX pra
+        // ver lançamentos de gente completamente alheia — confirma dono OU convidado aceito.
+        if (carteiraPapelDoUsuario($pdo, $carteira, $usuario_id) === null) {
+            echo json_encode(['sucesso' => false, 'erro' => 'Sem acesso a essa carteira']);
+            exit;
+        }
+        $stmtChkComp = $pdo->prepare("SELECT Compartilhada FROM Carteira WHERE IDCarteira = :cid");
+        $stmtChkComp->execute([':cid' => $carteira]);
+        $carteiraEhCompartilhada = (int)$stmtChkComp->fetchColumn() === 1;
+        // Carteira específica: mostra TODOS os lançamentos dela (todos os membros da
+        // carteira compartilhada), não só os meus — senão o dono nunca veria o que o
+        // convidado lançou (e vice-versa).
+        $whereGrelha = "r.FKCarteira = :cid AND MONTH(COALESCE(r.DataVencimento, r.MomentoRegistro)) = :mes AND YEAR(COALESCE(r.DataVencimento, r.MomentoRegistro)) = :ano";
+        $whereSaldos = "FKCarteira = :cid AND MONTH(MomentoRegistro) = :mes AND YEAR(MomentoRegistro) = :ano";
+        $whereSidebar = "r.FKCarteira = :cid AND r.StatusRegistro = 'pendente'";
+        $params = [':cid' => $carteira, ':mes' => $mes_alvo, ':ano' => $ano_alvo];
+        $sidebarParams = [':cid' => $carteira];
+    } else {
+        // "Todas as carteiras" continua sendo só os MEUS lançamentos, como sempre foi —
+        // misturar lançamentos de outros membros de carteiras compartilhadas na visão
+        // agregada de "todas" é uma decisão de UX separada, não resolvida nesta versão.
+        $whereGrelha = "r.FKUsuario = :uid AND MONTH(COALESCE(r.DataVencimento, r.MomentoRegistro)) = :mes AND YEAR(COALESCE(r.DataVencimento, r.MomentoRegistro)) = :ano";
+        $whereSaldos = "FKUsuario = :uid AND MONTH(MomentoRegistro) = :mes AND YEAR(MomentoRegistro) = :ano";
+        $whereSidebar = "r.FKUsuario = :uid AND r.StatusRegistro = 'pendente'";
+        $params = [':uid' => $usuario_id, ':mes' => $mes_alvo, ':ano' => $ano_alvo];
+        $sidebarParams = [':uid' => $usuario_id];
     }
 
     try {
@@ -172,9 +272,11 @@ if (isset($_GET['ajax']) && $_GET['acao'] === 'listar') {
                    c.NomeCategoria as categoria, COALESCE(c.IconeCategoria, 'bi-tag') as icone,
                    (SELECT COUNT(*) FROM Comprovante WHERE FKRegistro = r.IDRegistro AND FKUsuario = r.FKUsuario) AS tem_comprovante,
                    COALESCE(fp.IDFatura, fp2.IDFatura) as fatura_id,
-                   COALESCE(fp.FKCartao, fp2.FKCartao) as cartao_id
+                   COALESCE(fp.FKCartao, fp2.FKCartao) as cartao_id,
+                   u.Nome as lancador
             FROM Registro r
             LEFT JOIN Categoria c ON r.FKCategoria = c.IDCategoria
+            LEFT JOIN Usuario u ON u.IDUsuario = r.FKUsuario
             LEFT JOIN FaturaCartao fp  ON fp.FKRegistroPagamento = r.IDRegistro AND fp.FKUsuario  = r.FKUsuario
             LEFT JOIN FaturaCartao fp2 ON fp2.FKRegistroPreview  = r.IDRegistro AND fp2.FKUsuario = r.FKUsuario
             WHERE $whereGrelha ORDER BY data_evento ASC");
@@ -182,7 +284,6 @@ if (isset($_GET['ajax']) && $_GET['acao'] === 'listar') {
         $transacoesGrelha = $stmtG->fetchAll(PDO::FETCH_ASSOC);
 
         // ─── Saldos ───────────────────────────────────────────────────────────
-        $whereSaldos = "FKUsuario = :uid AND MONTH(MomentoRegistro) = :mes AND YEAR(MomentoRegistro) = :ano" . ($carteira !== 'todas' ? " AND FKCarteira = :cid" : "");
         $stmtS = $pdo->prepare("SELECT Valor, TipoRegistro, StatusRegistro FROM Registro WHERE $whereSaldos");
         $stmtS->execute($params);
 
@@ -197,9 +298,6 @@ if (isset($_GET['ajax']) && $_GET['acao'] === 'listar') {
         }
 
         // ─── Sidebar (global — relativo a hoje) ───────────────────────────────
-        $sidebarParams = [':uid' => $usuario_id];
-        if ($carteira !== 'todas' && $carteira !== '') $sidebarParams[':cid'] = $carteira;
-
         $stmtSb = $pdo->prepare("
             SELECT r.IDRegistro as id, r.TipoRegistro as tipo, r.Descricao as titulo,
                    r.Valor as valor,
@@ -209,8 +307,7 @@ if (isset($_GET['ajax']) && $_GET['acao'] === 'listar') {
             FROM Registro r
             LEFT JOIN FaturaCartao fp  ON fp.FKRegistroPagamento = r.IDRegistro AND fp.FKUsuario  = r.FKUsuario
             LEFT JOIN FaturaCartao fp2 ON fp2.FKRegistroPreview  = r.IDRegistro AND fp2.FKUsuario = r.FKUsuario
-            WHERE r.FKUsuario = :uid AND r.StatusRegistro = 'pendente'
-            $carteiraFilter ORDER BY COALESCE(r.DataVencimento, r.MomentoRegistro) ASC");
+            WHERE $whereSidebar ORDER BY COALESCE(r.DataVencimento, r.MomentoRegistro) ASC");
         $stmtSb->execute($sidebarParams);
 
         $hoje    = date('Y-m-d');
@@ -227,6 +324,7 @@ if (isset($_GET['ajax']) && $_GET['acao'] === 'listar') {
         echo json_encode([
             'sucesso' => true,
             'dados'   => $transacoesGrelha,
+            'compartilhada' => $carteiraEhCompartilhada,
             'saldos'  => [
                 'efetivado' => $totRecEfet - $totDesEfet,
                 'a_pagar'   => $totDesPend,
@@ -249,9 +347,8 @@ if (isset($_GET['ajax']) && $_GET['acao'] === 'listar') {
 // ==============================================================================
 $carteiras = [];
 try {
-    $stmtCart = $pdo->prepare("SELECT IDCarteira, TipoCarteira, Principal FROM Carteira WHERE FKUsuarioDono = :uid ORDER BY Principal DESC, TipoCarteira ASC");
-    $stmtCart->execute([':uid' => $usuario_id]);
-    $carteiras = $stmtCart->fetchAll();
+    garantirEstruturaCarteirasCompartilhadas($pdo);
+    $carteiras = carteirasAcessiveisPorUsuario($pdo, $usuario_id);
 } catch (PDOException $e) {
 }
 
@@ -331,6 +428,9 @@ require_once 'geral/header.php';
                                     <?php else: ?>
                                         <i class="bi bi-circle flex-shrink-0 text-secondary opacity-50"></i>
                                         <span class="text-light text-truncate" style="max-width:170px;" title="<?= htmlspecialchars($cart['TipoCarteira']) ?>"><?= htmlspecialchars($cart['TipoCarteira']) ?></span>
+                                    <?php endif; ?>
+                                    <?php if ((int)($cart['Compartilhada'] ?? 0) === 1): ?>
+                                        <i class="bi bi-people-fill flex-shrink-0" style="color:#60a5fa;font-size:0.75rem;" title="Carteira compartilhada"></i>
                                     <?php endif; ?>
                                 </a>
                             </li>
@@ -878,6 +978,7 @@ require_once 'geral/header.php';
             const r = await fetch(`agenda.php?ajax=1&acao=listar&mes=${mesStr}&carteira=${carteiraAtual}`);
             const json = await r.json();
             if (json.sucesso) {
+                carteiraCompartilhadaAtual = !!json.compartilhada;
                 renderizarGrelha(ano, mes, json.dados);
                 atualizarSaldos(json.saldos);
                 renderizarSidebar(json.sidebar);
@@ -907,6 +1008,10 @@ require_once 'geral/header.php';
     }
 
     // ── Sidebar ───────────────────────────────────────────────────────────
+    // Guarda os itens por ID pra o menu de contexto (editar/excluir) achar o objeto
+    // completo sem precisar serializar tudo dentro do HTML.
+    window._sidebarItemsPorId = {};
+
     function itemSidebar(item) {
         const isRec = item.tipo === 'receita' || item.tipo === 'transferencia_entrada';
         const incomeColor = cssVar('--color-income-text') || '#6ee7c7';
@@ -917,10 +1022,20 @@ require_once 'geral/header.php';
             `<i class="bi bi-arrow-up-short" style="color:${incomeColor};font-size:1.15rem;flex-shrink:0;"></i>` :
             `<i class="bi bi-arrow-down-short" style="color:${expenseColor};font-size:1.15rem;flex-shrink:0;"></i>`;
 
-        const clickSb = item.fatura_id ?
+        const isCC = !!item.fatura_id;
+        const clickSb = isCC ?
             `abrirModalFaturaCC('${item.fatura_id}','${item.cartao_id}')` :
             `window.location.href='nova_transacao.php?voltar=agenda.php&editar=${encodeURIComponent(item.id)}'`;
-        return `<div class="sidebar-item" onclick="${clickSb}">
+
+        // Itens de fatura de cartão não têm editar/excluir direto (igual no calendário) —
+        // só os lançamentos normais ganham o menu de contexto.
+        let ctxAttr = '';
+        if (!isCC) {
+            window._sidebarItemsPorId[item.id] = item;
+            ctxAttr = `oncontextmenu="event.preventDefault();event.stopPropagation();window._ctxSidebarItem(event,'${item.id}')"`;
+        }
+
+        return `<div class="sidebar-item" onclick="${clickSb}" ${ctxAttr}>
             <div class="d-flex align-items-center gap-2" style="min-width:0;">
                 ${arrow}
                 <div style="min-width:0;">
@@ -931,6 +1046,12 @@ require_once 'geral/header.php';
             <span class="fw-bold flex-shrink-0 ms-3" style="font-size:0.83rem;color:${corValor};">${sinal}${formatarMoeda(item.valor)}</span>
         </div>`;
     }
+
+    window._ctxSidebarItem = function(e, id) {
+        const item = window._sidebarItemsPorId[id];
+        if (!item) return;
+        window._mostrarMenuPill(e.clientX, e.clientY, item);
+    };
 
     function renderizarSidebar(sidebar) {
         const pares = [{
@@ -973,6 +1094,10 @@ require_once 'geral/header.php';
 
     // ── Grelha do calendário ──────────────────────────────────────────────
     let transacoesMes = [];
+    // Só true quando uma carteira compartilhada específica está selecionada — controla se
+    // mostra "quem lançou" nos itens (em "todas as carteiras" ou carteira pessoal seria
+    // sempre o próprio nome, então não faz sentido exibir).
+    let carteiraCompartilhadaAtual = false;
 
     function abrirModalDia(dataStr, transacoesDoDia) {
         const parts = dataStr.split('-');
@@ -1030,6 +1155,7 @@ require_once 'geral/header.php';
                     <div style="min-width:0;flex:1;">
                         <div class="text-light fw-semibold text-truncate" style="font-size:0.88rem;">${esc(t.titulo)}</div>
                         <div class="text-secondary" style="font-size:0.72rem;">${isCC ? 'Fatura do cartão' : esc(t.categoria ?? 'Sem categoria')}</div>
+                        ${(carteiraCompartilhadaAtual && t.lancador) ? `<div style="font-size:0.68rem;color:#60a5fa;"><i class="bi bi-person-fill"></i> ${esc(t.lancador)}</div>` : ''}
                     </div>
                     <div class="text-end flex-shrink-0 d-flex flex-column align-items-end gap-1">
                         <span class="fw-bold" style="color:${corVal};font-size:0.88rem;">${sinal}${formatarMoeda(t.valor)}</span>
@@ -1098,6 +1224,7 @@ require_once 'geral/header.php';
 
             const cel = document.createElement('div');
             cel.className = `calendar-day${isHoje ? ' today' : ''}`;
+            cel.dataset.data = dataStr;
 
             const num = document.createElement('div');
             num.className = 'day-number';
@@ -1130,7 +1257,7 @@ require_once 'geral/header.php';
 
                 const pill = document.createElement('div');
                 pill.className = `calendar-event ${cls}`;
-                pill.title = `${t.titulo} — ${formatarMoeda(t.valor)}`;
+                pill.title = (carteiraCompartilhadaAtual && t.lancador) ? `${t.titulo} — ${formatarMoeda(t.valor)} (${t.lancador})` : `${t.titulo} — ${formatarMoeda(t.valor)}`;
                 if (t.fatura_id) {
                     pill.onclick = (e) => {
                         e.stopPropagation();
@@ -1147,7 +1274,7 @@ require_once 'geral/header.php';
                         e.stopPropagation();
                         window._mostrarMenuPill(e.clientX, e.clientY, t);
                     });
-                    // Drag-and-drop
+                    // Drag-and-drop (botão esquerdo = mover)
                     pill.draggable = true;
                     pill.addEventListener('dragstart', (e) => {
                         e.stopPropagation();
@@ -1182,16 +1309,7 @@ require_once 'geral/header.php';
                 cel.classList.remove('drag-over');
                 const id = e.dataTransfer.getData('text/plain');
                 if (!id) return;
-                const fd = new FormData();
-                fd.append('action', 'mover_dia');
-                fd.append('registro_id', id);
-                fd.append('nova_data', dataStr);
-                try {
-                    const res = await fetch('agenda.php', { method: 'POST', body: fd });
-                    const json = await res.json();
-                    if (json.ok) window.carregarMes(anoAtual, mesAtual);
-                    else alert('Erro ao mover transação.');
-                } catch { alert('Erro de conexão.'); }
+                window._moverTransacaoParaDia(id, dataStr);
             });
 
             // Clique no fundo do dia → modal de detalhes
@@ -1207,10 +1325,11 @@ require_once 'geral/header.php';
         menu.id = 'ctx-pill';
         menu.style.cssText = 'position:fixed;z-index:9999;display:none;background:var(--bg-card-analysis);border:1px solid var(--border-color-analysis);border-radius:10px;box-shadow:0 8px 28px rgba(0,0,0,.25);min-width:168px;overflow:hidden;';
         menu.innerHTML = `
-            <div id="ctx-editar"  class="ctx-item"><i class="bi bi-pencil-square" style="color:#f5c542;"></i> Editar</div>
-            <div id="ctx-comp"    class="ctx-item" style="display:none;"><i class="bi bi-eye" style="color:#38bdf8;"></i> Ver comprovante</div>
+            <div id="ctx-editar"    class="ctx-item"><i class="bi bi-pencil-square" style="color:#f5c542;"></i> Editar</div>
+            <div id="ctx-duplicar"  class="ctx-item"><i class="bi bi-copy" style="color:#6ee7c7;"></i> Duplicar</div>
+            <div id="ctx-comp"      class="ctx-item" style="display:none;"><i class="bi bi-eye" style="color:#38bdf8;"></i> Ver comprovante</div>
             <div class="ctx-sep"></div>
-            <div id="ctx-excluir" class="ctx-item ctx-danger"><i class="bi bi-trash3"></i> Excluir</div>`;
+            <div id="ctx-excluir"   class="ctx-item ctx-danger"><i class="bi bi-trash3"></i> Excluir</div>`;
         document.body.appendChild(menu);
 
         const style = document.createElement('style');
@@ -1233,6 +1352,10 @@ require_once 'geral/header.php';
                 fechar();
                 window.location.href = `nova_transacao.php?voltar=agenda.php&editar=${encodeURIComponent(t.id)}`;
             };
+            document.getElementById('ctx-duplicar').onclick = () => {
+                fechar();
+                window._duplicarTransacao(t.id);
+            };
             const btnComp = document.getElementById('ctx-comp');
             if (_temAcessoCompAgenda && t.tem_comprovante > 0) {
                 btnComp.style.display = 'flex';
@@ -1245,21 +1368,7 @@ require_once 'geral/header.php';
             }
             document.getElementById('ctx-excluir').onclick = () => {
                 fechar();
-                const desc = t.titulo.length > 40 ? t.titulo.slice(0, 40) + '…' : t.titulo;
-                if (!confirm(`Excluir "${desc}"?\n\nEsta ação é irreversível.`)) return;
-                fetch('agenda.php', {
-                        method: 'POST',
-                        headers: {
-                            'Content-Type': 'application/x-www-form-urlencoded'
-                        },
-                        body: `action=excluir_rapido&registro_id=${encodeURIComponent(t.id)}`
-                    })
-                    .then(r => r.json())
-                    .then(d => {
-                        if (d.ok) window.carregarMes(anoAtual, mesAtual);
-                        else alert('Erro ao excluir.');
-                    })
-                    .catch(() => alert('Erro de conexão.'));
+                window._confirmarExcluirItemAgenda(t.id, t.titulo, () => window.carregarMes(anoAtual, mesAtual));
             };
 
             // Posiciona sem sair da viewport
@@ -1272,6 +1381,60 @@ require_once 'geral/header.php';
             menu.style.top = (y + mh > vh ? y - mh : y) + 'px';
         };
     })();
+
+    // ── Duplicar / mover transação (compartilhado pelo menu de contexto e pelo
+    //    arrastar com o botão direito) ──────────────────────────────────────
+    window._moverTransacaoParaDia = async function(id, novaData) {
+        const fd = new FormData();
+        fd.append('action', 'mover_dia');
+        fd.append('registro_id', id);
+        fd.append('nova_data', novaData);
+        try {
+            const res = await fetch('agenda.php', { method: 'POST', body: fd });
+            const json = await res.json();
+            if (json.ok) window.carregarMes(anoAtual, mesAtual);
+            else alert('Erro ao mover transação.');
+        } catch { alert('Erro de conexão.'); }
+    };
+
+    window._duplicarTransacao = async function(id, novaData) {
+        const fd = new FormData();
+        fd.append('action', 'duplicar_rapido');
+        fd.append('registro_id', id);
+        if (novaData) fd.append('nova_data', novaData);
+        try {
+            const res = await fetch('agenda.php', { method: 'POST', body: fd });
+            const json = await res.json();
+            if (json.ok) window.carregarMes(anoAtual, mesAtual);
+            else alert('Erro ao duplicar transação.');
+        } catch { alert('Erro de conexão.'); }
+    };
+
+    // Modal de confirmação de exclusão de um único item (menu de contexto do pill e do
+    // modal de dia) — substitui o confirm() nativo do navegador.
+    window._confirmarExcluirItemAgenda = function(id, titulo, aoConcluir) {
+        const desc = (titulo || '').length > 40 ? titulo.slice(0, 40) + '…' : (titulo || 'este item');
+        document.getElementById('modalExcluirItemAgendaTexto').textContent =
+            `Tem certeza que deseja excluir "${desc}"? Essa ação não pode ser desfeita.`;
+
+        const modalEl = document.getElementById('modalExcluirItemAgenda');
+        const modal = bootstrap.Modal.getOrCreateInstance(modalEl);
+        const btnConfirmar = document.getElementById('modalExcluirItemAgendaConfirmar');
+
+        btnConfirmar.onclick = () => {
+            modal.hide();
+            fetch('agenda.php', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+                body: `action=excluir_rapido&registro_id=${encodeURIComponent(id)}`
+            }).then(r => r.json()).then(d => {
+                if (d.ok) { if (aoConcluir) aoConcluir(); }
+                else alert('Erro ao excluir.');
+            }).catch(() => alert('Erro de conexão.'));
+        };
+
+        modal.show();
+    };
 
     // ── Seleção múltipla de itens no modal de dia ─────────────────────────
     let _agendaSelMode = false;
@@ -1397,16 +1560,11 @@ require_once 'geral/header.php';
             };
             document.getElementById('ctx-m-del').onclick = () => {
                 fecharM();
-                const desc = titulo.length > 40 ? titulo.slice(0, 40) + '…' : titulo;
-                if (!confirm(`Excluir "${desc}"?\n\nEsta ação é irreversível.`)) return;
-                fetch('agenda.php', {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-                    body: `action=excluir_rapido&registro_id=${encodeURIComponent(id)}`
-                }).then(r => r.json()).then(d => {
-                    if (d.ok) { _agendaSairSel(); window.carregarMes(anoAtual, mesAtual); bootstrap.Modal.getInstance(document.getElementById('modalDia'))?.hide(); }
-                    else alert('Erro ao excluir.');
-                }).catch(() => alert('Erro de conexão.'));
+                window._confirmarExcluirItemAgenda(id, titulo, () => {
+                    _agendaSairSel();
+                    window.carregarMes(anoAtual, mesAtual);
+                    bootstrap.Modal.getInstance(document.getElementById('modalDia'))?.hide();
+                });
             };
 
             const delSelBtn = document.getElementById('ctx-m-delsel');
@@ -1597,6 +1755,29 @@ require_once 'geral/header.php';
                         Cancelar
                     </button>
                 </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- MODAL: CONFIRMAR EXCLUSÃO DE UM ITEM -->
+<div class="modal fade" id="modalExcluirItemAgenda" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered modal-sm" style="max-width: 400px;">
+        <div class="modal-content border-secondary-subtle shadow-lg rounded-4" style="background:var(--bg-card-analysis);">
+            <div class="modal-header border-bottom border-secondary-subtle p-3">
+                <h6 class="modal-title text-light fw-bold">
+                    <i class="bi bi-trash3-fill me-2 text-danger"></i> Excluir transação
+                </h6>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body p-4 text-center">
+                <p class="text-secondary mb-0" id="modalExcluirItemAgendaTexto">Tem certeza que deseja excluir este item? Essa ação não pode ser desfeita.</p>
+            </div>
+            <div class="modal-footer border-top border-secondary-subtle d-flex justify-content-between p-2">
+                <button type="button" class="btn btn-sm btn-link text-secondary text-decoration-none" data-bs-dismiss="modal">Cancelar</button>
+                <button type="button" id="modalExcluirItemAgendaConfirmar" class="btn btn-sm btn-danger fw-bold px-3 rounded-pill">
+                    Confirmar Exclusão
+                </button>
             </div>
         </div>
     </div>

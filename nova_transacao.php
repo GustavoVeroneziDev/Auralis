@@ -29,10 +29,15 @@ $id_editar = $_GET['editar'] ?? null;
 $transacao_edit = null;
 
 if ($id_editar) {
-    // Busca os dados da transação específica para preencher o formulário
-    $sqlEdit = "SELECT * FROM Registro WHERE IDRegistro = :id AND FKUsuario = :uid";
+    // Busca os dados da transação específica para preencher o formulário — libera se for
+    // quem lançou OU o dono da carteira compartilhada onde o lançamento está.
+    $sqlEdit = "
+        SELECT * FROM Registro
+        WHERE IDRegistro = :id
+          AND (FKUsuario = :uid OR FKCarteira IN (SELECT IDCarteira FROM Carteira WHERE FKUsuarioDono = :uid2))
+    ";
     $stmtEdit = $pdo->prepare($sqlEdit);
-    $stmtEdit->execute([':id' => $id_editar, ':uid' => $usuario_id]);
+    $stmtEdit->execute([':id' => $id_editar, ':uid' => $usuario_id, ':uid2' => $usuario_id]);
     $transacao_edit = $stmtEdit->fetch();
 
     // Trava de segurança: se a transação não existir, volta pro painel
@@ -55,39 +60,75 @@ $_nomePlanoNT   = strtoupper($_planoNT);
 $_nomeUpgradeNT = strtoupper($_upgradeSlugNT);
 
 try {
-    $sqlCarteiras = "
-        SELECT DISTINCT c.IDCarteira, c.TipoCarteira
-        FROM Carteira c
-        LEFT JOIN MembroCarteira mc ON mc.FKCarteira = c.IDCarteira AND mc.FKUsuario = :uid_membro AND mc.StatusConvite = 1
-        WHERE c.FKUsuarioDono = :uid_dono OR mc.FKCarteira IS NOT NULL
-        ORDER BY c.TipoCarteira ASC
-    ";
-    $stmtC = $pdo->prepare($sqlCarteiras);
-    $stmtC->execute([':uid_dono' => $usuario_id, ':uid_membro' => $usuario_id]);
-    $carteiras = $stmtC->fetchAll();
+    garantirEstruturaCarteirasCompartilhadas($pdo);
+    $carteiras = carteirasAcessiveisPorUsuario($pdo, $usuario_id);
 
-    // IDs de carteiras além do limite (só relevante para free sem trial, sem edição)
+    // IDs de carteiras além do limite (só relevante para free sem trial, sem edição).
+    // Só carteiras próprias e NÃO compartilhadas contam pro limite do plano: como
+    // convidado a carteira nem é "sua"; como dona, quem depende dela é outra pessoa —
+    // bloquear o acesso por causa do SEU downgrade seria injusto com quem foi convidado.
     $_cartsBloqNT = [];
     if ($_freeRestNT && $_limitesNT['carteiras'] !== PHP_INT_MAX) {
-        for ($i = $_limitesNT['carteiras']; $i < count($carteiras); $i++) {
-            $_cartsBloqNT[] = $carteiras[$i]['IDCarteira'];
+        $_cartsProprias = array_values(array_filter($carteiras, function ($c) {
+            return ($c['papel'] ?? 'dono') === 'dono' && (int)($c['Compartilhada'] ?? 0) !== 1;
+        }));
+        for ($i = $_limitesNT['carteiras']; $i < count($_cartsProprias); $i++) {
+            $_cartsBloqNT[] = $_cartsProprias[$i]['IDCarteira'];
         }
     }
 
-    $sqlCategorias = "
-        SELECT IDCategoria, NomeCategoria
-        FROM Categoria
-        WHERE FKUsuario = :uid AND TipoCategoria = :tipo
-        ORDER BY NomeCategoria ASC
-    ";
+    // Precisa saber qual carteira vai vir selecionada no <select> ANTES de montar a lista
+    // de categorias — se for compartilhada, as categorias são dela (FKCarteira), não do
+    // usuário. (Mesma precedência de $val_cart mais abaixo, calculada aqui só pra isso.)
+    $_carteiraParaCategorias = $_POST['carteira_id'] ?? ($transacao_edit ? $transacao_edit['FKCarteira'] : ($_GET['carteira_id'] ?? ''));
+    if (empty($_carteiraParaCategorias) && count($carteiras) === 1) {
+        $_carteiraParaCategorias = $carteiras[0]['IDCarteira'];
+    }
+    $_carteiraCategoriasCompartilhada = false;
+    foreach ($carteiras as $_cc) {
+        if ($_cc['IDCarteira'] === $_carteiraParaCategorias) {
+            $_carteiraCategoriasCompartilhada = (int)($_cc['Compartilhada'] ?? 0) === 1;
+            break;
+        }
+    }
+
     $tipoCat = ($tipo_sugerido === 'cartao') ? 'despesa' : $tipo_sugerido;
-    $stmtCat = $pdo->prepare($sqlCategorias);
-    $stmtCat->execute([':uid' => $usuario_id, ':tipo' => $tipoCat]);
+
+    if ($_carteiraCategoriasCompartilhada) {
+        // Categorias da carteira compartilhada — mesma lista pra todos os membros
+        $stmtCat = $pdo->prepare("
+            SELECT IDCategoria, NomeCategoria
+            FROM Categoria
+            WHERE FKCarteira = :cid AND TipoCategoria = :tipo
+            ORDER BY NomeCategoria ASC
+        ");
+        $stmtCat->execute([':cid' => $_carteiraParaCategorias, ':tipo' => $tipoCat]);
+    } else {
+        // Categorias pessoais — exclui de propósito as que pertencem a alguma carteira
+        // compartilhada que o usuário é dono (senão elas vazariam pras carteiras normais dele)
+        $stmtCat = $pdo->prepare("
+            SELECT IDCategoria, NomeCategoria
+            FROM Categoria
+            WHERE FKUsuario = :uid AND TipoCategoria = :tipo AND FKCarteira IS NULL
+            ORDER BY NomeCategoria ASC
+        ");
+        $stmtCat->execute([':uid' => $usuario_id, ':tipo' => $tipoCat]);
+    }
     $categorias = $stmtCat->fetchAll();
 
-    // IDs de categorias além do limite
+    // IDs de categorias além do limite — dentro de carteira compartilhada usa o limite do
+    // plano de quem criou a carteira, sem exceção de trial (o plano do dono já é
+    // definitivo, diferente do trial passageiro de quem está lançando).
     $_catsBloqNT = [];
-    if ($_freeRestNT && $_limitesNT['categorias'] !== PHP_INT_MAX) {
+    if ($_carteiraCategoriasCompartilhada) {
+        $_planoCatNT = planoEfetivoDaCarteira($pdo, $_carteiraParaCategorias);
+        $_limCatNT   = limitesDoPlano($_planoCatNT)['categorias'];
+        if ($_limCatNT !== PHP_INT_MAX) {
+            for ($i = $_limCatNT; $i < count($categorias); $i++) {
+                $_catsBloqNT[] = $categorias[$i]['IDCategoria'];
+            }
+        }
+    } elseif ($_freeRestNT && $_limitesNT['categorias'] !== PHP_INT_MAX) {
         for ($i = $_limitesNT['categorias']; $i < count($categorias); $i++) {
             $_catsBloqNT[] = $categorias[$i]['IDCategoria'];
         }
@@ -111,6 +152,14 @@ if ($id_editar && $transacao_edit) {
     } catch (PDOException $e) {
         $comprovantes = [];
     }
+}
+
+// Helper: monta o texto de detalhe do log de atividade da carteira compartilhada
+// (ex.: "Receita de R$ 800,00 — Salário de julho") a partir dos dados do lançamento.
+function _descLogRegistroNT(string $tipoRegistro, $valor, string $descricao): string
+{
+    $rotulo = $tipoRegistro === 'receita' ? 'Receita' : 'Despesa';
+    return $rotulo . ' de R$ ' . number_format((float)$valor, 2, ',', '.') . ' — ' . $descricao;
 }
 
 // Helper: processa e salva arquivos enviados para um registro
@@ -264,6 +313,18 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     // Compra/recebimento que já vinha de antes do Auralis — gera só as parcelas restantes.
     $parcelaInicial = $parcelado ? max(1, min($numParcelas, intval($_POST['parcela_inicial'] ?? 1))) : 1;
 
+    // Dentro de uma carteira compartilhada, os limites de plano (parcelas, juros,
+    // transações/mês) seguem o plano de quem criou a carteira, não o do usuário logado —
+    // convidado ou dono, quem define o teto é sempre o plano real da carteira (sem
+    // exceção de trial: o plano do dono já é definitivo, não passageiro).
+    $_carteiraAlvoCompartilhada = false;
+    if (!empty($carteiraId)) {
+        $_stmtCartAlvoNT = $pdo->prepare("SELECT Compartilhada FROM Carteira WHERE IDCarteira = :cid");
+        $_stmtCartAlvoNT->execute([':cid' => $carteiraId]);
+        $_carteiraAlvoCompartilhada = (int)($_stmtCartAlvoNT->fetchColumn() ?: 0) === 1;
+    }
+    $_planoAlvoNT = $_carteiraAlvoCompartilhada ? planoEfetivoDaCarteira($pdo, $carteiraId) : $_planoNT;
+
     // Validações (agora usando o valorRaw limpo)
     if (!in_array($tipoRegistro, ['receita', 'despesa'])) $erro = "Tipo de registro inválido.";
     elseif (empty($valorRaw) || !is_numeric($valorRaw)) $erro = "Informe um valor numérico válido.";
@@ -277,16 +338,21 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     elseif ($parcelado && intval($_POST['num_parcelas'] ?? 0) === 1) $erro = "O número de parcelas não pode ser 1. Se não quiser parcelar, desative a opção de parcelamento.";
     elseif ($parcelado && $recorrente) $erro = "Uma transação não pode ser parcelada E recorrente ao mesmo tempo.";
     elseif ($parcelado && intval($_POST['parcela_inicial'] ?? 1) > $numParcelas) $erro = "A parcela inicial não pode ser maior que o total de parcelas.";
-    elseif ($parcelado && !isset($_POST['id_editar']) && !$_testeNT) {
-        $_limParcNT = limitesDoPlano()['parcelas_max'];
+    elseif ($parcelado && !isset($_POST['id_editar']) && (!$_testeNT || $_carteiraAlvoCompartilhada)) {
+        // Numa carteira compartilhada, o teto de parcelas segue o plano de quem criou a
+        // carteira — o convidado não fica preso ao próprio plano enquanto lança nela, e o
+        // trial pessoal de quem lança não bypassa o teto real da carteira.
+        $_limParcNT = limitesDoPlano($_planoAlvoNT)['parcelas_max'];
         if ($numParcelas > $_limParcNT) {
-            $erro = "Seu plano permite parcelar em até " . exibirLimite($_limParcNT) . "x. Assine o {$_nomeUpgradeNT} para parcelar em até " . exibirLimite(limitesDoPlano($_upgradeSlugNT)['parcelas_max']) . "x.";
+            $_upgradeParcNT = ['free' => 'pro', 'pro' => 'vip'][$_planoAlvoNT] ?? 'vip';
+            $erro = "Este plano permite parcelar em até " . exibirLimite($_limParcNT) . "x. Assine o " . strtoupper($_upgradeParcNT) . " para parcelar em até " . exibirLimite(limitesDoPlano($_upgradeParcNT)['parcelas_max']) . "x.";
         }
     }
 
-    // Verifica limite mensal de registros (apenas para novas transações, não edições, não trial)
-    if (!$erro && !isset($_POST['id_editar']) && !$_testeNT) {
-        $_limMensalNT = limitesDoPlano()['transacoes_mes'];
+    // Verifica limite mensal de registros (apenas para novas transações, não edições, não
+    // trial — exceto se a carteira alvo for compartilhada, aí segue o plano dela)
+    if (!$erro && !isset($_POST['id_editar']) && (!$_testeNT || $_carteiraAlvoCompartilhada)) {
+        $_limMensalNT = limitesDoPlano($_planoAlvoNT)['transacoes_mes'];
         if ($_limMensalNT !== PHP_INT_MAX) {
             $stmtLimMes = $pdo->prepare(
                 "SELECT COUNT(*) FROM Registro WHERE FKUsuario = :uid
@@ -316,7 +382,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                         MomentoRegistro = :momento, DataVencimento = :vencimento,
                         StatusRegistro = :status, Recorrente = :recorrente, DiaVencimento = :dia,
                         FKCarteira = :carteira, FKCategoria = :categoria
-                    WHERE IDRegistro = :id_editar AND FKUsuario = :usuario
+                    WHERE IDRegistro = :id_editar
+                      AND (FKUsuario = :usuario OR FKCarteira IN (SELECT IDCarteira FROM Carteira WHERE FKUsuarioDono = :usuario2))
                 ";
                 $stmt = $pdo->prepare($sql);
                 $stmt->execute([
@@ -332,6 +399,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                     ':categoria' => $categoriaId,
                     ':id_editar' => $_POST['id_editar'],
                     ':usuario'   => $usuario_id,
+                    ':usuario2'  => $usuario_id,
                 ]);
 
                 // ── PROPAGAÇÃO DE EDIÇÃO (FUTUROS) ───────────────────────────
@@ -344,7 +412,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                             Valor = :valor, Descricao = :descricao,
                             FKCarteira = :carteira, FKCategoria = :categoria
                         WHERE GrupoParcela = :grupo
-                          AND FKUsuario = :usuario
+                          AND (FKUsuario = :usuario OR FKCarteira IN (SELECT IDCarteira FROM Carteira WHERE FKUsuarioDono = :usuario2))
                           AND IDRegistro != :id_editar
                           AND MomentoRegistro > :data_base
                           AND StatusRegistro = 'pendente'
@@ -358,6 +426,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                         ':categoria' => $categoriaId,
                         ':grupo'     => $grupoAtual,
                         ':usuario'   => $usuario_id,
+                        ':usuario2'  => $usuario_id,
                         ':id_editar' => $_POST['id_editar'],
                         ':data_base' => $dataAtual
                     ]);
@@ -374,7 +443,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                             Valor = :valor, Descricao = :descricao,
                             FKCarteira = :carteira, FKCategoria = :categoria
                         WHERE GrupoParcela = :grupo
-                          AND FKUsuario = :usuario
+                          AND (FKUsuario = :usuario OR FKCarteira IN (SELECT IDCarteira FROM Carteira WHERE FKUsuarioDono = :usuario2))
                           AND IDRegistro != :id_editar
                           AND ParcelaAtual > :parcela_atual
                           AND StatusRegistro = 'pendente'
@@ -388,11 +457,15 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                         ':categoria'     => $categoriaId,
                         ':grupo'         => $grupoAtual,
                         ':usuario'       => $usuario_id,
+                        ':usuario2'      => $usuario_id,
                         ':id_editar'     => $_POST['id_editar'],
                         ':parcela_atual' => $parcelaAtualEdit,
                     ]);
                 }
                 processarComprovantes($pdo, $_POST['id_editar'], $usuario_id);
+                if ($_carteiraAlvoCompartilhada) {
+                    logAtividadeCarteira($pdo, $carteiraId, $usuario_id, 'lancamento_editado', _descLogRegistroNT($tipoRegistro, $valor, $descricao));
+                }
                 header("Location: " . $_urlVoltar . (strpos($_urlVoltar, '?') !== false ? '&' : '?') . "sucesso=editado");
             } elseif ($parcelado && $numParcelas >= 2) {
                 // ── CRIAÇÃO PARCELADA ────────────────
@@ -402,10 +475,14 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 $valorJurosTotal = 0;
                 $jurosPorParcela = null;
 
-                // 1. VERIFICAÇÃO DE ACESSO (PRO, VIP OU TESTE)
-                $planoUsuarioLogado  = strtolower($_SESSION['plano'] ?? 'free');
-                $horasTesteRestantes = function_exists('obterHorasRestantesTeste') ? obterHorasRestantesTeste() : 0;
-                $acessoLiberadoJuros = ($planoUsuarioLogado === 'pro' || $planoUsuarioLogado === 'vip' || $horasTesteRestantes > 0);
+                // 1. VERIFICAÇÃO DE ACESSO (PRO, VIP OU TESTE) — numa carteira compartilhada
+                // segue o plano de quem criou ela, sem depender do trial pessoal de quem lançou.
+                if ($_carteiraAlvoCompartilhada) {
+                    $acessoLiberadoJuros = ($_planoAlvoNT === 'pro' || $_planoAlvoNT === 'vip');
+                } else {
+                    $horasTesteRestantes = function_exists('obterHorasRestantesTeste') ? obterHorasRestantesTeste() : 0;
+                    $acessoLiberadoJuros = ($_planoAlvoNT === 'pro' || $_planoAlvoNT === 'vip' || $horasTesteRestantes > 0);
+                }
 
                 // 2. LÓGICA DE JUROS (COM TRAVA DE SEGURANÇA) — só calcula; não insere ainda
                 if ($acessoLiberadoJuros && isset($_POST['tipo_juros']) && $_POST['tipo_juros'] === 'com') {
@@ -509,6 +586,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                     verificarConquistasRegistros($pdo, $usuario_id);
                     verificarConquistasComprovantes($pdo, $usuario_id);
                     verificarConquistasCategorias($pdo, $usuario_id);
+                    if ($_carteiraAlvoCompartilhada) {
+                        logAtividadeCarteira($pdo, $carteiraId, $usuario_id, 'lancamento_criado', _descLogRegistroNT($tipoRegistro, $valor, $descricao) . " (parcelado {$numParcelas}x)");
+                    }
                     header("Location: " . $_urlVoltar . (strpos($_urlVoltar, '?') !== false ? '&' : '?') . "sucesso=parcelado&parcelas={$numParcelas}");
                     exit;
                 }
@@ -565,6 +645,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 verificarConquistasRegistros($pdo, $usuario_id);
                 verificarConquistasComprovantes($pdo, $usuario_id);
                 verificarConquistasCategorias($pdo, $usuario_id);
+                if ($_carteiraAlvoCompartilhada) {
+                    logAtividadeCarteira($pdo, $carteiraId, $usuario_id, 'lancamento_criado', _descLogRegistroNT($tipoRegistro, $valor, $descricao) . " (recorrente)");
+                }
                 header("Location: " . $_urlVoltar . (strpos($_urlVoltar, '?') !== false ? '&' : '?') . "sucesso=recorrente");
             } else {
                 // ── CRIAÇÃO SIMPLES (Transação Única) ────────────────────────
@@ -598,6 +681,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 verificarConquistasRegistros($pdo, $usuario_id);
                 verificarConquistasComprovantes($pdo, $usuario_id);
                 verificarConquistasCategorias($pdo, $usuario_id);
+                if ($_carteiraAlvoCompartilhada) {
+                    logAtividadeCarteira($pdo, $carteiraId, $usuario_id, 'lancamento_criado', _descLogRegistroNT($tipoRegistro, $valor, $descricao));
+                }
                 header("Location: " . $_urlVoltar . (strpos($_urlVoltar, '?') !== false ? '&' : '?') . "sucesso=registro");
             }
             exit;

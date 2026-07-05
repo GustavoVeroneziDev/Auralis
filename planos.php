@@ -91,6 +91,8 @@ if ($upgrade === 'pro') {
 }
 
 // ── Carrega limites e recursos do banco ──────────────────────────────────
+garantirEstruturaCarteirasCompartilhadas($pdo);
+
 $limitesRaw = [];   // valores brutos do banco (com -1 para ilimitado)
 try {
     $rows = $pdo->query("SELECT * FROM config_limites_plano")->fetchAll(PDO::FETCH_ASSOC);
@@ -101,9 +103,9 @@ try {
 // Fallback se a tabela ainda não existir
 if (empty($limitesRaw)) {
     $limitesRaw = [
-        'free' => ['transacoes_mes' => 35, 'carteiras' => 1,  'cartoes' => 1,  'categorias' => 10, 'parcelas_max' => 3],
-        'pro'  => ['transacoes_mes' => -1, 'carteiras' => 3,  'cartoes' => 3,  'categorias' => -1, 'parcelas_max' => 48],
-        'vip'  => ['transacoes_mes' => -1, 'carteiras' => -1, 'cartoes' => -1, 'categorias' => -1, 'parcelas_max' => 48],
+        'free' => ['transacoes_mes' => 35, 'carteiras' => 1,  'cartoes' => 1,  'categorias' => 10, 'parcelas_max' => 3, 'carteiras_compartilhadas_membros' => 0],
+        'pro'  => ['transacoes_mes' => -1, 'carteiras' => 3,  'cartoes' => 3,  'categorias' => -1, 'parcelas_max' => 48, 'carteiras_compartilhadas_membros' => 2],
+        'vip'  => ['transacoes_mes' => -1, 'carteiras' => -1, 'cartoes' => -1, 'categorias' => -1, 'parcelas_max' => 48, 'carteiras_compartilhadas_membros' => 8],
     ];
 }
 
@@ -128,6 +130,8 @@ function _itensLimite($row)
     if ($pmax == -1)     $itens[] = ['ok', 'Lançamentos parcelados ilimitados'];
     elseif ($pmax <= 3)  $itens[] = ['ok', "Registre compras parceladas em até {$pmax}x"];
     else                 $itens[] = ['ok', "Registre compras parceladas em até {$pmax}x"];
+    $membros = $row['carteiras_compartilhadas_membros'] ?? 0;
+    if ($membros >= 2) $itens[] = ['ok', "Carteira compartilhada (até {$membros} pessoas)"];
     return $itens;
 }
 

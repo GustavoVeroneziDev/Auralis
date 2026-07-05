@@ -149,6 +149,10 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
     if ($action === 'marcar_paga') {
         $faturaId = trim($_POST['fatura_id'] ?? '');
+        // Repara antes de marcar como paga: se essa fatura fechou numa época em que o
+        // cartão ainda não tinha carteira de pagamento definida, nunca existiu um lançamento
+        // de cobrança vinculado — sem isso, marcar como paga não debitava nada do saldo.
+        cartao_repararRegistroPagamento($pdo, $faturaId, $uid);
         $pdo->prepare("UPDATE FaturaCartao SET Status='paga' WHERE IDFatura=:id AND FKUsuario=:uid AND Status='fechada'")
             ->execute([':id' => $faturaId, ':uid' => $uid]);
         // Efetiva o Registro de pagamento vinculado
@@ -161,6 +165,18 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             )->execute([':fid' => $faturaId, ':uid' => $uid]);
         } catch (PDOException $e) {}
         $sucesso = 'Fatura marcada como paga.';
+    }
+
+    // Corrige uma fatura já fechada/paga que ficou órfã (sem lançamento de cobrança
+    // vinculado) — único jeito de resolver isso depois que a fatura já virou "paga", já
+    // que os botões de marcar paga/reabrir somem nesse status.
+    if ($action === 'reparar_pagamento') {
+        $faturaId = trim($_POST['fatura_id'] ?? '');
+        $reparou  = cartao_repararRegistroPagamento($pdo, $faturaId, $uid);
+        $sucesso  = $reparou
+            ? 'Lançamento da fatura recriado e vinculado — já deve aparecer na agenda e no saldo.'
+            : null;
+        $erro     = $reparou ? null : 'Não deu pra reparar. Confira se o cartão já tem uma carteira de pagamento definida em "Editar Cartão".';
     }
 
     if ($action === 'reabrir_fatura') {
@@ -458,6 +474,29 @@ require_once '../geral/header.php';
                         <i class="bi bi-chevron-down text-secondary" id="ico-fh-<?= $fh['IDFatura'] ?>"></i>
                     </div>
                 </div>
+
+                <?php if (empty($fh['FKRegistroPagamento']) && (float)$fh['ValorTotal'] > 0): ?>
+                    <div class="d-flex align-items-center justify-content-between gap-2 flex-wrap px-4 py-2"
+                        style="background:rgba(245,158,11,.08);border-top:1px solid rgba(245,158,11,.2);">
+                        <span class="text-secondary" style="font-size:0.75rem;">
+                            <i class="bi bi-exclamation-triangle-fill me-1" style="color:#f59e0b;"></i>
+                            Essa fatura não tem um lançamento de cobrança vinculado — por isso não aparece na agenda nem debita do saldo.
+                            <?php if (empty($cartao['FKCarteiraDebito'])): ?>
+                                Defina uma carteira de pagamento em <strong class="text-light">Editar Cartão</strong> primeiro.
+                            <?php endif; ?>
+                        </span>
+                        <?php if (!empty($cartao['FKCarteiraDebito'])): ?>
+                            <form method="POST" onclick="event.stopPropagation()">
+                                <input type="hidden" name="action" value="reparar_pagamento">
+                                <input type="hidden" name="fatura_id" value="<?= $fh['IDFatura'] ?>">
+                                <button class="btn btn-sm rounded-pill fw-semibold px-3 flex-shrink-0"
+                                    style="background:rgba(245,158,11,.15);color:#fbbf24;border:1px solid rgba(245,158,11,.35);font-size:0.75rem;">
+                                    <i class="bi bi-tools me-1"></i> Corrigir agora
+                                </button>
+                            </form>
+                        <?php endif; ?>
+                    </div>
+                <?php endif; ?>
 
                 <!-- Lançamentos (colapsável) -->
                 <div id="fh-<?= $fh['IDFatura'] ?>" style="display:none;">

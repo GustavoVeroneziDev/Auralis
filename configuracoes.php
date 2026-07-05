@@ -295,6 +295,36 @@ require_once 'geral/header.php';
     </div>
     <?php endif; ?>
 
+    <?php
+    garantirEstruturaCarteirasCompartilhadas($pdo);
+    $codigoConvite = obterOuGerarCodigoConvite($pdo, $usuario_id);
+    ?>
+    <!-- Widget de convite pra carteira compartilhada — visual azul, de propósito diferente
+         do dourado da indicação acima, pra nunca confundir os dois códigos. -->
+    <div class="rounded-4 p-4 mb-4" style="background:rgba(96,165,250,.05);border:1px solid rgba(96,165,250,.18);">
+        <div class="d-flex align-items-center gap-3 mb-3 flex-wrap">
+            <div class="rounded-3 d-flex align-items-center justify-content-center flex-shrink-0"
+                style="width:40px;height:40px;background:rgba(96,165,250,.12);border:1px solid rgba(96,165,250,.25);">
+                <i class="bi bi-people-fill" style="color:#60a5fa;font-size:1.1rem;"></i>
+            </div>
+            <div>
+                <div class="fw-semibold text-light">Seu código de convite</div>
+                <div class="text-secondary" style="font-size:.78rem;">Passe esse código pra alguém te adicionar numa carteira compartilhada.</div>
+            </div>
+        </div>
+        <div class="d-flex align-items-center gap-2 flex-wrap">
+            <code id="cfgCodigoConvite" class="px-3 py-2 rounded-3 flex-grow-1"
+                style="background:rgba(0,0,0,.3);color:#60a5fa;font-size:.95rem;font-weight:700;letter-spacing:.05em;display:block;">
+                <?= htmlspecialchars($codigoConvite) ?>
+            </code>
+            <button onclick="cfgCopiarCodigoConvite()" id="cfgBtnCopiarConvite"
+                class="btn btn-sm rounded-pill px-3 flex-shrink-0"
+                style="background:rgba(96,165,250,.15);color:#60a5fa;border:1px solid rgba(96,165,250,.3);">
+                <i class="bi bi-clipboard me-1"></i> Copiar código
+            </button>
+        </div>
+    </div>
+
     <div class="row g-4 mb-5">
 
         <div class="col-lg-6">
@@ -732,6 +762,16 @@ function cfgCopiarLink() {
     var texto = document.getElementById('cfgLinkRef').textContent.trim();
     navigator.clipboard.writeText(texto).then(function() {
         var btn = document.getElementById('cfgBtnCopiar');
+        var orig = btn.innerHTML;
+        btn.innerHTML = '<i class="bi bi-check2 me-1"></i> Copiado!';
+        setTimeout(function() { btn.innerHTML = orig; }, 2000);
+    });
+}
+
+function cfgCopiarCodigoConvite() {
+    var texto = document.getElementById('cfgCodigoConvite').textContent.trim();
+    navigator.clipboard.writeText(texto).then(function() {
+        var btn = document.getElementById('cfgBtnCopiarConvite');
         var orig = btn.innerHTML;
         btn.innerHTML = '<i class="bi bi-check2 me-1"></i> Copiado!';
         setTimeout(function() { btn.innerHTML = orig; }, 2000);
