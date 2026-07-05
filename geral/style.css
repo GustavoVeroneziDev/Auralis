@@ -1288,8 +1288,16 @@ input[type="number"] {
   .btn, .dropdown-menu, .toast-container,
   .no-print, #installModal, [data-bs-toggle]:not(tr):not(td),
   .alert-dismissible .btn-close,
-  #notif-container {
+  #notif-container,
+  .auralis-sidebar, #sidebarOverlay {
     display: none !important;
+  }
+
+  /* A sidebar (position:fixed, 240px) some acima, mas o conteúdo ainda reserva o espaço
+     dela via margin-left — sem isso sobra uma barra em branco à esquerda de toda página,
+     e o logo/menu da sidebar aparecia por cima do conteúdo em cada página impressa. */
+  .auralis-content {
+    margin-left: 0 !important;
   }
 
   /* Forçar fundo branco e texto escuro */
