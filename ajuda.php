@@ -335,7 +335,7 @@ require_once 'geral/header.php';
                     <li>Em <strong class="text-light">Carteiras</strong>, clique em <strong class="text-light">"+ Nova Carteira"</strong> e marque <strong class="text-light">"Carteira compartilhada?"</strong> — só dá pra decidir isso na criação.</li>
                     <li>Peça pra pessoa abrir <strong class="text-light">Configurações</strong> e te passar o código dela (tipo "USR-AB12CD").</li>
                     <li>Na carteira criada, abra <strong class="text-light">"Gerenciar Membros"</strong> e cole o código pra enviar o convite.</li>
-                    <li>A pessoa vê o convite em <strong class="text-light">Convites</strong> (na barra lateral) e precisa aceitar pra entrar — nada acontece automaticamente sem a confirmação dela.</li>
+                    <li>A pessoa vê o convite direto na página <strong class="text-light">Carteiras</strong> (com um selinho de aviso na barra lateral) e precisa aceitar pra entrar — nada acontece automaticamente sem a confirmação dela.</li>
                 </ol>
 
                 <h6 class="fw-bold text-light mb-3"><i class="bi bi-diagram-2 me-2" style="color:var(--primary-gold-analysis);"></i>Como funciona a hierarquia</h6>

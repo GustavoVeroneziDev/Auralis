@@ -288,13 +288,8 @@ $_carteiraParam = (!empty($_SESSION['ultima_carteira']))
                class="sidebar-item <?= $paginaAtual === 'listar_carteiras.php' ? 'active' : '' ?>">
                 <i class="bi bi-wallet"></i>
                 <span class="sidebar-label">Carteiras</span>
-            </a>
-            <a href="/carteira/convites.php"
-               class="sidebar-item <?= $paginaAtual === 'convites.php' ? 'active' : '' ?>">
-                <i class="bi bi-envelope-paper"></i>
-                <span class="sidebar-label">Convites</span>
                 <?php if ($_qtdConvitesPendentes > 0): ?>
-                    <span class="sidebar-badge sidebar-label" style="background:#60a5fa22;color:#60a5fa;border:1px solid #60a5fa55;border-radius:999px;padding:1px 7px;font-size:0.65rem;font-weight:700;line-height:1.6;"><?= $_qtdConvitesPendentes ?></span>
+                    <span class="sidebar-badge sidebar-label" style="background:#60a5fa22;color:#60a5fa;border:1px solid #60a5fa55;border-radius:999px;padding:1px 7px;font-size:0.65rem;font-weight:700;line-height:1.6;" title="<?= $_qtdConvitesPendentes ?> convite(s) pendente(s)"><?= $_qtdConvitesPendentes ?></span>
                 <?php endif; ?>
             </a>
             <a href="/cartao_credito/index.php"
@@ -591,15 +586,10 @@ $_carteiraParam = (!empty($_SESSION['ultima_carteira']))
                             </a>
                         </li>
                         <li class="nav-item">
-                            <a class="nav-link custom-link py-3 py-lg-2 <?= $paginaAtual === 'listar_carteiras.php' ? 'text-warning active' : '' ?>" href="/carteira/listar_carteiras.php">
+                            <a class="nav-link custom-link py-3 py-lg-2 d-flex align-items-center gap-1 <?= $paginaAtual === 'listar_carteiras.php' ? 'text-warning active' : '' ?>" href="/carteira/listar_carteiras.php">
                                 <i class="bi bi-wallet me-2"></i> Carteiras
-                            </a>
-                        </li>
-                        <li class="nav-item">
-                            <a class="nav-link custom-link py-3 py-lg-2 d-flex align-items-center gap-1 <?= $paginaAtual === 'convites.php' ? 'text-warning active' : '' ?>" href="/carteira/convites.php">
-                                <i class="bi bi-envelope-paper me-2"></i> Convites
                                 <?php if ($_qtdConvitesPendentes > 0): ?>
-                                    <span style="background:#60a5fa22;color:#60a5fa;border:1px solid #60a5fa55;border-radius:999px;padding:1px 7px;font-size:0.65rem;font-weight:700;line-height:1.6;"><?= $_qtdConvitesPendentes ?></span>
+                                    <span style="background:#60a5fa22;color:#60a5fa;border:1px solid #60a5fa55;border-radius:999px;padding:1px 7px;font-size:0.65rem;font-weight:700;line-height:1.6;" title="<?= $_qtdConvitesPendentes ?> convite(s) pendente(s)"><?= $_qtdConvitesPendentes ?></span>
                                 <?php endif; ?>
                             </a>
                         </li>

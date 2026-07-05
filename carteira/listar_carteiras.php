@@ -76,6 +76,49 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action']) && $_POST['
     }
 }
 
+// --- ACEITAR CONVITE DE CARTEIRA COMPARTILHADA ---
+if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action']) && $_POST['action'] === 'aceitar_convite') {
+    $idMembro = trim($_POST['id_membro'] ?? '');
+    try {
+        $stmt = $pdo->prepare("SELECT FKCarteira FROM MembroCarteira WHERE IDMembro = :id AND FKUsuario = :uid AND StatusConvite = 0");
+        $stmt->execute([':id' => $idMembro, ':uid' => $usuario_id]);
+        $carteiraIdConv = $stmt->fetchColumn();
+
+        if ($carteiraIdConv) {
+            $pdo->prepare("UPDATE MembroCarteira SET StatusConvite = 1, DataResposta = NOW() WHERE IDMembro = :id")
+                ->execute([':id' => $idMembro]);
+            logAtividadeCarteira($pdo, $carteiraIdConv, $usuario_id, 'aceitou_convite');
+            header("Location: listar_carteiras.php?sucesso=convite_aceito");
+        } else {
+            header("Location: listar_carteiras.php?erro=convite_invalido");
+        }
+        exit;
+    } catch (PDOException $e) {
+        header("Location: listar_carteiras.php?erro=banco");
+        exit;
+    }
+}
+
+// --- RECUSAR CONVITE DE CARTEIRA COMPARTILHADA ---
+if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action']) && $_POST['action'] === 'recusar_convite') {
+    $idMembro = trim($_POST['id_membro'] ?? '');
+    try {
+        $stmt = $pdo->prepare("SELECT FKCarteira FROM MembroCarteira WHERE IDMembro = :id AND FKUsuario = :uid AND StatusConvite = 0");
+        $stmt->execute([':id' => $idMembro, ':uid' => $usuario_id]);
+        $carteiraIdConv = $stmt->fetchColumn();
+
+        if ($carteiraIdConv) {
+            logAtividadeCarteira($pdo, $carteiraIdConv, $usuario_id, 'recusou_convite');
+            $pdo->prepare("DELETE FROM MembroCarteira WHERE IDMembro = :id")->execute([':id' => $idMembro]);
+        }
+        header("Location: listar_carteiras.php?sucesso=convite_recusado");
+        exit;
+    } catch (PDOException $e) {
+        header("Location: listar_carteiras.php?erro=banco");
+        exit;
+    }
+}
+
 // --- PROCESSA A MESCLA DE CARTEIRAS ---
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action']) && $_POST['action'] === 'mesclar_carteira') {
     $carteira_origem = $_POST['carteira_origem'];
@@ -120,6 +163,8 @@ if (isset($_GET['sucesso'])) {
     if ($_GET['sucesso'] === 'mesclada') $sucesso = "Carteiras mescladas com sucesso!";
     if ($_GET['sucesso'] === 'principal_definida') $sucesso = "Carteira principal definida! É nela que o sistema vai entrar por padrão.";
     if ($_GET['sucesso'] === 'principal_removida') $sucesso = "Carteira principal removida.";
+    if ($_GET['sucesso'] === 'convite_aceito') $sucesso = "Convite aceito! A carteira já aparece na sua lista.";
+    if ($_GET['sucesso'] === 'convite_recusado') $sucesso = "Convite recusado.";
 }
 if (isset($_GET['erro'])) {
     if ($_GET['erro'] === 'duplicada') $erro = "Já existe uma carteira com este nome exato.";
@@ -128,6 +173,7 @@ if (isset($_GET['erro'])) {
     if ($_GET['erro'] === 'limite_plano') $erro = "Seu plano não permite criar mais carteiras. Faça upgrade para adicionar mais.";
     if ($_GET['erro'] === 'limite_membros') $erro = "Carteira compartilhada é um recurso PRO/VIP. Assine um desses planos ou crie a carteira sem marcar essa opção.";
     if ($_GET['erro'] === 'carteira_invalida') $erro = "Carteira inválida.";
+    if ($_GET['erro'] === 'convite_invalido') $erro = "Convite não encontrado (talvez já tenha sido respondido).";
 }
 if (($_GET['sucesso'] ?? '') === 'saiu_carteira') $sucesso = "Você saiu da carteira compartilhada.";
 
@@ -178,6 +224,22 @@ try {
     ");
     $stmtConv->execute([':uid' => $usuario_id]);
     $carteirasComoConvidado = $stmtConv->fetchAll(PDO::FETCH_ASSOC);
+} catch (PDOException $e) {
+}
+
+// --- CONVITES PENDENTES (ainda não aceitos nem recusados) ---
+$convitesPendentes = [];
+try {
+    $stmtConvPend = $pdo->prepare("
+        SELECT mc.IDMembro, mc.DataConvite, c.TipoCarteira, u.Nome AS NomeDono
+        FROM MembroCarteira mc
+        JOIN Carteira c ON c.IDCarteira = mc.FKCarteira
+        JOIN Usuario u ON u.IDUsuario = c.FKUsuarioDono
+        WHERE mc.FKUsuario = :uid AND mc.StatusConvite = 0
+        ORDER BY mc.DataConvite DESC
+    ");
+    $stmtConvPend->execute([':uid' => $usuario_id]);
+    $convitesPendentes = $stmtConvPend->fetchAll(PDO::FETCH_ASSOC);
 } catch (PDOException $e) {
 }
 
@@ -242,6 +304,43 @@ require_once '../geral/header.php';
             <?php if ($_GET['erro'] === 'limite_plano'): ?>
                 &nbsp;<a href="/planos.php?upgrade=<?= $_upgradeSlugLC ?>" class="fw-bold" style="color:#f87171;">Assinar <?= $_nomeUpgradeLC ?> &rarr;</a>
             <?php endif; ?>
+        </div>
+    <?php endif; ?>
+
+    <?php if (!empty($convitesPendentes)): ?>
+        <div class="mb-4">
+            <h6 class="fw-bold text-light mb-2 d-flex align-items-center gap-2">
+                <i class="bi bi-envelope-paper" style="color:#60a5fa;"></i> Convites de Carteira Compartilhada
+            </h6>
+            <?php foreach ($convitesPendentes as $conv): ?>
+                <div class="card shadow-sm rounded-4 mb-2" style="background:var(--bg-card);border:1px solid var(--card-border-color);">
+                    <div class="card-body p-3 d-flex align-items-center justify-content-between flex-wrap gap-3">
+                        <div class="d-flex align-items-center gap-3">
+                            <div class="rounded-circle d-flex align-items-center justify-content-center flex-shrink-0" style="width:40px;height:40px;background:rgba(96,165,250,0.15);">
+                                <i class="bi bi-people-fill" style="color:#60a5fa;font-size:1.1rem;"></i>
+                            </div>
+                            <div>
+                                <div class="text-light fw-semibold"><?= htmlspecialchars($conv['TipoCarteira']) ?></div>
+                                <div class="text-secondary small">Convite de <?= htmlspecialchars($conv['NomeDono']) ?> &middot; <?= date('d/m/Y', strtotime($conv['DataConvite'])) ?></div>
+                            </div>
+                        </div>
+                        <div class="d-flex gap-2">
+                            <form method="POST" action="">
+                                <input type="hidden" name="action" value="recusar_convite">
+                                <input type="hidden" name="id_membro" value="<?= htmlspecialchars($conv['IDMembro']) ?>">
+                                <button type="submit" class="btn btn-sm btn-outline-secondary rounded-pill px-3">Recusar</button>
+                            </form>
+                            <form method="POST" action="">
+                                <input type="hidden" name="action" value="aceitar_convite">
+                                <input type="hidden" name="id_membro" value="<?= htmlspecialchars($conv['IDMembro']) ?>">
+                                <button type="submit" class="btn btn-sm rounded-pill fw-semibold px-3" style="background:rgba(96,165,250,0.18);color:#60a5fa;border:1px solid rgba(96,165,250,0.4);">
+                                    <i class="bi bi-check-lg me-1"></i> Aceitar
+                                </button>
+                            </form>
+                        </div>
+                    </div>
+                </div>
+            <?php endforeach; ?>
         </div>
     <?php endif; ?>
 
@@ -312,7 +411,7 @@ require_once '../geral/header.php';
                             </div>
 
                             <div class="dropdown">
-                                <button class="btn btn-link text-secondary p-0 shadow-none border-0" type="button" data-bs-toggle="dropdown" data-bs-strategy="fixed" aria-expanded="false">
+                                <button class="btn btn-link text-secondary p-0 shadow-none border-0 js-dropdown-carteira" type="button" data-bs-toggle="dropdown" aria-expanded="false">
                                     <i class="bi bi-three-dots-vertical fs-5"></i>
                                 </button>
                                 <ul class="dropdown-menu dropdown-menu-end bg-dark border-secondary-subtle shadow-lg">
@@ -379,7 +478,7 @@ require_once '../geral/header.php';
                             </div>
 
                             <div class="dropdown">
-                                <button class="btn btn-link text-secondary p-0 shadow-none border-0" type="button" data-bs-toggle="dropdown" data-bs-strategy="fixed" aria-expanded="false">
+                                <button class="btn btn-link text-secondary p-0 shadow-none border-0 js-dropdown-carteira" type="button" data-bs-toggle="dropdown" aria-expanded="false">
                                     <i class="bi bi-three-dots-vertical fs-5"></i>
                                 </button>
                                 <ul class="dropdown-menu dropdown-menu-end bg-dark border-secondary-subtle shadow-lg">
@@ -513,8 +612,8 @@ require_once '../geral/header.php';
     }
 
     /* Sem "transform" aqui de propósito — um transform no card cria um novo "containing
-       block" pra elementos position:fixed, o que quebraria o data-bs-strategy="fixed" do
-       dropdown (usado pra ele escapar do overflow-hidden do card e não ficar cortado). */
+       block" pra elementos position:fixed, o que quebraria o popperConfig{strategy:'fixed'}
+       do dropdown (usado pra ele escapar do overflow-hidden do card e não ficar cortado). */
     .auralis-wallet-card:hover {
         box-shadow: 0 12px 24px rgba(0, 0, 0, 0.4) !important;
         border-color: rgba(170, 140, 44, 0.3) !important;
@@ -775,6 +874,21 @@ require_once '../geral/header.php';
             }, '', url.href);
         }
     }
+
+    // O dropdown de 3 pontos do card ficava cortado pelo overflow-hidden do card (usado
+    // pra arredondar os cantos e conter o selo "N pessoa(s)"). Reinicializa cada um com
+    // popperConfig strategy:'fixed', que posiciona o menu relativo à janela em vez de
+    // ficar preso à caixa do card — precisa ser feito via JS, não existe um data-bs-*
+    // simples pra isso no Bootstrap 5.
+    document.addEventListener('DOMContentLoaded', function() {
+        document.querySelectorAll('.js-dropdown-carteira').forEach(function(el) {
+            new bootstrap.Dropdown(el, {
+                popperConfig: function(defaultConfig) {
+                    return Object.assign({}, defaultConfig, { strategy: 'fixed' });
+                }
+            });
+        });
+    });
 </script>
 
 <?php require_once '../geral/footer.php'; ?>
