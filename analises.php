@@ -352,7 +352,10 @@ require_once 'geral/header.php';
 
 <div class="print-header" style="display:none;">
     <div class="print-header-logo">Auralis</div>
-    <div class="print-header-meta">Análises de <?= $nome_mes . ' ' . $ano_atual ?> &mdash; <?= htmlspecialchars($nome_carteira_atual ?? 'Todas as carteiras') ?></div>
+    <div class="print-header-meta">
+        Análises de <?= $nome_mes . ' ' . $ano_atual ?> &mdash; <?= htmlspecialchars($nome_carteira_atual ?? 'Todas as carteiras') ?>
+        <br><span style="font-size:0.7rem;opacity:0.75;">Gerado em <?= date('d/m/Y \à\s H:i') ?></span>
+    </div>
 </div>
 
 <main class="container-fluid py-4 mt-2 flex-grow-1" style="max-width: 1500px; padding-inline: var(--space-page-x); min-height: 100vh;">
@@ -432,7 +435,7 @@ require_once 'geral/header.php';
                     <i class="bi bi-filetype-csv" style="color:var(--accent);font-size:0.9rem;"></i>
                     <span class="d-none d-sm-inline">CSV</span>
                 </a>
-                <button onclick="window.print()"
+                <button onclick="exportarAnalisesPDF()"
                     class="btn btn-sm d-flex align-items-center gap-1 rounded-3 flex-shrink-0 no-print"
                     style="background:var(--bg-card);border:1px solid var(--card-border-color);color:var(--text-main);font-size:0.78rem;"
                     title="Exportar análises em PDF">
@@ -709,7 +712,7 @@ require_once 'geral/header.php';
                             $metaCat       = $metasPorCategoria[$cat['IDCategoria']] ?? null;
                             $pctCat        = ($metaCat && $metaCat > 0) ? round(($gastoAtualCat / $metaCat) * 100, 1) : null;
                         ?>
-                        <div class="d-flex align-items-center gap-3 px-4 py-3 border-bottom border-secondary-subtle">
+                        <div class="meta-cat-row d-flex align-items-center gap-3 px-4 py-3 border-bottom border-secondary-subtle">
                             <i class="bi <?php echo htmlspecialchars($cat['IconeCategoria'] ?: 'bi-tag') ?> text-secondary fs-5 flex-shrink-0"></i>
                             <div class="flex-grow-1 min-w-0">
                                 <div class="text-light fw-semibold text-truncate"><?php echo htmlspecialchars($cat['NomeCategoria']) ?></div>
@@ -760,7 +763,7 @@ require_once 'geral/header.php';
                             $metaCatR        = $metasPorCategoria[$cat['IDCategoria']] ?? null;
                             $pctCatR         = ($metaCatR && $metaCatR > 0) ? round(($receitaAtualCat / $metaCatR) * 100, 1) : null;
                         ?>
-                        <div class="d-flex align-items-center gap-3 px-4 py-3 border-bottom border-secondary-subtle">
+                        <div class="meta-cat-row d-flex align-items-center gap-3 px-4 py-3 border-bottom border-secondary-subtle">
                             <i class="bi <?php echo htmlspecialchars($cat['IconeCategoria'] ?: 'bi-tag') ?> text-secondary fs-5 flex-shrink-0"></i>
                             <div class="flex-grow-1 min-w-0">
                                 <div class="text-light fw-semibold text-truncate"><?php echo htmlspecialchars($cat['NomeCategoria']) ?></div>
@@ -1645,6 +1648,16 @@ require_once 'geral/header.php';
             }
         });
     })();
+
+    // Troca o título da página antes de imprimir/exportar em PDF — vira o nome sugerido
+    // ao "Salvar como PDF" e aparece no cabeçalho/rodapé nativo do navegador em cada página.
+    function exportarAnalisesPDF() {
+        const tituloOriginal = document.title;
+        document.title = <?= json_encode('Auralis - Analises - ' . str_replace(' ', '-', $nome_mes) . '-' . $ano_atual) ?>;
+        const restaurar = () => { document.title = tituloOriginal; window.removeEventListener('afterprint', restaurar); };
+        window.addEventListener('afterprint', restaurar);
+        window.print();
+    }
 
     function atualizarListaDetalhes(categoriaFiltro, tipo) {
         const containerLista = document.getElementById(`lista-detalhes-${tipo}`);

@@ -1363,5 +1363,55 @@ input[type="number"] {
   /* Remover padding excessivo de container */
   main.container { padding: 0 !important; max-width: 100% !important; }
   .container     { max-width: 100% !important; padding: 0 12px !important; }
+
+  /* Paleta semântica fixa pro papel — o app tem vários temas (dark, cosmos, aurora...) e
+     essas variáveis (usadas via var(--color-x) em toda a página, inclusive inline) refletem
+     a cor do tema ativo na tela. Sem isso, um tema mais saturado imprime cores erradas/
+     ilegíveis no PDF. Sobrescrevendo aqui, cobre todo mundo que usa var(--color-x) de uma vez. */
+  :root {
+    --color-income-text:     #166534;
+    --color-income-bg:       #dcfce7;
+    --color-income-border:   #86efac;
+    --color-expense-text:    #991b1b;
+    --color-expense-bg:      #fee2e2;
+    --color-expense-border:  #fca5a5;
+    --color-pending-text:    #1e40af;
+    --color-pending-bg:      #dbeafe;
+    --color-today-text:      #92400e;
+    --color-today-bg:        #fef3c7;
+    --color-card-text:       #5b21b6;
+    --color-card-bg:         #ede9fe;
+    --color-card-border:     #c4b5fd;
+    --primary-gold-analysis: #b8860b;
+    --accent:                #b8860b;
+  }
+
+  /* Força a impressão de cores de fundo (barra de progresso, badges) mesmo quando o
+     navegador não tem "imprimir gráficos de fundo" marcado — sem isso a barra de
+     progresso das metas/orçamento por categoria simplesmente some no PDF. */
+  * {
+    -webkit-print-color-adjust: exact !important;
+    print-color-adjust: exact !important;
+    color-adjust: exact !important;
+  }
+
+  /* Cada linha de categoria em "Orçamento/Meta por Categoria" não pode ser cortada
+     ao meio entre duas páginas do PDF. */
+  .meta-cat-row {
+    break-inside: avoid;
+    page-break-inside: avoid;
+  }
+
+  /* No papel sobra espaço horizontal — nomes de categoria não devem truncar com "..." */
+  .text-truncate {
+    white-space: normal !important;
+    overflow: visible !important;
+    text-overflow: unset !important;
+  }
+
+  /* Margem consistente pro PDF gerado via "Salvar como PDF" do navegador */
+  @page {
+    margin: 14mm 12mm;
+  }
 }
 
