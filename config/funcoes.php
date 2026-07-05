@@ -678,6 +678,37 @@ if (!function_exists('verificarConquistasCategorias')) {
     }
 }
 
+// Conquista "carteira_comp" (evento único, não é ladder de threshold — mesmo padrão de
+// 'metabatida'/'sempendencias'): participar de uma carteira compartilhada com pelo menos
+// 2 pessoas. Dono (Carteira.FKUsuarioDono) + 1 convidado com StatusConvite=1 já basta, já
+// que o dono não tem linha própria em MembroCarteira. Concede pra quem chamar (dono ou
+// convidado) se ele se enquadrar em qualquer um dos dois papéis em qualquer carteira.
+if (!function_exists('verificarConquistaCarteiraCompartilhada')) {
+    function verificarConquistaCarteiraCompartilhada(PDO $pdo, string $uid): void
+    {
+        try {
+            $stmtDono = $pdo->prepare("
+                SELECT 1 FROM Carteira c
+                JOIN MembroCarteira mc ON mc.FKCarteira = c.IDCarteira AND mc.StatusConvite = 1
+                WHERE c.FKUsuarioDono = :uid AND c.Compartilhada = 1
+                LIMIT 1
+            ");
+            $stmtDono->execute([':uid' => $uid]);
+            if ($stmtDono->fetchColumn()) {
+                concederConquistaParaUsuario($pdo, $uid, 'carteira_comp');
+                return;
+            }
+
+            $stmtConv = $pdo->prepare("SELECT 1 FROM MembroCarteira WHERE FKUsuario = :uid AND StatusConvite = 1 LIMIT 1");
+            $stmtConv->execute([':uid' => $uid]);
+            if ($stmtConv->fetchColumn()) {
+                concederConquistaParaUsuario($pdo, $uid, 'carteira_comp');
+            }
+        } catch (PDOException $e) {
+        }
+    }
+}
+
 // ── Helper MP: cancela assinatura no Mercado Pago via API ────────────────
 if (!function_exists('mpCancelarNoMP')) {
     function mpCancelarNoMP(string $gwId): void

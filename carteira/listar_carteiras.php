@@ -17,6 +17,13 @@ $usuario_id = $_SESSION['usuario_id'];
 $sucesso = null;
 $erro = null;
 
+// Conquista "carteira_comp" (participar de carteira compartilhada com >= 2 pessoas) —
+// checagem retroativa a cada carregamento da página, pra quem já se enquadrava antes
+// dessa conquista existir também receber (concederConquistaParaUsuario é idempotente).
+if (function_exists('verificarConquistaCarteiraCompartilhada')) {
+    verificarConquistaCarteiraCompartilhada($pdo, $usuario_id);
+}
+
 // --- PROCESSA A EXCLUSÃO DE CARTEIRA ---
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action']) && $_POST['action'] === 'excluir_carteira') {
     $id_carteira = $_POST['carteira_id'];
@@ -88,6 +95,17 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action']) && $_POST['
             $pdo->prepare("UPDATE MembroCarteira SET StatusConvite = 1, DataResposta = NOW() WHERE IDMembroCarteira = :id")
                 ->execute([':id' => $idMembro]);
             logAtividadeCarteira($pdo, $carteiraIdConv, $usuario_id, 'aceitou_convite');
+
+            // Conquista "carteira_comp" — aceitar o convite já garante dono + convidado
+            // (pelo menos 2 pessoas), então concede pros dois lados agora mesmo.
+            if (function_exists('verificarConquistaCarteiraCompartilhada')) {
+                verificarConquistaCarteiraCompartilhada($pdo, $usuario_id);
+                $stmtDonoConv = $pdo->prepare("SELECT FKUsuarioDono FROM Carteira WHERE IDCarteira = :cid");
+                $stmtDonoConv->execute([':cid' => $carteiraIdConv]);
+                $donoIdConv = $stmtDonoConv->fetchColumn();
+                if ($donoIdConv) verificarConquistaCarteiraCompartilhada($pdo, $donoIdConv);
+            }
+
             header("Location: listar_carteiras.php?sucesso=convite_aceito");
         } else {
             header("Location: listar_carteiras.php?erro=convite_invalido");
