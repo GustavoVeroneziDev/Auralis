@@ -73,7 +73,13 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && ($_POST['action'] ?? '') === 'convi
                 }
             }
         } catch (PDOException $e) {
-            $erro = "Erro ao enviar o convite. [debug temporário: " . $e->getMessage() . "]";
+            $_estrutura = '';
+            try {
+                $_estrutura = $pdo->query("SHOW CREATE TABLE MembroCarteira")->fetch(PDO::FETCH_ASSOC)['Create Table'] ?? '';
+            } catch (PDOException $e2) {
+                $_estrutura = 'não deu pra ler: ' . $e2->getMessage();
+            }
+            $erro = "Erro ao enviar o convite. [debug temporário: " . $e->getMessage() . " | estrutura atual: " . $_estrutura . "]";
         }
     }
 }
