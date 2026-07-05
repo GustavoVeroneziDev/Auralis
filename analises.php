@@ -720,8 +720,10 @@ require_once 'geral/header.php';
                                     </div>
                                     <div class="d-flex justify-content-between mt-1">
                                         <span class="text-secondary" style="font-size:0.72rem;">R$ <?php echo number_format($gastoAtualCat, 2, ',', '.') ?> / R$ <?php echo number_format($metaCat, 2, ',', '.') ?></span>
-                                        <?php if ($pctCat >= 100): ?>
-                                            <span class="fw-semibold text-danger" style="font-size:0.72rem;"><i class="bi bi-exclamation-triangle-fill me-1"></i>Estourou!</span>
+                                        <?php if ($pctCat >= 100):
+                                            $_excedenteCat = round($pctCat - 100, 1);
+                                        ?>
+                                            <span class="fw-bold" style="font-size:0.72rem;color:var(--color-expense-text);"><i class="bi bi-exclamation-triangle-fill me-1"></i>Estourou <?php echo number_format($_excedenteCat, $_excedenteCat == (int)$_excedenteCat ? 0 : 1, ',', '.') ?>%!</span>
                                         <?php endif; ?>
                                     </div>
                                 <?php else: ?>
@@ -769,8 +771,10 @@ require_once 'geral/header.php';
                                     </div>
                                     <div class="d-flex justify-content-between mt-1">
                                         <span class="text-secondary" style="font-size:0.72rem;">R$ <?php echo number_format($receitaAtualCat, 2, ',', '.') ?> / R$ <?php echo number_format($metaCatR, 2, ',', '.') ?></span>
-                                        <?php if ($pctCatR >= 100): ?>
-                                            <span class="fw-semibold" style="font-size:0.72rem;color:#06D6A0;"><i class="bi bi-check-circle-fill me-1"></i>Meta atingida!</span>
+                                        <?php if ($pctCatR >= 100):
+                                            $_excedenteCatR = round($pctCatR - 100, 1);
+                                        ?>
+                                            <span class="fw-bold" style="font-size:0.72rem;color:#06D6A0;"><i class="bi bi-emoji-laughing-fill me-1"></i><?php echo $_excedenteCatR > 0 ? ('Parabéns! +' . number_format($_excedenteCatR, $_excedenteCatR == (int)$_excedenteCatR ? 0 : 1, ',', '.') . '%') : 'Meta atingida!' ?></span>
                                         <?php endif; ?>
                                     </div>
                                 <?php else: ?>
