@@ -312,7 +312,7 @@ require_once '../geral/header.php';
                             </div>
 
                             <div class="dropdown">
-                                <button class="btn btn-link text-secondary p-0 shadow-none border-0" type="button" data-bs-toggle="dropdown" aria-expanded="false">
+                                <button class="btn btn-link text-secondary p-0 shadow-none border-0" type="button" data-bs-toggle="dropdown" data-bs-strategy="fixed" aria-expanded="false">
                                     <i class="bi bi-three-dots-vertical fs-5"></i>
                                 </button>
                                 <ul class="dropdown-menu dropdown-menu-end bg-dark border-secondary-subtle shadow-lg">
@@ -379,7 +379,7 @@ require_once '../geral/header.php';
                             </div>
 
                             <div class="dropdown">
-                                <button class="btn btn-link text-secondary p-0 shadow-none border-0" type="button" data-bs-toggle="dropdown" aria-expanded="false">
+                                <button class="btn btn-link text-secondary p-0 shadow-none border-0" type="button" data-bs-toggle="dropdown" data-bs-strategy="fixed" aria-expanded="false">
                                     <i class="bi bi-three-dots-vertical fs-5"></i>
                                 </button>
                                 <ul class="dropdown-menu dropdown-menu-end bg-dark border-secondary-subtle shadow-lg">
@@ -509,11 +509,13 @@ require_once '../geral/header.php';
     }
 
     .auralis-wallet-card {
-        transition: transform 0.2s ease, box-shadow 0.2s ease;
+        transition: box-shadow 0.2s ease, border-color 0.2s ease;
     }
 
+    /* Sem "transform" aqui de propósito — um transform no card cria um novo "containing
+       block" pra elementos position:fixed, o que quebraria o data-bs-strategy="fixed" do
+       dropdown (usado pra ele escapar do overflow-hidden do card e não ficar cortado). */
     .auralis-wallet-card:hover {
-        transform: translateY(-4px);
         box-shadow: 0 12px 24px rgba(0, 0, 0, 0.4) !important;
         border-color: rgba(170, 140, 44, 0.3) !important;
     }
