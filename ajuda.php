@@ -67,17 +67,19 @@ require_once 'geral/header.php';
                     foreach ($topicos as $key => $t) {
                         $grupos[$t['tag']][] = ['key' => $key, 'titulo' => $t['titulo'], 'icone' => $t['icone']];
                     }
+                    $_primeiroGrupo = true;
                     foreach ($grupos as $tag => $items): ?>
-                        <div class="mb-3">
-                            <div class="text-uppercase fw-bold mb-1 ps-2"
-                                style="font-size:0.6rem;letter-spacing:.08em;color:var(--text-muted);">
+                        <div class="<?= $_primeiroGrupo ? 'mb-4' : 'mt-4 mb-4 pt-4' ?>"
+                            style="<?= $_primeiroGrupo ? '' : 'border-top:1px solid var(--card-border-color);' ?>">
+                            <div class="text-uppercase fw-bold mb-2"
+                                style="font-size:0.78rem;letter-spacing:.06em;color:var(--primary-gold-analysis);">
                                 <?= htmlspecialchars($tag) ?>
                             </div>
                             <?php foreach ($items as $item):
                                 $isAtivo = $item['key'] === $topico;
                             ?>
                             <a href="?topico=<?= $item['key'] ?>"
-                                class="d-flex align-items-center gap-2 px-2 py-2 rounded-3 text-decoration-none mb-1 transition-hover"
+                                class="d-flex align-items-center gap-2 px-2 py-2 ms-2 rounded-3 text-decoration-none mb-1 transition-hover"
                                 style="font-size:0.82rem;
                                        <?= $isAtivo
                                            ? 'background:var(--primary-gold-analysis)18;color:var(--primary-gold-analysis);font-weight:600;'
@@ -87,7 +89,7 @@ require_once 'geral/header.php';
                             </a>
                             <?php endforeach; ?>
                         </div>
-                    <?php endforeach; ?>
+                    <?php $_primeiroGrupo = false; endforeach; ?>
                 </div>
             </div>
         </div>
