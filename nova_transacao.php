@@ -29,10 +29,15 @@ $id_editar = $_GET['editar'] ?? null;
 $transacao_edit = null;
 
 if ($id_editar) {
-    // Busca os dados da transação específica para preencher o formulário
-    $sqlEdit = "SELECT * FROM Registro WHERE IDRegistro = :id AND FKUsuario = :uid";
+    // Busca os dados da transação específica para preencher o formulário — libera se for
+    // quem lançou OU o dono da carteira compartilhada onde o lançamento está.
+    $sqlEdit = "
+        SELECT * FROM Registro
+        WHERE IDRegistro = :id
+          AND (FKUsuario = :uid OR FKCarteira IN (SELECT IDCarteira FROM Carteira WHERE FKUsuarioDono = :uid2))
+    ";
     $stmtEdit = $pdo->prepare($sqlEdit);
-    $stmtEdit->execute([':id' => $id_editar, ':uid' => $usuario_id]);
+    $stmtEdit->execute([':id' => $id_editar, ':uid' => $usuario_id, ':uid2' => $usuario_id]);
     $transacao_edit = $stmtEdit->fetch();
 
     // Trava de segurança: se a transação não existir, volta pro painel
@@ -55,16 +60,8 @@ $_nomePlanoNT   = strtoupper($_planoNT);
 $_nomeUpgradeNT = strtoupper($_upgradeSlugNT);
 
 try {
-    $sqlCarteiras = "
-        SELECT DISTINCT c.IDCarteira, c.TipoCarteira
-        FROM Carteira c
-        LEFT JOIN MembroCarteira mc ON mc.FKCarteira = c.IDCarteira AND mc.FKUsuario = :uid_membro AND mc.StatusConvite = 1
-        WHERE c.FKUsuarioDono = :uid_dono OR mc.FKCarteira IS NOT NULL
-        ORDER BY c.TipoCarteira ASC
-    ";
-    $stmtC = $pdo->prepare($sqlCarteiras);
-    $stmtC->execute([':uid_dono' => $usuario_id, ':uid_membro' => $usuario_id]);
-    $carteiras = $stmtC->fetchAll();
+    garantirEstruturaCarteirasCompartilhadas($pdo);
+    $carteiras = carteirasAcessiveisPorUsuario($pdo, $usuario_id);
 
     // IDs de carteiras além do limite (só relevante para free sem trial, sem edição)
     $_cartsBloqNT = [];
@@ -74,15 +71,43 @@ try {
         }
     }
 
-    $sqlCategorias = "
-        SELECT IDCategoria, NomeCategoria
-        FROM Categoria
-        WHERE FKUsuario = :uid AND TipoCategoria = :tipo
-        ORDER BY NomeCategoria ASC
-    ";
+    // Precisa saber qual carteira vai vir selecionada no <select> ANTES de montar a lista
+    // de categorias — se for compartilhada, as categorias são dela (FKCarteira), não do
+    // usuário. (Mesma precedência de $val_cart mais abaixo, calculada aqui só pra isso.)
+    $_carteiraParaCategorias = $_POST['carteira_id'] ?? ($transacao_edit ? $transacao_edit['FKCarteira'] : ($_GET['carteira_id'] ?? ''));
+    if (empty($_carteiraParaCategorias) && count($carteiras) === 1) {
+        $_carteiraParaCategorias = $carteiras[0]['IDCarteira'];
+    }
+    $_carteiraCategoriasCompartilhada = false;
+    foreach ($carteiras as $_cc) {
+        if ($_cc['IDCarteira'] === $_carteiraParaCategorias) {
+            $_carteiraCategoriasCompartilhada = (int)($_cc['Compartilhada'] ?? 0) === 1;
+            break;
+        }
+    }
+
     $tipoCat = ($tipo_sugerido === 'cartao') ? 'despesa' : $tipo_sugerido;
-    $stmtCat = $pdo->prepare($sqlCategorias);
-    $stmtCat->execute([':uid' => $usuario_id, ':tipo' => $tipoCat]);
+
+    if ($_carteiraCategoriasCompartilhada) {
+        // Categorias da carteira compartilhada — mesma lista pra todos os membros
+        $stmtCat = $pdo->prepare("
+            SELECT IDCategoria, NomeCategoria
+            FROM Categoria
+            WHERE FKCarteira = :cid AND TipoCategoria = :tipo
+            ORDER BY NomeCategoria ASC
+        ");
+        $stmtCat->execute([':cid' => $_carteiraParaCategorias, ':tipo' => $tipoCat]);
+    } else {
+        // Categorias pessoais — exclui de propósito as que pertencem a alguma carteira
+        // compartilhada que o usuário é dono (senão elas vazariam pras carteiras normais dele)
+        $stmtCat = $pdo->prepare("
+            SELECT IDCategoria, NomeCategoria
+            FROM Categoria
+            WHERE FKUsuario = :uid AND TipoCategoria = :tipo AND FKCarteira IS NULL
+            ORDER BY NomeCategoria ASC
+        ");
+        $stmtCat->execute([':uid' => $usuario_id, ':tipo' => $tipoCat]);
+    }
     $categorias = $stmtCat->fetchAll();
 
     // IDs de categorias além do limite
@@ -278,9 +303,13 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     elseif ($parcelado && $recorrente) $erro = "Uma transação não pode ser parcelada E recorrente ao mesmo tempo.";
     elseif ($parcelado && intval($_POST['parcela_inicial'] ?? 1) > $numParcelas) $erro = "A parcela inicial não pode ser maior que o total de parcelas.";
     elseif ($parcelado && !isset($_POST['id_editar']) && !$_testeNT) {
-        $_limParcNT = limitesDoPlano()['parcelas_max'];
+        // Numa carteira compartilhada, o teto de parcelas segue o plano de quem criou a
+        // carteira — o convidado não fica preso ao próprio plano enquanto lança nela.
+        $_planoParcNT = planoEfetivoDaCarteira($pdo, $carteiraId);
+        $_limParcNT   = limitesDoPlano($_planoParcNT)['parcelas_max'];
         if ($numParcelas > $_limParcNT) {
-            $erro = "Seu plano permite parcelar em até " . exibirLimite($_limParcNT) . "x. Assine o {$_nomeUpgradeNT} para parcelar em até " . exibirLimite(limitesDoPlano($_upgradeSlugNT)['parcelas_max']) . "x.";
+            $_upgradeParcNT = ['free' => 'pro', 'pro' => 'vip'][$_planoParcNT] ?? 'vip';
+            $erro = "Este plano permite parcelar em até " . exibirLimite($_limParcNT) . "x. Assine o " . strtoupper($_upgradeParcNT) . " para parcelar em até " . exibirLimite(limitesDoPlano($_upgradeParcNT)['parcelas_max']) . "x.";
         }
     }
 
@@ -316,7 +345,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                         MomentoRegistro = :momento, DataVencimento = :vencimento,
                         StatusRegistro = :status, Recorrente = :recorrente, DiaVencimento = :dia,
                         FKCarteira = :carteira, FKCategoria = :categoria
-                    WHERE IDRegistro = :id_editar AND FKUsuario = :usuario
+                    WHERE IDRegistro = :id_editar
+                      AND (FKUsuario = :usuario OR FKCarteira IN (SELECT IDCarteira FROM Carteira WHERE FKUsuarioDono = :usuario2))
                 ";
                 $stmt = $pdo->prepare($sql);
                 $stmt->execute([
@@ -332,6 +362,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                     ':categoria' => $categoriaId,
                     ':id_editar' => $_POST['id_editar'],
                     ':usuario'   => $usuario_id,
+                    ':usuario2'  => $usuario_id,
                 ]);
 
                 // ── PROPAGAÇÃO DE EDIÇÃO (FUTUROS) ───────────────────────────
@@ -344,7 +375,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                             Valor = :valor, Descricao = :descricao,
                             FKCarteira = :carteira, FKCategoria = :categoria
                         WHERE GrupoParcela = :grupo
-                          AND FKUsuario = :usuario
+                          AND (FKUsuario = :usuario OR FKCarteira IN (SELECT IDCarteira FROM Carteira WHERE FKUsuarioDono = :usuario2))
                           AND IDRegistro != :id_editar
                           AND MomentoRegistro > :data_base
                           AND StatusRegistro = 'pendente'
@@ -358,6 +389,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                         ':categoria' => $categoriaId,
                         ':grupo'     => $grupoAtual,
                         ':usuario'   => $usuario_id,
+                        ':usuario2'  => $usuario_id,
                         ':id_editar' => $_POST['id_editar'],
                         ':data_base' => $dataAtual
                     ]);
@@ -374,7 +406,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                             Valor = :valor, Descricao = :descricao,
                             FKCarteira = :carteira, FKCategoria = :categoria
                         WHERE GrupoParcela = :grupo
-                          AND FKUsuario = :usuario
+                          AND (FKUsuario = :usuario OR FKCarteira IN (SELECT IDCarteira FROM Carteira WHERE FKUsuarioDono = :usuario2))
                           AND IDRegistro != :id_editar
                           AND ParcelaAtual > :parcela_atual
                           AND StatusRegistro = 'pendente'
@@ -388,6 +420,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                         ':categoria'     => $categoriaId,
                         ':grupo'         => $grupoAtual,
                         ':usuario'       => $usuario_id,
+                        ':usuario2'      => $usuario_id,
                         ':id_editar'     => $_POST['id_editar'],
                         ':parcela_atual' => $parcelaAtualEdit,
                     ]);

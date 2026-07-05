@@ -10,6 +10,8 @@ if (!isset($_SESSION['usuario_id'])) {
 
 // Volta uma pasta para achar a conexão
 require_once '../config/conexao.php';
+require_once '../config/funcoes.php';
+garantirEstruturaCarteirasCompartilhadas($pdo);
 
 $usuario_id = $_SESSION['usuario_id'];
 $sucesso = null;
@@ -26,8 +28,16 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action']) && $_POST['
         $stmtCheck->execute([':cid' => $id_carteira]);
         $qtdRegistros = $stmtCheck->fetchColumn();
 
+        // Trava extra: não deixa apagar carteira compartilhada com gente ainda dentro —
+        // evita que outra pessoa perca o acesso sem aviso.
+        $stmtMembros = $pdo->prepare("SELECT COUNT(*) FROM MembroCarteira WHERE FKCarteira = :cid AND StatusConvite = 1");
+        $stmtMembros->execute([':cid' => $id_carteira]);
+        $qtdMembros = (int) $stmtMembros->fetchColumn();
+
         if ($qtdRegistros > 0) {
             $erro = "Não é possível excluir esta carteira pois ela possui {$qtdRegistros} transação(ões) registrada(s). Exclua ou transfira os registros antes de apagar a carteira.";
+        } elseif ($qtdMembros > 0) {
+            $erro = "Esta carteira é compartilhada com {$qtdMembros} pessoa(s). Remova os membros em \"Gerenciar membros\" antes de excluir.";
         } else {
             // Se estiver vazia, pode deletar
             $sqlDel = "DELETE FROM Carteira WHERE IDCarteira = :cid AND FKUsuarioDono = :uid";
@@ -40,6 +50,29 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action']) && $_POST['
         }
     } catch (PDOException $e) {
         $erro = "Erro ao tentar excluir a carteira.";
+    }
+}
+
+// --- CONVIDADO SAI DE UMA CARTEIRA COMPARTILHADA ---
+if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action']) && $_POST['action'] === 'sair_carteira') {
+    $id_carteira = $_POST['carteira_id'] ?? '';
+    try {
+        $stmtNome = $pdo->prepare("SELECT TipoCarteira FROM Carteira WHERE IDCarteira = :cid");
+        $stmtNome->execute([':cid' => $id_carteira]);
+        $nomeCarteira = $stmtNome->fetchColumn();
+
+        $pdo->prepare("DELETE FROM MembroCarteira WHERE FKCarteira = :cid AND FKUsuario = :uid")
+            ->execute([':cid' => $id_carteira, ':uid' => $usuario_id]);
+
+        if ($nomeCarteira !== false) {
+            logAtividadeCarteira($pdo, $id_carteira, $usuario_id, 'saiu', "Saiu da carteira compartilhada");
+        }
+
+        header("Location: listar_carteiras.php?sucesso=saiu_carteira");
+        exit;
+    } catch (PDOException $e) {
+        header("Location: listar_carteiras.php?erro=banco");
+        exit;
     }
 }
 
@@ -93,25 +126,28 @@ if (isset($_GET['erro'])) {
     if ($_GET['erro'] === 'vazio') $erro = "O nome da carteira não pode ficar vazio.";
     if ($_GET['erro'] === 'banco') $erro = "Ocorreu um erro interno ao salvar a carteira.";
     if ($_GET['erro'] === 'limite_plano') $erro = "Seu plano não permite criar mais carteiras. Faça upgrade para adicionar mais.";
+    if ($_GET['erro'] === 'limite_membros') $erro = "Carteira compartilhada é um recurso PRO/VIP. Assine um desses planos ou crie a carteira sem marcar essa opção.";
     if ($_GET['erro'] === 'carteira_invalida') $erro = "Carteira inválida.";
 }
+if (($_GET['sucesso'] ?? '') === 'saiu_carteira') $sucesso = "Você saiu da carteira compartilhada.";
 
-// --- BUSCA AS CARTEIRAS E CALCULA O SALDO DE CADA UMA ---
+// --- BUSCA AS CARTEIRAS PRÓPRIAS E CALCULA O SALDO DE CADA UMA ---
 $carteiras = [];
 try {
     // SQL Inteligente: Já calcula o saldo exato de cada carteira direto no banco
     $sqlCarteiras = "
-        SELECT c.IDCarteira, c.TipoCarteira, c.Principal,
+        SELECT c.IDCarteira, c.TipoCarteira, c.Principal, c.Compartilhada,
                COALESCE(SUM(CASE WHEN r.TipoRegistro = 'receita'               THEN  r.Valor ELSE 0 END), 0) +
                COALESCE(SUM(CASE WHEN r.TipoRegistro = 'cofrinho_retirada'     THEN  r.Valor ELSE 0 END), 0) +
                COALESCE(SUM(CASE WHEN r.TipoRegistro = 'transferencia_entrada' THEN  r.Valor ELSE 0 END), 0) -
                COALESCE(SUM(CASE WHEN r.TipoRegistro = 'despesa'               THEN  r.Valor ELSE 0 END), 0) -
                COALESCE(SUM(CASE WHEN r.TipoRegistro = 'cofrinho'              THEN  r.Valor ELSE 0 END), 0) -
-               COALESCE(SUM(CASE WHEN r.TipoRegistro = 'transferencia_saida'   THEN  r.Valor ELSE 0 END), 0) as SaldoAtual
+               COALESCE(SUM(CASE WHEN r.TipoRegistro = 'transferencia_saida'   THEN  r.Valor ELSE 0 END), 0) as SaldoAtual,
+               (SELECT COUNT(*) FROM MembroCarteira mc WHERE mc.FKCarteira = c.IDCarteira AND mc.StatusConvite = 1) as QtdMembros
         FROM Carteira c
         LEFT JOIN Registro r ON c.IDCarteira = r.FKCarteira AND r.StatusRegistro = 'efetivado'
         WHERE c.FKUsuarioDono = :uid
-        GROUP BY c.IDCarteira, c.TipoCarteira, c.Principal
+        GROUP BY c.IDCarteira, c.TipoCarteira, c.Principal, c.Compartilhada
         ORDER BY c.Principal DESC, c.TipoCarteira ASC
     ";
     $stmt = $pdo->prepare($sqlCarteiras);
@@ -121,8 +157,35 @@ try {
     $erro = "Erro ao buscar as suas carteiras.";
 }
 
+// --- CARTEIRAS COMPARTILHADAS EM QUE SOU CONVIDADO (não-dono) ---
+$carteirasComoConvidado = [];
+try {
+    $stmtConv = $pdo->prepare("
+        SELECT c.IDCarteira, c.TipoCarteira, u.Nome AS NomeDono,
+               COALESCE(SUM(CASE WHEN r.TipoRegistro = 'receita'               THEN  r.Valor ELSE 0 END), 0) +
+               COALESCE(SUM(CASE WHEN r.TipoRegistro = 'cofrinho_retirada'     THEN  r.Valor ELSE 0 END), 0) +
+               COALESCE(SUM(CASE WHEN r.TipoRegistro = 'transferencia_entrada' THEN  r.Valor ELSE 0 END), 0) -
+               COALESCE(SUM(CASE WHEN r.TipoRegistro = 'despesa'               THEN  r.Valor ELSE 0 END), 0) -
+               COALESCE(SUM(CASE WHEN r.TipoRegistro = 'cofrinho'              THEN  r.Valor ELSE 0 END), 0) -
+               COALESCE(SUM(CASE WHEN r.TipoRegistro = 'transferencia_saida'   THEN  r.Valor ELSE 0 END), 0) as SaldoAtual
+        FROM MembroCarteira mc
+        JOIN Carteira c ON c.IDCarteira = mc.FKCarteira
+        JOIN Usuario u ON u.IDUsuario = c.FKUsuarioDono
+        LEFT JOIN Registro r ON c.IDCarteira = r.FKCarteira AND r.StatusRegistro = 'efetivado'
+        WHERE mc.FKUsuario = :uid AND mc.StatusConvite = 1
+        GROUP BY c.IDCarteira, c.TipoCarteira, u.Nome
+        ORDER BY c.TipoCarteira ASC
+    ");
+    $stmtConv->execute([':uid' => $usuario_id]);
+    $carteirasComoConvidado = $stmtConv->fetchAll(PDO::FETCH_ASSOC);
+} catch (PDOException $e) {
+}
+
+// Recurso liberado (plano) e limite de pessoas do plano atual, pra UI do toggle "compartilhada"
+$_podeCompartilhar   = recursoDisponivelParaPlano('carteiras_compartilhadas');
+$_limiteMembrosPlano = limitesDoPlano()['carteiras_compartilhadas_membros'] ?? 0;
+
 // Determina carteiras bloqueadas e carteiras "trial" (além do limite, mas dentro do período de teste)
-require_once '../config/funcoes.php';
 $_planoLC        = strtolower($_SESSION['plano'] ?? 'free');
 $_testeLC        = function_exists('obterHorasRestantesTeste') ? (obterHorasRestantesTeste() > 0) : false;
 $_limitesLC      = limitesDoPlano();
@@ -202,10 +265,19 @@ require_once '../geral/header.php';
         <?php foreach ($carteiras as $cart):
             $_cartBloqueada = in_array($cart['IDCarteira'], $carteiras_bloqueadas_ids);
             $_cartTrial     = in_array($cart['IDCarteira'], $carteiras_trial_ids);
+            $_cartCompart   = (int)($cart['Compartilhada'] ?? 0) === 1;
         ?>
             <div class="col-md-6 col-lg-4">
                 <div class="card bg-body-tertiary border-secondary-subtle shadow-sm h-100 rounded-4 auralis-wallet-card position-relative overflow-hidden"
                     <?= $_cartBloqueada ? 'style="opacity:0.55;border-color:rgba(124,58,237,0.35) !important;"' : '' ?>>
+
+                    <?php if ($_cartCompart): ?>
+                        <span class="position-absolute top-0 start-0 m-2 d-flex align-items-center gap-1"
+                              style="background:rgba(96,165,250,0.18);color:#60a5fa;border:1px solid rgba(96,165,250,0.4);border-radius:999px;padding:2px 8px;font-size:0.6rem;font-weight:700;z-index:2;"
+                              title="Carteira compartilhada">
+                            <i class="bi bi-people-fill" style="font-size:0.6rem;"></i> <?= (int)($cart['QtdMembros'] ?? 0) + 1 ?> pessoa(s)
+                        </span>
+                    <?php endif; ?>
 
                     <?php if ($_cartTrial): ?>
                         <span class="position-absolute top-0 end-0 m-2 d-flex align-items-center gap-1"
@@ -250,6 +322,14 @@ require_once '../geral/header.php';
                                             <i class="bi bi-pencil-square me-2 text-warning"></i> <span class="text-warning">Editar Nome</span>
                                         </button>
                                     </li>
+                                    <?php if ($_cartCompart): ?>
+                                    <li>
+                                        <a class="dropdown-item d-flex align-items-center transition-hover py-2" style="color:#60a5fa;"
+                                           href="membros.php?carteira=<?= urlencode($cart['IDCarteira']) ?>">
+                                            <i class="bi bi-people-fill me-2"></i> Gerenciar Membros
+                                        </a>
+                                    </li>
+                                    <?php endif; ?>
                                     <li>
                                         <button type="button" class="dropdown-item text-info d-flex align-items-center transition-hover py-2"
                                             onclick="abrirModalMescla('<?= $cart['IDCarteira'] ?>', '<?= htmlspecialchars($cart['TipoCarteira']) ?>')">
@@ -260,6 +340,59 @@ require_once '../geral/header.php';
                                         <button type="button" class="dropdown-item text-danger d-flex align-items-center transition-hover py-2"
                                             onclick="abrirModalExcluirCarteira('<?= $cart['IDCarteira'] ?>', '<?= htmlspecialchars($cart['TipoCarteira'], ENT_QUOTES) ?>')">
                                             <i class="bi bi-trash3 me-2"></i> Excluir Carteira
+                                        </button>
+                                    </li>
+                                </ul>
+                            </div>
+                        </div>
+
+                        <div class="mt-auto">
+                            <p class="text-secondary small mb-1 text-uppercase fw-semibold tracking-wide">Saldo Atual</p>
+                            <h3 class="fw-bold mb-0 <?= $cart['SaldoAtual'] < 0 ? 'text-danger' : 'text-light' ?>" style="letter-spacing: -0.5px;">
+                                R$ <?= number_format($cart['SaldoAtual'], 2, ',', '.') ?>
+                            </h3>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        <?php endforeach; ?>
+
+        <?php foreach ($carteirasComoConvidado as $cart): ?>
+            <div class="col-md-6 col-lg-4">
+                <div class="card bg-body-tertiary border-secondary-subtle shadow-sm h-100 rounded-4 auralis-wallet-card position-relative overflow-hidden">
+                    <span class="position-absolute top-0 start-0 m-2 d-flex align-items-center gap-1"
+                          style="background:rgba(96,165,250,0.18);color:#60a5fa;border:1px solid rgba(96,165,250,0.4);border-radius:999px;padding:2px 8px;font-size:0.6rem;font-weight:700;z-index:2;"
+                          title="Carteira compartilhada">
+                        <i class="bi bi-people-fill" style="font-size:0.6rem;"></i> Convidado(a)
+                    </span>
+
+                    <div class="card-body p-4 position-relative z-1 d-flex flex-column">
+                        <div class="d-flex justify-content-between align-items-start mb-4">
+                            <div class="d-flex align-items-center gap-3">
+                                <div class="icon-circle bg-primary bg-opacity-10 d-flex justify-content-center align-items-center rounded-3 shadow-sm" style="width: 48px; height: 48px;">
+                                    <i class="bi bi-bank fs-4" style="color: var(--primary-gold-analysis) !important;"></i>
+                                </div>
+                                <div>
+                                    <h5 class="fw-bold text-light mb-0"><?= htmlspecialchars($cart['TipoCarteira']) ?></h5>
+                                    <p class="text-secondary small mb-0">de <?= htmlspecialchars($cart['NomeDono']) ?></p>
+                                </div>
+                            </div>
+
+                            <div class="dropdown">
+                                <button class="btn btn-link text-secondary p-0 shadow-none border-0" type="button" data-bs-toggle="dropdown" aria-expanded="false">
+                                    <i class="bi bi-three-dots-vertical fs-5"></i>
+                                </button>
+                                <ul class="dropdown-menu dropdown-menu-end bg-dark border-secondary-subtle shadow-lg">
+                                    <li>
+                                        <a class="dropdown-item d-flex align-items-center transition-hover py-2" style="color:#60a5fa;"
+                                           href="../gerenciar_categorias.php?carteira=<?= urlencode($cart['IDCarteira']) ?>">
+                                            <i class="bi bi-tags me-2"></i> Ver Categorias
+                                        </a>
+                                    </li>
+                                    <li>
+                                        <button type="button" class="dropdown-item text-danger d-flex align-items-center transition-hover py-2"
+                                            onclick="abrirModalSairCarteira('<?= $cart['IDCarteira'] ?>', '<?= htmlspecialchars($cart['TipoCarteira'], ENT_QUOTES) ?>')">
+                                            <i class="bi bi-box-arrow-left me-2"></i> Sair da Carteira
                                         </button>
                                     </li>
                                 </ul>
@@ -461,12 +594,59 @@ require_once '../geral/header.php';
                                 placeholder="Ex: Conta Pessoal, Nubank...">
                         </div>
                     </div>
+
+                    <!-- Só aparece na criação — não dá pra converter depois de criada -->
+                    <div id="blocoCompartilhada" class="rounded-3 p-3" style="background:rgba(96,165,250,0.07);border:1px solid rgba(96,165,250,0.2);">
+                        <?php if ($_podeCompartilhar): ?>
+                            <div class="form-check form-switch mb-0">
+                                <input class="form-check-input" type="checkbox" role="switch" id="input_compartilhada" name="compartilhada" value="1">
+                                <label class="form-check-label text-light fw-semibold" for="input_compartilhada" style="cursor:pointer;">
+                                    <i class="bi bi-people-fill me-1" style="color:#60a5fa;"></i> Carteira compartilhada
+                                </label>
+                            </div>
+                            <p class="text-secondary small mb-0 mt-1">Permite convidar até <?= (int)$_limiteMembrosPlano ?> pessoa(s) (você incluso(a)) pra ver e lançar nessa carteira.</p>
+                        <?php else: ?>
+                            <div class="d-flex align-items-center justify-content-between gap-2">
+                                <span class="text-secondary small"><i class="bi bi-people-fill me-1"></i>Carteira compartilhada é um recurso PRO/VIP.</span>
+                                <a href="/planos.php?upgrade=pro" class="btn btn-sm rounded-pill fw-semibold" style="background:var(--color-card-bg);color:var(--color-card-text);border:1px solid var(--color-card-border);font-size:0.72rem;">Assinar</a>
+                            </div>
+                        <?php endif; ?>
+                    </div>
                 </div>
                 <div class="modal-footer border-top border-secondary-subtle p-3 d-flex justify-content-between">
                     <button type="button" class="btn btn-link text-secondary text-decoration-none fw-semibold" data-bs-dismiss="modal">Cancelar</button>
                     <button type="submit" class="btn btn-gold rounded-pill px-4 fw-bold text-dark d-flex align-items-center" id="btnSalvarCarteira">
                         <i class="bi bi-check-lg me-2" id="modalCarteiraBtnIcon"></i> <span id="modalCarteiraBtnText">Salvar Carteira</span>
                     </button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+<!-- MODAL: SAIR DE CARTEIRA COMPARTILHADA -->
+<div class="modal fade" id="modalSairCarteira" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered modal-sm" style="max-width: 400px;">
+        <div class="modal-content bg-dark border-secondary-subtle shadow-lg rounded-4">
+            <div class="modal-header border-bottom border-secondary-subtle p-3">
+                <h6 class="modal-title text-light fw-bold">
+                    <i class="bi bi-box-arrow-left me-2 text-danger"></i> Sair da Carteira
+                </h6>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <form method="POST" action="">
+                <div class="modal-body p-4 text-center">
+                    <input type="hidden" name="action" value="sair_carteira">
+                    <input type="hidden" name="carteira_id" id="input_sair_carteira_id">
+                    <p class="text-secondary mb-0 fs-6">
+                        Tem certeza que deseja sair da carteira <br>
+                        <strong class="text-light fs-5" id="text_sair_carteira_nome"></strong>?
+                    </p>
+                    <p class="text-secondary small mt-2 opacity-75">Suas transações já lançadas continuam lá — você só perde o acesso.</p>
+                </div>
+                <div class="modal-footer border-top border-secondary-subtle d-flex justify-content-between p-2">
+                    <button type="button" class="btn btn-sm btn-link text-secondary text-decoration-none" data-bs-dismiss="modal">Cancelar</button>
+                    <button type="submit" class="btn btn-sm btn-danger fw-bold px-4 rounded-pill">Sair</button>
                 </div>
             </form>
         </div>
@@ -523,18 +703,25 @@ require_once '../geral/header.php';
         const btnText = document.getElementById('modalCarteiraBtnText');
         const btnIcon = document.getElementById('modalCarteiraBtnIcon');
 
+        // "Compartilhada" só se decide na criação — não dá pra converter depois
+        const blocoCompartilhada = document.getElementById('blocoCompartilhada');
+        const inputCompartilhada = document.getElementById('input_compartilhada');
+
         if (id !== '') {
             // MODO EDIÇÃO
             titleText.textContent = 'Editar Carteira';
             icon.className = 'bi bi-pencil-square me-2';
             btnText.textContent = 'Atualizar Carteira';
             btnIcon.className = 'bi bi-arrow-repeat me-2';
+            if (blocoCompartilhada) blocoCompartilhada.style.display = 'none';
         } else {
             // MODO CRIAÇÃO
             titleText.textContent = 'Nova Carteira';
             icon.className = 'bi bi-wallet-fill me-2';
             btnText.textContent = 'Salvar Carteira';
             btnIcon.className = 'bi bi-check-lg me-2';
+            if (blocoCompartilhada) blocoCompartilhada.style.display = '';
+            if (inputCompartilhada) inputCompartilhada.checked = false;
         }
 
         new bootstrap.Modal(document.getElementById('modalCarteira')).show();
@@ -545,6 +732,13 @@ require_once '../geral/header.php';
         document.getElementById('input_excluir_carteira_id').value = id;
         document.getElementById('text_excluir_carteira_nome').textContent = nome;
         new bootstrap.Modal(document.getElementById('modalExcluirCarteira')).show();
+    }
+
+    // Alimenta o modal de "sair da carteira" (convidado)
+    function abrirModalSairCarteira(id, nome) {
+        document.getElementById('input_sair_carteira_id').value = id;
+        document.getElementById('text_sair_carteira_nome').textContent = nome;
+        new bootstrap.Modal(document.getElementById('modalSairCarteira')).show();
     }
 
     // Trava de Anti-Spam (Blindagem no clique duplo)

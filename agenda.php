@@ -31,6 +31,10 @@ if (!$_testeAgenda && !recursoDisponivelParaPlano('agenda')) {
 
 $usuario_id = $_SESSION['usuario_id'];
 
+// Quem lançou o registro pode mexer nele; o dono da carteira compartilhada onde ele está
+// também pode — reaproveitado em todo UPDATE/DELETE de Registro feito por esta página.
+$_whereRegPermitido = "(FKUsuario = :uid OR FKCarteira IN (SELECT IDCarteira FROM Carteira WHERE FKUsuarioDono = :uid2))";
+
 // ==============================================================================
 // AJAX
 // ==============================================================================
@@ -42,8 +46,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && ($_POST['action'] ?? '') === 'exclu
     $id = trim($_POST['registro_id'] ?? '');
     if ($id) {
         try {
-            $pdo->prepare("DELETE FROM Registro WHERE IDRegistro = :id AND FKUsuario = :uid")
-                ->execute([':id' => $id, ':uid' => $usuario_id]);
+            $pdo->prepare("DELETE FROM Registro WHERE IDRegistro = :id AND $_whereRegPermitido")
+                ->execute([':id' => $id, ':uid' => $usuario_id, ':uid2' => $usuario_id]);
             echo json_encode(['ok' => true]);
         } catch (PDOException $e) {
             echo json_encode(['ok' => false, 'erro' => $e->getMessage()]);
@@ -70,8 +74,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && ($_POST['action'] ?? '') === 'exclu
     }
     try {
         $ph   = implode(',', array_fill(0, count($ids), '?'));
-        $stmt = $pdo->prepare("DELETE FROM Registro WHERE IDRegistro IN ($ph) AND FKUsuario = ?");
-        $stmt->execute(array_merge($ids, [$usuario_id]));
+        $stmt = $pdo->prepare("DELETE FROM Registro WHERE IDRegistro IN ($ph) AND (FKUsuario = ? OR FKCarteira IN (SELECT IDCarteira FROM Carteira WHERE FKUsuarioDono = ?))");
+        $stmt->execute(array_merge($ids, [$usuario_id, $usuario_id]));
         echo json_encode(['ok' => true, 'deletados' => $stmt->rowCount()]);
     } catch (PDOException $e) {
         echo json_encode(['ok' => false, 'erro' => $e->getMessage()]);
@@ -95,8 +99,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && ($_POST['action'] ?? '') === 'mover
                 MomentoRegistro = CASE WHEN DataVencimento IS NULL
                                        THEN CONCAT(:nd2, ' ', TIME(MomentoRegistro))
                                        ELSE MomentoRegistro END
-            WHERE IDRegistro = :id AND FKUsuario = :uid
-        ")->execute([':nd1' => $novaData, ':nd2' => $novaData, ':id' => $id, ':uid' => $usuario_id]);
+            WHERE IDRegistro = :id AND $_whereRegPermitido
+        ")->execute([':nd1' => $novaData, ':nd2' => $novaData, ':id' => $id, ':uid' => $usuario_id, ':uid2' => $usuario_id]);
         echo json_encode(['ok' => true]);
     } catch (PDOException $e) {
         echo json_encode(['ok' => false, 'erro' => $e->getMessage()]);
@@ -120,8 +124,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && ($_POST['action'] ?? '') === 'dupli
         echo json_encode(['ok' => false, 'erro' => 'ID inválido']); exit;
     }
     try {
-        $stmt = $pdo->prepare("SELECT * FROM Registro WHERE IDRegistro = :id AND FKUsuario = :uid");
-        $stmt->execute([':id' => $id, ':uid' => $usuario_id]);
+        $stmt = $pdo->prepare("SELECT * FROM Registro WHERE IDRegistro = :id AND $_whereRegPermitido");
+        $stmt->execute([':id' => $id, ':uid' => $usuario_id, ':uid2' => $usuario_id]);
         $original = $stmt->fetch(PDO::FETCH_ASSOC);
         if (!$original) {
             echo json_encode(['ok' => false, 'erro' => 'Registro não encontrado']); exit;
@@ -214,14 +218,36 @@ if (isset($_GET['ajax']) && $_GET['acao'] === 'listar') {
     $mes_alvo = (int)date('m', strtotime($mes_str . '-01'));
     $ano_alvo = (int)date('Y', strtotime($mes_str . '-01'));
 
-    $whereGrelha   = "r.FKUsuario = :uid AND MONTH(COALESCE(r.DataVencimento, r.MomentoRegistro)) = :mes AND YEAR(COALESCE(r.DataVencimento, r.MomentoRegistro)) = :ano";
-    $carteiraFilter = '';
-    $params = [':uid' => $usuario_id, ':mes' => $mes_alvo, ':ano' => $ano_alvo];
+    $modoCarteiraUnica = ($carteira !== 'todas' && $carteira !== '');
+    $carteiraEhCompartilhada = false;
 
-    if ($carteira !== 'todas' && $carteira !== '') {
-        $whereGrelha   .= " AND r.FKCarteira = :cid";
-        $carteiraFilter = " AND r.FKCarteira = :cid";
-        $params[':cid'] = $carteira;
+    if ($modoCarteiraUnica) {
+        // Sem essa checagem, bastava passar qualquer ID de carteira na URL da AJAX pra
+        // ver lançamentos de gente completamente alheia — confirma dono OU convidado aceito.
+        if (carteiraPapelDoUsuario($pdo, $carteira, $usuario_id) === null) {
+            echo json_encode(['sucesso' => false, 'erro' => 'Sem acesso a essa carteira']);
+            exit;
+        }
+        $stmtChkComp = $pdo->prepare("SELECT Compartilhada FROM Carteira WHERE IDCarteira = :cid");
+        $stmtChkComp->execute([':cid' => $carteira]);
+        $carteiraEhCompartilhada = (int)$stmtChkComp->fetchColumn() === 1;
+        // Carteira específica: mostra TODOS os lançamentos dela (todos os membros da
+        // carteira compartilhada), não só os meus — senão o dono nunca veria o que o
+        // convidado lançou (e vice-versa).
+        $whereGrelha = "r.FKCarteira = :cid AND MONTH(COALESCE(r.DataVencimento, r.MomentoRegistro)) = :mes AND YEAR(COALESCE(r.DataVencimento, r.MomentoRegistro)) = :ano";
+        $whereSaldos = "FKCarteira = :cid AND MONTH(MomentoRegistro) = :mes AND YEAR(MomentoRegistro) = :ano";
+        $whereSidebar = "r.FKCarteira = :cid AND r.StatusRegistro = 'pendente'";
+        $params = [':cid' => $carteira, ':mes' => $mes_alvo, ':ano' => $ano_alvo];
+        $sidebarParams = [':cid' => $carteira];
+    } else {
+        // "Todas as carteiras" continua sendo só os MEUS lançamentos, como sempre foi —
+        // misturar lançamentos de outros membros de carteiras compartilhadas na visão
+        // agregada de "todas" é uma decisão de UX separada, não resolvida nesta versão.
+        $whereGrelha = "r.FKUsuario = :uid AND MONTH(COALESCE(r.DataVencimento, r.MomentoRegistro)) = :mes AND YEAR(COALESCE(r.DataVencimento, r.MomentoRegistro)) = :ano";
+        $whereSaldos = "FKUsuario = :uid AND MONTH(MomentoRegistro) = :mes AND YEAR(MomentoRegistro) = :ano";
+        $whereSidebar = "r.FKUsuario = :uid AND r.StatusRegistro = 'pendente'";
+        $params = [':uid' => $usuario_id, ':mes' => $mes_alvo, ':ano' => $ano_alvo];
+        $sidebarParams = [':uid' => $usuario_id];
     }
 
     try {
@@ -233,9 +259,11 @@ if (isset($_GET['ajax']) && $_GET['acao'] === 'listar') {
                    c.NomeCategoria as categoria, COALESCE(c.IconeCategoria, 'bi-tag') as icone,
                    (SELECT COUNT(*) FROM Comprovante WHERE FKRegistro = r.IDRegistro AND FKUsuario = r.FKUsuario) AS tem_comprovante,
                    COALESCE(fp.IDFatura, fp2.IDFatura) as fatura_id,
-                   COALESCE(fp.FKCartao, fp2.FKCartao) as cartao_id
+                   COALESCE(fp.FKCartao, fp2.FKCartao) as cartao_id,
+                   u.Nome as lancador
             FROM Registro r
             LEFT JOIN Categoria c ON r.FKCategoria = c.IDCategoria
+            LEFT JOIN Usuario u ON u.IDUsuario = r.FKUsuario
             LEFT JOIN FaturaCartao fp  ON fp.FKRegistroPagamento = r.IDRegistro AND fp.FKUsuario  = r.FKUsuario
             LEFT JOIN FaturaCartao fp2 ON fp2.FKRegistroPreview  = r.IDRegistro AND fp2.FKUsuario = r.FKUsuario
             WHERE $whereGrelha ORDER BY data_evento ASC");
@@ -243,7 +271,6 @@ if (isset($_GET['ajax']) && $_GET['acao'] === 'listar') {
         $transacoesGrelha = $stmtG->fetchAll(PDO::FETCH_ASSOC);
 
         // ─── Saldos ───────────────────────────────────────────────────────────
-        $whereSaldos = "FKUsuario = :uid AND MONTH(MomentoRegistro) = :mes AND YEAR(MomentoRegistro) = :ano" . ($carteira !== 'todas' ? " AND FKCarteira = :cid" : "");
         $stmtS = $pdo->prepare("SELECT Valor, TipoRegistro, StatusRegistro FROM Registro WHERE $whereSaldos");
         $stmtS->execute($params);
 
@@ -258,9 +285,6 @@ if (isset($_GET['ajax']) && $_GET['acao'] === 'listar') {
         }
 
         // ─── Sidebar (global — relativo a hoje) ───────────────────────────────
-        $sidebarParams = [':uid' => $usuario_id];
-        if ($carteira !== 'todas' && $carteira !== '') $sidebarParams[':cid'] = $carteira;
-
         $stmtSb = $pdo->prepare("
             SELECT r.IDRegistro as id, r.TipoRegistro as tipo, r.Descricao as titulo,
                    r.Valor as valor,
@@ -270,8 +294,7 @@ if (isset($_GET['ajax']) && $_GET['acao'] === 'listar') {
             FROM Registro r
             LEFT JOIN FaturaCartao fp  ON fp.FKRegistroPagamento = r.IDRegistro AND fp.FKUsuario  = r.FKUsuario
             LEFT JOIN FaturaCartao fp2 ON fp2.FKRegistroPreview  = r.IDRegistro AND fp2.FKUsuario = r.FKUsuario
-            WHERE r.FKUsuario = :uid AND r.StatusRegistro = 'pendente'
-            $carteiraFilter ORDER BY COALESCE(r.DataVencimento, r.MomentoRegistro) ASC");
+            WHERE $whereSidebar ORDER BY COALESCE(r.DataVencimento, r.MomentoRegistro) ASC");
         $stmtSb->execute($sidebarParams);
 
         $hoje    = date('Y-m-d');
@@ -288,6 +311,7 @@ if (isset($_GET['ajax']) && $_GET['acao'] === 'listar') {
         echo json_encode([
             'sucesso' => true,
             'dados'   => $transacoesGrelha,
+            'compartilhada' => $carteiraEhCompartilhada,
             'saldos'  => [
                 'efetivado' => $totRecEfet - $totDesEfet,
                 'a_pagar'   => $totDesPend,
@@ -310,9 +334,8 @@ if (isset($_GET['ajax']) && $_GET['acao'] === 'listar') {
 // ==============================================================================
 $carteiras = [];
 try {
-    $stmtCart = $pdo->prepare("SELECT IDCarteira, TipoCarteira, Principal FROM Carteira WHERE FKUsuarioDono = :uid ORDER BY Principal DESC, TipoCarteira ASC");
-    $stmtCart->execute([':uid' => $usuario_id]);
-    $carteiras = $stmtCart->fetchAll();
+    garantirEstruturaCarteirasCompartilhadas($pdo);
+    $carteiras = carteirasAcessiveisPorUsuario($pdo, $usuario_id);
 } catch (PDOException $e) {
 }
 
@@ -392,6 +415,9 @@ require_once 'geral/header.php';
                                     <?php else: ?>
                                         <i class="bi bi-circle flex-shrink-0 text-secondary opacity-50"></i>
                                         <span class="text-light text-truncate" style="max-width:170px;" title="<?= htmlspecialchars($cart['TipoCarteira']) ?>"><?= htmlspecialchars($cart['TipoCarteira']) ?></span>
+                                    <?php endif; ?>
+                                    <?php if ((int)($cart['Compartilhada'] ?? 0) === 1): ?>
+                                        <i class="bi bi-people-fill flex-shrink-0" style="color:#60a5fa;font-size:0.75rem;" title="Carteira compartilhada"></i>
                                     <?php endif; ?>
                                 </a>
                             </li>
@@ -939,6 +965,7 @@ require_once 'geral/header.php';
             const r = await fetch(`agenda.php?ajax=1&acao=listar&mes=${mesStr}&carteira=${carteiraAtual}`);
             const json = await r.json();
             if (json.sucesso) {
+                carteiraCompartilhadaAtual = !!json.compartilhada;
                 renderizarGrelha(ano, mes, json.dados);
                 atualizarSaldos(json.saldos);
                 renderizarSidebar(json.sidebar);
@@ -1054,6 +1081,10 @@ require_once 'geral/header.php';
 
     // ── Grelha do calendário ──────────────────────────────────────────────
     let transacoesMes = [];
+    // Só true quando uma carteira compartilhada específica está selecionada — controla se
+    // mostra "quem lançou" nos itens (em "todas as carteiras" ou carteira pessoal seria
+    // sempre o próprio nome, então não faz sentido exibir).
+    let carteiraCompartilhadaAtual = false;
 
     function abrirModalDia(dataStr, transacoesDoDia) {
         const parts = dataStr.split('-');
@@ -1111,6 +1142,7 @@ require_once 'geral/header.php';
                     <div style="min-width:0;flex:1;">
                         <div class="text-light fw-semibold text-truncate" style="font-size:0.88rem;">${esc(t.titulo)}</div>
                         <div class="text-secondary" style="font-size:0.72rem;">${isCC ? 'Fatura do cartão' : esc(t.categoria ?? 'Sem categoria')}</div>
+                        ${(carteiraCompartilhadaAtual && t.lancador) ? `<div style="font-size:0.68rem;color:#60a5fa;"><i class="bi bi-person-fill"></i> ${esc(t.lancador)}</div>` : ''}
                     </div>
                     <div class="text-end flex-shrink-0 d-flex flex-column align-items-end gap-1">
                         <span class="fw-bold" style="color:${corVal};font-size:0.88rem;">${sinal}${formatarMoeda(t.valor)}</span>
@@ -1212,7 +1244,7 @@ require_once 'geral/header.php';
 
                 const pill = document.createElement('div');
                 pill.className = `calendar-event ${cls}`;
-                pill.title = `${t.titulo} — ${formatarMoeda(t.valor)}`;
+                pill.title = (carteiraCompartilhadaAtual && t.lancador) ? `${t.titulo} — ${formatarMoeda(t.valor)} (${t.lancador})` : `${t.titulo} — ${formatarMoeda(t.valor)}`;
                 if (t.fatura_id) {
                     pill.onclick = (e) => {
                         e.stopPropagation();

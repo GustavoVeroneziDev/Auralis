@@ -7,6 +7,7 @@ if (!isset($_SESSION['usuario_id'])) {
 
 require_once '../config/conexao.php';
 require_once '../config/funcoes.php';
+garantirEstruturaCarteirasCompartilhadas($pdo);
 
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
@@ -61,9 +62,19 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 }
             }
 
-            $sql = "INSERT INTO Carteira (IDCarteira, TipoCarteira, FKUsuarioDono) VALUES (:idCarteira, :tipoCarteira, :usuarioId)";
+            // "Compartilhada" só pode ser marcada se o plano atual libera o recurso — checagem
+            // no servidor além do toggle escondido/visível no modal (que é só UX). Rejeita em
+            // vez de criar como normal silenciosamente, pra não confundir quem pediu compartilhada.
+            $quisCompartilhada = !empty($_POST['compartilhada']);
+            if ($quisCompartilhada && !recursoDisponivelParaPlano('carteiras_compartilhadas')) {
+                header("Location: listar_carteiras.php?erro=limite_membros");
+                exit;
+            }
+            $compartilhada = $quisCompartilhada ? 1 : 0;
+
+            $sql = "INSERT INTO Carteira (IDCarteira, TipoCarteira, FKUsuarioDono, Compartilhada) VALUES (:idCarteira, :tipoCarteira, :usuarioId, :compartilhada)";
             $stmt = $pdo->prepare($sql);
-            $stmt->execute([':idCarteira' => gerarUuid(), ':tipoCarteira' => $tipoCarteira, ':usuarioId' => $usuarioId]);
+            $stmt->execute([':idCarteira' => gerarUuid(), ':tipoCarteira' => $tipoCarteira, ':usuarioId' => $usuarioId, ':compartilhada' => $compartilhada]);
 
             // Retorna para o lugar certo dependendo de onde o modal foi aberto
             if (isset($_POST['origem']) && $_POST['origem'] === 'listar_carteiras') {

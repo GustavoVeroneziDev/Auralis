@@ -12,26 +12,34 @@ $id   = trim($_POST['id'] ?? '');
 
 if (!$id || !$acao) { echo json_encode(['ok' => false, 'erro' => 'parametros invalidos']); exit; }
 
-// Verifica que o registro pertence ao usuário antes de qualquer ação
-$stmtCheck = $pdo->prepare("SELECT IDRegistro, StatusRegistro FROM Registro WHERE IDRegistro = :id AND FKUsuario = :uid LIMIT 1");
-$stmtCheck->execute([':id' => $id, ':uid' => $uid]);
+// Verifica que o registro pertence ao usuário (ou que ele é dono da carteira compartilhada
+// onde o registro está) antes de qualquer ação.
+$stmtCheck = $pdo->prepare("
+    SELECT IDRegistro, StatusRegistro FROM Registro
+    WHERE IDRegistro = :id
+      AND (FKUsuario = :uid OR FKCarteira IN (SELECT IDCarteira FROM Carteira WHERE FKUsuarioDono = :uid2))
+    LIMIT 1
+");
+$stmtCheck->execute([':id' => $id, ':uid' => $uid, ':uid2' => $uid]);
 $reg = $stmtCheck->fetch();
 if (!$reg) { http_response_code(404); echo json_encode(['ok' => false, 'erro' => 'nao encontrado']); exit; }
 
+$_whereAcao = "IDRegistro = :id AND (FKUsuario = :uid OR FKCarteira IN (SELECT IDCarteira FROM Carteira WHERE FKUsuarioDono = :uid2))";
+
 try {
     if ($acao === 'excluir') {
-        $pdo->prepare("DELETE FROM Registro WHERE IDRegistro = :id AND FKUsuario = :uid")
-            ->execute([':id' => $id, ':uid' => $uid]);
+        $pdo->prepare("DELETE FROM Registro WHERE $_whereAcao")
+            ->execute([':id' => $id, ':uid' => $uid, ':uid2' => $uid]);
         echo json_encode(['ok' => true]);
 
     } elseif ($acao === 'nao_efetivar') {
-        $pdo->prepare("UPDATE Registro SET StatusRegistro = 'pendente' WHERE IDRegistro = :id AND FKUsuario = :uid")
-            ->execute([':id' => $id, ':uid' => $uid]);
+        $pdo->prepare("UPDATE Registro SET StatusRegistro = 'pendente' WHERE $_whereAcao")
+            ->execute([':id' => $id, ':uid' => $uid, ':uid2' => $uid]);
         echo json_encode(['ok' => true]);
 
     } elseif ($acao === 'efetivar') {
-        $pdo->prepare("UPDATE Registro SET StatusRegistro = 'efetivado' WHERE IDRegistro = :id AND FKUsuario = :uid")
-            ->execute([':id' => $id, ':uid' => $uid]);
+        $pdo->prepare("UPDATE Registro SET StatusRegistro = 'efetivado' WHERE $_whereAcao")
+            ->execute([':id' => $id, ':uid' => $uid, ':uid2' => $uid]);
 
         // Verifica conquista sempendencias (nenhum pendente + ao menos 1 efetivado no mês)
         try {
@@ -64,8 +72,8 @@ try {
             echo json_encode(['ok' => false, 'erro' => 'carteira nao encontrada']);
             exit;
         }
-        $pdo->prepare("UPDATE Registro SET FKCarteira = :dest WHERE IDRegistro = :id AND FKUsuario = :uid")
-            ->execute([':dest' => $dest, ':id' => $id, ':uid' => $uid]);
+        $pdo->prepare("UPDATE Registro SET FKCarteira = :dest WHERE $_whereAcao")
+            ->execute([':dest' => $dest, ':id' => $id, ':uid' => $uid, ':uid2' => $uid]);
         echo json_encode(['ok' => true]);
 
     } else {

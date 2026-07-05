@@ -16,22 +16,29 @@ if (!isset($_SESSION['usuario_id'])) {
 require_once 'config/conexao.php';
 require_once 'config/funcoes.php';
 require_once 'config/funcoes_cartao.php';
+garantirEstruturaCarteirasCompartilhadas($pdo);
 
 $usuario_id = $_SESSION['usuario_id'];
 cartao_verificarFechamentos($pdo, $usuario_id);
-$carteiras  = [];
 
+// $carteirasProprias: só as que o usuário é DONO — usada pra Transferência entre Carteiras
+// (que continua exigindo posse das duas). $carteiras: donas + compartilhadas aceitas — usada
+// pro seletor de carteira no topo, pra um convidado conseguir ver/selecionar a carteira.
+$carteirasProprias = [];
 try {
     // Principal primeiro — usada como fallback quando não há carteira escolhida na sessão/URL
     $sql  = "SELECT IDCarteira, TipoCarteira, Principal FROM Carteira WHERE FKUsuarioDono = :usuario_id ORDER BY Principal DESC, TipoCarteira ASC";
     $stmt = $pdo->prepare($sql);
     $stmt->execute([':usuario_id' => $usuario_id]);
-    $carteiras = $stmt->fetchAll();
+    $carteirasProprias = $stmt->fetchAll();
 } catch (PDOException $e) {
-    $carteiras = [];
+    $carteirasProprias = [];
 }
 
-$totalCarteiras = count($carteiras);
+$carteiras = carteirasAcessiveisPorUsuario($pdo, $usuario_id);
+
+$totalCarteiras         = count($carteiras);
+$totalCarteirasProprias = count($carteirasProprias);
 
 // Categorias pra transferência entre carteiras (reusa as de despesa, mesmo padrão do lançamento de cartão)
 try {
@@ -151,22 +158,26 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'])) {
     $carteira_url = isset($_GET['carteira']) ? "&carteira=" . $_GET['carteira'] : "";
     $redirectBase = "dashboard.php?mes={$mes_atual}&ano={$ano_atual}{$carteira_url}";
 
+    // Quem lançou o registro pode mexer nele; o dono da carteira compartilhada onde ele
+    // está também pode — usado em todo UPDATE/DELETE de Registro nesta seção.
+    $_whereRegPermitido = "(FKUsuario = :uid OR FKCarteira IN (SELECT IDCarteira FROM Carteira WHERE FKUsuarioDono = :uid2))";
+
     if ($_POST['action'] === 'toggle_status') {
         $id_registro = $_POST['registro_id'];
         $novo_status = $_POST['novo_status'];
         if (in_array($novo_status, ['pendente', 'efetivado'])) {
             try {
-                $sqlToggle  = "UPDATE Registro SET StatusRegistro = :status WHERE IDRegistro = :id AND FKUsuario = :uid";
+                $sqlToggle  = "UPDATE Registro SET StatusRegistro = :status WHERE IDRegistro = :id AND $_whereRegPermitido";
                 $stmtToggle = $pdo->prepare($sqlToggle);
-                $stmtToggle->execute([':status' => $novo_status, ':id' => $id_registro, ':uid' => $usuario_id]);
+                $stmtToggle->execute([':status' => $novo_status, ':id' => $id_registro, ':uid' => $usuario_id, ':uid2' => $usuario_id]);
                 // Se for transferência, sincroniza o par (ambos os lados)
                 try {
-                    $chkTransf = $pdo->prepare("SELECT GrupoParcela FROM Registro WHERE IDRegistro = :id AND FKUsuario = :uid AND TipoRegistro IN ('transferencia_saida','transferencia_entrada')");
-                    $chkTransf->execute([':id' => $id_registro, ':uid' => $usuario_id]);
+                    $chkTransf = $pdo->prepare("SELECT GrupoParcela FROM Registro WHERE IDRegistro = :id AND $_whereRegPermitido AND TipoRegistro IN ('transferencia_saida','transferencia_entrada')");
+                    $chkTransf->execute([':id' => $id_registro, ':uid' => $usuario_id, ':uid2' => $usuario_id]);
                     $grupoPar = $chkTransf->fetchColumn();
                     if ($grupoPar) {
-                        $pdo->prepare("UPDATE Registro SET StatusRegistro = :status WHERE GrupoParcela = :g AND FKUsuario = :uid AND TipoRegistro IN ('transferencia_saida','transferencia_entrada') AND IDRegistro != :id")
-                            ->execute([':status' => $novo_status, ':g' => $grupoPar, ':uid' => $usuario_id, ':id' => $id_registro]);
+                        $pdo->prepare("UPDATE Registro SET StatusRegistro = :status WHERE GrupoParcela = :g AND $_whereRegPermitido AND TipoRegistro IN ('transferencia_saida','transferencia_entrada') AND IDRegistro != :id")
+                            ->execute([':status' => $novo_status, ':g' => $grupoPar, ':uid' => $usuario_id, ':uid2' => $usuario_id, ':id' => $id_registro]);
                     }
                 } catch (PDOException $e) {}
                 // Sincroniza status da fatura de cartão vinculada
@@ -192,9 +203,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'])) {
     if ($_POST['action'] === 'excluir_registro') {
         $id_registro = $_POST['registro_id'];
         try {
-            $sqlDel  = "DELETE FROM Registro WHERE IDRegistro = :id AND FKUsuario = :uid";
+            $sqlDel  = "DELETE FROM Registro WHERE IDRegistro = :id AND $_whereRegPermitido";
             $stmtDel = $pdo->prepare($sqlDel);
-            $stmtDel->execute([':id' => $id_registro, ':uid' => $usuario_id]);
+            $stmtDel->execute([':id' => $id_registro, ':uid' => $usuario_id, ':uid2' => $usuario_id]);
             header("Location: " . $redirectBase . "&sucesso=excluido");
             exit;
         } catch (PDOException $e) {
@@ -211,23 +222,24 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'])) {
             if ($tipo_exclusao === 'futuros' && !empty($grupo_id)) {
                 // Exclui o registro selecionado E todas as projeções futuras pendentes do grupo
                 $sqlDel = "
-                    DELETE FROM Registro 
-                    WHERE FKUsuario = :uid 
+                    DELETE FROM Registro
+                    WHERE $_whereRegPermitido
                       AND GrupoParcela = :grupo
                       AND (IDRegistro = :id OR (MomentoRegistro > :data_base AND StatusRegistro = 'pendente' AND TotalParcelas IS NULL))
                 ";
                 $stmtDel = $pdo->prepare($sqlDel);
                 $stmtDel->execute([
                     ':uid'       => $usuario_id,
+                    ':uid2'      => $usuario_id,
                     ':grupo'     => $grupo_id,
                     ':id'        => $id_registro,
                     ':data_base' => $data_base
                 ]);
             } else {
                 // Comportamento padrão: exclui apenas o mês selecionado
-                $sqlDel  = "DELETE FROM Registro WHERE IDRegistro = :id AND FKUsuario = :uid";
+                $sqlDel  = "DELETE FROM Registro WHERE IDRegistro = :id AND $_whereRegPermitido";
                 $stmtDel = $pdo->prepare($sqlDel);
-                $stmtDel->execute([':id' => $id_registro, ':uid' => $usuario_id]);
+                $stmtDel->execute([':id' => $id_registro, ':uid' => $usuario_id, ':uid2' => $usuario_id]);
             }
             header("Location: " . $redirectBase . "&sucesso=excluido");
             exit;
@@ -245,22 +257,23 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'])) {
             if ($tipo_exclusao === 'futuros' && !empty($grupo_id)) {
                 // Exclui a parcela selecionada e todas as que vêm DEPOIS dela
                 $sqlDel = "
-                    DELETE FROM Registro 
-                    WHERE FKUsuario = :uid 
+                    DELETE FROM Registro
+                    WHERE $_whereRegPermitido
                       AND GrupoParcela = :grupo
                       AND ParcelaAtual >= :parc_atual
                 ";
                 $stmtDel = $pdo->prepare($sqlDel);
                 $stmtDel->execute([
                     ':uid'       => $usuario_id,
+                    ':uid2'      => $usuario_id,
                     ':grupo'     => $grupo_id,
                     ':parc_atual' => $parcela_atual
                 ]);
             } else {
                 // Exclui apenas a parcela selecionada
-                $sqlDel  = "DELETE FROM Registro WHERE IDRegistro = :id AND FKUsuario = :uid";
+                $sqlDel  = "DELETE FROM Registro WHERE IDRegistro = :id AND $_whereRegPermitido";
                 $stmtDel = $pdo->prepare($sqlDel);
-                $stmtDel->execute([':id' => $id_registro, ':uid' => $usuario_id]);
+                $stmtDel->execute([':id' => $id_registro, ':uid' => $usuario_id, ':uid2' => $usuario_id]);
             }
             header("Location: " . $redirectBase . "&sucesso=excluido");
             exit;
@@ -354,10 +367,12 @@ if (isset($_GET['carteira'])) {
     }
 }
 
-$nome_carteira_atual = 'Carteira';
+$nome_carteira_atual         = 'Carteira';
+$_carteiraAtualCompartilhada = false;
 foreach ($carteiras as $cart) {
     if ($cart['IDCarteira'] == $carteira_selecionada) {
-        $nome_carteira_atual = $cart['TipoCarteira'];
+        $nome_carteira_atual         = $cart['TipoCarteira'];
+        $_carteiraAtualCompartilhada = (int)($cart['Compartilhada'] ?? 0) === 1;
         break;
     }
 }
@@ -388,11 +403,10 @@ if ($carteira_selecionada) {
                     COALESCE(SUM(CASE WHEN TipoRegistro = 'transferencia_saida'   THEN Valor ELSE 0 END), 0) as total_transf_out
                 FROM Registro
                 WHERE FKCarteira = :carteira_id
-                  AND FKUsuario = :usuario_id
                   AND StatusRegistro = 'efetivado'
             ";
         $stmtSaldo = $pdo->prepare($sqlSaldo);
-        $stmtSaldo->execute([':carteira_id' => $carteira_selecionada, ':usuario_id' => $usuario_id]);
+        $stmtSaldo->execute([':carteira_id' => $carteira_selecionada]);
         $resultSaldo = $stmtSaldo->fetch();
 
         if ($resultSaldo) {
@@ -411,7 +425,6 @@ if ($carteira_selecionada) {
                     COALESCE(SUM(CASE WHEN TipoRegistro = 'despesa' THEN Valor ELSE 0 END), 0) as total_despesas
                 FROM Registro
                 WHERE FKCarteira = :carteira_id
-                  AND FKUsuario = :usuario_id
                   AND StatusRegistro = 'efetivado'
                   AND MONTH(MomentoRegistro) = :mes
                   AND YEAR(MomentoRegistro) = :ano
@@ -419,7 +432,6 @@ if ($carteira_selecionada) {
         $stmtMes = $pdo->prepare($sqlMes);
         $stmtMes->execute([
             ':carteira_id' => $carteira_selecionada,
-            ':usuario_id'  => $usuario_id,
             ':mes'         => $mes_atual,
             ':ano'         => $ano_atual,
         ]);
@@ -438,9 +450,11 @@ if ($carteira_selecionada) {
                     r.GrupoParcela, r.ParcelaAtual, r.TotalParcelas,
                     c.NomeCategoria, c.IconeCategoria,
                     (SELECT COUNT(*) FROM Comprovante WHERE FKRegistro = r.IDRegistro AND FKUsuario = r.FKUsuario) AS qtd_comprovantes,
-                    cart_par.TipoCarteira AS NomeCarteiraTransferencia
+                    cart_par.TipoCarteira AS NomeCarteiraTransferencia,
+                    u.Nome AS NomeLancador
                 FROM Registro r
                 LEFT JOIN Categoria c ON r.FKCategoria = c.IDCategoria
+                LEFT JOIN Usuario u ON u.IDUsuario = r.FKUsuario
                 LEFT JOIN Registro r_par ON (
                     r.TipoRegistro IN ('transferencia_saida','transferencia_entrada')
                     AND r.GrupoParcela IS NOT NULL
@@ -449,7 +463,6 @@ if ($carteira_selecionada) {
                 )
                 LEFT JOIN Carteira cart_par ON cart_par.IDCarteira = r_par.FKCarteira
                 WHERE r.FKCarteira = :carteira_id
-                  AND r.FKUsuario = :usuario_id
                   AND r.TipoRegistro NOT IN ('cofrinho','cofrinho_retirada')
                   AND MONTH(r.MomentoRegistro) = :mes
                   AND YEAR(r.MomentoRegistro) = :ano
@@ -459,7 +472,6 @@ if ($carteira_selecionada) {
         $stmtTrans = $pdo->prepare($sqlTransacoes);
         $stmtTrans->execute([
             ':carteira_id' => $carteira_selecionada,
-            ':usuario_id'  => $usuario_id,
             ':mes'         => $mes_atual,
             ':ano'         => $ano_atual,
         ]);
@@ -583,7 +595,6 @@ if ($carteira_selecionada) {
                     COALESCE(SUM(CASE WHEN TipoRegistro = 'despesa' THEN Valor ELSE 0 END), 0) as total_despesas
                 FROM Registro
                 WHERE FKCarteira = :carteira_id
-                  AND FKUsuario  = :usuario_id
                   AND StatusRegistro = 'efetivado'
                   AND MONTH(MomentoRegistro) = :mes
                   AND YEAR(MomentoRegistro)  = :ano
@@ -591,7 +602,6 @@ if ($carteira_selecionada) {
         $stmtAnt = $pdo->prepare($sqlMesAnt);
         $stmtAnt->execute([
             ':carteira_id' => $carteira_selecionada,
-            ':usuario_id'  => $usuario_id,
             ':mes'         => $mes_ant,
             ':ano'         => $ano_ant,
         ]);
@@ -616,7 +626,6 @@ if ($carteira_selecionada) {
                     COALESCE(SUM(CASE WHEN TipoRegistro = 'receita' THEN Valor ELSE 0 END), 0) as pend_rec
                 FROM Registro
                 WHERE FKCarteira = :carteira_id
-                  AND FKUsuario  = :usuario_id
                   AND StatusRegistro = 'pendente'
                   AND MONTH(MomentoRegistro) = :mes
                   AND YEAR(MomentoRegistro)  = :ano
@@ -624,7 +633,6 @@ if ($carteira_selecionada) {
         $stmtPend = $pdo->prepare($sqlPend);
         $stmtPend->execute([
             ':carteira_id' => $carteira_selecionada,
-            ':usuario_id'  => $usuario_id,
             ':mes'         => $mes_atual,
             ':ano'         => $ano_atual,
         ]);
@@ -725,6 +733,9 @@ require_once 'geral/header.php';
                             <span class="text-truncate d-flex align-items-center">
                                 <i class="bi bi-wallet2 me-1 me-sm-2" style="color:var(--accent);flex-shrink:0;"></i>
                                 <?php echo htmlspecialchars($nome_carteira_atual); ?>
+                                <?php if ($_carteiraAtualCompartilhada): ?>
+                                    <i class="bi bi-people-fill ms-1" style="color:#60a5fa;font-size:0.75rem;flex-shrink:0;" title="Carteira compartilhada"></i>
+                                <?php endif; ?>
                             </span>
                         </button>
 
@@ -749,6 +760,9 @@ require_once 'geral/header.php';
                                                 <?php echo htmlspecialchars($cart['TipoCarteira']); ?>
                                             </span>
                                         <?php endif; ?>
+                                        <?php if ((int)($cart['Compartilhada'] ?? 0) === 1): ?>
+                                            <i class="bi bi-people-fill flex-shrink-0" style="color:#60a5fa;font-size:0.75rem;" title="Carteira compartilhada"></i>
+                                        <?php endif; ?>
                                     </a>
                                 </li>
                             <?php endforeach; ?>
@@ -769,7 +783,7 @@ require_once 'geral/header.php';
                         <i class="bi bi-arrow-down-short fs-5"></i> Despesa
                     </a>
 
-                    <?php if ($totalCarteiras >= 2): ?>
+                    <?php if ($totalCarteirasProprias >= 2): ?>
                     <button type="button"
                         class="btn btn-outline-info fw-semibold d-flex align-items-center justify-content-center gap-1 rounded-pill transition-hover shadow-sm flex-grow-1"
                         style="font-size: 0.875rem; padding: 0.375rem 0.875rem;"
@@ -1166,6 +1180,12 @@ require_once 'geral/header.php';
                                                 </span>
                                             <?php endif; ?>
 
+                                            <?php if ($_carteiraAtualCompartilhada && !empty($t['NomeLancador'])): ?>
+                                                <span class="badge bg-opacity-10 px-2 py-1" style="font-size:0.6rem;background:rgba(96,165,250,0.12);color:#60a5fa;" title="Lançado por">
+                                                    <i class="bi bi-person-fill"></i> <?php echo htmlspecialchars($t['NomeLancador']) ?>
+                                                </span>
+                                            <?php endif; ?>
+
                                         </div>
                                     </div>
                                 </div>
@@ -1256,7 +1276,7 @@ require_once 'geral/header.php';
                                             <a href="nova_transacao.php?editar=<?php echo $t['IDRegistro'] ?>&voltar=<?php echo urlencode($_uv_dash) ?>" class="btn btn-sm btn-outline-warning rounded-pill fw-semibold px-3 d-inline-flex align-items-center gap-1 transition-hover">
                                                 <i class="bi bi-pencil-square"></i> <span class="d-none d-sm-inline">Editar</span>
                                             </a>
-                                            <?php if ($totalCarteiras > 1): ?>
+                                            <?php if ($totalCarteirasProprias > 1): ?>
                                             <div class="dropdown d-inline-block">
                                                 <button type="button"
                                                     class="btn btn-sm btn-outline-info rounded-pill fw-semibold px-3 d-inline-flex align-items-center gap-1 transition-hover dropdown-toggle dropdown-toggle-transferir"
@@ -1265,7 +1285,7 @@ require_once 'geral/header.php';
                                                 </button>
                                                 <ul class="dropdown-menu shadow border-secondary-subtle" style="background:var(--bg-card);min-width:180px;">
                                                     <li><span class="dropdown-header text-secondary small text-uppercase" style="font-size:.7rem;">Transferir para</span></li>
-                                                    <?php foreach ($carteiras as $cart): ?>
+                                                    <?php foreach ($carteirasProprias as $cart): ?>
                                                         <?php if ($cart['IDCarteira'] != $carteira_selecionada): ?>
                                                         <li>
                                                             <button class="dropdown-item d-flex align-items-center gap-2 py-2" type="button"
@@ -1718,7 +1738,7 @@ require_once 'geral/header.php';
 </div>
 
 <!-- ── Modal: Transferência entre Carteiras ─────────────────────────────── -->
-<?php if ($totalCarteiras >= 2): ?>
+<?php if ($totalCarteirasProprias >= 2): ?>
 <div class="modal fade" id="modalTransferencia" tabindex="-1" aria-hidden="true">
     <div class="modal-dialog modal-dialog-centered">
         <div class="modal-content border-secondary-subtle rounded-4" style="background:var(--bg-card);">
@@ -1737,7 +1757,7 @@ require_once 'geral/header.php';
                 <div class="mb-3">
                     <label class="form-label text-secondary small fw-semibold text-uppercase mb-1">De (origem)</label>
                     <select id="transf-de" class="form-select bg-body-tertiary border-secondary-subtle text-light">
-                        <?php foreach ($carteiras as $cart): ?>
+                        <?php foreach ($carteirasProprias as $cart): ?>
                             <option value="<?php echo htmlspecialchars($cart['IDCarteira']) ?>"
                                 <?php echo ($carteira_selecionada == $cart['IDCarteira']) ? 'selected' : '' ?>>
                                 <?php echo htmlspecialchars($cart['TipoCarteira']) ?>
@@ -1753,7 +1773,7 @@ require_once 'geral/header.php';
                 <div class="mb-3">
                     <label class="form-label text-secondary small fw-semibold text-uppercase mb-1">Para (destino)</label>
                     <select id="transf-para" class="form-select bg-body-tertiary border-secondary-subtle text-light">
-                        <?php foreach ($carteiras as $cart): ?>
+                        <?php foreach ($carteirasProprias as $cart): ?>
                             <option value="<?php echo htmlspecialchars($cart['IDCarteira']) ?>"
                                 <?php echo ($carteira_selecionada != $cart['IDCarteira']) ? 'selected' : '' ?>>
                                 <?php echo htmlspecialchars($cart['TipoCarteira']) ?>

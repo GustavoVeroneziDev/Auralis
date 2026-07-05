@@ -148,6 +148,9 @@ if (!function_exists('limitesDoPlano')) {
                         'categorias'     => $row['categorias']     == -1 ? PHP_INT_MAX : (int)$row['categorias'],
                         'parcelas_max'   => $row['parcelas_max'] == -1 ? PHP_INT_MAX : (int)$row['parcelas_max'],
                         'horas_teste'    => (int)$row['horas_teste'],
+                        'carteiras_compartilhadas_membros' => isset($row['carteiras_compartilhadas_membros'])
+                            ? ($row['carteiras_compartilhadas_membros'] == -1 ? PHP_INT_MAX : (int)$row['carteiras_compartilhadas_membros'])
+                            : ($plano === 'free' ? 0 : ($plano === 'pro' ? 2 : PHP_INT_MAX)),
                     ];
                     return $cache[$plano];
                 }
@@ -157,9 +160,9 @@ if (!function_exists('limitesDoPlano')) {
 
         // Fallback hardcoded se a tabela ainda não existir
         $defaults = [
-            'pro'  => ['transacoes_mes' => PHP_INT_MAX, 'carteiras' => 3,           'cartoes' => 3,           'categorias' => PHP_INT_MAX, 'parcelas_max' => 48, 'horas_teste' => 0],
-            'vip'  => ['transacoes_mes' => PHP_INT_MAX, 'carteiras' => PHP_INT_MAX, 'cartoes' => PHP_INT_MAX, 'categorias' => PHP_INT_MAX, 'parcelas_max' => 48, 'horas_teste' => 0],
-            'free' => ['transacoes_mes' => 35,          'carteiras' => 1,           'cartoes' => 1,           'categorias' => 10,          'parcelas_max' => 3,  'horas_teste' => 50],
+            'pro'  => ['transacoes_mes' => PHP_INT_MAX, 'carteiras' => 3,           'cartoes' => 3,           'categorias' => PHP_INT_MAX, 'parcelas_max' => 48, 'horas_teste' => 0,  'carteiras_compartilhadas_membros' => 2],
+            'vip'  => ['transacoes_mes' => PHP_INT_MAX, 'carteiras' => PHP_INT_MAX, 'cartoes' => PHP_INT_MAX, 'categorias' => PHP_INT_MAX, 'parcelas_max' => 48, 'horas_teste' => 0,  'carteiras_compartilhadas_membros' => 8],
+            'free' => ['transacoes_mes' => 35,          'carteiras' => 1,           'cartoes' => 1,           'categorias' => 10,          'parcelas_max' => 3,  'horas_teste' => 50, 'carteiras_compartilhadas_membros' => 0],
         ];
         $cache[$plano] = $defaults[$plano] ?? $defaults['free'];
         return $cache[$plano];
@@ -1241,6 +1244,261 @@ function garantirEstruturaComissaoRevendedor(PDO $pdo): void
               ProcessadoEm DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP
             ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4
         ");
+    } catch (PDOException $e) {
+    }
+}
+
+// ─────────────────────────────────────────────────────────────────────────
+// CARTEIRAS COMPARTILHADAS — múltiplas pessoas numa mesma carteira, com
+// hierarquia dono/convidado, categorias próprias da carteira (só quando
+// compartilhada) e log de atividade pro dono.
+// ─────────────────────────────────────────────────────────────────────────
+
+// Garante o schema completo de carteiras compartilhadas (auto-migração, sem SSH)
+function garantirEstruturaCarteirasCompartilhadas(PDO $pdo): void
+{
+    // Carteira.Compartilhada — decidido na criação, não muda depois nesta versão
+    try {
+        $chk = $pdo->query("
+            SELECT COLUMN_NAME FROM INFORMATION_SCHEMA.COLUMNS
+            WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'Carteira' AND COLUMN_NAME = 'Compartilhada'
+        ")->fetchColumn();
+        if (!$chk) {
+            $pdo->exec("ALTER TABLE Carteira ADD COLUMN Compartilhada TINYINT(1) NOT NULL DEFAULT 0 AFTER FKUsuarioDono");
+        }
+    } catch (PDOException $e) {
+    }
+
+    // Categoria.FKCarteira — NULL = categoria pessoal (comportamento de sempre, intocado);
+    // preenchida = a categoria pertence à carteira compartilhada, só o dono mexe nela
+    try {
+        $chkCat = $pdo->query("
+            SELECT COLUMN_NAME FROM INFORMATION_SCHEMA.COLUMNS
+            WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'Categoria' AND COLUMN_NAME = 'FKCarteira'
+        ")->fetchColumn();
+        if (!$chkCat) {
+            $pdo->exec("ALTER TABLE Categoria ADD COLUMN FKCarteira CHAR(36) NULL AFTER FKUsuario");
+        }
+    } catch (PDOException $e) {
+    }
+
+    // Usuario.CodigoConvite — código pessoal permanente pra adicionar alguém numa carteira
+    // compartilhada (tipo "adicionar amigo"). Propositalmente distinto do CodigoIndicacao
+    // (esse é do programa de indicação/revenda) pra nunca confundir os dois na UI.
+    try {
+        $chkUsu = $pdo->query("
+            SELECT COLUMN_NAME FROM INFORMATION_SCHEMA.COLUMNS
+            WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'Usuario' AND COLUMN_NAME = 'CodigoConvite'
+        ")->fetchColumn();
+        if (!$chkUsu) {
+            $pdo->exec("ALTER TABLE Usuario ADD COLUMN CodigoConvite VARCHAR(12) NULL AFTER CodigoIndicacao");
+            $pdo->exec("ALTER TABLE Usuario ADD UNIQUE KEY uq_usuario_codigo_convite (CodigoConvite)");
+        }
+    } catch (PDOException $e) {
+    }
+
+    // MembroCarteira — StatusConvite: 0 = pendente (aguardando aceite), 1 = ativo.
+    // O dono NÃO tem linha aqui (ele já é identificado por Carteira.FKUsuarioDono).
+    try {
+        $pdo->exec("
+            CREATE TABLE IF NOT EXISTS MembroCarteira (
+              IDMembro      CHAR(36) NOT NULL PRIMARY KEY,
+              FKCarteira    CHAR(36) NOT NULL,
+              FKUsuario     CHAR(36) NOT NULL,
+              StatusConvite TINYINT(1) NOT NULL DEFAULT 0,
+              DataConvite   DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+              DataResposta  DATETIME NULL,
+              UNIQUE KEY uq_membro_carteira_usuario (FKCarteira, FKUsuario),
+              KEY idx_membro_usuario (FKUsuario)
+            ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4
+        ");
+    } catch (PDOException $e) {
+    }
+
+    // Log de atividade da carteira compartilhada — insert-only, visível só pro dono
+    try {
+        $pdo->exec("
+            CREATE TABLE IF NOT EXISTS LogAtividadeCarteira (
+              IDLog      CHAR(36) NOT NULL PRIMARY KEY,
+              FKCarteira CHAR(36) NOT NULL,
+              FKUsuario  CHAR(36) NOT NULL,
+              Acao       VARCHAR(40) NOT NULL,
+              Detalhe    VARCHAR(255) NULL,
+              CriadoEm   DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+              KEY idx_log_carteira (FKCarteira, CriadoEm)
+            ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4
+        ");
+    } catch (PDOException $e) {
+    }
+
+    // config_limites_plano.carteiras_compartilhadas_membros — quantas pessoas cabem numa
+    // carteira compartilhada (dono incluso), por plano. Semeia os valores acordados
+    // (free=0, pro=2, vip=8) só na primeira vez que a coluna é criada.
+    try {
+        $chkLim = $pdo->query("
+            SELECT COLUMN_NAME FROM INFORMATION_SCHEMA.COLUMNS
+            WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'config_limites_plano'
+              AND COLUMN_NAME = 'carteiras_compartilhadas_membros'
+        ")->fetchColumn();
+        if (!$chkLim) {
+            $pdo->exec("ALTER TABLE config_limites_plano ADD COLUMN carteiras_compartilhadas_membros INT NOT NULL DEFAULT 0 AFTER parcelas_max");
+            $pdo->exec("UPDATE config_limites_plano SET carteiras_compartilhadas_membros = 0 WHERE plano = 'free'");
+            $pdo->exec("UPDATE config_limites_plano SET carteiras_compartilhadas_membros = 2 WHERE plano = 'pro'");
+            $pdo->exec("UPDATE config_limites_plano SET carteiras_compartilhadas_membros = 8 WHERE plano = 'vip'");
+        }
+    } catch (PDOException $e) {
+    }
+
+    // Recurso "Carteiras Compartilhadas" só pro gate de plano (recursoDisponivelParaPlano,
+    // usado ao criar/marcar uma carteira como compartilhada). mostrar_nos_planos=0 porque
+    // o número exato de pessoas já aparece como item de limite em planos.php (_itensLimite)
+    // — mostrar os dois juntos seria redundante.
+    try {
+        $existeRec = $pdo->prepare("SELECT 1 FROM config_recursos WHERE slug = 'carteiras_compartilhadas'");
+        $existeRec->execute();
+        if (!$existeRec->fetchColumn()) {
+            $maxOrdem = (int) $pdo->query("SELECT COALESCE(MAX(ordem), 0) FROM config_recursos")->fetchColumn();
+            $pdo->prepare("
+                INSERT INTO config_recursos (slug, label, disponivel_free, disponivel_pro, disponivel_vip, mostrar_nos_planos, ordem)
+                VALUES ('carteiras_compartilhadas', 'Carteiras Compartilhadas', 0, 1, 1, 0, :ordem)
+            ")->execute([':ordem' => $maxOrdem + 10]);
+        }
+    } catch (PDOException $e) {
+    }
+}
+
+// Gera um código pessoal único no formato USR-XXXXXX (mesmo alfabeto sem ambiguidade
+// visual do código de indicação, mas com prefixo diferente pra nunca confundir os dois).
+function gerarCodigoConvite(PDO $pdo): string
+{
+    $chars = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
+    do {
+        $code = 'USR-';
+        for ($i = 0; $i < 6; $i++) {
+            $code .= $chars[random_int(0, strlen($chars) - 1)];
+        }
+        $existe = $pdo->prepare("SELECT 1 FROM Usuario WHERE CodigoConvite = :c");
+        $existe->execute([':c' => $code]);
+    } while ($existe->fetchColumn());
+    return $code;
+}
+
+// Retorna o código de convite do usuário, gerando na hora se ele ainda não tiver um
+// (cobre contas criadas antes dessa feature existir).
+function obterOuGerarCodigoConvite(PDO $pdo, string $usuarioId): string
+{
+    $stmt = $pdo->prepare("SELECT CodigoConvite FROM Usuario WHERE IDUsuario = :uid");
+    $stmt->execute([':uid' => $usuarioId]);
+    $codigo = $stmt->fetchColumn();
+    if (!empty($codigo)) return $codigo;
+
+    $novo = gerarCodigoConvite($pdo);
+    try {
+        $pdo->prepare("UPDATE Usuario SET CodigoConvite = :c WHERE IDUsuario = :uid")
+            ->execute([':c' => $novo, ':uid' => $usuarioId]);
+    } catch (PDOException $e) {
+    }
+    return $novo;
+}
+
+// Todas as carteiras que o usuário pode acessar: as que ele é dono + as compartilhadas
+// em que foi aceito como membro. Cada linha ganha 'papel' ('dono'|'convidado').
+function carteirasAcessiveisPorUsuario(PDO $pdo, string $usuarioId): array
+{
+    try {
+        $stmt = $pdo->prepare("
+            SELECT c.IDCarteira, c.TipoCarteira, c.Principal, c.Compartilhada, c.FKUsuarioDono,
+                   CASE WHEN c.FKUsuarioDono = :uid THEN 'dono' ELSE 'convidado' END AS papel
+            FROM Carteira c
+            LEFT JOIN MembroCarteira mc
+                   ON mc.FKCarteira = c.IDCarteira AND mc.FKUsuario = :uid2 AND mc.StatusConvite = 1
+            WHERE c.FKUsuarioDono = :uid3 OR mc.FKCarteira IS NOT NULL
+            ORDER BY c.Principal DESC, c.TipoCarteira ASC
+        ");
+        $stmt->execute([':uid' => $usuarioId, ':uid2' => $usuarioId, ':uid3' => $usuarioId]);
+        return $stmt->fetchAll(PDO::FETCH_ASSOC);
+    } catch (PDOException $e) {
+        // Fallback pra base sem a migração ainda aplicada — só as carteiras próprias
+        $stmt = $pdo->prepare("
+            SELECT IDCarteira, TipoCarteira, Principal, 0 AS Compartilhada, FKUsuarioDono, 'dono' AS papel
+            FROM Carteira WHERE FKUsuarioDono = :uid ORDER BY Principal DESC, TipoCarteira ASC
+        ");
+        $stmt->execute([':uid' => $usuarioId]);
+        return $stmt->fetchAll(PDO::FETCH_ASSOC);
+    }
+}
+
+// 'dono', 'convidado' ou null (sem acesso). Usado pra travar ações estruturais
+// (renomear carteira, gerenciar membros/categorias) e pra permitir o dono mexer
+// em lançamentos de qualquer membro dentro da própria carteira.
+function carteiraPapelDoUsuario(PDO $pdo, string $carteiraId, string $usuarioId): ?string
+{
+    $stmt = $pdo->prepare("SELECT FKUsuarioDono FROM Carteira WHERE IDCarteira = :cid");
+    $stmt->execute([':cid' => $carteiraId]);
+    $dono = $stmt->fetchColumn();
+    if ($dono === false) return null;
+    if ($dono === $usuarioId) return 'dono';
+
+    try {
+        $stmtM = $pdo->prepare("SELECT 1 FROM MembroCarteira WHERE FKCarteira = :cid AND FKUsuario = :uid AND StatusConvite = 1");
+        $stmtM->execute([':cid' => $carteiraId, ':uid' => $usuarioId]);
+        return $stmtM->fetchColumn() ? 'convidado' : null;
+    } catch (PDOException $e) {
+        return null;
+    }
+}
+
+// Plano ativo de quem é dono da carteira — usado pra aplicar o teto de plano (parcelas,
+// categorias, membros) a convidados dentro de uma carteira compartilhada, já que eles
+// operam sob o plano de quem criou a carteira, não o próprio, enquanto estão nela.
+function planoEfetivoDaCarteira(PDO $pdo, string $carteiraId): string
+{
+    $stmt = $pdo->prepare("SELECT FKUsuarioDono FROM Carteira WHERE IDCarteira = :cid");
+    $stmt->execute([':cid' => $carteiraId]);
+    $donoId = $stmt->fetchColumn();
+    if (!$donoId) return 'free';
+
+    $stmtPlano = $pdo->prepare("SELECT Plano FROM Assinatura WHERE FKUsuario = :uid AND Status = 'ativa' LIMIT 1");
+    $stmtPlano->execute([':uid' => $donoId]);
+    return $stmtPlano->fetchColumn() ?: 'free';
+}
+
+// Confere o limite de membros (dono + convidados pendentes/ativos) contra o limite
+// de plano ativo de QUEM CRIOU a carteira — os convidados operam sob esse teto.
+function podeConvidarMaisMembros(PDO $pdo, string $carteiraId): bool
+{
+    $planoDono     = planoEfetivoDaCarteira($pdo, $carteiraId);
+    $limites       = limitesDoPlano($planoDono);
+    $limiteMembros = $limites['carteiras_compartilhadas_membros'] ?? 0;
+    if ($limiteMembros === PHP_INT_MAX) return true;
+    if ($limiteMembros <= 0) return false;
+
+    try {
+        $stmtCont = $pdo->prepare("SELECT COUNT(*) FROM MembroCarteira WHERE FKCarteira = :cid AND StatusConvite IN (0,1)");
+        $stmtCont->execute([':cid' => $carteiraId]);
+        $totalAtual = (int) $stmtCont->fetchColumn() + 1; // +1 pelo dono
+    } catch (PDOException $e) {
+        $totalAtual = 1;
+    }
+
+    return $totalAtual < $limiteMembros;
+}
+
+// Registra uma linha no log de atividade da carteira compartilhada. Nunca lança
+// exceção pro chamador — log é auxiliar, não pode travar a ação principal.
+function logAtividadeCarteira(PDO $pdo, string $carteiraId, string $usuarioId, string $acao, ?string $detalhe = null): void
+{
+    try {
+        $pdo->prepare("
+            INSERT INTO LogAtividadeCarteira (IDLog, FKCarteira, FKUsuario, Acao, Detalhe)
+            VALUES (:id, :cid, :uid, :acao, :detalhe)
+        ")->execute([
+            ':id'      => gerarUuid(),
+            ':cid'     => $carteiraId,
+            ':uid'     => $usuarioId,
+            ':acao'    => $acao,
+            ':detalhe' => $detalhe,
+        ]);
     } catch (PDOException $e) {
     }
 }

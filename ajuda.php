@@ -15,6 +15,7 @@ $topicos = [
     'parcelamentos' => ['titulo' => 'Compras Parceladas',            'icone' => 'bi-list-ol',              'tag' => 'Transações'],
     'carteiras'     => ['titulo' => 'Conta Pessoal e Empresarial',   'icone' => 'bi-wallet2',              'tag' => 'Carteiras'],
     'transferencia' => ['titulo' => 'Transferência entre Carteiras', 'icone' => 'bi-arrow-left-right',    'tag' => 'Carteiras'],
+    'compartilhadas'=> ['titulo' => 'Carteiras Compartilhadas',      'icone' => 'bi-people-fill',          'tag' => 'Carteiras'],
     'cartao'        => ['titulo' => 'Cartão de Crédito',             'icone' => 'bi-credit-card-2-front', 'tag' => 'Transações'],
     'categorias'    => ['titulo' => 'Categorias',                    'icone' => 'bi-tags',                'tag' => 'Organização'],
     'analises'      => ['titulo' => 'Análises e Gráficos',           'icone' => 'bi-graph-up-arrow',      'tag' => 'Organização'],
@@ -325,6 +326,52 @@ require_once 'geral/header.php';
                     </div>
                 </div>
 
+                <?php elseif ($topico === 'compartilhadas'): ?>
+                <!-- ═══ CARTEIRAS COMPARTILHADAS ═════════════════════════════ -->
+                <p class="text-secondary mb-4">Convide outras pessoas pra ver e lançar transações numa mesma carteira — ideal pra casal, família ou sócios que dividem uma conta. Disponível nos planos <strong class="text-light">Pro</strong> (até 2 pessoas) e <strong class="text-light">VIP</strong> (até 8 pessoas).</p>
+
+                <h6 class="fw-bold text-light mb-3"><i class="bi bi-list-check me-2" style="color:var(--primary-gold-analysis);"></i>Como criar e convidar</h6>
+                <ol class="ps-3 text-secondary mb-4" style="line-height:2;">
+                    <li>Em <strong class="text-light">Carteiras</strong>, clique em <strong class="text-light">"+ Nova Carteira"</strong> e marque <strong class="text-light">"Carteira compartilhada?"</strong> — só dá pra decidir isso na criação.</li>
+                    <li>Peça pra pessoa abrir <strong class="text-light">Configurações</strong> e te passar o código dela (tipo "USR-AB12CD").</li>
+                    <li>Na carteira criada, abra <strong class="text-light">"Gerenciar Membros"</strong> e cole o código pra enviar o convite.</li>
+                    <li>A pessoa vê o convite em <strong class="text-light">Convites</strong> (na barra lateral) e precisa aceitar pra entrar — nada acontece automaticamente sem a confirmação dela.</li>
+                </ol>
+
+                <h6 class="fw-bold text-light mb-3"><i class="bi bi-diagram-2 me-2" style="color:var(--primary-gold-analysis);"></i>Como funciona a hierarquia</h6>
+                <div class="mb-4">
+                    <div class="d-flex gap-3 mb-2 p-3 rounded-3" style="background:var(--bg-body);">
+                        <i class="bi bi-star-fill flex-shrink-0 mt-1" style="color:var(--primary-gold-analysis);"></i>
+                        <div><span class="fw-semibold text-light">Dono</span> <span class="text-secondary">— quem criou a carteira. Gerencia membros, categorias da carteira, e pode editar ou excluir o lançamento de qualquer pessoa.</span></div>
+                    </div>
+                    <div class="d-flex gap-3 p-3 rounded-3" style="background:var(--bg-body);">
+                        <i class="bi bi-person flex-shrink-0 mt-1" style="color:#60a5fa;"></i>
+                        <div><span class="fw-semibold text-light">Convidado</span> <span class="text-secondary">— vê tudo (sem privacidade seletiva), lança transações normalmente, mas só edita ou exclui o que ele mesmo lançou. Categorias da carteira só o dono cria ou edita.</span></div>
+                    </div>
+                </div>
+
+                <h6 class="fw-bold text-light mb-3"><i class="bi bi-eye me-2" style="color:var(--primary-gold-analysis);"></i>O que muda no dia a dia</h6>
+                <div class="mb-4">
+                    <div class="d-flex gap-3 mb-2 p-3 rounded-3" style="background:var(--bg-body);">
+                        <i class="bi bi-person-fill flex-shrink-0 mt-1" style="color:#60a5fa;"></i>
+                        <div><span class="fw-semibold text-light">Quem lançou</span> <span class="text-secondary">— cada transação mostra um selinho com o nome de quem lançou, no Dashboard e na Agenda.</span></div>
+                    </div>
+                    <div class="d-flex gap-3 p-3 rounded-3" style="background:var(--bg-body);">
+                        <i class="bi bi-clock-history flex-shrink-0 mt-1" style="color:#60a5fa;"></i>
+                        <div><span class="fw-semibold text-light">Log de atividade</span> <span class="text-secondary">— em "Gerenciar Membros", o dono vê quem entrou, saiu ou foi removido da carteira.</span></div>
+                    </div>
+                </div>
+
+                <div class="rounded-3 p-3" style="background:rgba(245,158,11,0.08);border:1px solid rgba(245,158,11,0.25);">
+                    <div class="d-flex gap-2">
+                        <i class="bi bi-lightbulb-fill flex-shrink-0 mt-1" style="color:#f59e0b;"></i>
+                        <div>
+                            <div class="fw-semibold" style="color:#f59e0b;">Dica</div>
+                            <div class="text-secondary small mt-1">Sair da carteira (ou ser removido) não apaga nada — suas transações já lançadas continuam lá, você só perde o acesso a partir daquele momento.</div>
+                        </div>
+                    </div>
+                </div>
+
                 <?php elseif ($topico === 'cofrinhos'): ?>
                 <!-- ═══ COFRINHOS ═══════════════════════════════════════════ -->
                 <p class="text-secondary mb-4">Cofrinhos são reservas para objetivos específicos — viagem, computador novo, reserva de emergência. O dinheiro sai da carteira, fica guardado no cofrinho e pode ser retirado a qualquer momento.</p>
@@ -609,20 +656,20 @@ require_once 'geral/header.php';
 
                 <?php elseif ($topico === 'familia'): ?>
                 <!-- ═══ RECOMENDAÇÃO: CASAIS E FAMÍLIA ═══════════════════════ -->
-                <p class="text-secondary mb-4">Para dividir contas da casa sem perder a visão do que é gasto individual — cada um mantém autonomia, mas o orçamento compartilhado fica claro pros dois.</p>
+                <p class="text-secondary mb-4">Para dividir contas da casa sem perder a visão do que é gasto individual — cada um mantém a carteira pessoal, e uma carteira compartilhada de verdade cuida do que é comum.</p>
 
                 <div class="mb-4">
                     <div class="d-flex gap-3 mb-2 p-3 rounded-3" style="background:var(--bg-body);">
-                        <i class="bi bi-wallet2 flex-shrink-0 mt-1" style="color:#60a5fa;"></i>
-                        <div><span class="fw-semibold text-light">Carteira da casa + carteiras individuais</span> <span class="text-secondary">— crie uma <a href="?topico=carteiras" class="text-decoration-none fw-semibold" style="color:var(--primary-gold-analysis);">carteira compartilhada</a> só pras despesas do lar, além da carteira pessoal de cada um.</span></div>
+                        <i class="bi bi-people-fill flex-shrink-0 mt-1" style="color:#60a5fa;"></i>
+                        <div><span class="fw-semibold text-light">Carteira da casa compartilhada de verdade</span> <span class="text-secondary">— crie uma <a href="?topico=compartilhadas" class="text-decoration-none fw-semibold" style="color:var(--primary-gold-analysis);">carteira compartilhada</a> (Pro ou VIP) só pras despesas do lar, e convide seu par pelo código dele. Os dois veem e lançam nela, sem precisar ficar transferindo nada.</span></div>
                     </div>
                     <div class="d-flex gap-3 mb-2 p-3 rounded-3" style="background:var(--bg-body);">
                         <i class="bi bi-arrow-left-right flex-shrink-0 mt-1" style="color:#60a5fa;"></i>
-                        <div><span class="fw-semibold text-light">Contribuição mensal por transferência</span> <span class="text-secondary">— cada um faz uma <a href="?topico=transferencia" class="text-decoration-none fw-semibold" style="color:var(--primary-gold-analysis);">transferência</a> fixa da conta pessoal pra carteira da casa (ideal como recorrente).</span></div>
+                        <div><span class="fw-semibold text-light">Contribuição mensal por transferência</span> <span class="text-secondary">— se preferir cada um "depositar" um valor fixo na carteira da casa em vez de lançar direto, use <a href="?topico=transferencia" class="text-decoration-none fw-semibold" style="color:var(--primary-gold-analysis);">transferência</a> da conta pessoal (ideal como recorrente).</span></div>
                     </div>
                     <div class="d-flex gap-3 mb-2 p-3 rounded-3" style="background:var(--bg-body);">
                         <i class="bi bi-tags flex-shrink-0 mt-1" style="color:#f59e0b;"></i>
-                        <div><span class="fw-semibold text-light">Categorias da casa</span> <span class="text-secondary">— "Mercado", "Filhos", "Contas da Casa" em <a href="?topico=categorias" class="text-decoration-none fw-semibold" style="color:var(--primary-gold-analysis);">Categorias</a> pra saber onde o orçamento comum está sendo gasto.</span></div>
+                        <div><span class="fw-semibold text-light">Categorias da casa</span> <span class="text-secondary">— "Mercado", "Filhos", "Contas da Casa" já nascem <a href="?topico=categorias" class="text-decoration-none fw-semibold" style="color:var(--primary-gold-analysis);">na própria carteira compartilhada</a> (quem cria é o dono), pra saber onde o orçamento comum está sendo gasto.</span></div>
                     </div>
                     <div class="d-flex gap-3 mb-2 p-3 rounded-3" style="background:var(--bg-body);">
                         <i class="bi bi-bullseye flex-shrink-0 mt-1" style="color:#22c55e;"></i>
@@ -639,7 +686,7 @@ require_once 'geral/header.php';
                         <i class="bi bi-lightbulb-fill flex-shrink-0 mt-1" style="color:#f59e0b;"></i>
                         <div>
                             <div class="fw-semibold" style="color:#f59e0b;">Dica</div>
-                            <div class="text-secondary small mt-1">Alterne entre as carteiras no seletor do Dashboard pra ver o extrato de cada uma — a da casa some tudo o que é compartilhado, sem misturar com o gasto pessoal de ninguém.</div>
+                            <div class="text-secondary small mt-1">Cada transação na carteira da casa mostra quem lançou — dá pra ver o extrato completo sem perder de vista quem pagou o quê, sem precisar de planilha à parte.</div>
                         </div>
                     </div>
                 </div>

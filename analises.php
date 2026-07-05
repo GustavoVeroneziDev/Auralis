@@ -46,13 +46,14 @@ $nome_mes = $meses_pt[$mes_atual];
 // ==============================================================================
 $carteiras = [];
 try {
-    // Principal primeiro — usada como fallback quando não há carteira escolhida na sessão/URL
-    $sqlCart = "SELECT IDCarteira, TipoCarteira, Principal FROM Carteira WHERE FKUsuarioDono = :usuario_id ORDER BY Principal DESC, TipoCarteira ASC";
-    $stmtCart = $pdo->prepare($sqlCart);
-    $stmtCart->execute([':usuario_id' => $usuario_id]);
-    $carteiras = $stmtCart->fetchAll();
+    garantirEstruturaCarteirasCompartilhadas($pdo);
+    $carteiras = carteirasAcessiveisPorUsuario($pdo, $usuario_id);
 } catch (PDOException $e) {
 }
+
+// Só as que o usuário é DONO — usada no menu "Transferir pra outra carteira" (transferência
+// continua exigindo posse das duas, mesmo com carteiras compartilhadas envolvidas).
+$carteirasProprias = array_values(array_filter($carteiras, fn($c) => ($c['papel'] ?? 'dono') === 'dono'));
 
 // Descobre qual carteira está selecionada na URL (ou restaura da sessão)
 $_carteiraIdsAn = array_column($carteiras, 'IDCarteira');
@@ -104,8 +105,7 @@ if ($carteira_selecionada) {
                     COALESCE(c.IconeCategoria, 'bi-tag') as Icone
                 FROM Registro r
                 LEFT JOIN Categoria c ON r.FKCategoria = c.IDCategoria
-                WHERE r.FKUsuario = :uid
-                  AND r.FKCarteira = :carteira_id
+                WHERE r.FKCarteira = :carteira_id
                   AND r.StatusRegistro = 'efetivado'
                   AND r.TipoRegistro IN ('receita','despesa')
                   AND MONTH(r.MomentoRegistro) = :mes
@@ -114,7 +114,6 @@ if ($carteira_selecionada) {
             ";
         $stmt = $pdo->prepare($sql);
         $stmt->execute([
-            ':uid' => $usuario_id,
             ':carteira_id' => $carteira_selecionada,
             ':mes' => $mes_atual,
             ':ano' => $ano_atual
@@ -163,8 +162,7 @@ if ($carteira_selecionada) {
                     COALESCE(c.NomeCategoria, 'Sem Categoria') as Categoria
                 FROM Registro r
                 LEFT JOIN Categoria c ON r.FKCategoria = c.IDCategoria
-                WHERE r.FKUsuario   = :uid
-                  AND r.FKCarteira  = :carteira_id
+                WHERE r.FKCarteira  = :carteira_id
                   AND r.StatusRegistro = 'efetivado'
                   AND r.TipoRegistro IN ('receita','despesa')
                   AND MONTH(r.MomentoRegistro) = :mes
@@ -172,7 +170,6 @@ if ($carteira_selecionada) {
             ";
         $stmtAnt = $pdo->prepare($sqlAnt);
         $stmtAnt->execute([
-            ':uid'         => $usuario_id,
             ':carteira_id' => $carteira_selecionada,
             ':mes'         => $mes_ant,
             ':ano'         => $ano_ant,
@@ -214,8 +211,7 @@ if ($carteira_selecionada) {
             SELECT YEAR(r.MomentoRegistro) as ano, MONTH(r.MomentoRegistro) as mes,
                    r.TipoRegistro, SUM(r.Valor) as total
             FROM Registro r
-            WHERE r.FKUsuario = :uid
-              AND r.FKCarteira = :carteira_id
+            WHERE r.FKCarteira = :carteira_id
               AND r.StatusRegistro = 'efetivado'
               AND r.TipoRegistro IN ('receita','despesa')
               AND r.MomentoRegistro >= :data_inicio
@@ -223,7 +219,6 @@ if ($carteira_selecionada) {
         ";
         $stmtHist = $pdo->prepare($sqlHist);
         $stmtHist->execute([
-            ':uid'         => $usuario_id,
             ':carteira_id' => $carteira_selecionada,
             ':data_inicio' => $dtInicioHist->format('Y-m-01'),
         ]);
@@ -402,6 +397,9 @@ require_once 'geral/header.php';
                                         <span class="text-light text-truncate" style="max-width: 170px;">
                                             <?php echo htmlspecialchars($cart['TipoCarteira']); ?>
                                         </span>
+                                    <?php endif; ?>
+                                    <?php if ((int)($cart['Compartilhada'] ?? 0) === 1): ?>
+                                        <i class="bi bi-people-fill ms-1 flex-shrink-0" style="color:#60a5fa;font-size:0.75rem;" title="Carteira compartilhada"></i>
                                     <?php endif; ?>
 
                                 </a>
@@ -1025,7 +1023,7 @@ require_once 'geral/header.php';
         <i class="bi bi-chevron-down text-secondary" id="ctxTransferirChevron" style="font-size:.7rem;transition:transform .15s;"></i>
     </div>
     <div id="ctxTransferirSubmenu" style="display:none;border-top:1px solid var(--card-border-color);">
-        <?php foreach ($carteiras as $cart): ?>
+        <?php foreach ($carteirasProprias as $cart): ?>
             <?php if ($cart['IDCarteira'] != $carteira_selecionada): ?>
                 <div onclick="ctxTransferir('<?= htmlspecialchars($cart['IDCarteira'], ENT_QUOTES) ?>', '<?= htmlspecialchars($cart['TipoCarteira'], ENT_QUOTES) ?>')"
                      style="padding:9px 16px 9px 28px;cursor:pointer;display:flex;align-items:center;gap:10px;font-size:.85rem;color:var(--text-main);"

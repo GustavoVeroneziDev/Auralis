@@ -19,6 +19,38 @@ $usuario_id = $_SESSION['usuario_id'];
 $sucesso = null;
 $erro = null;
 
+// ── Contexto: categorias pessoais (padrão) ou de uma carteira compartilhada ────
+// Só entra em "modo carteira" se ela existir, for compartilhada de verdade e o
+// usuário tiver acesso (dono ou convidado aceito) — qualquer outro caso cai no
+// modo pessoal de sempre, sem erro (evita vazar existência de carteiras alheias).
+garantirEstruturaCarteirasCompartilhadas($pdo);
+$carteira_ctx = null;
+$_carteiraParamGC = trim($_GET['carteira'] ?? '');
+if ($_carteiraParamGC !== '') {
+    $stmtCtxCat = $pdo->prepare("SELECT IDCarteira, TipoCarteira, Compartilhada, FKUsuarioDono FROM Carteira WHERE IDCarteira = :cid");
+    $stmtCtxCat->execute([':cid' => $_carteiraParamGC]);
+    $_cCtx = $stmtCtxCat->fetch(PDO::FETCH_ASSOC);
+    if ($_cCtx && (int)$_cCtx['Compartilhada'] === 1) {
+        $_papelCtx = carteiraPapelDoUsuario($pdo, $_carteiraParamGC, $usuario_id);
+        if ($_papelCtx !== null) {
+            $carteira_ctx = [
+                'id'      => $_cCtx['IDCarteira'],
+                'nome'    => $_cCtx['TipoCarteira'],
+                'papel'   => $_papelCtx,
+                'dono_id' => $_cCtx['FKUsuarioDono'],
+            ];
+        }
+    }
+}
+// Só o dono mexe em categoria/meta/poupança da carteira compartilhada — convidado só vê.
+$_podeEditarCategoriasGC = ($carteira_ctx === null) || ($carteira_ctx['papel'] === 'dono');
+// Dono de quem essas categorias/metas "pertencem" — o próprio usuário no modo pessoal,
+// ou o dono da carteira quando em modo carteira (MetaCategoria/ConfiguracaoFinanceira
+// continuam por-usuário; representamos a carteira usando o FKUsuario do dono dela).
+$_uidEfetivoGC = $carteira_ctx ? $carteira_ctx['dono_id'] : $usuario_id;
+// Anexado em todo link/redirect desta página pra não perder o contexto de carteira
+$_qsCarteiraGC = $carteira_ctx ? ('&carteira=' . urlencode($carteira_ctx['id'])) : '';
+
 // Mensagens de Sucesso da URL
 if (isset($_GET['sucesso'])) {
     if ($_GET['sucesso'] === 'kit_criado') $sucesso = "Seu Kit Inicial de categorias foi gerado!";
@@ -32,15 +64,24 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action']) && $_POST['
     $tipoCategoria  = $_POST['tipo_categoria'] ?? 'despesa';
     $iconeCategoria = $_POST['icone_categoria'] ?? 'bi-tag';
 
-    if (empty($nomeCategoria)) {
+    if (!$_podeEditarCategoriasGC) {
+        $erro = "Só o dono da carteira compartilhada pode criar categorias nela.";
+    } elseif (empty($nomeCategoria)) {
         $erro = "O nome da categoria não pode estar vazio.";
     } else {
-        // Verifica limite de categorias do plano (trial tem acesso total)
-        $_limitesCat  = limitesDoPlano();
+        // Verifica limite de categorias do plano (trial tem acesso total) — em modo carteira,
+        // conta só as categorias DA CARTEIRA e usa o plano de quem é dono dela.
+        $_planoLimiteCat = $carteira_ctx ? planoEfetivoDaCarteira($pdo, $carteira_ctx['id']) : null;
+        $_limitesCat  = limitesDoPlano($_planoLimiteCat);
         $_emTesteCat  = function_exists('obterHorasRestantesTeste') ? (obterHorasRestantesTeste() > 0) : false;
         if (!$_emTesteCat && $_limitesCat['categorias'] !== PHP_INT_MAX) {
-            $stmtContCat = $pdo->prepare("SELECT COUNT(*) FROM Categoria WHERE FKUsuario = :uid");
-            $stmtContCat->execute([':uid' => $usuario_id]);
+            if ($carteira_ctx) {
+                $stmtContCat = $pdo->prepare("SELECT COUNT(*) FROM Categoria WHERE FKCarteira = :cid");
+                $stmtContCat->execute([':cid' => $carteira_ctx['id']]);
+            } else {
+                $stmtContCat = $pdo->prepare("SELECT COUNT(*) FROM Categoria WHERE FKUsuario = :uid AND FKCarteira IS NULL");
+                $stmtContCat->execute([':uid' => $usuario_id]);
+            }
             if ((int)$stmtContCat->fetchColumn() >= $_limitesCat['categorias']) {
                 $_planoParaMsg   = strtoupper(strtolower($_SESSION['plano'] ?? 'free'));
                 $_upgradeParaMsg = strtoupper(['free' => 'pro', 'pro' => 'vip'][strtolower($_SESSION['plano'] ?? 'free')] ?? 'vip');
@@ -51,18 +92,19 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action']) && $_POST['
 
     if (!$erro && !empty($nomeCategoria)) {
         try {
-            $sqlInsert = "INSERT INTO Categoria (IDCategoria, NomeCategoria, TipoCategoria, IconeCategoria, FKUsuario) VALUES (:id, :nome, :tipo, :icone, :uid)";
+            $sqlInsert = "INSERT INTO Categoria (IDCategoria, NomeCategoria, TipoCategoria, IconeCategoria, FKUsuario, FKCarteira) VALUES (:id, :nome, :tipo, :icone, :uid, :cid)";
             $stmtInsert = $pdo->prepare($sqlInsert);
             $stmtInsert->execute([
                 ':id'    => gerarUuid(),
                 ':nome'  => $nomeCategoria,
                 ':tipo'  => $tipoCategoria,
                 ':icone' => $iconeCategoria,
-                ':uid'   => $usuario_id
+                ':uid'   => $_uidEfetivoGC,
+                ':cid'   => $carteira_ctx ? $carteira_ctx['id'] : null,
             ]);
 
             // PRG: Trava contra F5
-            header("Location: gerenciar_categorias.php?sucesso=criada");
+            header("Location: gerenciar_categorias.php?sucesso=criada{$_qsCarteiraGC}");
             exit;
         } catch (PDOException $e) {
             $erro = "Erro ao criar categoria. Talvez ela já exista.";
@@ -77,19 +119,25 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action']) && $_POST['
     $tipoCategoria  = $_POST['tipo_categoria'] ?? 'despesa';
     $iconeCategoria = $_POST['icone_categoria'] ?? 'bi-tag';
 
-    if (empty($nomeCategoria) || empty($idCategoria)) {
+    if (!$_podeEditarCategoriasGC) {
+        $erro = "Só o dono da carteira compartilhada pode editar categorias nela.";
+    } elseif (empty($nomeCategoria) || empty($idCategoria)) {
         $erro = "O nome da categoria não pode estar vazio.";
     } else {
         try {
-            $sqlUpdate = "UPDATE Categoria SET NomeCategoria = :nome, TipoCategoria = :tipo, IconeCategoria = :icone WHERE IDCategoria = :id AND FKUsuario = :uid";
-            $pdo->prepare($sqlUpdate)->execute([
+            if ($carteira_ctx) {
+                $sqlUpdate = "UPDATE Categoria SET NomeCategoria = :nome, TipoCategoria = :tipo, IconeCategoria = :icone WHERE IDCategoria = :id AND FKCarteira = :cid";
+                $params = [':id' => $idCategoria, ':cid' => $carteira_ctx['id']];
+            } else {
+                $sqlUpdate = "UPDATE Categoria SET NomeCategoria = :nome, TipoCategoria = :tipo, IconeCategoria = :icone WHERE IDCategoria = :id AND FKUsuario = :uid AND FKCarteira IS NULL";
+                $params = [':id' => $idCategoria, ':uid' => $usuario_id];
+            }
+            $pdo->prepare($sqlUpdate)->execute(array_merge([
                 ':nome'  => $nomeCategoria,
                 ':tipo'  => $tipoCategoria,
                 ':icone' => $iconeCategoria,
-                ':id'    => $idCategoria,
-                ':uid'   => $usuario_id
-            ]);
-            header("Location: gerenciar_categorias.php?sucesso=editada");
+            ], $params));
+            header("Location: gerenciar_categorias.php?sucesso=editada{$_qsCarteiraGC}");
             exit;
         } catch (PDOException $e) {
             $erro = "Erro ao atualizar categoria.";
@@ -100,13 +148,23 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action']) && $_POST['
 // --- PROCESSA A EXCLUSÃO VIA MODAL (POST) ---
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action']) && $_POST['action'] === 'excluir_categoria') {
     $idExcluir = $_POST['id_categoria'] ?? '';
-    try {
-        $sqlDelete = "DELETE FROM Categoria WHERE IDCategoria = :id AND FKUsuario = :uid";
-        $pdo->prepare($sqlDelete)->execute([':id' => $idExcluir, ':uid' => $usuario_id]);
-        header("Location: gerenciar_categorias.php?sucesso=excluida");
-        exit;
-    } catch (PDOException $e) {
-        $erro = "Não é possível excluir uma categoria que já possui transações atreladas.";
+    if (!$_podeEditarCategoriasGC) {
+        $erro = "Só o dono da carteira compartilhada pode excluir categorias nela.";
+    } else {
+        try {
+            if ($carteira_ctx) {
+                $sqlDelete = "DELETE FROM Categoria WHERE IDCategoria = :id AND FKCarteira = :cid";
+                $params = [':id' => $idExcluir, ':cid' => $carteira_ctx['id']];
+            } else {
+                $sqlDelete = "DELETE FROM Categoria WHERE IDCategoria = :id AND FKUsuario = :uid AND FKCarteira IS NULL";
+                $params = [':id' => $idExcluir, ':uid' => $usuario_id];
+            }
+            $pdo->prepare($sqlDelete)->execute($params);
+            header("Location: gerenciar_categorias.php?sucesso=excluida{$_qsCarteiraGC}");
+            exit;
+        } catch (PDOException $e) {
+            $erro = "Não é possível excluir uma categoria que já possui transações atreladas.";
+        }
     }
 }
 
@@ -138,22 +196,36 @@ $categorias_bloqueadas_ids = [];
 $categorias_trial_ids      = [];
 
 try {
-    $sqlBusca = "
-        SELECT c.IDCategoria, c.NomeCategoria, c.TipoCategoria, c.IconeCategoria, COUNT(r.IDRegistro) as total_usos
-        FROM Categoria c
-        LEFT JOIN Registro r ON c.IDCategoria = r.FKCategoria
-        WHERE c.FKUsuario = :uid
-        GROUP BY c.IDCategoria, c.NomeCategoria, c.TipoCategoria, c.IconeCategoria
-        ORDER BY c.NomeCategoria ASC
-    ";
-    $stmtBusca = $pdo->prepare($sqlBusca);
-    $stmtBusca->execute([':uid' => $usuario_id]);
+    if ($carteira_ctx) {
+        $sqlBusca = "
+            SELECT c.IDCategoria, c.NomeCategoria, c.TipoCategoria, c.IconeCategoria, COUNT(r.IDRegistro) as total_usos
+            FROM Categoria c
+            LEFT JOIN Registro r ON c.IDCategoria = r.FKCategoria
+            WHERE c.FKCarteira = :cid
+            GROUP BY c.IDCategoria, c.NomeCategoria, c.TipoCategoria, c.IconeCategoria
+            ORDER BY c.NomeCategoria ASC
+        ";
+        $stmtBusca = $pdo->prepare($sqlBusca);
+        $stmtBusca->execute([':cid' => $carteira_ctx['id']]);
+    } else {
+        $sqlBusca = "
+            SELECT c.IDCategoria, c.NomeCategoria, c.TipoCategoria, c.IconeCategoria, COUNT(r.IDRegistro) as total_usos
+            FROM Categoria c
+            LEFT JOIN Registro r ON c.IDCategoria = r.FKCategoria
+            WHERE c.FKUsuario = :uid AND c.FKCarteira IS NULL
+            GROUP BY c.IDCategoria, c.NomeCategoria, c.TipoCategoria, c.IconeCategoria
+            ORDER BY c.NomeCategoria ASC
+        ";
+        $stmtBusca = $pdo->prepare($sqlBusca);
+        $stmtBusca->execute([':uid' => $usuario_id]);
+    }
     $todas = $stmtBusca->fetchAll();
 
     // Detecta categorias bloqueadas e categorias "trial" (além do limite mas em período de teste)
-    $_planoGC       = strtolower($_SESSION['plano'] ?? 'free');
-    $_testeGC       = function_exists('obterHorasRestantesTeste') ? (obterHorasRestantesTeste() > 0) : false;
-    $_limitesGC     = limitesDoPlano();
+    // — em modo carteira, usa o plano de quem é dono dela (convidado opera sob esse teto).
+    $_planoGC       = $carteira_ctx ? planoEfetivoDaCarteira($pdo, $carteira_ctx['id']) : strtolower($_SESSION['plano'] ?? 'free');
+    $_testeGC       = $carteira_ctx ? false : (function_exists('obterHorasRestantesTeste') ? (obterHorasRestantesTeste() > 0) : false);
+    $_limitesGC     = limitesDoPlano($_planoGC);
     $_upgradeSlugGC = ['free' => 'pro', 'pro' => 'vip'][$_planoGC] ?? 'vip';
     $_nomePlanoGC   = strtoupper($_planoGC);
     $_nomeUpgradeGC = strtoupper($_upgradeSlugGC);
@@ -185,7 +257,7 @@ garantirTabelaMetaCategoria($pdo);
 $metasPorCategoria = [];
 try {
     $stmtMetas = $pdo->prepare("SELECT FKCategoria, ValorMeta FROM MetaCategoria WHERE FKUsuario = :uid");
-    $stmtMetas->execute([':uid' => $usuario_id]);
+    $stmtMetas->execute([':uid' => $_uidEfetivoGC]);
     foreach ($stmtMetas->fetchAll(PDO::FETCH_ASSOC) as $m) {
         $metasPorCategoria[$m['FKCategoria']] = (float) $m['ValorMeta'];
     }
@@ -197,7 +269,7 @@ garantirTabelaConfiguracaoFinanceira($pdo);
 $percentualPoupanca = null;
 try {
     $stmtPoup = $pdo->prepare("SELECT PercentualPoupanca FROM ConfiguracaoFinanceira WHERE FKUsuario = :uid");
-    $stmtPoup->execute([':uid' => $usuario_id]);
+    $stmtPoup->execute([':uid' => $_uidEfetivoGC]);
     $poup = $stmtPoup->fetch(PDO::FETCH_ASSOC);
     if ($poup !== false) {
         $percentualPoupanca = (float) $poup['PercentualPoupanca'];
@@ -224,6 +296,7 @@ $msgsPoupanca = [
 $errosPoupanca = [
     'valor_invalido' => 'Informe uma porcentagem entre 0 e 100.',
     'banco'          => 'Erro ao salvar no banco de dados.',
+    'sem_permissao'  => 'Só o dono da carteira compartilhada pode definir a poupança dela.',
 ];
 $sucessoPoupanca = ($_GET['sucesso_poupanca'] ?? null);
 $erroPoupanca    = ($_GET['erro_poupanca'] ?? null);
@@ -277,10 +350,18 @@ $listaIcones = [
 
 <main class="container py-4 mt-2 flex-grow-1" style="min-height: 100vh; padding-inline: var(--space-page-x);">
 
-    <div class="d-flex justify-content-between align-items-center mb-4 border-bottom border-secondary-subtle pb-3 gap-3">
-        <a href="dashboard.php" class="btn btn-outline-secondary btn-sm rounded-pill px-3 transition-hover">
-            <i class="bi bi-arrow-left me-1"></i> Voltar ao Painel
+    <div class="d-flex justify-content-between align-items-center mb-2 border-bottom border-secondary-subtle pb-3 gap-3 flex-wrap">
+        <a href="<?= $carteira_ctx ? 'carteira/membros.php?carteira=' . urlencode($carteira_ctx['id']) : 'dashboard.php' ?>" class="btn btn-outline-secondary btn-sm rounded-pill px-3 transition-hover">
+            <i class="bi bi-arrow-left me-1"></i> <?= $carteira_ctx ? 'Voltar aos Membros' : 'Voltar ao Painel' ?>
         </a>
+        <?php if ($carteira_ctx): ?>
+            <span class="d-flex align-items-center gap-2" style="font-size:0.85rem;color:#60a5fa;">
+                <i class="bi bi-people-fill"></i> Categorias da carteira compartilhada — <strong><?= htmlspecialchars($carteira_ctx['nome']) ?></strong>
+                <?php if (!$_podeEditarCategoriasGC): ?>
+                    <span class="badge rounded-pill" style="background:rgba(255,255,255,0.08);color:var(--text-secondary);font-size:0.65rem;font-weight:600;">somente leitura</span>
+                <?php endif; ?>
+            </span>
+        <?php endif; ?>
     </div>
 
     <?php if ($sucesso): ?>
@@ -312,9 +393,11 @@ $listaIcones = [
                         <h5 class="text-light fw-bold mb-0"><i class="bi bi-arrow-left-right me-2" style="color:var(--primary-gold-analysis);"></i>Relação Entrada/Saída</h5>
                         <p class="text-secondary small mb-0 mt-1">Quanto sobra pra distribuir entre os orçamentos, depois de guardar sua poupança mensal.</p>
                     </div>
+                    <?php if ($_podeEditarCategoriasGC): ?>
                     <button type="button" class="btn btn-sm btn-outline-secondary rounded-pill flex-shrink-0" style="font-size:0.75rem;" data-bs-toggle="modal" data-bs-target="#modalPoupancaMensal">
                         <i class="bi bi-gear me-1"></i><?= $percentualPoupanca !== null ? 'Editar %' : 'Definir poupança' ?>
                     </button>
+                    <?php endif; ?>
                 </div>
                 <div class="card-body p-4">
                     <?php if ($totalMetaReceita <= 0): ?>
@@ -324,7 +407,9 @@ $listaIcones = [
                     <?php elseif ($percentualPoupanca === null): ?>
                         <div class="d-flex align-items-center justify-content-center gap-2 flex-wrap text-center py-2">
                             <span class="text-secondary small"><i class="bi bi-piggy-bank me-1"></i>Você ainda não definiu quanto quer guardar por mês.</span>
-                            <button type="button" class="btn btn-sm btn-warning fw-bold rounded-pill" data-bs-toggle="modal" data-bs-target="#modalPoupancaMensal">Definir agora</button>
+                            <?php if ($_podeEditarCategoriasGC): ?>
+                                <button type="button" class="btn btn-sm btn-warning fw-bold rounded-pill" data-bs-toggle="modal" data-bs-target="#modalPoupancaMensal">Definir agora</button>
+                            <?php endif; ?>
                         </div>
                     <?php else: ?>
                         <div class="row g-3 text-center">
@@ -381,7 +466,7 @@ $listaIcones = [
         </div>
     <?php endif; ?>
 
-    <?php if (!empty($categorias_bloqueadas_ids)): ?>
+    <?php if (!empty($categorias_bloqueadas_ids) && $_podeEditarCategoriasGC): ?>
         <div class="alert d-flex align-items-start gap-3 rounded-3 border-0 mb-3" style="background:var(--color-pending-bg);border:1px solid var(--color-today-bg) !important;">
             <i class="bi bi-lock-fill mt-1 flex-shrink-0" style="color:var(--accent);"></i>
             <div>
@@ -404,6 +489,13 @@ $listaIcones = [
         <div class="col-md-5 col-lg-4">
             <div class="card border-secondary-subtle shadow-sm rounded-4 h-100">
                 <div class="card-body p-4">
+                <?php if (!$_podeEditarCategoriasGC): ?>
+                    <div class="text-center py-4">
+                        <i class="bi bi-eye mb-3 d-block" style="font-size:2rem;color:#60a5fa;"></i>
+                        <h6 class="text-light fw-bold mb-2">Modo somente leitura</h6>
+                        <p class="text-secondary mb-0" style="font-size:0.875rem;">Só o dono da carteira compartilhada pode criar, editar ou excluir categorias aqui. Você pode usá-las normalmente ao lançar transações.</p>
+                    </div>
+                <?php else: ?>
                     <h5 class="text-light fw-bold mb-4 d-flex align-items-center gap-2">
                         <i class="bi bi-plus-circle text-primary" style="color: var(--primary-gold-analysis) !important;"></i> Nova Categoria
                         <?php if (!$_podeCriarCat): ?>
@@ -482,6 +574,7 @@ $listaIcones = [
                             </button>
                         </form>
                     <?php endif; ?>
+                <?php endif; ?>
                 </div>
             </div>
         </div>
@@ -527,18 +620,27 @@ $listaIcones = [
                                         </td>
                                         <td class="py-3 border-secondary-subtle text-center fs-7" style="min-width:150px;">
                                             <?php $metaCat = $metasPorCategoria[$cat['IDCategoria']] ?? null; ?>
-                                            <button type="button"
-                                                class="btn btn-sm rounded-pill <?= $metaCat !== null ? 'btn-outline-info' : 'btn-outline-secondary' ?>"
-                                                style="font-size:0.72rem;"
-                                                onclick="abrirModalMeta('<?= $cat['IDCategoria'] ?>','<?= htmlspecialchars(addslashes($cat['NomeCategoria'])) ?>','despesa',<?= $metaCat !== null ? $metaCat : 'null' ?>)">
-                                                <?php if ($metaCat !== null): ?>
-                                                    <i class="bi bi-piggy-bank me-1"></i>R$ <?= number_format($metaCat, 2, ',', '.') ?>
-                                                <?php else: ?>
-                                                    <i class="bi bi-plus-lg me-1"></i>Orçamento
-                                                <?php endif; ?>
-                                            </button>
+                                            <?php if ($_podeEditarCategoriasGC): ?>
+                                                <button type="button"
+                                                    class="btn btn-sm rounded-pill <?= $metaCat !== null ? 'btn-outline-info' : 'btn-outline-secondary' ?>"
+                                                    style="font-size:0.72rem;"
+                                                    onclick="abrirModalMeta('<?= $cat['IDCategoria'] ?>','<?= htmlspecialchars(addslashes($cat['NomeCategoria'])) ?>','despesa',<?= $metaCat !== null ? $metaCat : 'null' ?>)">
+                                                    <?php if ($metaCat !== null): ?>
+                                                        <i class="bi bi-piggy-bank me-1"></i>R$ <?= number_format($metaCat, 2, ',', '.') ?>
+                                                    <?php else: ?>
+                                                        <i class="bi bi-plus-lg me-1"></i>Orçamento
+                                                    <?php endif; ?>
+                                                </button>
+                                            <?php elseif ($metaCat !== null): ?>
+                                                <span class="text-secondary"><i class="bi bi-piggy-bank me-1"></i>R$ <?= number_format($metaCat, 2, ',', '.') ?></span>
+                                            <?php else: ?>
+                                                <span class="text-secondary opacity-50">—</span>
+                                            <?php endif; ?>
                                         </td>
                                         <td class="text-end pe-3 pe-md-4 py-3 border-secondary-subtle">
+                                            <?php if (!$_podeEditarCategoriasGC): ?>
+                                                <span class="text-secondary opacity-50">—</span>
+                                            <?php else: ?>
                                             <div class="d-flex align-items-center justify-content-end gap-2">
                                                 <button type="button"
                                                     class="btn btn-sm btn-outline-warning rounded-circle transition-hover d-flex align-items-center justify-content-center"
@@ -568,6 +670,7 @@ $listaIcones = [
                                                     </button>
                                                 <?php endif; ?>
                                             </div>
+                                            <?php endif; ?>
                                         </td>
                                     </tr>
                                 <?php endforeach; ?>
@@ -616,18 +719,27 @@ $listaIcones = [
                                         </td>
                                         <td class="py-3 border-secondary-subtle text-center fs-7" style="min-width:150px;">
                                             <?php $metaCat = $metasPorCategoria[$cat['IDCategoria']] ?? null; ?>
-                                            <button type="button"
-                                                class="btn btn-sm rounded-pill <?= $metaCat !== null ? 'btn-outline-info' : 'btn-outline-secondary' ?>"
-                                                style="font-size:0.72rem;"
-                                                onclick="abrirModalMeta('<?= $cat['IDCategoria'] ?>','<?= htmlspecialchars(addslashes($cat['NomeCategoria'])) ?>','receita',<?= $metaCat !== null ? $metaCat : 'null' ?>)">
-                                                <?php if ($metaCat !== null): ?>
-                                                    <i class="bi bi-flag-fill me-1"></i>R$ <?= number_format($metaCat, 2, ',', '.') ?>
-                                                <?php else: ?>
-                                                    <i class="bi bi-plus-lg me-1"></i>Meta
-                                                <?php endif; ?>
-                                            </button>
+                                            <?php if ($_podeEditarCategoriasGC): ?>
+                                                <button type="button"
+                                                    class="btn btn-sm rounded-pill <?= $metaCat !== null ? 'btn-outline-info' : 'btn-outline-secondary' ?>"
+                                                    style="font-size:0.72rem;"
+                                                    onclick="abrirModalMeta('<?= $cat['IDCategoria'] ?>','<?= htmlspecialchars(addslashes($cat['NomeCategoria'])) ?>','receita',<?= $metaCat !== null ? $metaCat : 'null' ?>)">
+                                                    <?php if ($metaCat !== null): ?>
+                                                        <i class="bi bi-flag-fill me-1"></i>R$ <?= number_format($metaCat, 2, ',', '.') ?>
+                                                    <?php else: ?>
+                                                        <i class="bi bi-plus-lg me-1"></i>Meta
+                                                    <?php endif; ?>
+                                                </button>
+                                            <?php elseif ($metaCat !== null): ?>
+                                                <span class="text-secondary"><i class="bi bi-flag-fill me-1"></i>R$ <?= number_format($metaCat, 2, ',', '.') ?></span>
+                                            <?php else: ?>
+                                                <span class="text-secondary opacity-50">—</span>
+                                            <?php endif; ?>
                                         </td>
                                         <td class="text-end pe-3 pe-md-4 py-3 border-secondary-subtle">
+                                            <?php if (!$_podeEditarCategoriasGC): ?>
+                                                <span class="text-secondary opacity-50">—</span>
+                                            <?php else: ?>
                                             <div class="d-flex align-items-center justify-content-end gap-2">
                                                 <button type="button"
                                                     class="btn btn-sm btn-outline-warning rounded-circle transition-hover d-flex align-items-center justify-content-center"
@@ -657,6 +769,7 @@ $listaIcones = [
                                                     </button>
                                                 <?php endif; ?>
                                             </div>
+                                            <?php endif; ?>
                                         </td>
                                     </tr>
                                 <?php endforeach; ?>
@@ -900,6 +1013,9 @@ $listaIcones = [
                 <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
             </div>
             <form method="POST" action="salvar_poupanca_mensal.php">
+                <?php if ($carteira_ctx): ?>
+                    <input type="hidden" name="carteira" value="<?= htmlspecialchars($carteira_ctx['id']) ?>">
+                <?php endif; ?>
                 <div class="modal-body p-4">
                     <label class="form-label text-secondary small mb-1">Quanto você quer guardar por mês?</label>
                     <div class="input-group">
