@@ -286,11 +286,13 @@ $_carteiraParam = (!empty($_SESSION['ultima_carteira']))
             </a>
             <a href="/carteira/listar_carteiras.php"
                class="sidebar-item <?= $paginaAtual === 'listar_carteiras.php' ? 'active' : '' ?>">
-                <i class="bi bi-wallet"></i>
+                <span class="sidebar-icon-badge-wrap">
+                    <i class="bi bi-wallet"></i>
+                    <?php if ($_qtdConvitesPendentes > 0): ?>
+                        <span class="sidebar-icon-badge" title="<?= $_qtdConvitesPendentes ?> convite(s) pendente(s)"><?= $_qtdConvitesPendentes ?></span>
+                    <?php endif; ?>
+                </span>
                 <span class="sidebar-label">Carteiras</span>
-                <?php if ($_qtdConvitesPendentes > 0): ?>
-                    <span class="sidebar-badge sidebar-label" style="background:#60a5fa22;color:#60a5fa;border:1px solid #60a5fa55;border-radius:999px;padding:1px 7px;font-size:0.65rem;font-weight:700;line-height:1.6;" title="<?= $_qtdConvitesPendentes ?> convite(s) pendente(s)"><?= $_qtdConvitesPendentes ?></span>
-                <?php endif; ?>
             </a>
             <a href="/cartao_credito/index.php"
                class="sidebar-item <?= (strpos($_SERVER['PHP_SELF'], '/cartao_credito/') !== false) ? 'active' : '' ?>">

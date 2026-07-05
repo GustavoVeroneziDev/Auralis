@@ -1123,6 +1123,34 @@ input[type="number"] {
   transition: opacity 0.15s;
 }
 
+/* Selo numérico ancorado no canto do ícone (ex.: convites pendentes) — ao contrário do
+   .sidebar-badge de texto (que só faz sentido ao lado do label), esse continua visível
+   mesmo com a sidebar colapsada, igual um badge de notificação de app. */
+.sidebar-icon-badge-wrap {
+  position: relative;
+  display: inline-flex;
+  flex-shrink: 0;
+}
+
+.sidebar-icon-badge {
+  position: absolute;
+  top: -6px;
+  right: -8px;
+  min-width: 15px;
+  height: 15px;
+  padding: 0 3px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 999px;
+  background: #60a5fa;
+  color: #06111f;
+  border: 2px solid var(--bg-card);
+  font-size: 0.6rem;
+  font-weight: 800;
+  line-height: 1;
+}
+
 .auralis-sidebar.sidebar-collapsed .sidebar-label,
 .auralis-sidebar.sidebar-collapsed .sidebar-badge {
   opacity: 0;
