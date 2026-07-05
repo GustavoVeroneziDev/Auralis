@@ -875,17 +875,45 @@ require_once '../geral/header.php';
         }
     }
 
-    // O dropdown de 3 pontos do card ficava cortado pelo overflow-hidden do card (usado
-    // pra arredondar os cantos e conter o selo "N pessoa(s)"). Reinicializa cada um com
-    // popperConfig strategy:'fixed', que posiciona o menu relativo à janela em vez de
-    // ficar preso à caixa do card — precisa ser feito via JS, não existe um data-bs-*
-    // simples pra isso no Bootstrap 5.
+    // O dropdown de 3 pontos ficava cortado pelo overflow-hidden do card (usado pra
+    // arredondar cantos e conter o selo "N pessoa(s)"), e mesmo com strategy:'fixed'
+    // continuava aparecendo por baixo de outros cards — cada card tem seu próprio
+    // "stacking context", e um z-index alto dentro de um card não vence um card
+    // seguinte no HTML. A solução (igual painel de camadas do Canva, um overlay que
+    // sempre fica por cima de tudo): quando o menu abre, ele é fisicamente movido pra
+    // ser filho direto do <body> — some de dentro do card, então nada nele consegue
+    // mais cortar ou cobrir o menu — e volta pro lugar original quando fecha (o Popper
+    // continua ancorando a posição nos 3 pontos normalmente, isso não muda).
     document.addEventListener('DOMContentLoaded', function() {
-        document.querySelectorAll('.js-dropdown-carteira').forEach(function(el) {
-            new bootstrap.Dropdown(el, {
+        document.querySelectorAll('.js-dropdown-carteira').forEach(function(toggleEl) {
+            new bootstrap.Dropdown(toggleEl, {
                 popperConfig: function(defaultConfig) {
                     return Object.assign({}, defaultConfig, { strategy: 'fixed' });
                 }
+            });
+
+            const menu = toggleEl.nextElementSibling;
+            if (!menu || !menu.classList.contains('dropdown-menu')) return;
+
+            const placeholder = document.createComment('dropdown-lugar-original');
+            let movido = false;
+
+            // Precisa ser "shown" (depois que o Bootstrap termina de abrir), não "show" —
+            // o Bootstrap ainda procura o menu como "próximo irmão" do botão logo depois
+            // do evento "show" disparar, então mover cedo demais quebra a abertura.
+            toggleEl.addEventListener('shown.bs.dropdown', function() {
+                if (movido) return;
+                menu.parentNode.insertBefore(placeholder, menu);
+                document.body.appendChild(menu);
+                menu.style.zIndex = '3000';
+                movido = true;
+            });
+
+            toggleEl.addEventListener('hidden.bs.dropdown', function() {
+                if (!movido) return;
+                placeholder.parentNode.insertBefore(menu, placeholder);
+                placeholder.remove();
+                movido = false;
             });
         });
     });
