@@ -351,8 +351,8 @@ $listaIcones = [
 <main class="container py-4 mt-2 flex-grow-1" style="min-height: 100vh; padding-inline: var(--space-page-x);">
 
     <div class="d-flex justify-content-between align-items-center mb-2 border-bottom border-secondary-subtle pb-3 gap-3 flex-wrap">
-        <a href="<?= $carteira_ctx ? 'carteira/membros.php?carteira=' . urlencode($carteira_ctx['id']) : 'dashboard.php' ?>" class="btn btn-outline-secondary btn-sm rounded-pill px-3 transition-hover">
-            <i class="bi bi-arrow-left me-1"></i> <?= $carteira_ctx ? 'Voltar aos Membros' : 'Voltar ao Painel' ?>
+        <a href="<?= $carteira_ctx ? 'carteira/administrar_carteira.php?carteira=' . urlencode($carteira_ctx['id']) : 'dashboard.php' ?>" class="btn btn-outline-secondary btn-sm rounded-pill px-3 transition-hover">
+            <i class="bi bi-arrow-left me-1"></i> <?= $carteira_ctx ? 'Voltar à Carteira' : 'Voltar ao Painel' ?>
         </a>
         <?php if ($carteira_ctx): ?>
             <span class="d-flex align-items-center gap-2" style="font-size:0.85rem;color:#60a5fa;">

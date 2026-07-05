@@ -193,6 +193,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'])) {
                     }
                 } catch (PDOException $e) {
                 }
+                logAtividadeRegistroSeCompartilhada($pdo, $id_registro, $usuario_id, $novo_status === 'efetivado' ? 'lancamento_efetivado' : 'lancamento_estornado');
                 header("Location: " . $redirectBase);
                 exit;
             } catch (PDOException $e) {
@@ -202,7 +203,12 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'])) {
 
     if ($_POST['action'] === 'excluir_registro') {
         $id_registro = $_POST['registro_id'];
+        if (!podeExcluirRegistro($pdo, $id_registro, $usuario_id)) {
+            header("Location: " . $redirectBase . "&erro=sem_permissao_excluir");
+            exit;
+        }
         try {
+            logAtividadeRegistroSeCompartilhada($pdo, $id_registro, $usuario_id, 'lancamento_excluido');
             $sqlDel  = "DELETE FROM Registro WHERE IDRegistro = :id AND $_whereRegPermitido";
             $stmtDel = $pdo->prepare($sqlDel);
             $stmtDel->execute([':id' => $id_registro, ':uid' => $usuario_id, ':uid2' => $usuario_id]);
@@ -218,7 +224,13 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'])) {
         $data_base     = $_POST['momento_registro'];
         $tipo_exclusao = $_POST['tipo_exclusao'] ?? 'apenas_este';
 
+        if (!podeExcluirRegistro($pdo, $id_registro, $usuario_id)) {
+            header("Location: " . $redirectBase . "&erro=sem_permissao_excluir");
+            exit;
+        }
+
         try {
+            logAtividadeRegistroSeCompartilhada($pdo, $id_registro, $usuario_id, 'lancamento_excluido');
             if ($tipo_exclusao === 'futuros' && !empty($grupo_id)) {
                 // Exclui o registro selecionado E todas as projeções futuras pendentes do grupo
                 $sqlDel = "
@@ -253,7 +265,13 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'])) {
         $parcela_atual = (int)$_POST['parcela_atual'];
         $tipo_exclusao = $_POST['tipo_exclusao'] ?? 'apenas_este';
 
+        if (!podeExcluirRegistro($pdo, $id_registro, $usuario_id)) {
+            header("Location: " . $redirectBase . "&erro=sem_permissao_excluir");
+            exit;
+        }
+
         try {
+            logAtividadeRegistroSeCompartilhada($pdo, $id_registro, $usuario_id, 'lancamento_excluido');
             if ($tipo_exclusao === 'futuros' && !empty($grupo_id)) {
                 // Exclui a parcela selecionada e todas as que vêm DEPOIS dela
                 $sqlDel = "
@@ -697,6 +715,9 @@ require_once 'geral/header.php';
                 $n = isset($_GET['parcelas']) ? (int)$_GET['parcelas'] : '';
                 $msg = "Compra parcelada em {$n}x registrada!";
             }
+        }
+        if (($_GET['erro'] ?? '') === 'sem_permissao_excluir') {
+            $msg = 'O dono desligou a exclusão livre pra convidados nessa carteira. Só ele pode excluir.';
         }
         if ($msg): ?>
             <script>

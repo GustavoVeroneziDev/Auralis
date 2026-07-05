@@ -154,6 +154,14 @@ if ($id_editar && $transacao_edit) {
     }
 }
 
+// Helper: monta o texto de detalhe do log de atividade da carteira compartilhada
+// (ex.: "Receita de R$ 800,00 — Salário de julho") a partir dos dados do lançamento.
+function _descLogRegistroNT(string $tipoRegistro, $valor, string $descricao): string
+{
+    $rotulo = $tipoRegistro === 'receita' ? 'Receita' : 'Despesa';
+    return $rotulo . ' de R$ ' . number_format((float)$valor, 2, ',', '.') . ' — ' . $descricao;
+}
+
 // Helper: processa e salva arquivos enviados para um registro
 function processarComprovantes(PDO $pdo, string $registroId, string $usuarioId): void
 {
@@ -455,6 +463,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                     ]);
                 }
                 processarComprovantes($pdo, $_POST['id_editar'], $usuario_id);
+                if ($_carteiraAlvoCompartilhada) {
+                    logAtividadeCarteira($pdo, $carteiraId, $usuario_id, 'lancamento_editado', _descLogRegistroNT($tipoRegistro, $valor, $descricao));
+                }
                 header("Location: " . $_urlVoltar . (strpos($_urlVoltar, '?') !== false ? '&' : '?') . "sucesso=editado");
             } elseif ($parcelado && $numParcelas >= 2) {
                 // ── CRIAÇÃO PARCELADA ────────────────
@@ -575,6 +586,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                     verificarConquistasRegistros($pdo, $usuario_id);
                     verificarConquistasComprovantes($pdo, $usuario_id);
                     verificarConquistasCategorias($pdo, $usuario_id);
+                    if ($_carteiraAlvoCompartilhada) {
+                        logAtividadeCarteira($pdo, $carteiraId, $usuario_id, 'lancamento_criado', _descLogRegistroNT($tipoRegistro, $valor, $descricao) . " (parcelado {$numParcelas}x)");
+                    }
                     header("Location: " . $_urlVoltar . (strpos($_urlVoltar, '?') !== false ? '&' : '?') . "sucesso=parcelado&parcelas={$numParcelas}");
                     exit;
                 }
@@ -631,6 +645,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 verificarConquistasRegistros($pdo, $usuario_id);
                 verificarConquistasComprovantes($pdo, $usuario_id);
                 verificarConquistasCategorias($pdo, $usuario_id);
+                if ($_carteiraAlvoCompartilhada) {
+                    logAtividadeCarteira($pdo, $carteiraId, $usuario_id, 'lancamento_criado', _descLogRegistroNT($tipoRegistro, $valor, $descricao) . " (recorrente)");
+                }
                 header("Location: " . $_urlVoltar . (strpos($_urlVoltar, '?') !== false ? '&' : '?') . "sucesso=recorrente");
             } else {
                 // ── CRIAÇÃO SIMPLES (Transação Única) ────────────────────────
@@ -664,6 +681,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 verificarConquistasRegistros($pdo, $usuario_id);
                 verificarConquistasComprovantes($pdo, $usuario_id);
                 verificarConquistasCategorias($pdo, $usuario_id);
+                if ($_carteiraAlvoCompartilhada) {
+                    logAtividadeCarteira($pdo, $carteiraId, $usuario_id, 'lancamento_criado', _descLogRegistroNT($tipoRegistro, $valor, $descricao));
+                }
                 header("Location: " . $_urlVoltar . (strpos($_urlVoltar, '?') !== false ? '&' : '?') . "sucesso=registro");
             }
             exit;

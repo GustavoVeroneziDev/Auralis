@@ -15,31 +15,55 @@ if (!$id || !$acao) { echo json_encode(['ok' => false, 'erro' => 'parametros inv
 // Verifica que o registro pertence ao usuário (ou que ele é dono da carteira compartilhada
 // onde o registro está) antes de qualquer ação.
 $stmtCheck = $pdo->prepare("
-    SELECT IDRegistro, StatusRegistro FROM Registro
+    SELECT IDRegistro, StatusRegistro, TipoRegistro, Valor, Descricao, FKCarteira FROM Registro
     WHERE IDRegistro = :id
       AND (FKUsuario = :uid OR FKCarteira IN (SELECT IDCarteira FROM Carteira WHERE FKUsuarioDono = :uid2))
     LIMIT 1
 ");
 $stmtCheck->execute([':id' => $id, ':uid' => $uid, ':uid2' => $uid]);
-$reg = $stmtCheck->fetch();
+$reg = $stmtCheck->fetch(PDO::FETCH_ASSOC);
 if (!$reg) { http_response_code(404); echo json_encode(['ok' => false, 'erro' => 'nao encontrado']); exit; }
 
 $_whereAcao = "IDRegistro = :id AND (FKUsuario = :uid OR FKCarteira IN (SELECT IDCarteira FROM Carteira WHERE FKUsuarioDono = :uid2))";
+
+// Se a carteira do registro for compartilhada, cada ação vira uma linha no log de
+// atividade (visível pro dono em "Atividade" na página de administrar carteira) — sem
+// isso, o dono nunca ficava sabendo quando um convidado excluía/efetivava algo.
+$_carteiraLogAR = null;
+try {
+    $stmtCartAR = $pdo->prepare("SELECT Compartilhada FROM Carteira WHERE IDCarteira = :cid");
+    $stmtCartAR->execute([':cid' => $reg['FKCarteira']]);
+    if ((int)($stmtCartAR->fetchColumn() ?: 0) === 1) $_carteiraLogAR = $reg['FKCarteira'];
+} catch (PDOException $e) {
+}
+$_detalheLogAR = ($reg['TipoRegistro'] === 'receita' ? 'Receita' : 'Despesa')
+    . ' de R$ ' . number_format((float)$reg['Valor'], 2, ',', '.') . ' — ' . $reg['Descricao'];
+
+// Dono pode restringir convidados de excluir livremente (Permissões, na página de
+// administrar carteira) — quem não é dono da carteira compartilhada fica bloqueado aqui.
+if ($acao === 'excluir' && $_carteiraLogAR && carteiraPapelDoUsuario($pdo, $_carteiraLogAR, $uid) !== 'dono' && !carteiraPermiteConvidadoExcluir($pdo, $_carteiraLogAR)) {
+    http_response_code(403);
+    echo json_encode(['ok' => false, 'erro' => 'sem permissao para excluir nessa carteira']);
+    exit;
+}
 
 try {
     if ($acao === 'excluir') {
         $pdo->prepare("DELETE FROM Registro WHERE $_whereAcao")
             ->execute([':id' => $id, ':uid' => $uid, ':uid2' => $uid]);
+        if ($_carteiraLogAR) logAtividadeCarteira($pdo, $_carteiraLogAR, $uid, 'lancamento_excluido', $_detalheLogAR);
         echo json_encode(['ok' => true]);
 
     } elseif ($acao === 'nao_efetivar') {
         $pdo->prepare("UPDATE Registro SET StatusRegistro = 'pendente' WHERE $_whereAcao")
             ->execute([':id' => $id, ':uid' => $uid, ':uid2' => $uid]);
+        if ($_carteiraLogAR) logAtividadeCarteira($pdo, $_carteiraLogAR, $uid, 'lancamento_estornado', $_detalheLogAR);
         echo json_encode(['ok' => true]);
 
     } elseif ($acao === 'efetivar') {
         $pdo->prepare("UPDATE Registro SET StatusRegistro = 'efetivado' WHERE $_whereAcao")
             ->execute([':id' => $id, ':uid' => $uid, ':uid2' => $uid]);
+        if ($_carteiraLogAR) logAtividadeCarteira($pdo, $_carteiraLogAR, $uid, 'lancamento_efetivado', $_detalheLogAR);
 
         // Verifica conquista sempendencias (nenhum pendente + ao menos 1 efetivado no mês)
         try {
@@ -74,6 +98,7 @@ try {
         }
         $pdo->prepare("UPDATE Registro SET FKCarteira = :dest WHERE $_whereAcao")
             ->execute([':dest' => $dest, ':id' => $id, ':uid' => $uid, ':uid2' => $uid]);
+        if ($_carteiraLogAR) logAtividadeCarteira($pdo, $_carteiraLogAR, $uid, 'lancamento_transferido', $_detalheLogAR);
         echo json_encode(['ok' => true]);
 
     } else {

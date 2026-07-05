@@ -332,9 +332,9 @@ require_once 'geral/header.php';
 
                 <h6 class="fw-bold text-light mb-3"><i class="bi bi-list-check me-2" style="color:var(--primary-gold-analysis);"></i>Como criar e convidar</h6>
                 <ol class="ps-3 text-secondary mb-4" style="line-height:2;">
-                    <li>Em <strong class="text-light">Carteiras</strong>, clique em <strong class="text-light">"+ Nova Carteira"</strong> e marque <strong class="text-light">"Carteira compartilhada?"</strong> — só dá pra decidir isso na criação.</li>
+                    <li>Em <strong class="text-light">Carteiras</strong>, clique em <strong class="text-light">"+ Nova Carteira"</strong> e marque <strong class="text-light">"Carteira compartilhada?"</strong> — só dá pra decidir isso na criação. Ela já nasce com o mesmo kit de categorias prontas de uma conta nova.</li>
                     <li>Peça pra pessoa abrir <strong class="text-light">Configurações</strong> e te passar o código dela (tipo "USR-AB12CD").</li>
-                    <li>Na carteira criada, abra <strong class="text-light">"Gerenciar Membros"</strong> e cole o código pra enviar o convite.</li>
+                    <li>Clique na própria carteira (ou no menu de 3 pontos) pra abrir <strong class="text-light">"Administrar Carteira"</strong> e cole o código na aba <strong class="text-light">Membros</strong> pra enviar o convite.</li>
                     <li>A pessoa vê o convite direto na página <strong class="text-light">Carteiras</strong> (com um selinho de aviso na barra lateral) e precisa aceitar pra entrar — nada acontece automaticamente sem a confirmação dela.</li>
                 </ol>
 
@@ -342,11 +342,11 @@ require_once 'geral/header.php';
                 <div class="mb-4">
                     <div class="d-flex gap-3 mb-2 p-3 rounded-3" style="background:var(--bg-body);">
                         <i class="bi bi-star-fill flex-shrink-0 mt-1" style="color:var(--primary-gold-analysis);"></i>
-                        <div><span class="fw-semibold text-light">Dono</span> <span class="text-secondary">— quem criou a carteira. Gerencia membros, categorias da carteira, e pode editar ou excluir o lançamento de qualquer pessoa.</span></div>
+                        <div><span class="fw-semibold text-light">Dono</span> <span class="text-secondary">— quem criou a carteira. Gerencia membros, categorias da carteira, define permissões (ex: se convidado pode excluir lançamento livremente) e pode editar ou excluir o lançamento de qualquer pessoa.</span></div>
                     </div>
                     <div class="d-flex gap-3 p-3 rounded-3" style="background:var(--bg-body);">
                         <i class="bi bi-person flex-shrink-0 mt-1" style="color:#60a5fa;"></i>
-                        <div><span class="fw-semibold text-light">Convidado</span> <span class="text-secondary">— vê tudo (sem privacidade seletiva), lança transações normalmente, mas só edita ou exclui o que ele mesmo lançou. Categorias da carteira só o dono cria ou edita.</span></div>
+                        <div><span class="fw-semibold text-light">Convidado</span> <span class="text-secondary">— vê tudo (sem privacidade seletiva), lança transações normalmente, edita o que ele mesmo lançou, e exclui também — a não ser que o dono tenha desligado isso em Permissões. Categorias da carteira só o dono cria ou edita.</span></div>
                     </div>
                 </div>
 
@@ -358,7 +358,7 @@ require_once 'geral/header.php';
                     </div>
                     <div class="d-flex gap-3 p-3 rounded-3" style="background:var(--bg-body);">
                         <i class="bi bi-clock-history flex-shrink-0 mt-1" style="color:#60a5fa;"></i>
-                        <div><span class="fw-semibold text-light">Log de atividade</span> <span class="text-secondary">— em "Gerenciar Membros", o dono vê quem entrou, saiu ou foi removido da carteira.</span></div>
+                        <div><span class="fw-semibold text-light">Atividade</span> <span class="text-secondary">— em "Administrar Carteira", a aba Atividade mostra quem criou, editou, excluiu, efetivou ou transferiu cada lançamento, além de convites/entradas/saídas. Filtra por "Tudo", "Movimentações na Carteira" (lançamentos) ou "Movimentações de Membro" (convite, entrou, saiu).</span></div>
                     </div>
                 </div>
 

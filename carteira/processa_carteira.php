@@ -71,10 +71,17 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 exit;
             }
             $compartilhada = $quisCompartilhada ? 1 : 0;
+            $novaCarteiraId = gerarUuid();
 
             $sql = "INSERT INTO Carteira (IDCarteira, TipoCarteira, FKUsuarioDono, Compartilhada) VALUES (:idCarteira, :tipoCarteira, :usuarioId, :compartilhada)";
             $stmt = $pdo->prepare($sql);
-            $stmt->execute([':idCarteira' => gerarUuid(), ':tipoCarteira' => $tipoCarteira, ':usuarioId' => $usuarioId, ':compartilhada' => $compartilhada]);
+            $stmt->execute([':idCarteira' => $novaCarteiraId, ':tipoCarteira' => $tipoCarteira, ':usuarioId' => $usuarioId, ':compartilhada' => $compartilhada]);
+
+            // Carteira compartilhada já nasce com o mesmo kit de categorias de um usuário
+            // novo, em vez de começar vazia (todo mundo que entrar já vê categorias prontas).
+            if ($compartilhada) {
+                injetarKitCategoriasIniciais($pdo, $usuarioId, $novaCarteiraId);
+            }
 
             // Retorna para o lugar certo dependendo de onde o modal foi aberto
             if (isset($_POST['origem']) && $_POST['origem'] === 'listar_carteiras') {

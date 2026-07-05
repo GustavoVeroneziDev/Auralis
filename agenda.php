@@ -45,7 +45,12 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && ($_POST['action'] ?? '') === 'exclu
     header('Content-Type: application/json; charset=utf-8');
     $id = trim($_POST['registro_id'] ?? '');
     if ($id) {
+        if (!podeExcluirRegistro($pdo, $id, $usuario_id)) {
+            echo json_encode(['ok' => false, 'erro' => 'O dono desligou a exclusão livre pra convidados nessa carteira.']);
+            exit;
+        }
         try {
+            logAtividadeRegistroSeCompartilhada($pdo, $id, $usuario_id, 'lancamento_excluido');
             $pdo->prepare("DELETE FROM Registro WHERE IDRegistro = :id AND $_whereRegPermitido")
                 ->execute([':id' => $id, ':uid' => $usuario_id, ':uid2' => $usuario_id]);
             echo json_encode(['ok' => true]);
@@ -72,7 +77,15 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && ($_POST['action'] ?? '') === 'exclu
         echo json_encode(['ok' => false, 'erro' => 'IDs inválidos']);
         exit;
     }
+    $ids = array_values(array_filter($ids, fn($id) => podeExcluirRegistro($pdo, $id, $usuario_id)));
+    if (empty($ids)) {
+        echo json_encode(['ok' => false, 'erro' => 'O dono desligou a exclusão livre pra convidados nessa carteira.']);
+        exit;
+    }
     try {
+        foreach ($ids as $id) {
+            logAtividadeRegistroSeCompartilhada($pdo, $id, $usuario_id, 'lancamento_excluido');
+        }
         $ph   = implode(',', array_fill(0, count($ids), '?'));
         $stmt = $pdo->prepare("DELETE FROM Registro WHERE IDRegistro IN ($ph) AND (FKUsuario = ? OR FKCarteira IN (SELECT IDCarteira FROM Carteira WHERE FKUsuarioDono = ?))");
         $stmt->execute(array_merge($ids, [$usuario_id, $usuario_id]));

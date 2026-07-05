@@ -373,6 +373,7 @@ require_once '../geral/header.php';
         ?>
             <div class="col-md-6 col-lg-4">
                 <div class="card bg-body-tertiary border-secondary-subtle shadow-sm h-100 rounded-4 auralis-wallet-card position-relative overflow-hidden"
+                    <?= $_cartCompart ? 'data-href="administrar_carteira.php?carteira=' . urlencode($cart['IDCarteira']) . '"' : '' ?>
                     <?= $_cartBloqueada ? 'style="opacity:0.55;border-color:rgba(124,58,237,0.35) !important;"' : '' ?>>
 
                     <?php if ($_cartCompart):
@@ -436,8 +437,8 @@ require_once '../geral/header.php';
                                     <?php if ($_cartCompart): ?>
                                     <li>
                                         <a class="dropdown-item d-flex align-items-center transition-hover py-2" style="color:#60a5fa;"
-                                           href="membros.php?carteira=<?= urlencode($cart['IDCarteira']) ?>">
-                                            <i class="bi bi-people-fill me-2"></i> Gerenciar Membros
+                                           href="administrar_carteira.php?carteira=<?= urlencode($cart['IDCarteira']) ?>">
+                                            <i class="bi bi-people-fill me-2"></i> Administrar Carteira
                                         </a>
                                     </li>
                                     <?php endif; ?>
@@ -475,7 +476,8 @@ require_once '../geral/header.php';
             $_convMax     = $_convMaxRaw === PHP_INT_MAX ? '∞' : (int)$_convMaxRaw;
         ?>
             <div class="col-md-6 col-lg-4">
-                <div class="card bg-body-tertiary border-secondary-subtle shadow-sm h-100 rounded-4 auralis-wallet-card position-relative overflow-hidden">
+                <div class="card bg-body-tertiary border-secondary-subtle shadow-sm h-100 rounded-4 auralis-wallet-card position-relative overflow-hidden"
+                    data-href="administrar_carteira.php?carteira=<?= urlencode($cart['IDCarteira']) ?>">
                     <span class="position-absolute top-0 start-0 m-2 d-flex align-items-center gap-1"
                           style="background:rgba(96,165,250,0.18);color:#60a5fa;border:1px solid rgba(96,165,250,0.4);border-radius:999px;padding:2px 8px;font-size:0.6rem;font-weight:700;z-index:2;"
                           title="Carteira compartilhada &mdash; você é convidado(a)">
@@ -499,6 +501,12 @@ require_once '../geral/header.php';
                                     <i class="bi bi-three-dots-vertical fs-5"></i>
                                 </button>
                                 <ul class="dropdown-menu dropdown-menu-end bg-dark border-secondary-subtle shadow-lg">
+                                    <li>
+                                        <a class="dropdown-item d-flex align-items-center transition-hover py-2" style="color:#60a5fa;"
+                                           href="administrar_carteira.php?carteira=<?= urlencode($cart['IDCarteira']) ?>">
+                                            <i class="bi bi-clock-history me-2"></i> Ver Atividade
+                                        </a>
+                                    </li>
                                     <li>
                                         <a class="dropdown-item d-flex align-items-center transition-hover py-2" style="color:#60a5fa;"
                                            href="../gerenciar_categorias.php?carteira=<?= urlencode($cart['IDCarteira']) ?>">
@@ -626,6 +634,10 @@ require_once '../geral/header.php';
 
     .auralis-wallet-card {
         transition: box-shadow 0.2s ease, border-color 0.2s ease;
+    }
+
+    .auralis-wallet-card[data-href] {
+        cursor: pointer;
     }
 
     /* Sem "transform" aqui de propósito — um transform no card cria um novo "containing
@@ -942,6 +954,16 @@ require_once '../geral/header.php';
             // Reancora se a página rolar ou a janela for redimensionada com o menu aberto
             window.addEventListener('scroll', function() { if (movido) posicionar(); }, true);
             window.addEventListener('resize', function() { if (movido) posicionar(); });
+        });
+
+        // Card de carteira compartilhada inteiro é clicável e leva pra Administrar Carteira
+        // — ignora clique no dropdown de 3 pontos e no botão de favoritar (estrela), que têm
+        // sua própria ação.
+        document.querySelectorAll('.auralis-wallet-card[data-href]').forEach(function(card) {
+            card.addEventListener('click', function(e) {
+                if (e.target.closest('.dropdown') || e.target.closest('.btn-favoritar-carteira')) return;
+                window.location.href = card.dataset.href;
+            });
         });
     });
 </script>

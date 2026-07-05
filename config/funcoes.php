@@ -1345,10 +1345,41 @@ function garantirEstruturaCarteirasCompartilhadas(PDO $pdo): void
               FKUsuario  CHAR(36) NOT NULL,
               Acao       VARCHAR(40) NOT NULL,
               Detalhe    VARCHAR(255) NULL,
+              Categoria  VARCHAR(20) NOT NULL DEFAULT 'membro',
               CriadoEm   DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
               KEY idx_log_carteira (FKCarteira, CriadoEm)
             ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4
         ");
+    } catch (PDOException $e) {
+    }
+
+    // LogAtividadeCarteira.Categoria — separa "movimentação de membro" (convite,
+    // entrou/saiu) de "movimentação na carteira" (criou/editou/excluiu lançamento), pro
+    // filtro de 3 visões (Tudo/Movimentações na carteira/Movimentações de membro) na
+    // página de administrar carteira. Backfill 'membro' porque só esse tipo de evento
+    // existia antes dessa coluna existir.
+    try {
+        $chkCatLog = $pdo->query("
+            SELECT COLUMN_NAME FROM INFORMATION_SCHEMA.COLUMNS
+            WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'LogAtividadeCarteira' AND COLUMN_NAME = 'Categoria'
+        ")->fetchColumn();
+        if (!$chkCatLog) {
+            $pdo->exec("ALTER TABLE LogAtividadeCarteira ADD COLUMN Categoria VARCHAR(20) NOT NULL DEFAULT 'membro'");
+        }
+    } catch (PDOException $e) {
+    }
+
+    // Carteira.PermiteConvidadoExcluir — dono controla se convidados podem excluir os
+    // próprios lançamentos livremente (default 1 = mantém o comportamento de sempre).
+    // Desligado, só o dono exclui — evita sumiço de lançamento sem o dono perceber.
+    try {
+        $chkPerm = $pdo->query("
+            SELECT COLUMN_NAME FROM INFORMATION_SCHEMA.COLUMNS
+            WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'Carteira' AND COLUMN_NAME = 'PermiteConvidadoExcluir'
+        ")->fetchColumn();
+        if (!$chkPerm) {
+            $pdo->exec("ALTER TABLE Carteira ADD COLUMN PermiteConvidadoExcluir TINYINT(1) NOT NULL DEFAULT 1 AFTER Compartilhada");
+        }
     } catch (PDOException $e) {
     }
 
@@ -1514,17 +1545,134 @@ function podeConvidarMaisMembros(PDO $pdo, string $carteiraId): bool
 // exceção pro chamador — log é auxiliar, não pode travar a ação principal.
 function logAtividadeCarteira(PDO $pdo, string $carteiraId, string $usuarioId, string $acao, ?string $detalhe = null): void
 {
+    // 'membro' = convite/entrada/saída de pessoas; 'movimentacao' = criar/editar/excluir/
+    // efetivar/transferir lançamento. Usado pro filtro de 3 visões na página de
+    // administrar carteira (Tudo / Movimentações na carteira / Movimentações de membro).
+    static $categoriasPorAcao = [
+        'convite_enviado'       => 'membro',
+        'removeu_membro'        => 'membro',
+        'saiu'                  => 'membro',
+        'aceitou_convite'       => 'membro',
+        'recusou_convite'       => 'membro',
+        'lancamento_criado'     => 'movimentacao',
+        'lancamento_editado'    => 'movimentacao',
+        'lancamento_excluido'   => 'movimentacao',
+        'lancamento_efetivado'  => 'movimentacao',
+        'lancamento_estornado'  => 'movimentacao',
+        'lancamento_transferido' => 'movimentacao',
+    ];
+    $categoria = $categoriasPorAcao[$acao] ?? 'movimentacao';
+
     try {
         $pdo->prepare("
-            INSERT INTO LogAtividadeCarteira (IDLog, FKCarteira, FKUsuario, Acao, Detalhe)
-            VALUES (:id, :cid, :uid, :acao, :detalhe)
+            INSERT INTO LogAtividadeCarteira (IDLog, FKCarteira, FKUsuario, Acao, Detalhe, Categoria)
+            VALUES (:id, :cid, :uid, :acao, :detalhe, :categoria)
         ")->execute([
-            ':id'      => gerarUuid(),
-            ':cid'     => $carteiraId,
-            ':uid'     => $usuarioId,
-            ':acao'    => $acao,
-            ':detalhe' => $detalhe,
+            ':id'        => gerarUuid(),
+            ':cid'       => $carteiraId,
+            ':uid'       => $usuarioId,
+            ':acao'      => $acao,
+            ':detalhe'   => $detalhe,
+            ':categoria' => $categoria,
         ]);
     } catch (PDOException $e) {
+    }
+}
+
+// Se convidados podem excluir os próprios lançamentos livremente (dono sempre pode).
+// Default true (mesmo comportamento de sempre) até o dono desligar em Permissões.
+function carteiraPermiteConvidadoExcluir(PDO $pdo, string $carteiraId): bool
+{
+    try {
+        $stmt = $pdo->prepare("SELECT PermiteConvidadoExcluir FROM Carteira WHERE IDCarteira = :cid");
+        $stmt->execute([':cid' => $carteiraId]);
+        $val = $stmt->fetchColumn();
+        return $val === false ? true : (int)$val === 1;
+    } catch (PDOException $e) {
+        return true;
+    }
+}
+
+// Busca os dados do registro (tipo/valor/descrição/carteira) e, se a carteira dele for
+// compartilhada, grava a linha de log com o texto padrão ("Receita de R$ X — descrição").
+// Centraliza essa checagem porque excluir/efetivar/editar registro está espalhado em
+// dashboard.php, agenda.php e geral/acao_registro.php — sem isso cada um duplicaria a
+// mesma lógica. Chamar ANTES de excluir o registro (depois de excluído não dá pra buscar
+// os dados dele mais).
+function logAtividadeRegistroSeCompartilhada(PDO $pdo, string $registroId, string $usuarioId, string $acao): void
+{
+    try {
+        $stmt = $pdo->prepare("
+            SELECT r.TipoRegistro, r.Valor, r.Descricao, r.FKCarteira, c.Compartilhada
+            FROM Registro r
+            JOIN Carteira c ON c.IDCarteira = r.FKCarteira
+            WHERE r.IDRegistro = :id
+        ");
+        $stmt->execute([':id' => $registroId]);
+        $reg = $stmt->fetch(PDO::FETCH_ASSOC);
+        if (!$reg || (int)($reg['Compartilhada'] ?? 0) !== 1) return;
+
+        $detalhe = ($reg['TipoRegistro'] === 'receita' ? 'Receita' : 'Despesa')
+            . ' de R$ ' . number_format((float)$reg['Valor'], 2, ',', '.') . ' — ' . $reg['Descricao'];
+        logAtividadeCarteira($pdo, $reg['FKCarteira'], $usuarioId, $acao, $detalhe);
+    } catch (PDOException $e) {
+    }
+}
+
+// Se o usuário pode excluir esse registro específico: dono da carteira sempre pode; quem
+// lançou só pode se a carteira permitir (Permissões, na página de administrar carteira) —
+// numa carteira que não é compartilhada, não existe essa trava (sempre true). Chamar antes
+// de qualquer DELETE de Registro feito fora de geral/acao_registro.php (que já tem a sua).
+function podeExcluirRegistro(PDO $pdo, string $registroId, string $usuarioId): bool
+{
+    try {
+        $stmt = $pdo->prepare("SELECT FKCarteira FROM Registro WHERE IDRegistro = :id");
+        $stmt->execute([':id' => $registroId]);
+        $carteiraId = $stmt->fetchColumn();
+        if (!$carteiraId) return true;
+
+        $stmtCart = $pdo->prepare("SELECT Compartilhada FROM Carteira WHERE IDCarteira = :cid");
+        $stmtCart->execute([':cid' => $carteiraId]);
+        if ((int)($stmtCart->fetchColumn() ?: 0) !== 1) return true;
+
+        if (carteiraPapelDoUsuario($pdo, $carteiraId, $usuarioId) === 'dono') return true;
+        return carteiraPermiteConvidadoExcluir($pdo, $carteiraId);
+    } catch (PDOException $e) {
+        return true;
+    }
+}
+
+// Kit inicial de categorias — mesmo conjunto usado no cadastro de um usuário novo
+// (usuario/processa_cadastro.php), reaproveitado pra popular uma carteira compartilhada
+// recém-criada com as mesmas categorias prontas, em vez de começar vazia.
+function injetarKitCategoriasIniciais(PDO $pdo, string $usuarioId, ?string $carteiraId = null): void
+{
+    $kitInicial = [
+        ['nome' => 'Alimentação', 'tipo' => 'despesa', 'icone' => 'bi-cart3'],
+        ['nome' => 'Moradia',     'tipo' => 'despesa', 'icone' => 'bi-house-door'],
+        ['nome' => 'Transporte',  'tipo' => 'despesa', 'icone' => 'bi-car-front'],
+        ['nome' => 'Saúde',       'tipo' => 'despesa', 'icone' => 'bi-heart-pulse'],
+        ['nome' => 'Educação',    'tipo' => 'despesa', 'icone' => 'bi-book'],
+        ['nome' => 'Lazer',       'tipo' => 'despesa', 'icone' => 'bi-controller'],
+        ['nome' => 'Assinaturas', 'tipo' => 'despesa', 'icone' => 'bi-play-btn'],
+        ['nome' => 'Vestuário',   'tipo' => 'despesa', 'icone' => 'bi-bag'],
+        ['nome' => 'Salário',       'tipo' => 'receita', 'icone' => 'bi-cash-stack'],
+        ['nome' => 'Rendimentos',   'tipo' => 'receita', 'icone' => 'bi-graph-up-arrow'],
+        ['nome' => 'Serviços/Free', 'tipo' => 'receita', 'icone' => 'bi-laptop'],
+        ['nome' => 'Outros',        'tipo' => 'receita', 'icone' => 'bi-plus-circle-dotted'],
+    ];
+
+    $sqlCat = "INSERT INTO Categoria (IDCategoria, NomeCategoria, TipoCategoria, IconeCategoria, FKUsuario, FKCarteira)
+               VALUES (:id, :nome, :tipo, :icone, :uid, :cid)";
+    $stmtCat = $pdo->prepare($sqlCat);
+    foreach ($kitInicial as $cat) {
+        $stmtCat->execute([
+            ':id'   => gerarUuid(),
+            ':nome' => $cat['nome'],
+            ':tipo' => $cat['tipo'],
+            ':icone' => $cat['icone'],
+            ':uid'  => $usuarioId,
+            ':cid'  => $carteiraId,
+        ]);
     }
 }
