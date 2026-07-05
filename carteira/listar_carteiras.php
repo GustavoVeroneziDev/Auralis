@@ -255,11 +255,15 @@ $_limitesLC      = limitesDoPlano();
 $_upgradeSlugLC  = ['free' => 'pro', 'pro' => 'vip'][$_planoLC] ?? 'vip';
 $_nomePlanoLC    = strtoupper($_planoLC);
 $_nomeUpgradeLC  = strtoupper($_upgradeSlugLC);
+// Carteira compartilhada nunca conta pro limite/bloqueio de "quantas carteiras eu tenho":
+// quem depende dela pode ser outra pessoa (convidado), então travar o acesso por causa do
+// SEU downgrade de plano seria injusto com quem foi convidado pra ela.
 $carteiras_bloqueadas_ids = [];
 $carteiras_trial_ids      = [];
+$_cartsPropriasLC = array_values(array_filter($carteiras, fn($c) => (int)($c['Compartilhada'] ?? 0) !== 1));
 if ($_limitesLC['carteiras'] !== PHP_INT_MAX) {
-    for ($i = $_limitesLC['carteiras']; $i < count($carteiras); $i++) {
-        $id = $carteiras[$i]['IDCarteira'];
+    for ($i = $_limitesLC['carteiras']; $i < count($_cartsPropriasLC); $i++) {
+        $id = $_cartsPropriasLC[$i]['IDCarteira'];
         if ($_testeLC) {
             $carteiras_trial_ids[] = $id;   // trial: pode usar mas mostra badge PRO (teste)
         } else {
@@ -280,7 +284,7 @@ require_once '../geral/header.php';
                 <i class="bi bi-arrow-left me-1"></i> Voltar
             </a>
             <?php
-            $_podeNovaCat = ($_limitesLC['carteiras'] === PHP_INT_MAX) || count($carteiras) < $_limitesLC['carteiras'] || $_testeLC;
+            $_podeNovaCat = ($_limitesLC['carteiras'] === PHP_INT_MAX) || count($_cartsPropriasLC) < $_limitesLC['carteiras'] || $_testeLC;
             ?>
             <?php if ($_podeNovaCat): ?>
                 <button type="button" onclick="abrirModalCarteira()" class="btn btn-gold btn-sm rounded-pill px-4 fw-bold text-dark transition-hover shadow-sm d-flex align-items-center">
