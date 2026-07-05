@@ -80,12 +80,12 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action']) && $_POST['
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action']) && $_POST['action'] === 'aceitar_convite') {
     $idMembro = trim($_POST['id_membro'] ?? '');
     try {
-        $stmt = $pdo->prepare("SELECT FKCarteira FROM MembroCarteira WHERE IDMembro = :id AND FKUsuario = :uid AND StatusConvite = 0");
+        $stmt = $pdo->prepare("SELECT FKCarteira FROM MembroCarteira WHERE IDMembroCarteira = :id AND FKUsuario = :uid AND StatusConvite = 0");
         $stmt->execute([':id' => $idMembro, ':uid' => $usuario_id]);
         $carteiraIdConv = $stmt->fetchColumn();
 
         if ($carteiraIdConv) {
-            $pdo->prepare("UPDATE MembroCarteira SET StatusConvite = 1, DataResposta = NOW() WHERE IDMembro = :id")
+            $pdo->prepare("UPDATE MembroCarteira SET StatusConvite = 1, DataResposta = NOW() WHERE IDMembroCarteira = :id")
                 ->execute([':id' => $idMembro]);
             logAtividadeCarteira($pdo, $carteiraIdConv, $usuario_id, 'aceitou_convite');
             header("Location: listar_carteiras.php?sucesso=convite_aceito");
@@ -103,13 +103,13 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action']) && $_POST['
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action']) && $_POST['action'] === 'recusar_convite') {
     $idMembro = trim($_POST['id_membro'] ?? '');
     try {
-        $stmt = $pdo->prepare("SELECT FKCarteira FROM MembroCarteira WHERE IDMembro = :id AND FKUsuario = :uid AND StatusConvite = 0");
+        $stmt = $pdo->prepare("SELECT FKCarteira FROM MembroCarteira WHERE IDMembroCarteira = :id AND FKUsuario = :uid AND StatusConvite = 0");
         $stmt->execute([':id' => $idMembro, ':uid' => $usuario_id]);
         $carteiraIdConv = $stmt->fetchColumn();
 
         if ($carteiraIdConv) {
             logAtividadeCarteira($pdo, $carteiraIdConv, $usuario_id, 'recusou_convite');
-            $pdo->prepare("DELETE FROM MembroCarteira WHERE IDMembro = :id")->execute([':id' => $idMembro]);
+            $pdo->prepare("DELETE FROM MembroCarteira WHERE IDMembroCarteira = :id")->execute([':id' => $idMembro]);
         }
         header("Location: listar_carteiras.php?sucesso=convite_recusado");
         exit;
@@ -232,12 +232,12 @@ try {
 $convitesPendentes = [];
 try {
     $stmtConvPend = $pdo->prepare("
-        SELECT mc.IDMembro, mc.DataConvite, c.TipoCarteira, u.Nome AS NomeDono
+        SELECT mc.IDMembroCarteira AS IDMembro, mc.MomentoCriacao AS DataConvite, c.TipoCarteira, u.Nome AS NomeDono
         FROM MembroCarteira mc
         JOIN Carteira c ON c.IDCarteira = mc.FKCarteira
         JOIN Usuario u ON u.IDUsuario = c.FKUsuarioDono
         WHERE mc.FKUsuario = :uid AND mc.StatusConvite = 0
-        ORDER BY mc.DataConvite DESC
+        ORDER BY mc.MomentoCriacao DESC
     ");
     $stmtConvPend->execute([':uid' => $usuario_id]);
     $convitesPendentes = $stmtConvPend->fetchAll(PDO::FETCH_ASSOC);

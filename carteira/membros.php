@@ -62,7 +62,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && ($_POST['action'] ?? '') === 'convi
                     $erro = "Limite de pessoas do seu plano atingido pra essa carteira. Remova alguém ou faça upgrade.";
                 } else {
                     $pdo->prepare("
-                        INSERT INTO MembroCarteira (IDMembro, FKCarteira, FKUsuario, StatusConvite)
+                        INSERT INTO MembroCarteira (IDMembroCarteira, FKCarteira, FKUsuario, StatusConvite)
                         VALUES (:id, :cid, :uid, 0)
                     ")->execute([':id' => gerarUuid(), ':cid' => $carteira_id, ':uid' => $convidadoUsuario['IDUsuario']]);
 
@@ -73,13 +73,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && ($_POST['action'] ?? '') === 'convi
                 }
             }
         } catch (PDOException $e) {
-            $_estrutura = '';
-            try {
-                $_estrutura = $pdo->query("SHOW CREATE TABLE MembroCarteira")->fetch(PDO::FETCH_ASSOC)['Create Table'] ?? '';
-            } catch (PDOException $e2) {
-                $_estrutura = 'não deu pra ler: ' . $e2->getMessage();
-            }
-            $erro = "Erro ao enviar o convite. [debug temporário: " . $e->getMessage() . " | estrutura atual: " . $_estrutura . "]";
+            $erro = "Erro ao enviar o convite.";
         }
     }
 }
@@ -116,11 +110,11 @@ if (($_GET['erro'] ?? '') === 'banco') $erro = "Erro ao salvar no banco de dados
 $membros = [];
 try {
     $stmtMembros = $pdo->prepare("
-        SELECT u.IDUsuario, u.Nome, u.Email, mc.StatusConvite, mc.DataConvite
+        SELECT u.IDUsuario, u.Nome, u.Email, mc.StatusConvite, mc.MomentoCriacao
         FROM MembroCarteira mc
         JOIN Usuario u ON u.IDUsuario = mc.FKUsuario
         WHERE mc.FKCarteira = :cid
-        ORDER BY mc.StatusConvite DESC, mc.DataConvite ASC
+        ORDER BY mc.StatusConvite DESC, mc.MomentoCriacao ASC
     ");
     $stmtMembros->execute([':cid' => $carteira_id]);
     $membros = $stmtMembros->fetchAll(PDO::FETCH_ASSOC);

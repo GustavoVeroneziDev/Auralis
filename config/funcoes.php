@@ -1299,19 +1299,40 @@ function garantirEstruturaCarteirasCompartilhadas(PDO $pdo): void
 
     // MembroCarteira — StatusConvite: 0 = pendente (aguardando aceite), 1 = ativo.
     // O dono NÃO tem linha aqui (ele já é identificado por Carteira.FKUsuarioDono).
+    //
+    // Essa tabela já existia no banco (resquício de uma tentativa anterior não documentada
+    // nesta sessão, referenciada em nova_transacao.php e admin/usuarios.php antes de tudo
+    // isso ser construído). O CREATE TABLE IF NOT EXISTS abaixo, por isso, nunca roda em
+    // produção — o schema real de lá usa IDMembroCarteira (não IDMembro) e MomentoCriacao
+    // (não DataConvite). Pra instalação nova ficar idêntica à que já existe, o CREATE usa
+    // esses mesmos nomes; só a coluna DataResposta (que não existia) é adicionada via ALTER.
     try {
         $pdo->exec("
             CREATE TABLE IF NOT EXISTS MembroCarteira (
-              IDMembro      CHAR(36) NOT NULL PRIMARY KEY,
-              FKCarteira    CHAR(36) NOT NULL,
-              FKUsuario     CHAR(36) NOT NULL,
-              StatusConvite TINYINT(1) NOT NULL DEFAULT 0,
-              DataConvite   DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
-              DataResposta  DATETIME NULL,
+              IDMembroCarteira CHAR(36) NOT NULL PRIMARY KEY,
+              FKCarteira       CHAR(36) NOT NULL,
+              FKUsuario        CHAR(36) NOT NULL,
+              StatusConvite    TINYINT(1) NOT NULL DEFAULT 0,
+              MomentoCriacao   TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+              DataResposta     DATETIME NULL,
               UNIQUE KEY uq_membro_carteira_usuario (FKCarteira, FKUsuario),
-              KEY idx_membro_usuario (FKUsuario)
+              KEY idx_membro_usuario (FKUsuario),
+              KEY idx_membro_carteira (FKCarteira)
             ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4
         ");
+    } catch (PDOException $e) {
+    }
+
+    // DataResposta não existe na tabela pré-existente de produção — adiciona sem mexer
+    // em mais nada (coluna nova e opcional, não quebra os FKs/PK que já estavam lá).
+    try {
+        $chkResp = $pdo->query("
+            SELECT COLUMN_NAME FROM INFORMATION_SCHEMA.COLUMNS
+            WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'MembroCarteira' AND COLUMN_NAME = 'DataResposta'
+        ")->fetchColumn();
+        if (!$chkResp) {
+            $pdo->exec("ALTER TABLE MembroCarteira ADD COLUMN DataResposta DATETIME NULL");
+        }
     } catch (PDOException $e) {
     }
 
