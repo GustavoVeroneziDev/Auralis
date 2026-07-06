@@ -11,11 +11,17 @@ require_once 'config/conexao.php';
 require_once 'config/funcoes.php';
 
 verificarExpiracao($pdo);
+garantirColunaFotoPerfilReal($pdo);
 $uid = $_SESSION['usuario_id'];
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 function _rankAvatar(array $row, int $size = 40): string
 {
+    // Foto real (se o usuário tiver enviado uma) sempre na frente do personagem.
+    if (!empty($row['FotoPerfilReal'])) {
+        return "<img src=\"" . htmlspecialchars($row['FotoPerfilReal']) . "\" width=\"{$size}\" height=\"{$size}\" "
+            . "style=\"border-radius:50%;object-fit:cover;flex-shrink:0;\">";
+    }
     if (function_exists('getAvatarUrl')) {
         $fp = json_decode($row['FotoPerfil'] ?? '', true);
         if (is_array($fp) && ($fp['style'] ?? '') === 'avataaars') {
@@ -87,37 +93,37 @@ function _rankQuery(PDO $pdo, string $sql): array
 }
 
 $r_registros = _rankQuery($pdo, "
-    SELECT u.IDUsuario, u.Nome, u.FotoPerfil, COUNT(*) AS total
+    SELECT u.IDUsuario, u.Nome, u.FotoPerfil, u.FotoPerfilReal, COUNT(*) AS total
     FROM Registro r
     JOIN Usuario u ON u.IDUsuario = r.FKUsuario
     WHERE r.TipoRegistro IN ('receita','despesa') AND u.StatusConta = 'ativo'
-    GROUP BY u.IDUsuario, u.Nome, u.FotoPerfil
+    GROUP BY u.IDUsuario, u.Nome, u.FotoPerfil, u.FotoPerfilReal
     ORDER BY total DESC, u.MomentoCriacao ASC
     LIMIT 10
 ");
 
 $r_conquistas = _rankQuery($pdo, "
-    SELECT u.IDUsuario, u.Nome, u.FotoPerfil, COUNT(*) AS total
+    SELECT u.IDUsuario, u.Nome, u.FotoPerfil, u.FotoPerfilReal, COUNT(*) AS total
     FROM usuario_conquista uc
     JOIN Usuario u ON u.IDUsuario = uc.FKUsuario
     WHERE u.StatusConta = 'ativo'
-    GROUP BY u.IDUsuario, u.Nome, u.FotoPerfil
+    GROUP BY u.IDUsuario, u.Nome, u.FotoPerfil, u.FotoPerfilReal
     ORDER BY total DESC, u.MomentoCriacao ASC
     LIMIT 10
 ");
 
 $r_comprovantes = _rankQuery($pdo, "
-    SELECT u.IDUsuario, u.Nome, u.FotoPerfil, COUNT(*) AS total
+    SELECT u.IDUsuario, u.Nome, u.FotoPerfil, u.FotoPerfilReal, COUNT(*) AS total
     FROM Comprovante c
     JOIN Usuario u ON u.IDUsuario = c.FKUsuario
     WHERE u.StatusConta = 'ativo'
-    GROUP BY u.IDUsuario, u.Nome, u.FotoPerfil
+    GROUP BY u.IDUsuario, u.Nome, u.FotoPerfil, u.FotoPerfilReal
     ORDER BY total DESC, u.MomentoCriacao ASC
     LIMIT 10
 ");
 
 $r_veteranos = _rankQuery($pdo, "
-    SELECT IDUsuario, Nome, FotoPerfil,
+    SELECT IDUsuario, Nome, FotoPerfil, FotoPerfilReal,
            DATEDIFF(NOW(), MomentoCriacao) AS total
     FROM Usuario
     WHERE StatusConta = 'ativo'
@@ -126,11 +132,11 @@ $r_veteranos = _rankQuery($pdo, "
 ");
 
 $r_categorias = _rankQuery($pdo, "
-    SELECT u.IDUsuario, u.Nome, u.FotoPerfil, COUNT(*) AS total
+    SELECT u.IDUsuario, u.Nome, u.FotoPerfil, u.FotoPerfilReal, COUNT(*) AS total
     FROM Categoria cat
     JOIN Usuario u ON u.IDUsuario = cat.FKUsuario
     WHERE u.StatusConta = 'ativo'
-    GROUP BY u.IDUsuario, u.Nome, u.FotoPerfil
+    GROUP BY u.IDUsuario, u.Nome, u.FotoPerfil, u.FotoPerfilReal
     ORDER BY total DESC, u.MomentoCriacao ASC
     LIMIT 10
 ");
@@ -470,9 +476,9 @@ require_once 'geral/header.php';
                             </div>
                             <?php
                             // Busca dados do usuário atual
-                            $stmtMe = $pdo->prepare("SELECT Nome, FotoPerfil FROM Usuario WHERE IDUsuario = :uid LIMIT 1");
+                            $stmtMe = $pdo->prepare("SELECT Nome, FotoPerfil, FotoPerfilReal FROM Usuario WHERE IDUsuario = :uid LIMIT 1");
                             $stmtMe->execute([':uid' => $uid]);
-                            $meRow = $stmtMe->fetch() ?: ['Nome' => $_SESSION['nome'] ?? 'Você', 'FotoPerfil' => null];
+                            $meRow = $stmtMe->fetch() ?: ['Nome' => $_SESSION['nome'] ?? 'Você', 'FotoPerfil' => null, 'FotoPerfilReal' => null];
                             echo _rankAvatar($meRow, 36);
                             ?>
                             <div class="flex-grow-1">

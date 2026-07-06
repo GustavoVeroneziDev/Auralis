@@ -894,6 +894,64 @@ function getAvatarUrl(array $cfg): string
     return $base . '?' . implode('&', $p);
 }
 
+// Usuario.FotoPerfilReal — foto de verdade enviada pelo usuário (upload), separada do
+// personagem (Usuario.FotoPerfil, JSON do DiceBear). As duas colunas coexistem de
+// propósito: subir uma foto NUNCA apaga o personagem, só passa na frente dele na hora de
+// exibir. Isso deixa o caminho pronto pra, quando existir sistema de amizades, a pessoa
+// escolher qual das duas mostrar pra cada grupo — por ora a exibição é sempre foto > personagem.
+if (!function_exists('garantirColunaFotoPerfilReal')) {
+    function garantirColunaFotoPerfilReal(PDO $pdo): void
+    {
+        try {
+            $chk = $pdo->query("
+                SELECT COLUMN_NAME FROM INFORMATION_SCHEMA.COLUMNS
+                WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'Usuario' AND COLUMN_NAME = 'FotoPerfilReal'
+            ")->fetchColumn();
+            if (!$chk) {
+                $pdo->exec("ALTER TABLE Usuario ADD COLUMN FotoPerfilReal VARCHAR(255) NULL AFTER FotoPerfil");
+            }
+        } catch (PDOException $e) {
+        }
+    }
+}
+
+// URL de exibição do avatar do usuário: foto real (se tiver) sempre na frente do
+// personagem. Retorna null se não tiver nenhum dos dois — quem chama decide o fallback
+// (iniciais, ícone genérico etc.), que já varia de tela pra tela nesse app. Essa função
+// roda em header.php (toda página) — não chama garantirColunaFotoPerfilReal() aqui pra
+// não pagar um INFORMATION_SCHEMA a cada carregamento; se a coluna ainda não existir
+// (instalação recém-atualizada, antes de alguém abrir /perfil.php pela 1ª vez), cai pro
+// personagem sozinho em vez de quebrar o avatar em todo canto.
+if (!function_exists('obterUrlAvatarUsuario')) {
+    function obterUrlAvatarUsuario(PDO $pdo, string $uid): ?string
+    {
+        try {
+            try {
+                $stmt = $pdo->prepare("SELECT FotoPerfilReal, FotoPerfil FROM Usuario WHERE IDUsuario = :uid LIMIT 1");
+                $stmt->execute([':uid' => $uid]);
+                $row = $stmt->fetch(PDO::FETCH_ASSOC);
+            } catch (PDOException $e) {
+                $stmt = $pdo->prepare("SELECT NULL AS FotoPerfilReal, FotoPerfil FROM Usuario WHERE IDUsuario = :uid LIMIT 1");
+                $stmt->execute([':uid' => $uid]);
+                $row = $stmt->fetch(PDO::FETCH_ASSOC);
+            }
+            if (!$row) return null;
+
+            if (!empty($row['FotoPerfilReal'])) {
+                return $row['FotoPerfilReal'];
+            }
+            if (!empty($row['FotoPerfil'])) {
+                $dec = json_decode($row['FotoPerfil'], true);
+                if (is_array($dec) && ($dec['style'] ?? '') === 'avataaars') {
+                    return getAvatarUrl($dec);
+                }
+            }
+        } catch (Throwable $e) {
+        }
+        return null;
+    }
+}
+
 // Função universal para selos de recursos bloqueados/em teste
 function badgePremium($nivelExigido = 'pro', $emTeste = false)
 {

@@ -11,14 +11,18 @@ require_once 'config/conexao.php';
 require_once 'config/funcoes.php';
 
 verificarExpiracao($pdo);
+garantirColunaFotoPerfilReal($pdo);
+garantirEstruturaCarteirasCompartilhadas($pdo);
 
 $uid = $_SESSION['usuario_id'];
 
 // ── Dados do usuário ────────────────────────────────────────────────────────
-$stmtU = $pdo->prepare("SELECT Nome, Email, Plano, Tema, MomentoCriacao, FotoPerfil FROM Usuario WHERE IDUsuario = :uid LIMIT 1");
+$stmtU = $pdo->prepare("SELECT Nome, Email, Plano, Tema, MomentoCriacao, FotoPerfil, FotoPerfilReal FROM Usuario WHERE IDUsuario = :uid LIMIT 1");
 $stmtU->execute([':uid' => $uid]);
 $usuario = $stmtU->fetch(PDO::FETCH_ASSOC);
 if (!$usuario) { header("Location: /dashboard.php"); exit; }
+
+$codigoConvite = obterOuGerarCodigoConvite($pdo, $uid);
 
 $primeiroNome  = explode(' ', $usuario['Nome'])[0];
 $iniciais      = implode('', array_map(fn($p) => strtoupper($p[0]), array_filter(explode(' ', $usuario['Nome']))));
@@ -91,7 +95,8 @@ $avatarCor = match($plano) {
     default => '#6366f1',
 };
 
-// Avatar DiceBear
+// Avatar DiceBear (personagem) — nunca é apagado quando uma foto real é enviada, só
+// perde a preferência de exibição pra ela (ver $urlAvatarExibicao mais abaixo).
 $avatarConfig = [];
 $avatarPreviewUrl = '';
 if (!empty($usuario['FotoPerfil'])) {
@@ -101,6 +106,10 @@ if (!empty($usuario['FotoPerfil'])) {
         $avatarPreviewUrl = getAvatarUrl($dec);
     }
 }
+$temPersonagemSalvo = $avatarPreviewUrl !== '';
+$temFotoReal        = !empty($usuario['FotoPerfilReal']);
+// O que mostrar no herói/menu: foto real > personagem > iniciais (fallback já existente).
+$urlAvatarExibicao  = $temFotoReal ? $usuario['FotoPerfilReal'] : $avatarPreviewUrl;
 $avatarDefaults = [
     'skinColor' => 'd08b5b', 'hair' => 'shortCurly', 'hairColor' => '2c1b18',
     'eyes' => 'default', 'eyebrows' => 'default', 'mouth' => 'smile',
@@ -226,24 +235,80 @@ require_once 'geral/header.php';
 
 <main class="container-fluid py-4 mt-2 flex-grow-1" style="max-width:900px;padding-inline:var(--space-page-x);">
 
-    <?php if (isset($_GET['sucesso']) && $_GET['sucesso'] === 'personagem'): ?>
+    <?php
+    $_msgsSucessoPerfil = [
+        'personagem'      => 'Personagem salvo com sucesso!',
+        'foto'            => 'Foto atualizada!',
+        'foto_removida'   => 'Foto removida — voltando a mostrar seu personagem.',
+    ];
+    $_msgsErroPerfil = [
+        'foto_invalida' => 'Não recebi nenhuma foto. Tenta de novo.',
+        'foto_grande'   => 'Essa foto passa de 5 MB — escolhe uma menor.',
+        'foto_tipo'     => 'Formato não aceito — use JPG, PNG ou WebP.',
+        'foto_upload'   => 'Não consegui salvar a foto. Tenta de novo.',
+    ];
+    $_sucessoPerfil = $_msgsSucessoPerfil[$_GET['sucesso'] ?? ''] ?? null;
+    $_erroPerfil     = $_msgsErroPerfil[$_GET['erro'] ?? ''] ?? null;
+    // Acabou de salvar o personagem agora — mostra a seção mesmo que ela já fosse
+    // colapsar por padrão, senão a âncora #personagem cairia em cima de algo escondido.
+    $_forcarMostrarPersonagem = ($_GET['sucesso'] ?? '') === 'personagem';
+    ?>
+    <?php if ($_sucessoPerfil): ?>
     <div class="alert alert-success rounded-3 py-2 px-3 d-flex align-items-center gap-2 mb-3" style="font-size:0.9rem;">
-        <i class="bi bi-check-circle-fill"></i> Personagem salvo com sucesso!
+        <i class="bi bi-check-circle-fill"></i> <?= htmlspecialchars($_sucessoPerfil) ?>
+    </div>
+    <?php endif; ?>
+    <?php if ($_erroPerfil): ?>
+    <div class="alert alert-danger rounded-3 py-2 px-3 d-flex align-items-center gap-2 mb-3" style="font-size:0.9rem;">
+        <i class="bi bi-exclamation-triangle-fill"></i> <?= htmlspecialchars($_erroPerfil) ?>
     </div>
     <?php endif; ?>
 
     <!-- Hero -->
     <div class="perfil-hero mb-4 d-flex align-items-center gap-4 flex-wrap">
-        <?php if ($avatarPreviewUrl): ?>
-        <div style="width:80px;height:80px;border-radius:50%;overflow:hidden;flex-shrink:0;border:3px solid <?= htmlspecialchars($avatarCor) ?>88;background:#<?= htmlspecialchars($cfg['backgroundColor'] !== 'transparent' ? $cfg['backgroundColor'] : '1e2028') ?>;">
-            <img src="<?= htmlspecialchars($avatarPreviewUrl) ?>" alt="Avatar" style="width:100%;height:100%;object-fit:cover;">
+        <div class="dropdown flex-shrink-0">
+            <button type="button" class="btn p-0 border-0 position-relative" data-bs-toggle="dropdown" aria-expanded="false"
+                    style="background:transparent;" title="Editar personagem ou colocar foto">
+                <?php if ($urlAvatarExibicao): ?>
+                <div style="width:80px;height:80px;border-radius:50%;overflow:hidden;border:3px solid <?= htmlspecialchars($avatarCor) ?>88;background:#<?= htmlspecialchars($cfg['backgroundColor'] !== 'transparent' ? $cfg['backgroundColor'] : '1e2028') ?>;">
+                    <img src="<?= htmlspecialchars($urlAvatarExibicao) ?>" alt="Avatar" style="width:100%;height:100%;object-fit:cover;">
+                </div>
+                <?php else: ?>
+                <div class="perfil-avatar"
+                     style="background:<?= htmlspecialchars($avatarCor) ?>22;color:<?= htmlspecialchars($avatarCor) ?>;border-color:<?= htmlspecialchars($avatarCor) ?>55;">
+                    <?= htmlspecialchars($iniciais) ?>
+                </div>
+                <?php endif; ?>
+                <span class="d-flex align-items-center justify-content-center position-absolute"
+                      style="width:26px;height:26px;bottom:-2px;right:-2px;border-radius:50%;background:var(--accent);border:2px solid var(--bg-card);">
+                    <i class="bi bi-pencil-fill" style="font-size:0.7rem;color:#fff;"></i>
+                </span>
+            </button>
+            <ul class="dropdown-menu shadow-lg border-secondary-subtle" style="background:var(--bg-card);">
+                <li><h6 class="dropdown-header">Sua imagem</h6></li>
+                <li>
+                    <button type="button" class="dropdown-item d-flex align-items-center gap-2" onclick="mostrarEditorPersonagem()">
+                        <i class="bi bi-person-bounding-box" style="color:#ec4899;"></i> Editar personagem
+                    </button>
+                </li>
+                <li>
+                    <button type="button" class="dropdown-item d-flex align-items-center gap-2" data-bs-toggle="modal" data-bs-target="#modalFotoPerfil">
+                        <i class="bi bi-image" style="color:#60a5fa;"></i> Colocar foto
+                    </button>
+                </li>
+                <?php if ($temFotoReal): ?>
+                <li><hr class="dropdown-divider"></li>
+                <li>
+                    <form method="POST" action="/usuario/processa_foto_perfil.php" onsubmit="return confirm('Remover sua foto? Volta a mostrar o personagem.');">
+                        <input type="hidden" name="action" value="remover_foto">
+                        <button type="submit" class="dropdown-item d-flex align-items-center gap-2 text-danger">
+                            <i class="bi bi-trash3"></i> Remover foto (voltar ao personagem)
+                        </button>
+                    </form>
+                </li>
+                <?php endif; ?>
+            </ul>
         </div>
-        <?php else: ?>
-        <div class="perfil-avatar"
-             style="background:<?= htmlspecialchars($avatarCor) ?>22;color:<?= htmlspecialchars($avatarCor) ?>;border-color:<?= htmlspecialchars($avatarCor) ?>55;">
-            <?= htmlspecialchars($iniciais) ?>
-        </div>
-        <?php endif; ?>
         <div class="flex-grow-1">
             <h2 class="fw-bold mb-1" style="font-size:1.4rem;"><?= htmlspecialchars($usuario['Nome']) ?></h2>
             <div class="text-secondary small mb-2"><?= htmlspecialchars($usuario['Email']) ?></div>
@@ -272,6 +337,38 @@ require_once 'geral/header.php';
         </a>
     </div>
 
+    <!-- Código de convite pra carteira compartilhada — mudou de Configurações pra cá.
+         Visual azul de propósito, diferente do dourado do link de indicação (que
+         continua em Configurações), pra nunca confundir os dois. -->
+    <div class="rounded-4 p-4 mb-4" style="background:rgba(96,165,250,.05);border:1px solid rgba(96,165,250,.18);">
+        <div class="d-flex align-items-center gap-3 mb-3 flex-wrap">
+            <div class="rounded-3 d-flex align-items-center justify-content-center flex-shrink-0"
+                style="width:40px;height:40px;background:rgba(96,165,250,.12);border:1px solid rgba(96,165,250,.25);">
+                <i class="bi bi-people-fill" style="color:#60a5fa;font-size:1.1rem;"></i>
+            </div>
+            <div>
+                <div class="fw-semibold text-light">Seu código de convite</div>
+                <div class="text-secondary" style="font-size:.78rem;">Passe esse código pra alguém te adicionar numa carteira compartilhada.</div>
+            </div>
+        </div>
+        <div class="d-flex align-items-center gap-2 flex-wrap">
+            <code id="pfCodigoConvite" class="px-3 py-2 rounded-3 flex-grow-1"
+                style="background:rgba(0,0,0,.3);color:#60a5fa;font-size:.95rem;font-weight:700;letter-spacing:.05em;display:block;">
+                <?= htmlspecialchars($codigoConvite) ?>
+            </code>
+            <button onclick="pfCopiarCodigoConvite()" id="pfBtnCopiarConvite"
+                class="btn btn-sm rounded-pill px-3 flex-shrink-0"
+                style="background:rgba(96,165,250,.15);color:#60a5fa;border:1px solid rgba(96,165,250,.3);">
+                <i class="bi bi-clipboard me-1"></i> Copiar código
+            </button>
+            <button onclick="pfCompartilharCodigoConvite()" id="pfBtnCompartilharConvite"
+                class="btn btn-sm rounded-pill px-3 flex-shrink-0 d-none"
+                style="background:rgba(96,165,250,.15);color:#60a5fa;border:1px solid rgba(96,165,250,.3);">
+                <i class="bi bi-share-fill me-1"></i> Compartilhar
+            </button>
+        </div>
+    </div>
+
     <!-- Stats -->
     <div class="row g-3 mb-4">
         <div class="col-6 col-md-4">
@@ -294,9 +391,20 @@ require_once 'geral/header.php';
         </div>
     </div>
 
-    <!-- ── Meu Personagem ─────────────────────────────────────────────────── -->
-    <div id="personagem" class="mb-4">
-        <h5 class="fw-bold mb-3"><i class="bi bi-person-bounding-box me-2" style="color:#ec4899;"></i>Meu Personagem</h5>
+    <!-- ── Meu Personagem ─────────────────────────────────────────────────────
+         Some da tela principal assim que já existe um personagem salvo — quem quiser
+         editar clica na imagem lá em cima ("Editar personagem"), que revela essa seção
+         de novo. Pra quem ainda não tem nenhum (conta nova), fica visível direto, sem
+         precisar descobrir onde clicar. -->
+    <div id="personagem" class="mb-4<?= ($temPersonagemSalvo && !$_forcarMostrarPersonagem) ? ' d-none' : '' ?>">
+        <div class="d-flex align-items-center justify-content-between mb-3 flex-wrap gap-2">
+            <h5 class="fw-bold mb-0"><i class="bi bi-person-bounding-box me-2" style="color:#ec4899;"></i>Meu Personagem</h5>
+            <?php if ($temPersonagemSalvo): ?>
+            <button type="button" class="btn btn-sm btn-outline-secondary rounded-pill" onclick="esconderEditorPersonagem()">
+                <i class="bi bi-x-lg me-1"></i> Fechar
+            </button>
+            <?php endif; ?>
+        </div>
 
         <div class="row g-0 rounded-4 overflow-hidden" style="background:var(--bg-card);border:1px solid var(--bs-border-color);">
 
@@ -456,6 +564,32 @@ require_once 'geral/header.php';
                 </div>
 
             </div><!-- /controles -->
+        </div>
+    </div>
+
+    <!-- ── Modal: colocar foto real de perfil ───────────────────────────────
+         Separado do editor de personagem de propósito — o personagem nunca é apagado
+         por enviar uma foto, só perde a preferência de exibição enquanto ela existir. -->
+    <div class="modal fade" id="modalFotoPerfil" tabindex="-1" aria-hidden="true">
+        <div class="modal-dialog modal-dialog-centered">
+            <div class="modal-content border-secondary-subtle shadow-lg rounded-4" style="background:var(--bg-card);">
+                <form method="POST" action="/usuario/processa_foto_perfil.php" enctype="multipart/form-data">
+                    <div class="modal-header border-bottom border-secondary-subtle">
+                        <h6 class="modal-title fw-bold text-light mb-0"><i class="bi bi-image me-2" style="color:#60a5fa;"></i>Colocar foto</h6>
+                        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                    </div>
+                    <div class="modal-body p-4">
+                        <p class="text-secondary small mb-3">JPG, PNG ou WebP, até 5 MB. Seu personagem continua salvo — se remover a foto depois, ele volta a aparecer.</p>
+                        <input type="file" name="foto" accept="image/jpeg,image/png,image/webp" class="form-control bg-transparent text-light border-secondary" required>
+                    </div>
+                    <div class="modal-footer border-top border-secondary-subtle">
+                        <button type="button" class="btn btn-link text-secondary text-decoration-none" data-bs-dismiss="modal">Cancelar</button>
+                        <button type="submit" class="btn fw-bold rounded-pill px-4" style="background:#60a5fa;color:#06111f;">
+                            <i class="bi bi-upload me-1"></i> Enviar
+                        </button>
+                    </div>
+                </form>
+            </div>
         </div>
     </div>
 
@@ -802,6 +936,41 @@ require_once 'geral/header.php';
 
     aplicarFiltro('tenho'); // Estado inicial: só as que já tem
 })();
+
+// ── Menu da imagem de perfil (editar personagem / colocar foto) ─────────────
+function mostrarEditorPersonagem() {
+    var sec = document.getElementById('personagem');
+    if (!sec) return;
+    sec.classList.remove('d-none');
+    sec.scrollIntoView({ behavior: 'smooth', block: 'start' });
+}
+function esconderEditorPersonagem() {
+    var sec = document.getElementById('personagem');
+    if (sec) sec.classList.add('d-none');
+}
+
+// ── Código de convite (movido de Configurações pra cá) ───────────────────────
+function pfCopiarCodigoConvite() {
+    var texto = document.getElementById('pfCodigoConvite').textContent.trim();
+    navigator.clipboard.writeText(texto).then(function() {
+        var btn = document.getElementById('pfBtnCopiarConvite');
+        var orig = btn.innerHTML;
+        btn.innerHTML = '<i class="bi bi-check2 me-1"></i> Copiado!';
+        setTimeout(function() { btn.innerHTML = orig; }, 2000);
+    });
+}
+function pfCompartilharCodigoConvite() {
+    var codigo = document.getElementById('pfCodigoConvite').textContent.trim();
+    if (navigator.share) {
+        navigator.share({ title: 'Código de convite — Auralis', text: 'Ei, meu código é ' + codigo }).catch(function() {});
+    }
+}
+document.addEventListener('DOMContentLoaded', function() {
+    if (navigator.share) {
+        var btn = document.getElementById('pfBtnCompartilharConvite');
+        if (btn) btn.classList.remove('d-none');
+    }
+});
 </script>
 
 <?php require_once 'geral/footer.php'; ?>
