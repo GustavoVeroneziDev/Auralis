@@ -820,7 +820,7 @@ document.addEventListener('DOMContentLoaded', function() {
                     <label for="waApelidoInput" class="form-label text-light fw-semibold mb-1">Nome do dispositivo</label>
                     <input type="text" id="waApelidoInput" class="form-control form-control-lg bg-transparent border-secondary-subtle text-light shadow-none" maxlength="60" placeholder="Ex.: Meu celular">
                 </div>
-                <div class="alert alert-danger border-0 bg-danger bg-opacity-10 text-danger small mt-3 mb-0 d-none" id="waErro"></div>
+                <div class="alert border-0 small mt-3 mb-0 d-none" id="waErro"></div>
             </div>
             <div class="modal-footer border-top border-secondary-subtle">
                 <button type="button" class="btn btn-secondary rounded-pill px-4 fw-semibold" data-bs-dismiss="modal">Cancelar</button>
@@ -961,6 +961,12 @@ function waCadastrarBiometria() {
     new bootstrap.Modal(document.getElementById('modalCadastrarBiometria')).show();
 }
 
+function waMostrarMensagem(box, texto, tipo) {
+    tipo = tipo || 'danger';
+    box.className = 'alert border-0 bg-' + tipo + ' bg-opacity-10 text-' + tipo + ' small mt-3 mb-0';
+    box.textContent = texto;
+}
+
 function waConfirmarCadastro() {
     var apelido = document.getElementById('waApelidoInput').value.trim();
     var btn = document.getElementById('btnConfirmarBiometria');
@@ -994,15 +1000,18 @@ function waConfirmarCadastro() {
             if (res.success) {
                 location.href = 'configuracoes.php?sucesso_wa=1#seguranca';
             } else {
-                erroBox.textContent = res.msg || 'Não foi possível ativar o login rápido.';
+                waMostrarMensagem(erroBox, res.msg || 'Não foi possível ativar o login rápido.', 'danger');
                 erroBox.classList.remove('d-none');
             }
         })
         .catch(function(e) {
-            if (e.name !== 'NotAllowedError') {
-                erroBox.textContent = 'Não foi possível ativar o login rápido: ' + e.message;
-                erroBox.classList.remove('d-none');
+            if (e.name === 'NotAllowedError') return;
+            if (e.name === 'InvalidStateError') {
+                waMostrarMensagem(erroBox, 'Esse dispositivo já está com login rápido ativado — não precisa cadastrar de novo.', 'info');
+            } else {
+                waMostrarMensagem(erroBox, 'Não foi possível ativar o login rápido: ' + e.message, 'danger');
             }
+            erroBox.classList.remove('d-none');
         })
         .finally(function() {
             btn.disabled = false;
