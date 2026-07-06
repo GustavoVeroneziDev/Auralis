@@ -4,11 +4,14 @@
 // resposta do navigator.credentials.get(), confere a assinatura contra a chave
 // pública salva e, se bater, abre a sessão exatamente como o login por senha.
 // ==============================================================================
-session_start();
-header('Content-Type: application/json');
-
+// conexao.php (que carrega funcoes.php/o autoloader do Composer) precisa vir ANTES do
+// session_start() — a sessão guarda um objeto ByteBuffer (challenge), e se a classe
+// ainda não estiver registrada no autoloader nesse momento, o PHP desserializa como
+// __PHP_Incomplete_class em vez do objeto real.
 require_once '../config/conexao.php';
 require_once '../config/funcoes.php';
+session_start();
+header('Content-Type: application/json');
 
 $ip  = $_SERVER['REMOTE_ADDR'] ?? 'desconhecido';
 $uid = $_SESSION['webauthn_login_uid'] ?? null;

@@ -4,6 +4,12 @@
 // parâmetros (challenge, RP ID etc.) que o navegador precisa pra abrir o prompt
 // nativo de Face ID / Windows Hello / digital via navigator.credentials.create().
 // ==============================================================================
+// conexao.php (que carrega funcoes.php/o autoloader do Composer) precisa vir ANTES do
+// session_start() — a sessão guarda um objeto ByteBuffer (challenge), e se a classe
+// ainda não estiver registrada no autoloader nesse momento, o PHP desserializa como
+// __PHP_Incomplete_class em vez do objeto real.
+require_once '../config/conexao.php';
+require_once '../config/funcoes.php';
 session_start();
 header('Content-Type: application/json');
 
@@ -13,8 +19,6 @@ if (!isset($_SESSION['usuario_id'])) {
     exit;
 }
 
-require_once '../config/conexao.php';
-require_once '../config/funcoes.php';
 garantirTabelaCredencialWebAuthn($pdo);
 
 $uid = $_SESSION['usuario_id'];

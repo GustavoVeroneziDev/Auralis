@@ -6,11 +6,15 @@
 // mesmo formato (disponivel:false) quando o e-mail não existe, pra não dar pra
 // descobrir por aqui se um e-mail está cadastrado no Auralis ou não.
 // ==============================================================================
+// conexao.php (que carrega funcoes.php/o autoloader do Composer) precisa vir ANTES do
+// session_start() — a sessão guarda um objeto ByteBuffer (challenge), e se a classe
+// ainda não estiver registrada no autoloader nesse momento, o PHP desserializa como
+// __PHP_Incomplete_class em vez do objeto real.
+require_once '../config/conexao.php';
+require_once '../config/funcoes.php';
 session_start();
 header('Content-Type: application/json');
 
-require_once '../config/conexao.php';
-require_once '../config/funcoes.php';
 garantirTabelaCredencialWebAuthn($pdo);
 
 $ip = $_SERVER['REMOTE_ADDR'] ?? 'desconhecido';
