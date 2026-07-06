@@ -249,6 +249,9 @@ $credenciaisWebAuthn = listarCredenciaisWebAuthn($pdo, $usuario_id);
 if (($_GET['sucesso'] ?? '') === 'webauthn_removido') {
     $mensagem = 'Login rápido removido deste dispositivo.';
     $tipo_mensagem = 'success';
+} elseif (($_GET['sucesso'] ?? '') === 'webauthn_renomeado') {
+    $mensagem = 'Nome do dispositivo atualizado.';
+    $tipo_mensagem = 'success';
 } elseif (!empty($_GET['sucesso_wa'])) {
     $mensagem = 'Login rápido ativado com sucesso!';
     $tipo_mensagem = 'success';
@@ -411,12 +414,16 @@ require_once 'geral/header.php';
                                             <?php if ($cred['UltimoUso']): ?> · último uso em <?= date('d/m/Y', strtotime($cred['UltimoUso'])) ?><?php endif; ?>
                                         </div>
                                     </div>
-                                    <form method="POST" action="usuario/webauthn_remover.php" onsubmit="return confirm('Remover esse dispositivo? Você não vai mais poder entrar com ele sem senha.');">
-                                        <input type="hidden" name="id_credencial" value="<?= htmlspecialchars($cred['IDCredencial']) ?>">
-                                        <button type="submit" class="btn btn-sm btn-link text-danger text-decoration-none p-0">
+                                    <div class="d-flex align-items-center gap-1">
+                                        <button type="button" class="btn btn-sm btn-link text-secondary text-decoration-none p-1"
+                                            onclick="waAbrirEdicaoNome('<?= htmlspecialchars($cred['IDCredencial'], ENT_QUOTES) ?>', '<?= htmlspecialchars(addslashes($cred['Apelido'] ?? ''), ENT_QUOTES) ?>')">
+                                            <i class="bi bi-pencil"></i>
+                                        </button>
+                                        <button type="button" class="btn btn-sm btn-link text-danger text-decoration-none p-1"
+                                            onclick="waAbrirRemocao('<?= htmlspecialchars($cred['IDCredencial'], ENT_QUOTES) ?>')">
                                             <i class="bi bi-trash3"></i>
                                         </button>
-                                    </form>
+                                    </div>
                                 </div>
                             <?php endforeach; ?>
                         </div>
@@ -832,6 +839,49 @@ document.addEventListener('DOMContentLoaded', function() {
     </div>
 </div>
 
+<div class="modal fade" id="modalEditarNomeBiometria" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content border-secondary-subtle shadow-lg rounded-4" style="background:var(--bg-card);">
+            <form method="POST" action="usuario/webauthn_renomear.php">
+                <div class="modal-header border-bottom border-secondary-subtle">
+                    <h5 class="modal-title text-light fw-bold"><i class="bi bi-pencil me-2" style="color:var(--accent);"></i> Renomear dispositivo</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                </div>
+                <div class="modal-body p-4">
+                    <input type="hidden" name="id_credencial" id="waEditarId">
+                    <label for="waEditarApelidoInput" class="form-label text-light fw-semibold mb-1">Nome do dispositivo</label>
+                    <input type="text" name="apelido" id="waEditarApelidoInput" class="form-control form-control-lg bg-transparent border-secondary-subtle text-light shadow-none" maxlength="60" placeholder="Ex.: Meu celular">
+                </div>
+                <div class="modal-footer border-top border-secondary-subtle">
+                    <button type="button" class="btn btn-secondary rounded-pill px-4 fw-semibold" data-bs-dismiss="modal">Cancelar</button>
+                    <button type="submit" class="btn btn-outline-warning rounded-pill px-4 fw-bold">Salvar</button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+<div class="modal fade" id="modalRemoverBiometria" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content border-danger border-opacity-50 shadow-lg rounded-4" style="background:var(--bg-card);">
+            <form method="POST" action="usuario/webauthn_remover.php">
+                <div class="modal-header border-bottom border-secondary-subtle">
+                    <h5 class="modal-title text-danger fw-bold"><i class="bi bi-trash3 me-2"></i> Remover dispositivo</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                </div>
+                <div class="modal-body p-4">
+                    <input type="hidden" name="id_credencial" id="waRemoverId">
+                    <p class="text-light mb-0">Remover esse dispositivo? Você não vai mais poder entrar com ele sem senha.</p>
+                </div>
+                <div class="modal-footer border-top border-secondary-subtle">
+                    <button type="button" class="btn btn-secondary rounded-pill px-4 fw-semibold" data-bs-dismiss="modal">Cancelar</button>
+                    <button type="submit" class="btn btn-danger rounded-pill px-4 fw-bold">Remover</button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
 <div class="modal fade" id="modalExcluirConta" tabindex="-1" aria-hidden="true">
     <div class="modal-dialog modal-dialog-centered">
         <div class="modal-content border-danger border-opacity-50 shadow-lg rounded-4" style="background:var(--bg-card);">
@@ -950,6 +1000,17 @@ document.addEventListener('DOMContentLoaded', function() {
         if (aviso) aviso.style.display = '';
     }
 })();
+
+function waAbrirEdicaoNome(id, apelidoAtual) {
+    document.getElementById('waEditarId').value = id;
+    document.getElementById('waEditarApelidoInput').value = apelidoAtual;
+    new bootstrap.Modal(document.getElementById('modalEditarNomeBiometria')).show();
+}
+
+function waAbrirRemocao(id) {
+    document.getElementById('waRemoverId').value = id;
+    new bootstrap.Modal(document.getElementById('modalRemoverBiometria')).show();
+}
 
 function waCadastrarBiometria() {
     var apelidoPadrao = /iPad|iPhone|iPod/.test(navigator.userAgent) ? 'iPhone/iPad'
