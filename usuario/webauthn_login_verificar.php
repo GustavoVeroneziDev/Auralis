@@ -70,5 +70,6 @@ try {
 } catch (Throwable $e) {
     registrarTentativaSeguranca($pdo, 'login', $uid);
     registrarTentativaSeguranca($pdo, 'login_ip', $ip);
-    echo json_encode(['success' => false, 'msg' => 'Não foi possível confirmar a biometria.']);
+    // DEBUG TEMPORÁRIO — mensagem detalhada pra achar a causa raiz, tirar depois.
+    echo json_encode(['success' => false, 'msg' => get_class($e) . ': ' . $e->getMessage() . ' em ' . basename($e->getFile()) . ':' . $e->getLine()]);
 }

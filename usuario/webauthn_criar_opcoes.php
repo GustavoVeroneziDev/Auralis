@@ -42,5 +42,6 @@ try {
     echo json_encode($args);
 } catch (Throwable $e) {
     http_response_code(400);
-    echo json_encode(['success' => false, 'msg' => 'Não foi possível iniciar o cadastro da biometria.']);
+    // DEBUG TEMPORÁRIO — mensagem detalhada pra achar a causa raiz, tirar depois.
+    echo json_encode(['success' => false, 'msg' => get_class($e) . ': ' . $e->getMessage() . ' em ' . basename($e->getFile()) . ':' . $e->getLine()]);
 }

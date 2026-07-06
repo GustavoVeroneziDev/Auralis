@@ -56,7 +56,9 @@ try {
     unset($_SESSION['webauthn_challenge']);
     echo json_encode(['success' => true]);
 } catch (\lbuchs\WebAuthn\WebAuthnException $e) {
-    echo json_encode(['success' => false, 'msg' => 'Não foi possível confirmar a biometria. Tente novamente.']);
+    // DEBUG TEMPORÁRIO — mensagem detalhada pra achar a causa raiz, tirar depois.
+    echo json_encode(['success' => false, 'msg' => 'WebAuthnException: ' . $e->getMessage() . ' (código ' . $e->getCode() . ')']);
 } catch (Throwable $e) {
-    echo json_encode(['success' => false, 'msg' => 'Erro ao salvar a biometria.']);
+    // DEBUG TEMPORÁRIO — mensagem detalhada pra achar a causa raiz, tirar depois.
+    echo json_encode(['success' => false, 'msg' => get_class($e) . ': ' . $e->getMessage() . ' em ' . basename($e->getFile()) . ':' . $e->getLine()]);
 }
