@@ -37,7 +37,8 @@ try {
         $challenge,
         true,
         true,
-        false
+        false,
+        false // não exige que o Android seja um dispositivo "Google-certificado" (SafetyNet CTS)
     );
 
     $pdo->prepare("

@@ -1900,7 +1900,14 @@ if (!function_exists('obterWebAuthn')) {
         $host = explode(':', $_SERVER['HTTP_HOST'] ?? 'localhost')[0];
         // 4º parâmetro = usar base64url (em vez do formato RFC1342 padrão da lib) nos
         // campos binários do JSON — mais simples de decodificar no JS de quem chama.
-        return new \lbuchs\WebAuthn\WebAuthn('Auralis', $host, ['none'], true);
+        //
+        // Aceita todos os formatos de atestado suportados pela lib (não só 'none'):
+        // mesmo pedindo atestado 'none', Windows Hello costuma responder 'packed'/'tpm' e
+        // Android costuma responder 'android-safetynet'/'android-key' — restringir a
+        // 'none' fazia a lib rejeitar o cadastro vindo desses autenticadores. Sem CA raiz
+        // cadastrada, a lib não valida fabricante mesmo assim, só a estrutura/assinatura.
+        $formatos = ['android-key', 'android-safetynet', 'apple', 'fido-u2f', 'none', 'packed', 'tpm'];
+        return new \lbuchs\WebAuthn\WebAuthn('Auralis', $host, $formatos, true);
     }
 }
 
