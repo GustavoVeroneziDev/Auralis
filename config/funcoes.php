@@ -1310,7 +1310,7 @@ function garantirTabelaMetaCategoria(PDO $pdo): void
               AtualizadoEm DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
               UNIQUE KEY uq_meta_usuario_categoria (FKUsuario, FKCategoria),
               KEY idx_meta_usuario (FKUsuario)
-            ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4
+            ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
         ");
     } catch (PDOException $e) {
     }
@@ -1355,7 +1355,7 @@ function garantirTabelaConfiguracaoFinanceira(PDO $pdo): void
               FKUsuario          CHAR(36) NOT NULL PRIMARY KEY,
               PercentualPoupanca DECIMAL(5,2) NOT NULL DEFAULT 0,
               AtualizadoEm       DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
-            ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4
+            ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
         ");
     } catch (PDOException $e) {
     }
@@ -1397,7 +1397,7 @@ function garantirEstruturaComissaoRevendedor(PDO $pdo): void
               CriadoEm            DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
               UNIQUE KEY uq_revendedor_comprador (FKRevendedor, FKUsuarioComprador),
               KEY idx_revendedor (FKRevendedor)
-            ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4
+            ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
         ");
     } catch (PDOException $e) {
     }
@@ -1424,7 +1424,7 @@ function garantirEstruturaComissaoRevendedor(PDO $pdo): void
             CREATE TABLE IF NOT EXISTS PagamentoProcessado (
               Referencia   VARCHAR(64) NOT NULL PRIMARY KEY,
               ProcessadoEm DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP
-            ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4
+            ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
         ");
     } catch (PDOException $e) {
     }
@@ -1500,7 +1500,7 @@ function garantirEstruturaCarteirasCompartilhadas(PDO $pdo): void
               UNIQUE KEY uq_membro_carteira_usuario (FKCarteira, FKUsuario),
               KEY idx_membro_usuario (FKUsuario),
               KEY idx_membro_carteira (FKCarteira)
-            ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4
+            ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
         ");
     } catch (PDOException $e) {
     }
@@ -1530,7 +1530,7 @@ function garantirEstruturaCarteirasCompartilhadas(PDO $pdo): void
               Categoria  VARCHAR(20) NOT NULL DEFAULT 'membro',
               CriadoEm   DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
               KEY idx_log_carteira (FKCarteira, CriadoEm)
-            ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4
+            ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
         ");
     } catch (PDOException $e) {
     }
@@ -1884,7 +1884,7 @@ if (!function_exists('garantirTabelaCredencialWebAuthn')) {
                   UltimoUso    DATETIME NULL,
                   UNIQUE KEY uq_webauthn_credential (CredentialId),
                   KEY idx_webauthn_usuario (FKUsuario)
-                ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4
+                ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
             ");
 
             // Tabela já existia (de uma tentativa anterior) com CredentialId curto demais —
