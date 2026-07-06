@@ -915,6 +915,46 @@ if (!function_exists('garantirColunaFotoPerfilReal')) {
     }
 }
 
+// Usuario.InsigniasDestaque — 3 espaços fixos (ordenados) pra destacar conquistas
+// desbloqueadas no perfil. JSON simples (array de até 3 IDs, null = espaço vazio) em vez
+// de tabela própria, já que é só uma lista curta e ordenada por usuário.
+if (!function_exists('garantirColunaInsigniasDestaque')) {
+    function garantirColunaInsigniasDestaque(PDO $pdo): void
+    {
+        try {
+            $chk = $pdo->query("
+                SELECT COLUMN_NAME FROM INFORMATION_SCHEMA.COLUMNS
+                WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'Usuario' AND COLUMN_NAME = 'InsigniasDestaque'
+            ")->fetchColumn();
+            if (!$chk) {
+                $pdo->exec("ALTER TABLE Usuario ADD COLUMN InsigniasDestaque VARCHAR(255) NULL AFTER FotoPerfilReal");
+            }
+        } catch (PDOException $e) {
+        }
+    }
+}
+
+// Sempre retorna exatamente 3 posições (null = vazia), nunca menos, pra quem exibe não
+// precisar tratar tamanho variável.
+if (!function_exists('obterInsigniasDestaque')) {
+    function obterInsigniasDestaque(PDO $pdo, string $uid): array
+    {
+        $vazio = [null, null, null];
+        try {
+            $stmt = $pdo->prepare("SELECT InsigniasDestaque FROM Usuario WHERE IDUsuario = :uid LIMIT 1");
+            $stmt->execute([':uid' => $uid]);
+            $raw = $stmt->fetchColumn();
+            if (!$raw) return $vazio;
+            $dec = json_decode($raw, true);
+            if (!is_array($dec)) return $vazio;
+            $dec = array_slice(array_pad($dec, 3, null), 0, 3);
+            return $dec;
+        } catch (Throwable $e) {
+            return $vazio;
+        }
+    }
+}
+
 // URL de exibição do avatar do usuário: foto real (se tiver) sempre na frente do
 // personagem. Retorna null se não tiver nenhum dos dois — quem chama decide o fallback
 // (iniciais, ícone genérico etc.), que já varia de tela pra tela nesse app. Essa função

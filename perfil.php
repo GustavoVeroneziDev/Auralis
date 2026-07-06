@@ -12,6 +12,7 @@ require_once 'config/funcoes.php';
 
 verificarExpiracao($pdo);
 garantirColunaFotoPerfilReal($pdo);
+garantirColunaInsigniasDestaque($pdo);
 garantirEstruturaCarteirasCompartilhadas($pdo);
 
 $uid = $_SESSION['usuario_id'];
@@ -79,6 +80,10 @@ try {
 
 $totalConquistas     = count($conquistas);
 $totalDesbloqueadas  = count(array_filter($conquistas, fn($c) => $c['DataConquista'] !== null));
+
+// 3 espaços fixos de insígnia em destaque no herói do perfil
+$insigniasDestaque = obterInsigniasDestaque($pdo, $uid);
+$conquistasPorId   = array_column($conquistas, null, 'IDConquista');
 
 // ── Mapa de raridade → label/cor ────────────────────────────────────────────
 $raridadeInfo = [
@@ -157,6 +162,9 @@ require_once 'geral/header.php';
     display: flex;
     align-items: flex-start;
     gap: 1rem;
+    height: 136px;
+    overflow: hidden;
+    cursor: pointer;
     transition: transform .15s, box-shadow .15s;
 }
 .conquista-card:not(.bloqueada):hover {
@@ -222,8 +230,24 @@ require_once 'geral/header.php';
     box-shadow: none !important;
 }
 
-.conquista-nome { font-weight: 600; font-size: 0.9rem; margin-bottom: 2px; }
-.conquista-desc { font-size: 0.78rem; color: var(--text-muted); line-height: 1.45; }
+.conquista-nome {
+    font-weight: 600;
+    font-size: 0.9rem;
+    margin-bottom: 2px;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+.conquista-desc {
+    font-size: 0.78rem;
+    color: var(--text-muted);
+    line-height: 1.45;
+    display: -webkit-box;
+    -webkit-line-clamp: 2;
+    line-clamp: 2;
+    -webkit-box-orient: vertical;
+    overflow: hidden;
+}
 .conquista-footer { margin-top: 6px; font-size: 0.72rem; }
 .raridade-pill {
     display: inline-flex; align-items: center;
@@ -242,12 +266,15 @@ require_once 'geral/header.php';
         'personagem'      => 'Personagem salvo com sucesso!',
         'foto'            => 'Foto atualizada!',
         'foto_removida'   => 'Foto removida — voltando a mostrar seu personagem.',
+        'insignia_salva'  => 'Insígnia em destaque atualizada!',
     ];
     $_msgsErroPerfil = [
-        'foto_invalida' => 'Não recebi nenhuma foto. Tenta de novo.',
-        'foto_grande'   => 'Essa foto passa de 5 MB — escolhe uma menor.',
-        'foto_tipo'     => 'Formato não aceito — use JPG, PNG ou WebP.',
-        'foto_upload'   => 'Não consegui salvar a foto. Tenta de novo.',
+        'foto_invalida'     => 'Não recebi nenhuma foto. Tenta de novo.',
+        'foto_grande'       => 'Essa foto passa de 5 MB — escolhe uma menor.',
+        'foto_tipo'         => 'Formato não aceito — use JPG, PNG ou WebP.',
+        'foto_upload'       => 'Não consegui salvar a foto. Tenta de novo.',
+        'insignia_invalida' => 'Não deu pra destacar essa conquista.',
+        'banco'             => 'Erro ao salvar. Tenta de novo.',
     ];
     $_sucessoPerfil = $_msgsSucessoPerfil[$_GET['sucesso'] ?? ''] ?? null;
     $_erroPerfil     = $_msgsErroPerfil[$_GET['erro'] ?? ''] ?? null;
@@ -332,6 +359,30 @@ require_once 'geral/header.php';
                 <span class="text-muted small">
                     <i class="bi bi-clock-history me-1"></i><?= $diasAtivo ?> dia<?= $diasAtivo !== 1 ? 's' : '' ?> no Auralis
                 </span>
+            </div>
+
+            <!-- 3 espaços fixos de insígnia em destaque — clique numa conquista lá embaixo
+                 e escolha um espaço pra colocá-la aqui. -->
+            <div class="d-flex align-items-center gap-2 mt-2">
+                <?php foreach ($insigniasDestaque as $_insigniaId):
+                    $_confInsignia = $_insigniaId ? ($conquistasPorId[$_insigniaId] ?? null) : null;
+                ?>
+                    <?php if ($_confInsignia): ?>
+                        <div class="conquista-icon-wrap badge-<?= htmlspecialchars($_confInsignia['Raridade'] ?? 'comum') ?>"
+                             style="width:42px;height:42px;font-size:1rem;" title="<?= htmlspecialchars($_confInsignia['Nome']) ?>">
+                            <?php if (!empty($_confInsignia['ImagemUrl'])): ?>
+                                <img src="<?= htmlspecialchars($_confInsignia['ImagemUrl']) ?>" alt="<?= htmlspecialchars($_confInsignia['Nome']) ?>" style="width:78%;height:78%;object-fit:contain;border-radius:50%;">
+                            <?php else: ?>
+                                <i class="bi <?= htmlspecialchars($_confInsignia['Icone']) ?>" style="color:<?= htmlspecialchars($_confInsignia['Cor']) ?>;font-size:0.95rem;"></i>
+                            <?php endif; ?>
+                        </div>
+                    <?php else: ?>
+                        <a href="#listaConquistas" class="d-flex align-items-center justify-content-center rounded-circle text-decoration-none flex-shrink-0"
+                           style="width:42px;height:42px;border:1.5px dashed var(--bs-border-color);color:var(--text-muted);" title="Escolher insígnia">
+                            <i class="bi bi-plus" style="font-size:1.1rem;"></i>
+                        </a>
+                    <?php endif; ?>
+                <?php endforeach; ?>
             </div>
         </div>
         <a href="/configuracoes.php" class="btn btn-sm btn-outline-secondary rounded-pill">
@@ -596,6 +647,39 @@ require_once 'geral/header.php';
         </div>
     </div>
 
+    <!-- ── Modal: detalhe da conquista (abre ao clicar num card) ────────────
+         Também é daqui que se escolhe em qual dos 3 espaços de destaque colocar uma
+         conquista já desbloqueada. -->
+    <div class="modal fade" id="modalDetalheConquista" tabindex="-1" aria-hidden="true">
+        <div class="modal-dialog modal-dialog-centered">
+            <div class="modal-content border-secondary-subtle shadow-lg rounded-4 text-center" style="background:var(--bg-card);">
+                <div class="modal-header border-0 pb-0">
+                    <button type="button" class="btn-close ms-auto" data-bs-dismiss="modal" aria-label="Close"></button>
+                </div>
+                <div class="modal-body px-4 pb-4 pt-0 d-flex flex-column align-items-center">
+                    <div id="detConquistaIconWrap" class="conquista-icon-wrap mb-3" style="width:110px;height:110px;font-size:2.75rem;">
+                        <i id="detConquistaIcone"></i>
+                        <img id="detConquistaImagem" style="display:none;width:78%;height:78%;object-fit:contain;border-radius:50%;">
+                    </div>
+                    <h5 class="fw-bold text-light mb-1" id="detConquistaNome"></h5>
+                    <p class="text-secondary mb-3" id="detConquistaDesc" style="max-width:320px;"></p>
+                    <div class="d-flex align-items-center gap-2 mb-2">
+                        <span class="raridade-pill" id="detConquistaRaridade"></span>
+                        <span class="text-muted small" id="detConquistaStatus"></span>
+                    </div>
+                    <div id="detConquistaInsignias" class="d-none w-100 mt-2 pt-3" style="border-top:1px solid var(--bs-border-color);">
+                        <p class="text-secondary small mb-2">Destacar essa conquista no perfil:</p>
+                        <div class="d-flex justify-content-center gap-2" id="detConquistaSlots"></div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+    <form method="POST" action="/usuario/processa_insignias.php" id="formInsignia" class="d-none">
+        <input type="hidden" name="slot" id="insigniaSlot">
+        <input type="hidden" name="conquista_id" id="insigniaConquistaId">
+    </form>
+
     <!-- Conquistas -->
     <div class="d-flex align-items-center justify-content-between mb-3 flex-wrap gap-2">
         <div>
@@ -636,7 +720,20 @@ require_once 'geral/header.php';
             }
         ?>
         <div class="col-12 col-md-6 item-conquista" data-desbloqueada="<?= $desbloqueada ? '1' : '0' ?>">
-            <div class="conquista-card <?= $desbloqueada ? '' : 'bloqueada' ?>">
+            <div class="conquista-card <?= $desbloqueada ? '' : 'bloqueada' ?>"
+                 onclick='abrirDetalheConquista(<?= htmlspecialchars(json_encode([
+                     "id"            => $c["IDConquista"],
+                     "nome"          => $c["Nome"],
+                     "descricao"     => $c["Descricao"],
+                     "icone"         => $c["Icone"],
+                     "imagem"        => $c["ImagemUrl"],
+                     "cor"           => $c["Cor"],
+                     "raridade"      => $c["Raridade"] ?? "comum",
+                     "raridadeLabel" => $raridade["label"],
+                     "raridadeCor"   => $raridade["cor"],
+                     "desbloqueada"  => $desbloqueada,
+                     "dataTexto"     => $dataDesbloq,
+                 ]), ENT_QUOTES) ?>)'>
                 <!-- Ícone -->
                 <div class="conquista-icon-wrap badge-<?= htmlspecialchars($c['Raridade'] ?? 'comum') ?>">
                     <?php if (!$desbloqueada): ?>
@@ -939,6 +1036,81 @@ require_once 'geral/header.php';
 
     aplicarFiltro('tenho'); // Estado inicial: só as que já tem
 })();
+
+// ── Modal de detalhe da conquista + 3 espaços de destaque ───────────────────
+window.INSIGNIAS_ATUAIS = <?= json_encode($insigniasDestaque) ?>;
+
+function abrirDetalheConquista(c) {
+    var wrap = document.getElementById('detConquistaIconWrap');
+    wrap.className = 'conquista-icon-wrap mb-3 badge-' + (c.desbloqueada ? c.raridade : 'comum');
+
+    var icone  = document.getElementById('detConquistaIcone');
+    var imagem = document.getElementById('detConquistaImagem');
+    if (!c.desbloqueada) {
+        icone.className = 'bi bi-lock-fill';
+        icone.style.color = 'rgba(156,163,175,0.5)';
+        icone.style.display = '';
+        imagem.style.display = 'none';
+    } else if (c.imagem) {
+        imagem.src = c.imagem;
+        imagem.style.display = '';
+        icone.style.display = 'none';
+    } else {
+        icone.className = 'bi ' + c.icone;
+        icone.style.color = c.cor;
+        icone.style.display = '';
+        imagem.style.display = 'none';
+    }
+
+    document.getElementById('detConquistaNome').textContent = c.nome;
+    document.getElementById('detConquistaDesc').textContent = c.descricao;
+
+    var pill = document.getElementById('detConquistaRaridade');
+    pill.textContent = c.raridadeLabel;
+    pill.style.background = c.raridadeCor + '22';
+    pill.style.color = c.raridadeCor;
+    pill.style.border = '1px solid ' + c.raridadeCor + '44';
+
+    var status = document.getElementById('detConquistaStatus');
+    status.innerHTML = c.desbloqueada
+        ? '<i class="bi bi-check2-circle me-1" style="color:' + c.cor + ';"></i>' + c.dataTexto
+        : '<i class="bi bi-lock me-1"></i>Bloqueada';
+
+    var insigniasBox = document.getElementById('detConquistaInsignias');
+    if (c.desbloqueada) {
+        insigniasBox.classList.remove('d-none');
+        montarSlotsInsignia(c.id);
+    } else {
+        insigniasBox.classList.add('d-none');
+    }
+
+    bootstrap.Modal.getOrCreateInstance(document.getElementById('modalDetalheConquista')).show();
+}
+
+function montarSlotsInsignia(conquistaId) {
+    var cont = document.getElementById('detConquistaSlots');
+    cont.innerHTML = '';
+    for (var i = 0; i < 3; i++) {
+        var jaEEssa = window.INSIGNIAS_ATUAIS[i] === conquistaId;
+        var btn = document.createElement('button');
+        btn.type = 'button';
+        btn.className = 'btn btn-sm rounded-pill px-3';
+        btn.style.cssText = jaEEssa
+            ? 'background:var(--accent);color:#000;border:1px solid var(--accent);font-weight:700;'
+            : 'background:rgba(255,255,255,.05);color:var(--text-muted);border:1px solid var(--card-border-color);';
+        btn.textContent = 'Espaço ' + (i + 1) + (jaEEssa ? ' ✓' : '');
+        (function(slot, remover) {
+            btn.onclick = function() { salvarInsignia(slot, remover ? null : conquistaId); };
+        })(i, jaEEssa);
+        cont.appendChild(btn);
+    }
+}
+
+function salvarInsignia(slot, conquistaIdOuNull) {
+    document.getElementById('insigniaSlot').value = slot;
+    document.getElementById('insigniaConquistaId').value = conquistaIdOuNull || '';
+    document.getElementById('formInsignia').submit();
+}
 
 // ── Menu da imagem de perfil (editar personagem / colocar foto) ─────────────
 function mostrarEditorPersonagem() {
