@@ -369,16 +369,47 @@ function cartao_verificarFechamentos(PDO $pdo, string $uid): void
         // Estritamente < hoje (não <=): o dia do fechamento em si ainda pertence à fatura que
         // está fechando — uma compra feita nesse mesmo dia (a qualquer hora) precisa cair nela.
         // Só fecha de fato quando o dia seguinte começar.
+        // O "NOT EXISTS" é o que protege uma fatura antiga reaberta manualmente pra edição:
+        // sem ele, assim que a página recarrega essa verificação via encontra a fatura
+        // reaberta (aberta + DataFechamento no passado) e fecha ela de novo sozinha, antes
+        // mesmo de qualquer edição ser feita — desfazendo a reabertura silenciosamente.
+        // Só fecha automaticamente quando é mesmo a fatura "da vez" do cartão (não existe
+        // outra aberta mais recente pra esse mesmo cartão).
         $hoje = date('Y-m-d');
         $stmt = $pdo->prepare(
             "SELECT f.*, c.DiaVencimento, c.FKCarteiraDebito, c.Nome AS NomeCartao
              FROM FaturaCartao f
              JOIN CartaoCredito c ON f.FKCartao = c.IDCartao
-             WHERE f.FKUsuario = :uid AND f.Status = 'aberta' AND f.DataFechamento < :hoje"
+             WHERE f.FKUsuario = :uid AND f.Status = 'aberta' AND f.DataFechamento < :hoje
+               AND NOT EXISTS (
+                   SELECT 1 FROM FaturaCartao f2
+                   WHERE f2.FKCartao = f.FKCartao AND f2.FKUsuario = f.FKUsuario
+                     AND f2.Status = 'aberta' AND f2.IDFatura != f.IDFatura
+                     AND f2.DataFechamento > f.DataFechamento
+               )"
         );
         $stmt->execute([':uid' => $uid, ':hoje' => $hoje]);
         foreach ($stmt->fetchAll(PDO::FETCH_ASSOC) as $fatura) {
             cartao_fecharFatura($pdo, $fatura, $uid);
+        }
+    } catch (PDOException $e) {}
+
+    // Auto-repara faturas fechadas/pagas que ficaram órfãs (fecharam antes do cartão ter
+    // uma carteira de pagamento definida). Antes só reparava quando o usuário abria a
+    // fatura e clicava em algo — agora corrige sozinho assim que o cartão passa a ter
+    // FKCarteiraDebito, sem precisar de ação manual.
+    try {
+        $stmtOrf = $pdo->prepare(
+            "SELECT f.IDFatura
+             FROM FaturaCartao f
+             JOIN CartaoCredito c ON f.FKCartao = c.IDCartao
+             WHERE f.FKUsuario = :uid AND f.Status IN ('fechada','paga')
+               AND f.FKRegistroPagamento IS NULL AND f.ValorTotal > 0
+               AND c.FKCarteiraDebito IS NOT NULL"
+        );
+        $stmtOrf->execute([':uid' => $uid]);
+        foreach ($stmtOrf->fetchAll(PDO::FETCH_COLUMN) as $faturaOrfaId) {
+            cartao_repararRegistroPagamento($pdo, $faturaOrfaId, $uid);
         }
     } catch (PDOException $e) {}
 }
