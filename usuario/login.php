@@ -80,7 +80,7 @@ require_once '../geral/header.php';
                     <div class="mb-4" id="waLoginWrap" style="display:none !important;">
                         <div class="d-grid">
                             <button type="button" class="btn btn-outline-light btn-lg rounded-3 fw-semibold" id="btnLoginBiometria" onclick="waLoginBiometria()">
-                                <i class="bi bi-fingerprint me-2"></i> Entrar com biometria
+                                <i class="bi bi-fingerprint me-2"></i> Entrar sem senha
                             </button>
                         </div>
                         <div class="alert alert-danger border-0 bg-danger bg-opacity-10 text-danger small mt-2 mb-0 d-none" id="waLoginErro"></div>
@@ -247,7 +247,7 @@ require_once '../geral/header.php';
         })
         .then(function(r) { return r.json(); })
         .then(function(res) {
-            if (!res.disponivel) throw new Error('Biometria não disponível pra essa conta.');
+            if (!res.disponivel) throw new Error('Login sem senha não disponível pra essa conta.');
             var args = res.options;
             args.publicKey.challenge = waB64urlToBuf(args.publicKey.challenge);
             (args.publicKey.allowCredentials || []).forEach(function(c) { c.id = waB64urlToBuf(c.id); });
@@ -270,19 +270,19 @@ require_once '../geral/header.php';
             if (res.success) {
                 location.href = res.redirect;
             } else {
-                waLoginErro.textContent = res.msg || 'Não foi possível entrar com biometria.';
+                waLoginErro.textContent = res.msg || 'Não foi possível confirmar seu acesso.';
                 waLoginErro.classList.remove('d-none');
             }
         })
         .catch(function(e) {
             if (e.name !== 'NotAllowedError') {
-                waLoginErro.textContent = e.message || 'Não foi possível entrar com biometria.';
+                waLoginErro.textContent = e.message || 'Não foi possível confirmar seu acesso.';
                 waLoginErro.classList.remove('d-none');
             }
         })
         .finally(function() {
             btnLoginBio.disabled = false;
-            btnLoginBio.innerHTML = '<i class="bi bi-fingerprint me-2"></i> Entrar com biometria';
+            btnLoginBio.innerHTML = '<i class="bi bi-fingerprint me-2"></i> Entrar sem senha';
         });
     }
 </script>

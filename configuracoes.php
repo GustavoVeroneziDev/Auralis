@@ -247,10 +247,10 @@ try {
 garantirTabelaCredencialWebAuthn($pdo);
 $credenciaisWebAuthn = listarCredenciaisWebAuthn($pdo, $usuario_id);
 if (($_GET['sucesso'] ?? '') === 'webauthn_removido') {
-    $mensagem = 'Biometria removida deste dispositivo.';
+    $mensagem = 'Login rápido removido deste dispositivo.';
     $tipo_mensagem = 'success';
 } elseif (!empty($_GET['sucesso_wa'])) {
-    $mensagem = 'Biometria ativada com sucesso!';
+    $mensagem = 'Login rápido ativado com sucesso!';
     $tipo_mensagem = 'success';
 }
 
@@ -389,17 +389,17 @@ require_once 'geral/header.php';
                     <hr class="border-secondary-subtle opacity-50 my-4">
 
                     <div class="d-flex justify-content-between align-items-center mb-3">
-                        <h6 class="text-light fw-bold mb-0"><i class="bi bi-fingerprint me-2" style="color:var(--accent);"></i>Login por biometria</h6>
+                        <h6 class="text-light fw-bold mb-0"><i class="bi bi-fingerprint me-2" style="color:var(--accent);"></i>Login rápido do dispositivo</h6>
                         <button type="button" class="btn btn-sm btn-outline-warning rounded-pill px-3 fw-semibold" id="btnCadastrarBiometria" onclick="waCadastrarBiometria()">
                             <i class="bi bi-plus-lg me-1"></i> Ativar neste dispositivo
                         </button>
                     </div>
                     <p class="text-secondary small mb-3" id="waSemSuporte" style="display:none;">
-                        Este navegador/dispositivo não tem suporte a login por biometria.
+                        Este navegador/dispositivo não tem suporte a esse tipo de login.
                     </p>
 
                     <?php if (empty($credenciaisWebAuthn)): ?>
-                        <p class="text-secondary small mb-0" id="waListaVazia">Nenhum dispositivo cadastrado ainda. Use Face ID, digital ou Windows Hello pra entrar sem digitar senha.</p>
+                        <p class="text-secondary small mb-0" id="waListaVazia">Nenhum dispositivo cadastrado ainda. Use digital, reconhecimento facial, PIN ou outro método do aparelho pra entrar sem digitar senha.</p>
                     <?php else: ?>
                         <div class="d-flex flex-column gap-2">
                             <?php foreach ($credenciaisWebAuthn as $cred): ?>
@@ -411,7 +411,7 @@ require_once 'geral/header.php';
                                             <?php if ($cred['UltimoUso']): ?> · último uso em <?= date('d/m/Y', strtotime($cred['UltimoUso'])) ?><?php endif; ?>
                                         </div>
                                     </div>
-                                    <form method="POST" action="usuario/webauthn_remover.php" onsubmit="return confirm('Remover esse dispositivo? Você não vai mais poder entrar com ele por biometria.');">
+                                    <form method="POST" action="usuario/webauthn_remover.php" onsubmit="return confirm('Remover esse dispositivo? Você não vai mais poder entrar com ele sem senha.');">
                                         <input type="hidden" name="id_credencial" value="<?= htmlspecialchars($cred['IDCredencial']) ?>">
                                         <button type="submit" class="btn btn-sm btn-link text-danger text-decoration-none p-0">
                                             <i class="bi bi-trash3"></i>
@@ -811,7 +811,7 @@ document.addEventListener('DOMContentLoaded', function() {
     <div class="modal-dialog modal-dialog-centered">
         <div class="modal-content border-secondary-subtle shadow-lg rounded-4" style="background:var(--bg-card);">
             <div class="modal-header border-bottom border-secondary-subtle">
-                <h5 class="modal-title text-light fw-bold"><i class="bi bi-fingerprint me-2" style="color:var(--accent);"></i> Ativar biometria</h5>
+                <h5 class="modal-title text-light fw-bold"><i class="bi bi-fingerprint me-2" style="color:var(--accent);"></i> Ativar login rápido</h5>
                 <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
             </div>
             <div class="modal-body p-4">
@@ -994,13 +994,13 @@ function waConfirmarCadastro() {
             if (res.success) {
                 location.href = 'configuracoes.php?sucesso_wa=1#seguranca';
             } else {
-                erroBox.textContent = res.msg || 'Não foi possível ativar a biometria.';
+                erroBox.textContent = res.msg || 'Não foi possível ativar o login rápido.';
                 erroBox.classList.remove('d-none');
             }
         })
         .catch(function(e) {
             if (e.name !== 'NotAllowedError') {
-                erroBox.textContent = 'Não foi possível ativar a biometria: ' + e.message;
+                erroBox.textContent = 'Não foi possível ativar o login rápido: ' + e.message;
                 erroBox.classList.remove('d-none');
             }
         })
