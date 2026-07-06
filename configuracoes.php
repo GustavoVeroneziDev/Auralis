@@ -807,6 +807,31 @@ document.addEventListener('DOMContentLoaded', function() {
 });
 </script>
 
+<div class="modal fade" id="modalCadastrarBiometria" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content border-secondary-subtle shadow-lg rounded-4" style="background:var(--bg-card);">
+            <div class="modal-header border-bottom border-secondary-subtle">
+                <h5 class="modal-title text-light fw-bold"><i class="bi bi-fingerprint me-2" style="color:var(--accent);"></i> Ativar biometria</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body p-4">
+                <p class="text-secondary small mb-3">Dê um nome pra esse dispositivo, pra reconhecer depois na sua lista.</p>
+                <div class="mb-2">
+                    <label for="waApelidoInput" class="form-label text-light fw-semibold mb-1">Nome do dispositivo</label>
+                    <input type="text" id="waApelidoInput" class="form-control form-control-lg bg-transparent border-secondary-subtle text-light shadow-none" maxlength="60" placeholder="Ex.: Meu celular">
+                </div>
+                <div class="alert alert-danger border-0 bg-danger bg-opacity-10 text-danger small mt-3 mb-0 d-none" id="waErro"></div>
+            </div>
+            <div class="modal-footer border-top border-secondary-subtle">
+                <button type="button" class="btn btn-secondary rounded-pill px-4 fw-semibold" data-bs-dismiss="modal">Cancelar</button>
+                <button type="button" class="btn btn-outline-warning rounded-pill px-4 fw-bold" id="btnConfirmarBiometria" onclick="waConfirmarCadastro()">
+                    <i class="bi bi-fingerprint me-1"></i> Ativar
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+
 <div class="modal fade" id="modalExcluirConta" tabindex="-1" aria-hidden="true">
     <div class="modal-dialog modal-dialog-centered">
         <div class="modal-content border-danger border-opacity-50 shadow-lg rounded-4" style="background:var(--bg-card);">
@@ -931,11 +956,18 @@ function waCadastrarBiometria() {
         : /Android/.test(navigator.userAgent) ? 'Celular Android'
         : /Mac/.test(navigator.userAgent) ? 'Mac'
         : 'Windows';
-    var apelido = prompt('Dê um nome pra esse dispositivo (ex.: "Meu celular"):', apelidoPadrao);
-    if (apelido === null) return;
+    document.getElementById('waApelidoInput').value = apelidoPadrao;
+    document.getElementById('waErro').classList.add('d-none');
+    new bootstrap.Modal(document.getElementById('modalCadastrarBiometria')).show();
+}
 
-    var btn = document.getElementById('btnCadastrarBiometria');
-    if (btn) { btn.disabled = true; btn.innerHTML = '<span class="spinner-border spinner-border-sm"></span>'; }
+function waConfirmarCadastro() {
+    var apelido = document.getElementById('waApelidoInput').value.trim();
+    var btn = document.getElementById('btnConfirmarBiometria');
+    var erroBox = document.getElementById('waErro');
+    erroBox.classList.add('d-none');
+    btn.disabled = true;
+    btn.innerHTML = '<span class="spinner-border spinner-border-sm"></span>';
 
     fetch('usuario/webauthn_criar_opcoes.php')
         .then(function(r) { return r.json(); })
@@ -962,14 +994,19 @@ function waCadastrarBiometria() {
             if (res.success) {
                 location.href = 'configuracoes.php?sucesso_wa=1#seguranca';
             } else {
-                alert(res.msg || 'Não foi possível ativar a biometria.');
+                erroBox.textContent = res.msg || 'Não foi possível ativar a biometria.';
+                erroBox.classList.remove('d-none');
             }
         })
         .catch(function(e) {
-            if (e.name !== 'NotAllowedError') alert('Não foi possível ativar a biometria: ' + e.message);
+            if (e.name !== 'NotAllowedError') {
+                erroBox.textContent = 'Não foi possível ativar a biometria: ' + e.message;
+                erroBox.classList.remove('d-none');
+            }
         })
         .finally(function() {
-            if (btn) { btn.disabled = false; btn.innerHTML = '<i class="bi bi-plus-lg me-1"></i> Ativar neste dispositivo'; }
+            btn.disabled = false;
+            btn.innerHTML = '<i class="bi bi-fingerprint me-1"></i> Ativar';
         });
 }
 </script>

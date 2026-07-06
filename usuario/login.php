@@ -77,10 +77,13 @@ require_once '../geral/header.php';
                         </div>
                     </div>
 
-                    <div class="d-grid mb-4" id="waLoginWrap" style="display:none !important;">
-                        <button type="button" class="btn btn-outline-light btn-lg rounded-3 fw-semibold" id="btnLoginBiometria" onclick="waLoginBiometria()">
-                            <i class="bi bi-fingerprint me-2"></i> Entrar com biometria
-                        </button>
+                    <div class="mb-4" id="waLoginWrap" style="display:none !important;">
+                        <div class="d-grid">
+                            <button type="button" class="btn btn-outline-light btn-lg rounded-3 fw-semibold" id="btnLoginBiometria" onclick="waLoginBiometria()">
+                                <i class="bi bi-fingerprint me-2"></i> Entrar com biometria
+                            </button>
+                        </div>
+                        <div class="alert alert-danger border-0 bg-danger bg-opacity-10 text-danger small mt-2 mb-0 d-none" id="waLoginErro"></div>
                     </div>
 
                     <div class="mb-4">
@@ -205,6 +208,7 @@ require_once '../geral/header.php';
     var inputEmail   = document.getElementById('email');
     var waLoginWrap  = document.getElementById('waLoginWrap');
     var btnLoginBio  = document.getElementById('btnLoginBiometria');
+    var waLoginErro  = document.getElementById('waLoginErro');
     var waCheckTimer = null;
 
     if (window.PublicKeyCredential && inputEmail) {
@@ -232,6 +236,7 @@ require_once '../geral/header.php';
         var email = inputEmail.value.trim();
         if (!email) return;
 
+        waLoginErro.classList.add('d-none');
         btnLoginBio.disabled = true;
         btnLoginBio.innerHTML = '<span class="spinner-border spinner-border-sm"></span>';
 
@@ -265,11 +270,15 @@ require_once '../geral/header.php';
             if (res.success) {
                 location.href = res.redirect;
             } else {
-                alert(res.msg || 'Não foi possível entrar com biometria.');
+                waLoginErro.textContent = res.msg || 'Não foi possível entrar com biometria.';
+                waLoginErro.classList.remove('d-none');
             }
         })
         .catch(function(e) {
-            if (e.name !== 'NotAllowedError') alert(e.message || 'Não foi possível entrar com biometria.');
+            if (e.name !== 'NotAllowedError') {
+                waLoginErro.textContent = e.message || 'Não foi possível entrar com biometria.';
+                waLoginErro.classList.remove('d-none');
+            }
         })
         .finally(function() {
             btnLoginBio.disabled = false;

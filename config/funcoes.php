@@ -1876,7 +1876,7 @@ if (!function_exists('garantirTabelaCredencialWebAuthn')) {
                 CREATE TABLE IF NOT EXISTS CredencialWebAuthn (
                   IDCredencial CHAR(36) NOT NULL PRIMARY KEY,
                   FKUsuario    CHAR(36) NOT NULL,
-                  CredentialId VARCHAR(255) NOT NULL,
+                  CredentialId VARCHAR(700) NOT NULL,
                   PublicKey    TEXT NOT NULL,
                   SignCounter  INT UNSIGNED NOT NULL DEFAULT 0,
                   Apelido      VARCHAR(60) NULL,
@@ -1886,6 +1886,17 @@ if (!function_exists('garantirTabelaCredencialWebAuthn')) {
                   KEY idx_webauthn_usuario (FKUsuario)
                 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4
             ");
+
+            // Tabela já existia (de uma tentativa anterior) com CredentialId curto demais —
+            // o Windows Hello costuma gerar IDs de credencial bem mais longos que os 255
+            // caracteres que a coluna suportava, e o INSERT falhava ("erro ao salvar").
+            $tamanho = $pdo->query("
+                SELECT CHARACTER_MAXIMUM_LENGTH FROM INFORMATION_SCHEMA.COLUMNS
+                WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'CredencialWebAuthn' AND COLUMN_NAME = 'CredentialId'
+            ")->fetchColumn();
+            if ($tamanho !== false && (int)$tamanho < 700) {
+                $pdo->exec("ALTER TABLE CredencialWebAuthn MODIFY COLUMN CredentialId VARCHAR(700) NOT NULL");
+            }
         } catch (PDOException $e) {
         }
     }
