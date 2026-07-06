@@ -322,6 +322,14 @@ require_once 'geral/header.php';
                 style="background:rgba(96,165,250,.15);color:#60a5fa;border:1px solid rgba(96,165,250,.3);">
                 <i class="bi bi-clipboard me-1"></i> Copiar código
             </button>
+            <!-- Só aparece se o navegador suportar o share nativo (celular, majoritariamente) —
+                 evita mandar copiar/colar por fora quando dá pra abrir o WhatsApp/SMS já com
+                 o código preenchido. -->
+            <button onclick="cfgCompartilharCodigoConvite()" id="cfgBtnCompartilharConvite"
+                class="btn btn-sm rounded-pill px-3 flex-shrink-0 d-none"
+                style="background:rgba(96,165,250,.15);color:#60a5fa;border:1px solid rgba(96,165,250,.3);">
+                <i class="bi bi-share-fill me-1"></i> Compartilhar
+            </button>
         </div>
     </div>
 
@@ -777,6 +785,21 @@ function cfgCopiarCodigoConvite() {
         setTimeout(function() { btn.innerHTML = orig; }, 2000);
     });
 }
+
+function cfgCompartilharCodigoConvite() {
+    var codigo = document.getElementById('cfgCodigoConvite').textContent.trim();
+    var texto = 'Usa meu código ' + codigo + ' pra entrar na minha carteira compartilhada no Auralis! Abre o app, vai em Carteiras, entra na carteira e cola esse código em "Convidar por código".';
+    if (navigator.share) {
+        navigator.share({ title: 'Código de convite — Auralis', text: texto }).catch(function() {});
+    }
+}
+
+document.addEventListener('DOMContentLoaded', function() {
+    if (navigator.share) {
+        var btnShare = document.getElementById('cfgBtnCompartilharConvite');
+        if (btnShare) btnShare.classList.remove('d-none');
+    }
+});
 </script>
 
 <div class="modal fade" id="modalExcluirConta" tabindex="-1" aria-hidden="true">
