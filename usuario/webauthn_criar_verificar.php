@@ -60,9 +60,7 @@ try {
     unset($_SESSION['webauthn_challenge']);
     echo json_encode(['success' => true]);
 } catch (\lbuchs\WebAuthn\WebAuthnException $e) {
-    // DEBUG TEMPORÁRIO — mensagem detalhada pra achar a causa raiz, tirar depois.
-    echo json_encode(['success' => false, 'msg' => 'WebAuthnException: ' . $e->getMessage() . ' (código ' . $e->getCode() . ')']);
+    echo json_encode(['success' => false, 'msg' => 'Não foi possível confirmar o dispositivo. Tente novamente.']);
 } catch (Throwable $e) {
-    // DEBUG TEMPORÁRIO — mensagem detalhada pra achar a causa raiz, tirar depois.
-    echo json_encode(['success' => false, 'msg' => get_class($e) . ': ' . $e->getMessage() . ' em ' . basename($e->getFile()) . ':' . $e->getLine()]);
+    echo json_encode(['success' => false, 'msg' => 'Erro ao salvar o login rápido.']);
 }
