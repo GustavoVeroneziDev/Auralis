@@ -64,6 +64,24 @@ function parseBRL(val) {
     return parseFloat((val || '').replace(/[^\d,]/g, '').replace(',', '.')) || 0;
 }
 
+// ── WebAuthn (login por biometria) — conversão binário <-> texto pra JSON. ──
+// O servidor manda challenge/ids em base64url (padrão da lib lbuchs/webauthn);
+// a resposta do navigator.credentials.* volta pro servidor em base64 comum.
+function waB64urlToBuf(b64url) {
+    var b64 = b64url.replace(/-/g, '+').replace(/_/g, '/');
+    while (b64.length % 4) b64 += '=';
+    var bin = atob(b64);
+    var buf = new Uint8Array(bin.length);
+    for (var i = 0; i < bin.length; i++) buf[i] = bin.charCodeAt(i);
+    return buf.buffer;
+}
+function waBufToB64(buf) {
+    var bytes = new Uint8Array(buf);
+    var bin = '';
+    for (var i = 0; i < bytes.length; i++) bin += String.fromCharCode(bytes[i]);
+    return btoa(bin);
+}
+
 // Salvar posição de scroll antes de qualquer POST
 (function() {
     var key = 'auralis_scroll_' + location.pathname;

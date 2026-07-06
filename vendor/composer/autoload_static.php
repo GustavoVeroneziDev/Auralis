@@ -48,6 +48,10 @@ class ComposerStaticInit1bae9e80265f85709f7235955fd3024a
             'Brick\\Math\\' => 11,
             'Base64Url\\' => 10,
         ),
+        'l' =>
+        array (
+            'lbuchs\\WebAuthn\\' => 16,
+        ),
     );
 
     public static $prefixDirsPsr4 = array (
@@ -111,6 +115,10 @@ class ComposerStaticInit1bae9e80265f85709f7235955fd3024a
         'Base64Url\\' =>
         array (
             0 => __DIR__ . '/..' . '/spomky-labs/base64url/src',
+        ),
+        'lbuchs\\WebAuthn\\' =>
+        array (
+            0 => __DIR__ . '/..' . '/lbuchs/webauthn/src',
         ),
     );
 

@@ -1858,3 +1858,60 @@ function injetarKitCategoriasIniciais(PDO $pdo, string $usuarioId, ?string $cart
         ]);
     }
 }
+
+// ==============================================================================
+// WEBAUTHN — login por biometria (Face ID / Windows Hello / digital). Usa a lib
+// lbuchs/webauthn (vendor/lbuchs/webauthn) pra nao ter que validar assinatura
+// criptografica na mao. So aceitamos atestado 'none' (nao valida fabricante do
+// autenticador, so confirma que e o mesmo dispositivo do cadastro) — e o modo
+// recomendado pela propria lib pra login comum de site publico.
+// ==============================================================================
+require_once __DIR__ . '/../vendor/autoload.php';
+
+if (!function_exists('garantirTabelaCredencialWebAuthn')) {
+    function garantirTabelaCredencialWebAuthn(PDO $pdo): void
+    {
+        try {
+            $pdo->exec("
+                CREATE TABLE IF NOT EXISTS CredencialWebAuthn (
+                  IDCredencial CHAR(36) NOT NULL PRIMARY KEY,
+                  FKUsuario    CHAR(36) NOT NULL,
+                  CredentialId VARCHAR(255) NOT NULL,
+                  PublicKey    TEXT NOT NULL,
+                  SignCounter  INT UNSIGNED NOT NULL DEFAULT 0,
+                  Apelido      VARCHAR(60) NULL,
+                  CriadoEm     DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+                  UltimoUso    DATETIME NULL,
+                  UNIQUE KEY uq_webauthn_credential (CredentialId),
+                  KEY idx_webauthn_usuario (FKUsuario)
+                ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4
+            ");
+        } catch (PDOException $e) {
+        }
+    }
+}
+
+// Instancia central da lib — RP ID precisa bater exatamente com o domínio que está
+// servindo a página (senão o navegador recusa o cadastro/login), então é lido do
+// host da requisição em vez de fixo, pra funcionar em localhost, beta e produção.
+if (!function_exists('obterWebAuthn')) {
+    function obterWebAuthn(): \lbuchs\WebAuthn\WebAuthn
+    {
+        $host = explode(':', $_SERVER['HTTP_HOST'] ?? 'localhost')[0];
+        // 4º parâmetro = usar base64url (em vez do formato RFC1342 padrão da lib) nos
+        // campos binários do JSON — mais simples de decodificar no JS de quem chama.
+        return new \lbuchs\WebAuthn\WebAuthn('Auralis', $host, ['none'], true);
+    }
+}
+
+if (!function_exists('listarCredenciaisWebAuthn')) {
+    function listarCredenciaisWebAuthn(PDO $pdo, string $usuarioId): array
+    {
+        $stmt = $pdo->prepare("
+            SELECT IDCredencial, Apelido, CriadoEm, UltimoUso
+            FROM CredencialWebAuthn WHERE FKUsuario = :uid ORDER BY CriadoEm ASC
+        ");
+        $stmt->execute([':uid' => $usuarioId]);
+        return $stmt->fetchAll(PDO::FETCH_ASSOC);
+    }
+}

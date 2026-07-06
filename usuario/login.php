@@ -76,7 +76,13 @@ require_once '../geral/header.php';
                             <input type="email" class="form-control form-control-lg bg-dark border-secondary text-light" id="email" name="email" required placeholder="">
                         </div>
                     </div>
-                    
+
+                    <div class="d-grid mb-4" id="waLoginWrap" style="display:none !important;">
+                        <button type="button" class="btn btn-outline-light btn-lg rounded-3 fw-semibold" id="btnLoginBiometria" onclick="waLoginBiometria()">
+                            <i class="bi bi-fingerprint me-2"></i> Entrar com biometria
+                        </button>
+                    </div>
+
                     <div class="mb-4">
                         <div class="d-flex justify-content-between">
                             <label for="senha" class="form-label text-light opacity-75 fw-semibold">Senha</label>
@@ -191,6 +197,85 @@ require_once '../geral/header.php';
             iconeSenha.classList.add('bi-eye-fill'); // Volta o ícone normal
         }
     });
+
+    // ── Login por biometria (WebAuthn) ──────────────────────────────────────
+    // Assim que o e-mail é preenchido, verifica (sem revelar se o e-mail existe
+    // ou não pra quem está de fora) se essa conta tem alguma biometria cadastrada;
+    // se tiver, mostra o botão pra pular a digitação da senha.
+    var inputEmail   = document.getElementById('email');
+    var waLoginWrap  = document.getElementById('waLoginWrap');
+    var btnLoginBio  = document.getElementById('btnLoginBiometria');
+    var waCheckTimer = null;
+
+    if (window.PublicKeyCredential && inputEmail) {
+        inputEmail.addEventListener('input', function() {
+            clearTimeout(waCheckTimer);
+            waLoginWrap.style.setProperty('display', 'none', 'important');
+            var email = inputEmail.value.trim();
+            if (!email || email.indexOf('@') === -1) return;
+            waCheckTimer = setTimeout(function() {
+                fetch('webauthn_login_opcoes.php', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ email: email })
+                }).then(function(r) { return r.json(); })
+                  .then(function(res) {
+                      if (res.disponivel && inputEmail.value.trim() === email) {
+                          waLoginWrap.style.setProperty('display', '', '');
+                      }
+                  }).catch(function() {});
+            }, 500);
+        });
+    }
+
+    function waLoginBiometria() {
+        var email = inputEmail.value.trim();
+        if (!email) return;
+
+        btnLoginBio.disabled = true;
+        btnLoginBio.innerHTML = '<span class="spinner-border spinner-border-sm"></span>';
+
+        fetch('webauthn_login_opcoes.php', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ email: email })
+        })
+        .then(function(r) { return r.json(); })
+        .then(function(res) {
+            if (!res.disponivel) throw new Error('Biometria não disponível pra essa conta.');
+            var args = res.options;
+            args.publicKey.challenge = waB64urlToBuf(args.publicKey.challenge);
+            (args.publicKey.allowCredentials || []).forEach(function(c) { c.id = waB64urlToBuf(c.id); });
+            return navigator.credentials.get(args);
+        })
+        .then(function(cred) {
+            return fetch('webauthn_login_verificar.php', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    id: waBufToB64(cred.rawId),
+                    clientDataJSON: waBufToB64(cred.response.clientDataJSON),
+                    authenticatorData: waBufToB64(cred.response.authenticatorData),
+                    signature: waBufToB64(cred.response.signature)
+                })
+            });
+        })
+        .then(function(r) { return r.json(); })
+        .then(function(res) {
+            if (res.success) {
+                location.href = res.redirect;
+            } else {
+                alert(res.msg || 'Não foi possível entrar com biometria.');
+            }
+        })
+        .catch(function(e) {
+            if (e.name !== 'NotAllowedError') alert(e.message || 'Não foi possível entrar com biometria.');
+        })
+        .finally(function() {
+            btnLoginBio.disabled = false;
+            btnLoginBio.innerHTML = '<i class="bi bi-fingerprint me-2"></i> Entrar com biometria';
+        });
+    }
 </script>
 
 <?php

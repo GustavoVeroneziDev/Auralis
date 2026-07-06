@@ -7,6 +7,7 @@ if (!isset($_SESSION['usuario_id'])) {
 }
 
 require_once 'config/conexao.php';
+require_once 'config/funcoes.php';
 
 $usuario_id = $_SESSION['usuario_id'];
 $mensagem = '';
@@ -242,6 +243,17 @@ try {
     }
 } catch (PDOException $e) {}
 
+// ── Biometria (WebAuthn) ─────────────────────────────────────────────────────
+garantirTabelaCredencialWebAuthn($pdo);
+$credenciaisWebAuthn = listarCredenciaisWebAuthn($pdo, $usuario_id);
+if (($_GET['sucesso'] ?? '') === 'webauthn_removido') {
+    $mensagem = 'Biometria removida deste dispositivo.';
+    $tipo_mensagem = 'success';
+} elseif (!empty($_GET['sucesso_wa'])) {
+    $mensagem = 'Biometria ativada com sucesso!';
+    $tipo_mensagem = 'success';
+}
+
 require_once 'geral/header.php';
 ?>
 
@@ -333,7 +345,7 @@ require_once 'geral/header.php';
         </div>
 
         <div class="col-lg-6">
-            <div class="card border-secondary-subtle shadow-sm rounded-4 h-100" style="background:var(--bg-card);">
+            <div class="card border-secondary-subtle shadow-sm rounded-4 h-100" id="seguranca" style="background:var(--bg-card);">
                 <div class="card-header border-bottom border-secondary-subtle bg-transparent p-4">
                     <h5 class="text-light fw-bold mb-0">Segurança</h5>
                 </div>
@@ -373,6 +385,42 @@ require_once 'geral/header.php';
                             </button>
                         </div>
                     </form>
+
+                    <hr class="border-secondary-subtle opacity-50 my-4">
+
+                    <div class="d-flex justify-content-between align-items-center mb-3">
+                        <h6 class="text-light fw-bold mb-0"><i class="bi bi-fingerprint me-2" style="color:var(--accent);"></i>Login por biometria</h6>
+                        <button type="button" class="btn btn-sm btn-outline-warning rounded-pill px-3 fw-semibold" id="btnCadastrarBiometria" onclick="waCadastrarBiometria()">
+                            <i class="bi bi-plus-lg me-1"></i> Ativar neste dispositivo
+                        </button>
+                    </div>
+                    <p class="text-secondary small mb-3" id="waSemSuporte" style="display:none;">
+                        Este navegador/dispositivo não tem suporte a login por biometria.
+                    </p>
+
+                    <?php if (empty($credenciaisWebAuthn)): ?>
+                        <p class="text-secondary small mb-0" id="waListaVazia">Nenhum dispositivo cadastrado ainda. Use Face ID, digital ou Windows Hello pra entrar sem digitar senha.</p>
+                    <?php else: ?>
+                        <div class="d-flex flex-column gap-2">
+                            <?php foreach ($credenciaisWebAuthn as $cred): ?>
+                                <div class="d-flex align-items-center justify-content-between p-2 px-3 rounded-3" style="background:var(--bg-hover);">
+                                    <div>
+                                        <span class="text-light fw-semibold small"><?= htmlspecialchars($cred['Apelido'] ?: 'Dispositivo sem nome') ?></span>
+                                        <div class="text-secondary" style="font-size:0.75rem;">
+                                            Cadastrado em <?= date('d/m/Y', strtotime($cred['CriadoEm'])) ?>
+                                            <?php if ($cred['UltimoUso']): ?> · último uso em <?= date('d/m/Y', strtotime($cred['UltimoUso'])) ?><?php endif; ?>
+                                        </div>
+                                    </div>
+                                    <form method="POST" action="usuario/webauthn_remover.php" onsubmit="return confirm('Remover esse dispositivo? Você não vai mais poder entrar com ele por biometria.');">
+                                        <input type="hidden" name="id_credencial" value="<?= htmlspecialchars($cred['IDCredencial']) ?>">
+                                        <button type="submit" class="btn btn-sm btn-link text-danger text-decoration-none p-0">
+                                            <i class="bi bi-trash3"></i>
+                                        </button>
+                                    </form>
+                                </div>
+                            <?php endforeach; ?>
+                        </div>
+                    <?php endif; ?>
                 </div>
             </div>
         </div>
@@ -866,6 +914,64 @@ window.addEventListener('beforeinstallprompt', function() {
 document.addEventListener('DOMContentLoaded', function() {
     setTimeout(atualizarCardInstalar, 600);
 });
+</script>
+
+<script>
+(function() {
+    if (!window.PublicKeyCredential) {
+        var btn = document.getElementById('btnCadastrarBiometria');
+        if (btn) btn.style.display = 'none';
+        var aviso = document.getElementById('waSemSuporte');
+        if (aviso) aviso.style.display = '';
+    }
+})();
+
+function waCadastrarBiometria() {
+    var apelidoPadrao = /iPad|iPhone|iPod/.test(navigator.userAgent) ? 'iPhone/iPad'
+        : /Android/.test(navigator.userAgent) ? 'Celular Android'
+        : /Mac/.test(navigator.userAgent) ? 'Mac'
+        : 'Windows';
+    var apelido = prompt('Dê um nome pra esse dispositivo (ex.: "Meu celular"):', apelidoPadrao);
+    if (apelido === null) return;
+
+    var btn = document.getElementById('btnCadastrarBiometria');
+    if (btn) { btn.disabled = true; btn.innerHTML = '<span class="spinner-border spinner-border-sm"></span>'; }
+
+    fetch('usuario/webauthn_criar_opcoes.php')
+        .then(function(r) { return r.json(); })
+        .then(function(args) {
+            if (args.success === false) throw new Error(args.msg || 'Erro ao iniciar.');
+            args.publicKey.challenge = waB64urlToBuf(args.publicKey.challenge);
+            args.publicKey.user.id   = waB64urlToBuf(args.publicKey.user.id);
+            (args.publicKey.excludeCredentials || []).forEach(function(c) { c.id = waB64urlToBuf(c.id); });
+            return navigator.credentials.create(args);
+        })
+        .then(function(cred) {
+            return fetch('usuario/webauthn_criar_verificar.php', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    clientDataJSON: waBufToB64(cred.response.clientDataJSON),
+                    attestationObject: waBufToB64(cred.response.attestationObject),
+                    apelido: apelido
+                })
+            });
+        })
+        .then(function(r) { return r.json(); })
+        .then(function(res) {
+            if (res.success) {
+                location.href = 'configuracoes.php?sucesso_wa=1#seguranca';
+            } else {
+                alert(res.msg || 'Não foi possível ativar a biometria.');
+            }
+        })
+        .catch(function(e) {
+            if (e.name !== 'NotAllowedError') alert('Não foi possível ativar a biometria: ' + e.message);
+        })
+        .finally(function() {
+            if (btn) { btn.disabled = false; btn.innerHTML = '<i class="bi bi-plus-lg me-1"></i> Ativar neste dispositivo'; }
+        });
+}
 </script>
 
 <?php require_once 'geral/footer.php'; ?>
