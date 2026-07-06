@@ -11,14 +11,21 @@ require_once 'config/conexao.php';
 require_once 'config/funcoes.php';
 
 verificarExpiracao($pdo);
+garantirColunaFotoPerfilReal($pdo);
+garantirColunaInsigniasDestaque($pdo);
+garantirEstruturaCarteirasCompartilhadas($pdo);
 
 $uid = $_SESSION['usuario_id'];
 
 // ── Dados do usuário ────────────────────────────────────────────────────────
-$stmtU = $pdo->prepare("SELECT Nome, Email, Plano, Tema, MomentoCriacao, FotoPerfil FROM Usuario WHERE IDUsuario = :uid LIMIT 1");
+$stmtU = $pdo->prepare("SELECT Nome, Email, Plano, Tema, MomentoCriacao, FotoPerfil, FotoPerfilReal FROM Usuario WHERE IDUsuario = :uid LIMIT 1");
 $stmtU->execute([':uid' => $uid]);
 $usuario = $stmtU->fetch(PDO::FETCH_ASSOC);
 if (!$usuario) { header("Location: /dashboard.php"); exit; }
+
+// Chave pessoal única — mesmo código usado pra indicar amigos/revendedor (link em
+// Configurações) e pra convidar alguém pra carteira compartilhada, unificados num só.
+$codigoPessoal = obterOuGerarCodigoIndicacao($pdo, $uid);
 
 $primeiroNome  = explode(' ', $usuario['Nome'])[0];
 $iniciais      = implode('', array_map(fn($p) => strtoupper($p[0]), array_filter(explode(' ', $usuario['Nome']))));
@@ -74,6 +81,10 @@ try {
 $totalConquistas     = count($conquistas);
 $totalDesbloqueadas  = count(array_filter($conquistas, fn($c) => $c['DataConquista'] !== null));
 
+// 3 espaços fixos de insígnia em destaque no herói do perfil
+$insigniasDestaque = obterInsigniasDestaque($pdo, $uid);
+$conquistasPorId   = array_column($conquistas, null, 'IDConquista');
+
 // ── Mapa de raridade → label/cor ────────────────────────────────────────────
 $raridadeInfo = [
     'comum'    => ['label' => 'Comum',    'cor' => '#808080'],
@@ -91,7 +102,8 @@ $avatarCor = match($plano) {
     default => '#6366f1',
 };
 
-// Avatar DiceBear
+// Avatar DiceBear (personagem) — nunca é apagado quando uma foto real é enviada, só
+// perde a preferência de exibição pra ela (ver $urlAvatarExibicao mais abaixo).
 $avatarConfig = [];
 $avatarPreviewUrl = '';
 if (!empty($usuario['FotoPerfil'])) {
@@ -101,6 +113,10 @@ if (!empty($usuario['FotoPerfil'])) {
         $avatarPreviewUrl = getAvatarUrl($dec);
     }
 }
+$temPersonagemSalvo = $avatarPreviewUrl !== '';
+$temFotoReal        = !empty($usuario['FotoPerfilReal']);
+// O que mostrar no herói/menu: foto real > personagem > iniciais (fallback já existente).
+$urlAvatarExibicao  = $temFotoReal ? $usuario['FotoPerfilReal'] : $avatarPreviewUrl;
 $avatarDefaults = [
     'skinColor' => 'd08b5b', 'hair' => 'shortCurly', 'hairColor' => '2c1b18',
     'eyes' => 'default', 'eyebrows' => 'default', 'mouth' => 'smile',
@@ -146,6 +162,9 @@ require_once 'geral/header.php';
     display: flex;
     align-items: flex-start;
     gap: 1rem;
+    height: 136px;
+    overflow: hidden;
+    cursor: pointer;
     transition: transform .15s, box-shadow .15s;
 }
 .conquista-card:not(.bloqueada):hover {
@@ -211,8 +230,24 @@ require_once 'geral/header.php';
     box-shadow: none !important;
 }
 
-.conquista-nome { font-weight: 600; font-size: 0.9rem; margin-bottom: 2px; }
-.conquista-desc { font-size: 0.78rem; color: var(--text-muted); line-height: 1.45; }
+.conquista-nome {
+    font-weight: 600;
+    font-size: 0.9rem;
+    margin-bottom: 2px;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+.conquista-desc {
+    font-size: 0.78rem;
+    color: var(--text-muted);
+    line-height: 1.45;
+    display: -webkit-box;
+    -webkit-line-clamp: 2;
+    line-clamp: 2;
+    -webkit-box-orient: vertical;
+    overflow: hidden;
+}
 .conquista-footer { margin-top: 6px; font-size: 0.72rem; }
 .raridade-pill {
     display: inline-flex; align-items: center;
@@ -226,24 +261,83 @@ require_once 'geral/header.php';
 
 <main class="container-fluid py-4 mt-2 flex-grow-1" style="max-width:900px;padding-inline:var(--space-page-x);">
 
-    <?php if (isset($_GET['sucesso']) && $_GET['sucesso'] === 'personagem'): ?>
+    <?php
+    $_msgsSucessoPerfil = [
+        'personagem'      => 'Personagem salvo com sucesso!',
+        'foto'            => 'Foto atualizada!',
+        'foto_removida'   => 'Foto removida — voltando a mostrar seu personagem.',
+        'insignia_salva'  => 'Insígnia em destaque atualizada!',
+    ];
+    $_msgsErroPerfil = [
+        'foto_invalida'     => 'Não recebi nenhuma foto. Tenta de novo.',
+        'foto_grande'       => 'Essa foto passa de 5 MB — escolhe uma menor.',
+        'foto_tipo'         => 'Formato não aceito — use JPG, PNG ou WebP.',
+        'foto_upload'       => 'Não consegui salvar a foto. Tenta de novo.',
+        'insignia_invalida' => 'Não deu pra destacar essa conquista.',
+        'banco'             => 'Erro ao salvar. Tenta de novo.',
+    ];
+    $_sucessoPerfil = $_msgsSucessoPerfil[$_GET['sucesso'] ?? ''] ?? null;
+    $_erroPerfil     = $_msgsErroPerfil[$_GET['erro'] ?? ''] ?? null;
+    // Acabou de salvar o personagem agora — mostra a seção mesmo que ela já fosse
+    // colapsar por padrão, senão a âncora #personagem cairia em cima de algo escondido.
+    $_forcarMostrarPersonagem = ($_GET['sucesso'] ?? '') === 'personagem';
+    ?>
+    <?php if ($_sucessoPerfil): ?>
     <div class="alert alert-success rounded-3 py-2 px-3 d-flex align-items-center gap-2 mb-3" style="font-size:0.9rem;">
-        <i class="bi bi-check-circle-fill"></i> Personagem salvo com sucesso!
+        <i class="bi bi-check-circle-fill"></i> <?= htmlspecialchars($_sucessoPerfil) ?>
+    </div>
+    <?php endif; ?>
+    <?php if ($_erroPerfil): ?>
+    <div class="alert alert-danger rounded-3 py-2 px-3 d-flex align-items-center gap-2 mb-3" style="font-size:0.9rem;">
+        <i class="bi bi-exclamation-triangle-fill"></i> <?= htmlspecialchars($_erroPerfil) ?>
     </div>
     <?php endif; ?>
 
     <!-- Hero -->
     <div class="perfil-hero mb-4 d-flex align-items-center gap-4 flex-wrap">
-        <?php if ($avatarPreviewUrl): ?>
-        <div style="width:80px;height:80px;border-radius:50%;overflow:hidden;flex-shrink:0;border:3px solid <?= htmlspecialchars($avatarCor) ?>88;background:#<?= htmlspecialchars($cfg['backgroundColor'] !== 'transparent' ? $cfg['backgroundColor'] : '1e2028') ?>;">
-            <img src="<?= htmlspecialchars($avatarPreviewUrl) ?>" alt="Avatar" style="width:100%;height:100%;object-fit:cover;">
+        <div class="dropdown flex-shrink-0">
+            <button type="button" class="btn p-0 border-0 position-relative" data-bs-toggle="dropdown" aria-expanded="false"
+                    style="background:transparent;" title="Editar personagem ou colocar foto">
+                <?php if ($urlAvatarExibicao): ?>
+                <div style="width:80px;height:80px;border-radius:50%;overflow:hidden;border:3px solid <?= htmlspecialchars($avatarCor) ?>88;background:#<?= htmlspecialchars($cfg['backgroundColor'] !== 'transparent' ? $cfg['backgroundColor'] : '1e2028') ?>;">
+                    <img src="<?= htmlspecialchars($urlAvatarExibicao) ?>" alt="Avatar" style="width:100%;height:100%;object-fit:cover;">
+                </div>
+                <?php else: ?>
+                <div class="perfil-avatar"
+                     style="background:<?= htmlspecialchars($avatarCor) ?>22;color:<?= htmlspecialchars($avatarCor) ?>;border-color:<?= htmlspecialchars($avatarCor) ?>55;">
+                    <?= htmlspecialchars($iniciais) ?>
+                </div>
+                <?php endif; ?>
+                <span class="d-flex align-items-center justify-content-center position-absolute"
+                      style="width:26px;height:26px;bottom:-2px;right:-2px;border-radius:50%;background:var(--accent);border:2px solid var(--bg-card);">
+                    <i class="bi bi-pencil-fill" style="font-size:0.7rem;color:#fff;"></i>
+                </span>
+            </button>
+            <ul class="dropdown-menu shadow-lg border-secondary-subtle" style="background:var(--bg-card);">
+                <li><h6 class="dropdown-header">Sua imagem</h6></li>
+                <li>
+                    <button type="button" class="dropdown-item d-flex align-items-center gap-2" onclick="mostrarEditorPersonagem()">
+                        <i class="bi bi-person-bounding-box" style="color:#ec4899;"></i> Editar personagem
+                    </button>
+                </li>
+                <li>
+                    <button type="button" class="dropdown-item d-flex align-items-center gap-2" data-bs-toggle="modal" data-bs-target="#modalFotoPerfil">
+                        <i class="bi bi-image" style="color:#60a5fa;"></i> Colocar foto
+                    </button>
+                </li>
+                <?php if ($temFotoReal): ?>
+                <li><hr class="dropdown-divider"></li>
+                <li>
+                    <form method="POST" action="/usuario/processa_foto_perfil.php" onsubmit="return confirm('Remover sua foto? Volta a mostrar o personagem.');">
+                        <input type="hidden" name="action" value="remover_foto">
+                        <button type="submit" class="dropdown-item d-flex align-items-center gap-2 text-danger">
+                            <i class="bi bi-trash3"></i> Remover foto (voltar ao personagem)
+                        </button>
+                    </form>
+                </li>
+                <?php endif; ?>
+            </ul>
         </div>
-        <?php else: ?>
-        <div class="perfil-avatar"
-             style="background:<?= htmlspecialchars($avatarCor) ?>22;color:<?= htmlspecialchars($avatarCor) ?>;border-color:<?= htmlspecialchars($avatarCor) ?>55;">
-            <?= htmlspecialchars($iniciais) ?>
-        </div>
-        <?php endif; ?>
         <div class="flex-grow-1">
             <h2 class="fw-bold mb-1" style="font-size:1.4rem;"><?= htmlspecialchars($usuario['Nome']) ?></h2>
             <div class="text-secondary small mb-2"><?= htmlspecialchars($usuario['Email']) ?></div>
@@ -266,10 +360,67 @@ require_once 'geral/header.php';
                     <i class="bi bi-clock-history me-1"></i><?= $diasAtivo ?> dia<?= $diasAtivo !== 1 ? 's' : '' ?> no Auralis
                 </span>
             </div>
+
+            <!-- 3 espaços fixos de insígnia em destaque — clique numa conquista lá embaixo
+                 e escolha um espaço pra colocá-la aqui. -->
+            <div class="d-flex align-items-center gap-2 mt-2">
+                <?php foreach ($insigniasDestaque as $_insigniaId):
+                    $_confInsignia = $_insigniaId ? ($conquistasPorId[$_insigniaId] ?? null) : null;
+                ?>
+                    <?php if ($_confInsignia): ?>
+                        <div class="conquista-icon-wrap badge-<?= htmlspecialchars($_confInsignia['Raridade'] ?? 'comum') ?>"
+                             style="width:42px;height:42px;font-size:1rem;" title="<?= htmlspecialchars($_confInsignia['Nome']) ?>">
+                            <?php if (!empty($_confInsignia['ImagemUrl'])): ?>
+                                <img src="<?= htmlspecialchars($_confInsignia['ImagemUrl']) ?>" alt="<?= htmlspecialchars($_confInsignia['Nome']) ?>" style="width:78%;height:78%;object-fit:contain;border-radius:50%;">
+                            <?php else: ?>
+                                <i class="bi <?= htmlspecialchars($_confInsignia['Icone']) ?>" style="color:<?= htmlspecialchars($_confInsignia['Cor']) ?>;font-size:0.95rem;"></i>
+                            <?php endif; ?>
+                        </div>
+                    <?php else: ?>
+                        <a href="#listaConquistas" class="d-flex align-items-center justify-content-center rounded-circle text-decoration-none flex-shrink-0"
+                           style="width:42px;height:42px;border:1.5px dashed var(--bs-border-color);color:var(--text-muted);" title="Escolher insígnia">
+                            <i class="bi bi-plus" style="font-size:1.1rem;"></i>
+                        </a>
+                    <?php endif; ?>
+                <?php endforeach; ?>
+            </div>
         </div>
         <a href="/configuracoes.php" class="btn btn-sm btn-outline-secondary rounded-pill">
             <i class="bi bi-gear me-1"></i> Configurações
         </a>
+    </div>
+
+    <!-- Chave pessoal única — mesmo código do "link de indicação" em Configurações, só que
+         em formato de código pra colar em outros lugares (convite de carteira compartilhada
+         hoje; indicar amigo/revendedor e, no futuro, amizades usam essa mesma chave). Visual
+         azul de propósito, diferente do dourado usado no widget de indicação. -->
+    <div class="rounded-4 p-4 mb-4" style="background:rgba(96,165,250,.05);border:1px solid rgba(96,165,250,.18);">
+        <div class="d-flex align-items-center gap-3 mb-3 flex-wrap">
+            <div class="rounded-3 d-flex align-items-center justify-content-center flex-shrink-0"
+                style="width:40px;height:40px;background:rgba(96,165,250,.12);border:1px solid rgba(96,165,250,.25);">
+                <i class="bi bi-key-fill" style="color:#60a5fa;font-size:1.1rem;"></i>
+            </div>
+            <div>
+                <div class="fw-semibold text-light">Sua chave pessoal</div>
+                <div class="text-secondary" style="font-size:.78rem;">Use pra convidar alguém pra uma carteira compartilhada ou pra indicar o Auralis — é o mesmo código.</div>
+            </div>
+        </div>
+        <div class="d-flex align-items-center gap-2 flex-wrap">
+            <code id="pfCodigoConvite" class="px-3 py-2 rounded-3 flex-grow-1"
+                style="background:rgba(0,0,0,.3);color:#60a5fa;font-size:.95rem;font-weight:700;letter-spacing:.05em;display:block;">
+                <?= htmlspecialchars($codigoPessoal) ?>
+            </code>
+            <button onclick="pfCopiarCodigoConvite()" id="pfBtnCopiarConvite"
+                class="btn btn-sm rounded-pill px-3 flex-shrink-0"
+                style="background:rgba(96,165,250,.15);color:#60a5fa;border:1px solid rgba(96,165,250,.3);">
+                <i class="bi bi-clipboard me-1"></i> Copiar código
+            </button>
+            <button onclick="pfCompartilharCodigoConvite()" id="pfBtnCompartilharConvite"
+                class="btn btn-sm rounded-pill px-3 flex-shrink-0 d-none"
+                style="background:rgba(96,165,250,.15);color:#60a5fa;border:1px solid rgba(96,165,250,.3);">
+                <i class="bi bi-share-fill me-1"></i> Compartilhar
+            </button>
+        </div>
     </div>
 
     <!-- Stats -->
@@ -294,9 +445,20 @@ require_once 'geral/header.php';
         </div>
     </div>
 
-    <!-- ── Meu Personagem ─────────────────────────────────────────────────── -->
-    <div id="personagem" class="mb-4">
-        <h5 class="fw-bold mb-3"><i class="bi bi-person-bounding-box me-2" style="color:#ec4899;"></i>Meu Personagem</h5>
+    <!-- ── Meu Personagem ─────────────────────────────────────────────────────
+         Some da tela principal assim que já existe um personagem salvo — quem quiser
+         editar clica na imagem lá em cima ("Editar personagem"), que revela essa seção
+         de novo. Pra quem ainda não tem nenhum (conta nova), fica visível direto, sem
+         precisar descobrir onde clicar. -->
+    <div id="personagem" class="mb-4<?= ($temPersonagemSalvo && !$_forcarMostrarPersonagem) ? ' d-none' : '' ?>">
+        <div class="d-flex align-items-center justify-content-between mb-3 flex-wrap gap-2">
+            <h5 class="fw-bold mb-0"><i class="bi bi-person-bounding-box me-2" style="color:#ec4899;"></i>Meu Personagem</h5>
+            <?php if ($temPersonagemSalvo): ?>
+            <button type="button" class="btn btn-sm btn-outline-secondary rounded-pill" onclick="esconderEditorPersonagem()">
+                <i class="bi bi-x-lg me-1"></i> Fechar
+            </button>
+            <?php endif; ?>
+        </div>
 
         <div class="row g-0 rounded-4 overflow-hidden" style="background:var(--bg-card);border:1px solid var(--bs-border-color);">
 
@@ -459,6 +621,65 @@ require_once 'geral/header.php';
         </div>
     </div>
 
+    <!-- ── Modal: colocar foto real de perfil ───────────────────────────────
+         Separado do editor de personagem de propósito — o personagem nunca é apagado
+         por enviar uma foto, só perde a preferência de exibição enquanto ela existir. -->
+    <div class="modal fade" id="modalFotoPerfil" tabindex="-1" aria-hidden="true">
+        <div class="modal-dialog modal-dialog-centered">
+            <div class="modal-content border-secondary-subtle shadow-lg rounded-4" style="background:var(--bg-card);">
+                <form method="POST" action="/usuario/processa_foto_perfil.php" enctype="multipart/form-data">
+                    <div class="modal-header border-bottom border-secondary-subtle">
+                        <h6 class="modal-title fw-bold text-light mb-0"><i class="bi bi-image me-2" style="color:#60a5fa;"></i>Colocar foto</h6>
+                        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                    </div>
+                    <div class="modal-body p-4">
+                        <p class="text-secondary small mb-3">JPG, PNG ou WebP, até 5 MB. Seu personagem continua salvo — se remover a foto depois, ele volta a aparecer.</p>
+                        <input type="file" name="foto" accept="image/jpeg,image/png,image/webp" class="form-control bg-transparent text-light border-secondary" required>
+                    </div>
+                    <div class="modal-footer border-top border-secondary-subtle">
+                        <button type="button" class="btn btn-link text-secondary text-decoration-none" data-bs-dismiss="modal">Cancelar</button>
+                        <button type="submit" class="btn fw-bold rounded-pill px-4" style="background:#60a5fa;color:#06111f;">
+                            <i class="bi bi-upload me-1"></i> Enviar
+                        </button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+
+    <!-- ── Modal: detalhe da conquista (abre ao clicar num card) ────────────
+         Também é daqui que se escolhe em qual dos 3 espaços de destaque colocar uma
+         conquista já desbloqueada. -->
+    <div class="modal fade" id="modalDetalheConquista" tabindex="-1" aria-hidden="true">
+        <div class="modal-dialog modal-dialog-centered">
+            <div class="modal-content border-secondary-subtle shadow-lg rounded-4 text-center" style="background:var(--bg-card);">
+                <div class="modal-header border-0 pb-0">
+                    <button type="button" class="btn-close ms-auto" data-bs-dismiss="modal" aria-label="Close"></button>
+                </div>
+                <div class="modal-body px-4 pb-4 pt-0 d-flex flex-column align-items-center">
+                    <div id="detConquistaIconWrap" class="conquista-icon-wrap mb-3" style="width:110px;height:110px;font-size:2.75rem;">
+                        <i id="detConquistaIcone"></i>
+                        <img id="detConquistaImagem" style="display:none;width:78%;height:78%;object-fit:contain;border-radius:50%;">
+                    </div>
+                    <h5 class="fw-bold text-light mb-1" id="detConquistaNome"></h5>
+                    <p class="text-secondary mb-3" id="detConquistaDesc" style="max-width:320px;"></p>
+                    <div class="d-flex align-items-center gap-2 mb-2">
+                        <span class="raridade-pill" id="detConquistaRaridade"></span>
+                        <span class="text-muted small" id="detConquistaStatus"></span>
+                    </div>
+                    <div id="detConquistaInsignias" class="d-none w-100 mt-2 pt-3" style="border-top:1px solid var(--bs-border-color);">
+                        <p class="text-secondary small mb-2">Destacar essa conquista no perfil:</p>
+                        <div class="d-flex justify-content-center gap-2" id="detConquistaSlots"></div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+    <form method="POST" action="/usuario/processa_insignias.php" id="formInsignia" class="d-none">
+        <input type="hidden" name="slot" id="insigniaSlot">
+        <input type="hidden" name="conquista_id" id="insigniaConquistaId">
+    </form>
+
     <!-- Conquistas -->
     <div class="d-flex align-items-center justify-content-between mb-3 flex-wrap gap-2">
         <div>
@@ -499,7 +720,20 @@ require_once 'geral/header.php';
             }
         ?>
         <div class="col-12 col-md-6 item-conquista" data-desbloqueada="<?= $desbloqueada ? '1' : '0' ?>">
-            <div class="conquista-card <?= $desbloqueada ? '' : 'bloqueada' ?>">
+            <div class="conquista-card <?= $desbloqueada ? '' : 'bloqueada' ?>"
+                 onclick='abrirDetalheConquista(<?= htmlspecialchars(json_encode([
+                     "id"            => $c["IDConquista"],
+                     "nome"          => $c["Nome"],
+                     "descricao"     => $c["Descricao"],
+                     "icone"         => $c["Icone"],
+                     "imagem"        => $c["ImagemUrl"],
+                     "cor"           => $c["Cor"],
+                     "raridade"      => $c["Raridade"] ?? "comum",
+                     "raridadeLabel" => $raridade["label"],
+                     "raridadeCor"   => $raridade["cor"],
+                     "desbloqueada"  => $desbloqueada,
+                     "dataTexto"     => $dataDesbloq,
+                 ]), ENT_QUOTES) ?>)'>
                 <!-- Ícone -->
                 <div class="conquista-icon-wrap badge-<?= htmlspecialchars($c['Raridade'] ?? 'comum') ?>">
                     <?php if (!$desbloqueada): ?>
@@ -802,6 +1036,116 @@ require_once 'geral/header.php';
 
     aplicarFiltro('tenho'); // Estado inicial: só as que já tem
 })();
+
+// ── Modal de detalhe da conquista + 3 espaços de destaque ───────────────────
+window.INSIGNIAS_ATUAIS = <?= json_encode($insigniasDestaque) ?>;
+
+function abrirDetalheConquista(c) {
+    var wrap = document.getElementById('detConquistaIconWrap');
+    wrap.className = 'conquista-icon-wrap mb-3 badge-' + (c.desbloqueada ? c.raridade : 'comum');
+
+    var icone  = document.getElementById('detConquistaIcone');
+    var imagem = document.getElementById('detConquistaImagem');
+    if (!c.desbloqueada) {
+        icone.className = 'bi bi-lock-fill';
+        icone.style.color = 'rgba(156,163,175,0.5)';
+        icone.style.display = '';
+        imagem.style.display = 'none';
+    } else if (c.imagem) {
+        imagem.src = c.imagem;
+        imagem.style.display = '';
+        icone.style.display = 'none';
+    } else {
+        icone.className = 'bi ' + c.icone;
+        icone.style.color = c.cor;
+        icone.style.display = '';
+        imagem.style.display = 'none';
+    }
+
+    document.getElementById('detConquistaNome').textContent = c.nome;
+    document.getElementById('detConquistaDesc').textContent = c.descricao;
+
+    var pill = document.getElementById('detConquistaRaridade');
+    pill.textContent = c.raridadeLabel;
+    pill.style.background = c.raridadeCor + '22';
+    pill.style.color = c.raridadeCor;
+    pill.style.border = '1px solid ' + c.raridadeCor + '44';
+
+    var status = document.getElementById('detConquistaStatus');
+    status.innerHTML = c.desbloqueada
+        ? '<i class="bi bi-check2-circle me-1" style="color:' + c.cor + ';"></i>' + c.dataTexto
+        : '<i class="bi bi-lock me-1"></i>Bloqueada';
+
+    var insigniasBox = document.getElementById('detConquistaInsignias');
+    if (c.desbloqueada) {
+        insigniasBox.classList.remove('d-none');
+        montarSlotsInsignia(c.id);
+    } else {
+        insigniasBox.classList.add('d-none');
+    }
+
+    bootstrap.Modal.getOrCreateInstance(document.getElementById('modalDetalheConquista')).show();
+}
+
+function montarSlotsInsignia(conquistaId) {
+    var cont = document.getElementById('detConquistaSlots');
+    cont.innerHTML = '';
+    for (var i = 0; i < 3; i++) {
+        var jaEEssa = window.INSIGNIAS_ATUAIS[i] === conquistaId;
+        var btn = document.createElement('button');
+        btn.type = 'button';
+        btn.className = 'btn btn-sm rounded-pill px-3';
+        btn.style.cssText = jaEEssa
+            ? 'background:var(--accent);color:#000;border:1px solid var(--accent);font-weight:700;'
+            : 'background:rgba(255,255,255,.05);color:var(--text-muted);border:1px solid var(--card-border-color);';
+        btn.textContent = 'Espaço ' + (i + 1) + (jaEEssa ? ' ✓' : '');
+        (function(slot, remover) {
+            btn.onclick = function() { salvarInsignia(slot, remover ? null : conquistaId); };
+        })(i, jaEEssa);
+        cont.appendChild(btn);
+    }
+}
+
+function salvarInsignia(slot, conquistaIdOuNull) {
+    document.getElementById('insigniaSlot').value = slot;
+    document.getElementById('insigniaConquistaId').value = conquistaIdOuNull || '';
+    document.getElementById('formInsignia').submit();
+}
+
+// ── Menu da imagem de perfil (editar personagem / colocar foto) ─────────────
+function mostrarEditorPersonagem() {
+    var sec = document.getElementById('personagem');
+    if (!sec) return;
+    sec.classList.remove('d-none');
+    sec.scrollIntoView({ behavior: 'smooth', block: 'start' });
+}
+function esconderEditorPersonagem() {
+    var sec = document.getElementById('personagem');
+    if (sec) sec.classList.add('d-none');
+}
+
+// ── Código de convite (movido de Configurações pra cá) ───────────────────────
+function pfCopiarCodigoConvite() {
+    var texto = document.getElementById('pfCodigoConvite').textContent.trim();
+    navigator.clipboard.writeText(texto).then(function() {
+        var btn = document.getElementById('pfBtnCopiarConvite');
+        var orig = btn.innerHTML;
+        btn.innerHTML = '<i class="bi bi-check2 me-1"></i> Copiado!';
+        setTimeout(function() { btn.innerHTML = orig; }, 2000);
+    });
+}
+function pfCompartilharCodigoConvite() {
+    var codigo = document.getElementById('pfCodigoConvite').textContent.trim();
+    if (navigator.share) {
+        navigator.share({ title: 'Código de convite — Auralis', text: 'Ei, meu código é ' + codigo }).catch(function() {});
+    }
+}
+document.addEventListener('DOMContentLoaded', function() {
+    if (navigator.share) {
+        var btn = document.getElementById('pfBtnCompartilharConvite');
+        if (btn) btn.classList.remove('d-none');
+    }
+});
 </script>
 
 <?php require_once 'geral/footer.php'; ?>

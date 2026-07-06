@@ -894,6 +894,104 @@ function getAvatarUrl(array $cfg): string
     return $base . '?' . implode('&', $p);
 }
 
+// Usuario.FotoPerfilReal — foto de verdade enviada pelo usuário (upload), separada do
+// personagem (Usuario.FotoPerfil, JSON do DiceBear). As duas colunas coexistem de
+// propósito: subir uma foto NUNCA apaga o personagem, só passa na frente dele na hora de
+// exibir. Isso deixa o caminho pronto pra, quando existir sistema de amizades, a pessoa
+// escolher qual das duas mostrar pra cada grupo — por ora a exibição é sempre foto > personagem.
+if (!function_exists('garantirColunaFotoPerfilReal')) {
+    function garantirColunaFotoPerfilReal(PDO $pdo): void
+    {
+        try {
+            $chk = $pdo->query("
+                SELECT COLUMN_NAME FROM INFORMATION_SCHEMA.COLUMNS
+                WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'Usuario' AND COLUMN_NAME = 'FotoPerfilReal'
+            ")->fetchColumn();
+            if (!$chk) {
+                $pdo->exec("ALTER TABLE Usuario ADD COLUMN FotoPerfilReal VARCHAR(255) NULL AFTER FotoPerfil");
+            }
+        } catch (PDOException $e) {
+        }
+    }
+}
+
+// Usuario.InsigniasDestaque — 3 espaços fixos (ordenados) pra destacar conquistas
+// desbloqueadas no perfil. JSON simples (array de até 3 IDs, null = espaço vazio) em vez
+// de tabela própria, já que é só uma lista curta e ordenada por usuário.
+if (!function_exists('garantirColunaInsigniasDestaque')) {
+    function garantirColunaInsigniasDestaque(PDO $pdo): void
+    {
+        try {
+            $chk = $pdo->query("
+                SELECT COLUMN_NAME FROM INFORMATION_SCHEMA.COLUMNS
+                WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'Usuario' AND COLUMN_NAME = 'InsigniasDestaque'
+            ")->fetchColumn();
+            if (!$chk) {
+                $pdo->exec("ALTER TABLE Usuario ADD COLUMN InsigniasDestaque VARCHAR(255) NULL AFTER FotoPerfilReal");
+            }
+        } catch (PDOException $e) {
+        }
+    }
+}
+
+// Sempre retorna exatamente 3 posições (null = vazia), nunca menos, pra quem exibe não
+// precisar tratar tamanho variável.
+if (!function_exists('obterInsigniasDestaque')) {
+    function obterInsigniasDestaque(PDO $pdo, string $uid): array
+    {
+        $vazio = [null, null, null];
+        try {
+            $stmt = $pdo->prepare("SELECT InsigniasDestaque FROM Usuario WHERE IDUsuario = :uid LIMIT 1");
+            $stmt->execute([':uid' => $uid]);
+            $raw = $stmt->fetchColumn();
+            if (!$raw) return $vazio;
+            $dec = json_decode($raw, true);
+            if (!is_array($dec)) return $vazio;
+            $dec = array_slice(array_pad($dec, 3, null), 0, 3);
+            return $dec;
+        } catch (Throwable $e) {
+            return $vazio;
+        }
+    }
+}
+
+// URL de exibição do avatar do usuário: foto real (se tiver) sempre na frente do
+// personagem. Retorna null se não tiver nenhum dos dois — quem chama decide o fallback
+// (iniciais, ícone genérico etc.), que já varia de tela pra tela nesse app. Essa função
+// roda em header.php (toda página) — não chama garantirColunaFotoPerfilReal() aqui pra
+// não pagar um INFORMATION_SCHEMA a cada carregamento; se a coluna ainda não existir
+// (instalação recém-atualizada, antes de alguém abrir /perfil.php pela 1ª vez), cai pro
+// personagem sozinho em vez de quebrar o avatar em todo canto.
+if (!function_exists('obterUrlAvatarUsuario')) {
+    function obterUrlAvatarUsuario(PDO $pdo, string $uid): ?string
+    {
+        try {
+            try {
+                $stmt = $pdo->prepare("SELECT FotoPerfilReal, FotoPerfil FROM Usuario WHERE IDUsuario = :uid LIMIT 1");
+                $stmt->execute([':uid' => $uid]);
+                $row = $stmt->fetch(PDO::FETCH_ASSOC);
+            } catch (PDOException $e) {
+                $stmt = $pdo->prepare("SELECT NULL AS FotoPerfilReal, FotoPerfil FROM Usuario WHERE IDUsuario = :uid LIMIT 1");
+                $stmt->execute([':uid' => $uid]);
+                $row = $stmt->fetch(PDO::FETCH_ASSOC);
+            }
+            if (!$row) return null;
+
+            if (!empty($row['FotoPerfilReal'])) {
+                return $row['FotoPerfilReal'];
+            }
+            if (!empty($row['FotoPerfil'])) {
+                $dec = json_decode($row['FotoPerfil'], true);
+                if (is_array($dec) && ($dec['style'] ?? '') === 'avataaars') {
+                    return getAvatarUrl($dec);
+                }
+            }
+        } catch (Throwable $e) {
+        }
+        return null;
+    }
+}
+
 // Função universal para selos de recursos bloqueados/em teste
 function badgePremium($nivelExigido = 'pro', $emTeste = false)
 {
@@ -981,6 +1079,29 @@ function gerarCodigoIndicacao(PDO $pdo): string
         $existe->execute([':c' => $code]);
     } while ($existe->fetchColumn());
     return $code;
+}
+
+// Retorna o código pessoal do usuário (CodigoIndicacao), gerando na hora se ainda não
+// tiver um — cobre contas antigas e contas criadas via Google (login_google.php não gera
+// esse código no cadastro). Essa é A "chave" única de cada pessoa: usada pra indicar
+// amigos/revendedor (?ref= no link), pra convidar alguém pra carteira compartilhada
+// (Administrar Carteira > Membros) e, no futuro, pra sistema de amizades — um código só,
+// em vez do CodigoConvite separado que existia antes (mantido no banco por compatibilidade,
+// mas não é mais gerado/usado em lugar nenhum novo).
+function obterOuGerarCodigoIndicacao(PDO $pdo, string $usuarioId): string
+{
+    $stmt = $pdo->prepare("SELECT CodigoIndicacao FROM Usuario WHERE IDUsuario = :uid");
+    $stmt->execute([':uid' => $usuarioId]);
+    $codigo = $stmt->fetchColumn();
+    if (!empty($codigo)) return $codigo;
+
+    $novo = gerarCodigoIndicacao($pdo);
+    try {
+        $pdo->prepare("UPDATE Usuario SET CodigoIndicacao = :c WHERE IDUsuario = :uid")
+            ->execute([':c' => $novo, ':uid' => $usuarioId]);
+    } catch (PDOException $e) {
+    }
+    return $novo;
 }
 
 /**
@@ -1193,6 +1314,36 @@ function garantirTabelaMetaCategoria(PDO $pdo): void
         ");
     } catch (PDOException $e) {
     }
+}
+
+// Soma efetivada de cada categoria no mês passado — base pra sugestão automática de
+// meta/orçamento ("automatizar recomendação de metas baseado no mês passado"). Recebe os
+// IDs já filtrados/escopados pelo chamador (pessoal ou de uma carteira específica), então
+// não precisa saber nada sobre dono/convidado/carteira compartilhada aqui.
+function obterGastoMesPassadoPorCategoria(PDO $pdo, array $categoriaIds): array
+{
+    $resultado = [];
+    if (empty($categoriaIds)) return $resultado;
+    try {
+        $mesPassado = date('Y-m', strtotime('first day of last month'));
+        [$anoP, $mesP] = explode('-', $mesPassado);
+        $placeholders = implode(',', array_fill(0, count($categoriaIds), '?'));
+        $stmt = $pdo->prepare("
+            SELECT FKCategoria, SUM(Valor) as total
+            FROM Registro
+            WHERE FKCategoria IN ($placeholders)
+              AND StatusRegistro = 'efetivado'
+              AND TipoRegistro IN ('receita','despesa')
+              AND MONTH(MomentoRegistro) = ? AND YEAR(MomentoRegistro) = ?
+            GROUP BY FKCategoria
+        ");
+        $stmt->execute([...$categoriaIds, (int)$mesP, (int)$anoP]);
+        foreach ($stmt->fetchAll(PDO::FETCH_ASSOC) as $row) {
+            $resultado[$row['FKCategoria']] = (float) $row['total'];
+        }
+    } catch (PDOException $e) {
+    }
+    return $resultado;
 }
 
 // Garante a tabela de configuração financeira (percentual de poupança mensal do usuário)

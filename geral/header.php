@@ -43,19 +43,11 @@ if (isset($_SESSION['usuario_id']) && isset($pdo) && function_exists('verificarC
     verificarConquistasDiasMembro($pdo, $_SESSION['usuario_id']);
 }
 
-// Avatar do usuário
+// Avatar do usuário — foto real (se enviada) sempre na frente do personagem
 $_avatarUrl = '';
-if (isset($_SESSION['usuario_id']) && isset($pdo) && function_exists('getAvatarUrl')) {
+if (isset($_SESSION['usuario_id']) && isset($pdo) && function_exists('obterUrlAvatarUsuario')) {
     try {
-        $stmtAv = $pdo->prepare("SELECT FotoPerfil FROM Usuario WHERE IDUsuario = :uid LIMIT 1");
-        $stmtAv->execute([':uid' => $_SESSION['usuario_id']]);
-        $fpRaw = $stmtAv->fetchColumn();
-        if ($fpRaw) {
-            $fpData = json_decode($fpRaw, true);
-            if (is_array($fpData) && ($fpData['style'] ?? '') === 'avataaars') {
-                $_avatarUrl = getAvatarUrl($fpData);
-            }
-        }
+        $_avatarUrl = obterUrlAvatarUsuario($pdo, $_SESSION['usuario_id']) ?? '';
     } catch (Throwable $e) {}
 }
 

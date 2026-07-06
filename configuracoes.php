@@ -287,43 +287,19 @@ require_once 'geral/header.php';
                 style="background:rgba(212,175,55,.15);color:#d4af37;border:1px solid rgba(212,175,55,.3);">
                 <i class="bi bi-clipboard me-1"></i> Copiar link
             </button>
+            <button onclick="cfgCompartilharLink()" id="cfgBtnCompartilharLink"
+                class="btn btn-sm rounded-pill px-3 flex-shrink-0 d-none"
+                style="background:rgba(212,175,55,.15);color:#d4af37;border:1px solid rgba(212,175,55,.3);">
+                <i class="bi bi-share-fill me-1"></i> Compartilhar
+            </button>
         </div>
-        <div class="mt-2 d-flex align-items-center gap-2">
+        <div class="mt-2 d-flex align-items-center gap-2 flex-wrap">
             <span class="text-secondary" style="font-size:.75rem;">Código:</span>
             <code style="color:#d4af37;font-size:.78rem;"><?= htmlspecialchars($codigoRef) ?></code>
+            <span class="text-secondary" style="font-size:.72rem;">— esse mesmo código também serve pra convidar alguém pra uma carteira compartilhada.</span>
         </div>
     </div>
     <?php endif; ?>
-
-    <?php
-    garantirEstruturaCarteirasCompartilhadas($pdo);
-    $codigoConvite = obterOuGerarCodigoConvite($pdo, $usuario_id);
-    ?>
-    <!-- Widget de convite pra carteira compartilhada — visual azul, de propósito diferente
-         do dourado da indicação acima, pra nunca confundir os dois códigos. -->
-    <div class="rounded-4 p-4 mb-4" style="background:rgba(96,165,250,.05);border:1px solid rgba(96,165,250,.18);">
-        <div class="d-flex align-items-center gap-3 mb-3 flex-wrap">
-            <div class="rounded-3 d-flex align-items-center justify-content-center flex-shrink-0"
-                style="width:40px;height:40px;background:rgba(96,165,250,.12);border:1px solid rgba(96,165,250,.25);">
-                <i class="bi bi-people-fill" style="color:#60a5fa;font-size:1.1rem;"></i>
-            </div>
-            <div>
-                <div class="fw-semibold text-light">Seu código de convite</div>
-                <div class="text-secondary" style="font-size:.78rem;">Passe esse código pra alguém te adicionar numa carteira compartilhada.</div>
-            </div>
-        </div>
-        <div class="d-flex align-items-center gap-2 flex-wrap">
-            <code id="cfgCodigoConvite" class="px-3 py-2 rounded-3 flex-grow-1"
-                style="background:rgba(0,0,0,.3);color:#60a5fa;font-size:.95rem;font-weight:700;letter-spacing:.05em;display:block;">
-                <?= htmlspecialchars($codigoConvite) ?>
-            </code>
-            <button onclick="cfgCopiarCodigoConvite()" id="cfgBtnCopiarConvite"
-                class="btn btn-sm rounded-pill px-3 flex-shrink-0"
-                style="background:rgba(96,165,250,.15);color:#60a5fa;border:1px solid rgba(96,165,250,.3);">
-                <i class="bi bi-clipboard me-1"></i> Copiar código
-            </button>
-        </div>
-    </div>
 
     <div class="row g-4 mb-5">
 
@@ -768,15 +744,19 @@ function cfgCopiarLink() {
     });
 }
 
-function cfgCopiarCodigoConvite() {
-    var texto = document.getElementById('cfgCodigoConvite').textContent.trim();
-    navigator.clipboard.writeText(texto).then(function() {
-        var btn = document.getElementById('cfgBtnCopiarConvite');
-        var orig = btn.innerHTML;
-        btn.innerHTML = '<i class="bi bi-check2 me-1"></i> Copiado!';
-        setTimeout(function() { btn.innerHTML = orig; }, 2000);
-    });
+function cfgCompartilharLink() {
+    var link = document.getElementById('cfgLinkRef').textContent.trim();
+    if (navigator.share) {
+        navigator.share({ title: 'Auralis', text: 'Ei, usa meu link pra entrar no Auralis:', url: link }).catch(function() {});
+    }
 }
+
+document.addEventListener('DOMContentLoaded', function() {
+    if (navigator.share) {
+        var btn = document.getElementById('cfgBtnCompartilharLink');
+        if (btn) btn.classList.remove('d-none');
+    }
+});
 </script>
 
 <div class="modal fade" id="modalExcluirConta" tabindex="-1" aria-hidden="true">

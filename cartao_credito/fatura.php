@@ -167,6 +167,24 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $sucesso = 'Fatura marcada como paga.';
     }
 
+    // Desfaz "marcar como paga" — mesmo padrão do toggle Efetivado/Pendente das transações
+    // normais. Só volta pra "fechada" (não pra "aberta": lançamentos continuam travados,
+    // quem quiser editá-los de novo usa "Reabrir" a partir de fechada).
+    if ($action === 'desfazer_pagamento') {
+        $faturaId = trim($_POST['fatura_id'] ?? '');
+        $pdo->prepare("UPDATE FaturaCartao SET Status='fechada' WHERE IDFatura=:id AND FKUsuario=:uid AND Status='paga'")
+            ->execute([':id' => $faturaId, ':uid' => $uid]);
+        try {
+            $pdo->prepare(
+                "UPDATE Registro r
+                 JOIN FaturaCartao f ON f.FKRegistroPagamento = r.IDRegistro
+                 SET r.StatusRegistro = 'pendente'
+                 WHERE f.IDFatura = :fid AND f.FKUsuario = :uid"
+            )->execute([':fid' => $faturaId, ':uid' => $uid]);
+        } catch (PDOException $e) {}
+        $sucesso = 'Pagamento desfeito — a fatura voltou pra "fechada".';
+    }
+
     // Corrige uma fatura já fechada/paga que ficou órfã (sem lançamento de cobrança
     // vinculado) — único jeito de resolver isso depois que a fatura já virou "paga", já
     // que os botões de marcar paga/reabrir somem nesse status.
@@ -470,6 +488,18 @@ require_once '../geral/header.php';
                                 style="background:rgba(148,163,184,.08);color:#94a3b8;border:1px solid rgba(148,163,184,.2);font-size:0.75rem;">
                                 <i class="bi bi-arrow-counterclockwise me-1"></i> Reabrir
                             </button>
+                        <?php else: ?>
+                            <!-- Mesmo padrão de "Desfazer" que já existe pra transação normal (Efetivado ⇄
+                                 Pendente no dashboard) — marcar como paga não pode ter menos fricção de
+                                 reverter do que excluir um lançamento avulso. -->
+                            <form method="POST" onclick="event.stopPropagation()">
+                                <input type="hidden" name="action" value="desfazer_pagamento">
+                                <input type="hidden" name="fatura_id" value="<?= $fh['IDFatura'] ?>">
+                                <button class="btn btn-sm rounded-pill fw-semibold px-3" title="Volta a fatura pra 'fechada' e o lançamento pra pendente"
+                                    style="background:rgba(148,163,184,.08);color:#94a3b8;border:1px solid rgba(148,163,184,.2);font-size:0.75rem;">
+                                    <i class="bi bi-arrow-counterclockwise me-1"></i> Desfazer
+                                </button>
+                            </form>
                         <?php endif; ?>
                         <i class="bi bi-chevron-down text-secondary" id="ico-fh-<?= $fh['IDFatura'] ?>"></i>
                     </div>

@@ -35,8 +35,10 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         // Gera código de indicação único para este usuário
         $codigoIndicacao = gerarCodigoIndicacao($pdo);
 
-        // Resolve quem indicou (via ?ref= na URL, passado como campo oculto)
-        $refCode      = strtoupper(trim($_POST['ref_code'] ?? ''));
+        // Resolve quem indicou — via ?ref= na URL (campo oculto) OU digitado manualmente no
+        // checkbox "Possuo código de parceiro". É a mesma "chave" pessoal usada pra convite de
+        // carteira compartilhada, então serve tanto pra código de revendedor quanto de usuário comum.
+        $refCode = strtoupper(trim($_POST['ref_code'] ?? $_POST['codigo_parceiro'] ?? ''));
         $fkIndicadoPor = null;
         if ($refCode) {
             $stmtRef = $pdo->prepare(

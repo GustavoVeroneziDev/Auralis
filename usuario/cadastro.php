@@ -78,6 +78,27 @@ require_once '../geral/header.php';
                             </div>
                         </div>
                     </div>
+
+                    <?php if (empty($_GET['ref'])): ?>
+                    <!-- Código pessoal de quem indicou — mesma "chave" usada pra convite de carteira
+                         compartilhada, então serve tanto pra código de revendedor quanto de um
+                         usuário comum. Só aparece se não veio de um link de indicação (?ref=), que
+                         já anexa isso sozinho. -->
+                    <div class="form-check mb-3 text-start toggle-analysis">
+                        <input class="form-check-input bg-dark border-secondary shadow-none" type="checkbox" id="tem_codigo_parceiro"
+                            onchange="document.getElementById('blocoCodigoParceiro').classList.toggle('d-none', !this.checked)">
+                        <label class="form-check-label text-secondary small selection-none" for="tem_codigo_parceiro" style="font-size:0.85rem;">
+                            Possuo código de parceiro
+                        </label>
+                    </div>
+                    <div id="blocoCodigoParceiro" class="mb-4 d-none">
+                        <label for="codigo_parceiro" class="form-label text-light opacity-75 fw-semibold small">Código de quem te indicou</label>
+                        <input type="text" class="form-control bg-dark border-secondary text-light" id="codigo_parceiro"
+                            name="codigo_parceiro" placeholder="Ex: AUR-AB12CD" maxlength="12" style="text-transform:uppercase;">
+                        <div class="form-text text-secondary" style="font-size:0.72rem;">Código de um revendedor ou de outro usuário do Auralis.</div>
+                    </div>
+                    <?php endif; ?>
+
                     <div class="form-check mb-4 text-start toggle-analysis">
                         <input class="form-check-input bg-dark border-secondary shadow-none" type="checkbox" id="aceita_termos" name="aceita_termos" required>
                         <label class="form-check-label text-secondary small selection-none" for="aceita_termos" style="font-size: 0.8rem; line-height: 1.4;">
