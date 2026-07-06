@@ -333,7 +333,7 @@ require_once 'geral/header.php';
                 <h6 class="fw-bold text-light mb-3"><i class="bi bi-list-check me-2" style="color:var(--primary-gold-analysis);"></i>Como criar e convidar</h6>
                 <ol class="ps-3 text-secondary mb-4" style="line-height:2;">
                     <li>Em <strong class="text-light">Carteiras</strong>, clique em <strong class="text-light">"+ Nova Carteira"</strong> e marque <strong class="text-light">"Carteira compartilhada?"</strong> — só dá pra decidir isso na criação. Ela já nasce com o mesmo kit de categorias prontas de uma conta nova.</li>
-                    <li>Peça pra pessoa abrir <strong class="text-light">Configurações</strong> e te passar o código dela (tipo "USR-AB12CD").</li>
+                    <li>Peça pra pessoa abrir <strong class="text-light">Perfil</strong> e te passar a chave pessoal dela (tipo "AUR-AB12CD") — é o mesmo código usado pra indicar amigos.</li>
                     <li>Clique na própria carteira (ou no menu de 3 pontos) pra abrir <strong class="text-light">"Administrar Carteira"</strong> e cole o código na aba <strong class="text-light">Membros</strong> pra enviar o convite.</li>
                     <li>A pessoa vê o convite direto na página <strong class="text-light">Carteiras</strong> (com um selinho de aviso na barra lateral) e precisa aceitar pra entrar — nada acontece automaticamente sem a confirmação dela.</li>
                 </ol>

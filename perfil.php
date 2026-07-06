@@ -22,7 +22,9 @@ $stmtU->execute([':uid' => $uid]);
 $usuario = $stmtU->fetch(PDO::FETCH_ASSOC);
 if (!$usuario) { header("Location: /dashboard.php"); exit; }
 
-$codigoConvite = obterOuGerarCodigoConvite($pdo, $uid);
+// Chave pessoal única — mesmo código usado pra indicar amigos/revendedor (link em
+// Configurações) e pra convidar alguém pra carteira compartilhada, unificados num só.
+$codigoPessoal = obterOuGerarCodigoIndicacao($pdo, $uid);
 
 $primeiroNome  = explode(' ', $usuario['Nome'])[0];
 $iniciais      = implode('', array_map(fn($p) => strtoupper($p[0]), array_filter(explode(' ', $usuario['Nome']))));
@@ -337,24 +339,25 @@ require_once 'geral/header.php';
         </a>
     </div>
 
-    <!-- Código de convite pra carteira compartilhada — mudou de Configurações pra cá.
-         Visual azul de propósito, diferente do dourado do link de indicação (que
-         continua em Configurações), pra nunca confundir os dois. -->
+    <!-- Chave pessoal única — mesmo código do "link de indicação" em Configurações, só que
+         em formato de código pra colar em outros lugares (convite de carteira compartilhada
+         hoje; indicar amigo/revendedor e, no futuro, amizades usam essa mesma chave). Visual
+         azul de propósito, diferente do dourado usado no widget de indicação. -->
     <div class="rounded-4 p-4 mb-4" style="background:rgba(96,165,250,.05);border:1px solid rgba(96,165,250,.18);">
         <div class="d-flex align-items-center gap-3 mb-3 flex-wrap">
             <div class="rounded-3 d-flex align-items-center justify-content-center flex-shrink-0"
                 style="width:40px;height:40px;background:rgba(96,165,250,.12);border:1px solid rgba(96,165,250,.25);">
-                <i class="bi bi-people-fill" style="color:#60a5fa;font-size:1.1rem;"></i>
+                <i class="bi bi-key-fill" style="color:#60a5fa;font-size:1.1rem;"></i>
             </div>
             <div>
-                <div class="fw-semibold text-light">Seu código de convite</div>
-                <div class="text-secondary" style="font-size:.78rem;">Passe esse código pra alguém te adicionar numa carteira compartilhada.</div>
+                <div class="fw-semibold text-light">Sua chave pessoal</div>
+                <div class="text-secondary" style="font-size:.78rem;">Use pra convidar alguém pra uma carteira compartilhada ou pra indicar o Auralis — é o mesmo código.</div>
             </div>
         </div>
         <div class="d-flex align-items-center gap-2 flex-wrap">
             <code id="pfCodigoConvite" class="px-3 py-2 rounded-3 flex-grow-1"
                 style="background:rgba(0,0,0,.3);color:#60a5fa;font-size:.95rem;font-weight:700;letter-spacing:.05em;display:block;">
-                <?= htmlspecialchars($codigoConvite) ?>
+                <?= htmlspecialchars($codigoPessoal) ?>
             </code>
             <button onclick="pfCopiarCodigoConvite()" id="pfBtnCopiarConvite"
                 class="btn btn-sm rounded-pill px-3 flex-shrink-0"

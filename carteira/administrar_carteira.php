@@ -49,7 +49,10 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && ($_POST['action'] ?? '') === 'convi
         $erro = "Informe o código da pessoa.";
     } else {
         try {
-            $stmtBusca = $pdo->prepare("SELECT IDUsuario, Nome FROM Usuario WHERE CodigoConvite = :c LIMIT 1");
+            // CodigoIndicacao é a chave pessoal unificada (mesmo código de indicação, agora
+            // também usado pra convite de carteira). CodigoConvite entra no OR só por
+            // compatibilidade com quem já tinha compartilhado o código azul antigo.
+            $stmtBusca = $pdo->prepare("SELECT IDUsuario, Nome FROM Usuario WHERE CodigoIndicacao = :c OR CodigoConvite = :c LIMIT 1");
             $stmtBusca->execute([':c' => $codigo]);
             $convidadoUsuario = $stmtBusca->fetch(PDO::FETCH_ASSOC);
 

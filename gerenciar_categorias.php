@@ -188,6 +188,12 @@ $errosMeta = [
 ];
 $sucessoMeta = ($_GET['sucesso_meta'] ?? null);
 $erroMeta    = ($_GET['erro_meta'] ?? null);
+if ($sucessoMeta === 'sugestoes_aplicadas') {
+    $_qtdAplicadaMeta = (int)($_GET['qtd'] ?? 0);
+    $msgsMeta['sugestoes_aplicadas'] = $_qtdAplicadaMeta > 0
+        ? "{$_qtdAplicadaMeta} meta(s) preenchida(s) com base no mês passado!"
+        : "Nenhuma categoria sem meta tinha gasto no mês passado pra sugerir.";
+}
 
 // --- 1.4 BUSCA AS CATEGORIAS SEPARANDO POR TIPO ---
 $categorias_receita = [];
@@ -262,6 +268,19 @@ try {
         $metasPorCategoria[$m['FKCategoria']] = (float) $m['ValorMeta'];
     }
 } catch (PDOException $e) {
+}
+
+// Sugestão automática de meta/orçamento baseada no gasto/receita efetivado no mês
+// passado — usada tanto no "Usar sugestão" dentro do modal quanto no botão de aplicar
+// em lote pras categorias que ainda não têm meta definida. array_merge (não $todas) pra
+// funcionar mesmo se a busca de categorias acima tiver caído no catch.
+$_todasCategoriasGC = array_merge($categorias_despesa, $categorias_receita);
+$gastoMesPassadoPorCategoria = obterGastoMesPassadoPorCategoria($pdo, array_column($_todasCategoriasGC, 'IDCategoria'));
+$_qtdSemMeta = 0;
+foreach ($_todasCategoriasGC as $_catSug) {
+    if (!isset($metasPorCategoria[$_catSug['IDCategoria']]) && ($gastoMesPassadoPorCategoria[$_catSug['IDCategoria']] ?? 0) > 0) {
+        $_qtdSemMeta++;
+    }
 }
 
 // ── Relação Entrada/Saída (percentual de poupança mensal + saldo pra distribuir) ──
@@ -481,6 +500,24 @@ $listaIcones = [
         </div>
     <?php endif; ?>
 
+    <?php if ($_podeEditarCategoriasGC && $_qtdSemMeta > 0): ?>
+        <div class="alert d-flex align-items-center justify-content-between gap-3 flex-wrap rounded-3 border-0 mb-3" style="background:rgba(96,165,250,.07);border:1px solid rgba(96,165,250,.2) !important;">
+            <div class="d-flex align-items-center gap-2">
+                <i class="bi bi-lightbulb-fill" style="color:#60a5fa;"></i>
+                <span class="text-secondary" style="font-size:0.85rem;">
+                    <strong class="text-light"><?= $_qtdSemMeta ?></strong> categoria<?= $_qtdSemMeta !== 1 ? 's' : '' ?> sem orçamento/meta, mas com movimentação no mês passado.
+                </span>
+            </div>
+            <form method="POST" action="salvar_meta_categoria.php" class="m-0">
+                <input type="hidden" name="acao" value="aplicar_sugestoes">
+                <?php if ($carteira_ctx): ?><input type="hidden" name="carteira_id" value="<?= htmlspecialchars($carteira_ctx['id']) ?>"><?php endif; ?>
+                <button type="submit" class="btn btn-sm rounded-pill fw-semibold px-3 flex-shrink-0" style="background:rgba(96,165,250,.15);color:#60a5fa;border:1px solid rgba(96,165,250,.35);">
+                    Preencher com base no mês passado
+                </button>
+            </form>
+        </div>
+    <?php endif; ?>
+
     <?php
     $_totalCats = count($todas ?? []);
     $_podeCriarCat = ($_limitesGC['categorias'] === PHP_INT_MAX) || ($_totalCats < $_limitesGC['categorias']) || $_testeGC;
@@ -624,7 +661,7 @@ $listaIcones = [
                                                 <button type="button"
                                                     class="btn btn-sm rounded-pill <?= $metaCat !== null ? 'btn-outline-info' : 'btn-outline-secondary' ?>"
                                                     style="font-size:0.72rem;"
-                                                    onclick="abrirModalMeta('<?= $cat['IDCategoria'] ?>','<?= htmlspecialchars(addslashes($cat['NomeCategoria'])) ?>','despesa',<?= $metaCat !== null ? $metaCat : 'null' ?>)">
+                                                    onclick="abrirModalMeta('<?= $cat['IDCategoria'] ?>','<?= htmlspecialchars(addslashes($cat['NomeCategoria'])) ?>','despesa',<?= $metaCat !== null ? $metaCat : 'null' ?>,<?= $gastoMesPassadoPorCategoria[$cat['IDCategoria']] ?? 0 ?>)">
                                                     <?php if ($metaCat !== null): ?>
                                                         <i class="bi bi-piggy-bank me-1"></i>R$ <?= number_format($metaCat, 2, ',', '.') ?>
                                                     <?php else: ?>
@@ -723,7 +760,7 @@ $listaIcones = [
                                                 <button type="button"
                                                     class="btn btn-sm rounded-pill <?= $metaCat !== null ? 'btn-outline-info' : 'btn-outline-secondary' ?>"
                                                     style="font-size:0.72rem;"
-                                                    onclick="abrirModalMeta('<?= $cat['IDCategoria'] ?>','<?= htmlspecialchars(addslashes($cat['NomeCategoria'])) ?>','receita',<?= $metaCat !== null ? $metaCat : 'null' ?>)">
+                                                    onclick="abrirModalMeta('<?= $cat['IDCategoria'] ?>','<?= htmlspecialchars(addslashes($cat['NomeCategoria'])) ?>','receita',<?= $metaCat !== null ? $metaCat : 'null' ?>,<?= $gastoMesPassadoPorCategoria[$cat['IDCategoria']] ?? 0 ?>)">
                                                     <?php if ($metaCat !== null): ?>
                                                         <i class="bi bi-flag-fill me-1"></i>R$ <?= number_format($metaCat, 2, ',', '.') ?>
                                                     <?php else: ?>
@@ -990,6 +1027,15 @@ $listaIcones = [
                                class="form-control bg-dark border-secondary-subtle text-light" placeholder="0,00"
                                oninput="mascaraMoeda(this)" required>
                     </div>
+                    <div id="metaSugestaoBox" class="d-none mt-2 d-flex align-items-center justify-content-between gap-2 rounded-3 px-3 py-2" style="background:rgba(96,165,250,.08);border:1px solid rgba(96,165,250,.2);">
+                        <span class="text-secondary" style="font-size:0.78rem;">
+                            <i class="bi bi-lightbulb-fill me-1" style="color:#60a5fa;"></i>
+                            Sugestão: <strong class="text-light" id="metaSugestaoTexto">R$ 0,00</strong> <span class="text-secondary">(mês passado)</span>
+                        </span>
+                        <button type="button" class="btn btn-sm rounded-pill flex-shrink-0" style="background:rgba(96,165,250,.15);color:#60a5fa;border:1px solid rgba(96,165,250,.35);font-size:0.72rem;" id="metaSugestaoBtn">
+                            Usar
+                        </button>
+                    </div>
                 </div>
                 <div class="modal-footer border-top border-secondary-subtle d-flex justify-content-between p-2">
                     <button type="button" class="btn btn-sm btn-link text-danger text-decoration-none" id="btnRemoverMeta" style="display:none;">
@@ -1078,7 +1124,7 @@ $listaIcones = [
     });
 
     // ── Modal: Definir Meta/Orçamento por Categoria ─────────────────────────
-    function abrirModalMeta(categoriaId, nome, tipo, metaAtual) {
+    function abrirModalMeta(categoriaId, nome, tipo, metaAtual, gastoMesPassado) {
         document.getElementById('metaCategoriaId').value = categoriaId;
         document.getElementById('metaAcao').value = 'salvar';
         document.getElementById('modalDefinirMetaTitulo').textContent = (tipo === 'despesa' ? 'Orçamento — ' : 'Meta — ') + nome;
@@ -1099,6 +1145,21 @@ $listaIcones = [
             };
         } else {
             btnRemover.style.display = 'none';
+        }
+
+        // Sugestão automática baseada no mês passado — só mostra se tiver algo relevante
+        // e for diferente do valor já definido (senão "sugerir" o que já está lá é ruído).
+        const sugestaoBox = document.getElementById('metaSugestaoBox');
+        const gasto = Number(gastoMesPassado) || 0;
+        if (gasto > 0 && gasto !== Number(metaAtual)) {
+            const gastoFmt = gasto.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
+            document.getElementById('metaSugestaoTexto').textContent = gastoFmt;
+            document.getElementById('metaSugestaoBtn').onclick = function() {
+                input.value = gastoFmt;
+            };
+            sugestaoBox.classList.remove('d-none');
+        } else {
+            sugestaoBox.classList.add('d-none');
         }
 
         bootstrap.Modal.getOrCreateInstance(document.getElementById('modalDefinirMeta')).show();

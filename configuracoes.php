@@ -293,9 +293,10 @@ require_once 'geral/header.php';
                 <i class="bi bi-share-fill me-1"></i> Compartilhar
             </button>
         </div>
-        <div class="mt-2 d-flex align-items-center gap-2">
+        <div class="mt-2 d-flex align-items-center gap-2 flex-wrap">
             <span class="text-secondary" style="font-size:.75rem;">Código:</span>
             <code style="color:#d4af37;font-size:.78rem;"><?= htmlspecialchars($codigoRef) ?></code>
+            <span class="text-secondary" style="font-size:.72rem;">— esse mesmo código também serve pra convidar alguém pra uma carteira compartilhada.</span>
         </div>
     </div>
     <?php endif; ?>

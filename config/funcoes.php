@@ -1041,6 +1041,29 @@ function gerarCodigoIndicacao(PDO $pdo): string
     return $code;
 }
 
+// Retorna o código pessoal do usuário (CodigoIndicacao), gerando na hora se ainda não
+// tiver um — cobre contas antigas e contas criadas via Google (login_google.php não gera
+// esse código no cadastro). Essa é A "chave" única de cada pessoa: usada pra indicar
+// amigos/revendedor (?ref= no link), pra convidar alguém pra carteira compartilhada
+// (Administrar Carteira > Membros) e, no futuro, pra sistema de amizades — um código só,
+// em vez do CodigoConvite separado que existia antes (mantido no banco por compatibilidade,
+// mas não é mais gerado/usado em lugar nenhum novo).
+function obterOuGerarCodigoIndicacao(PDO $pdo, string $usuarioId): string
+{
+    $stmt = $pdo->prepare("SELECT CodigoIndicacao FROM Usuario WHERE IDUsuario = :uid");
+    $stmt->execute([':uid' => $usuarioId]);
+    $codigo = $stmt->fetchColumn();
+    if (!empty($codigo)) return $codigo;
+
+    $novo = gerarCodigoIndicacao($pdo);
+    try {
+        $pdo->prepare("UPDATE Usuario SET CodigoIndicacao = :c WHERE IDUsuario = :uid")
+            ->execute([':c' => $novo, ':uid' => $usuarioId]);
+    } catch (PDOException $e) {
+    }
+    return $novo;
+}
+
 /**
  * Decide (e trava pra sempre) qual % de comissão vale pra um cliente específico de um
  * revendedor. Na comissão "fixa", é sempre o mesmo %. Na "em 2 partes", os N primeiros
@@ -1251,6 +1274,36 @@ function garantirTabelaMetaCategoria(PDO $pdo): void
         ");
     } catch (PDOException $e) {
     }
+}
+
+// Soma efetivada de cada categoria no mês passado — base pra sugestão automática de
+// meta/orçamento ("automatizar recomendação de metas baseado no mês passado"). Recebe os
+// IDs já filtrados/escopados pelo chamador (pessoal ou de uma carteira específica), então
+// não precisa saber nada sobre dono/convidado/carteira compartilhada aqui.
+function obterGastoMesPassadoPorCategoria(PDO $pdo, array $categoriaIds): array
+{
+    $resultado = [];
+    if (empty($categoriaIds)) return $resultado;
+    try {
+        $mesPassado = date('Y-m', strtotime('first day of last month'));
+        [$anoP, $mesP] = explode('-', $mesPassado);
+        $placeholders = implode(',', array_fill(0, count($categoriaIds), '?'));
+        $stmt = $pdo->prepare("
+            SELECT FKCategoria, SUM(Valor) as total
+            FROM Registro
+            WHERE FKCategoria IN ($placeholders)
+              AND StatusRegistro = 'efetivado'
+              AND TipoRegistro IN ('receita','despesa')
+              AND MONTH(MomentoRegistro) = ? AND YEAR(MomentoRegistro) = ?
+            GROUP BY FKCategoria
+        ");
+        $stmt->execute([...$categoriaIds, (int)$mesP, (int)$anoP]);
+        foreach ($stmt->fetchAll(PDO::FETCH_ASSOC) as $row) {
+            $resultado[$row['FKCategoria']] = (float) $row['total'];
+        }
+    } catch (PDOException $e) {
+    }
+    return $resultado;
 }
 
 // Garante a tabela de configuração financeira (percentual de poupança mensal do usuário)

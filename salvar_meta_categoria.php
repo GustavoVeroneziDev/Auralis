@@ -17,8 +17,55 @@ if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
 garantirTabelaMetaCategoria($pdo);
 garantirEstruturaCarteirasCompartilhadas($pdo);
 
-$categoriaId = trim($_POST['categoria_id'] ?? '');
-$acao        = trim($_POST['acao'] ?? 'salvar');
+$categoriaId  = trim($_POST['categoria_id'] ?? '');
+$acao         = trim($_POST['acao'] ?? 'salvar');
+$carteiraIdQS = trim($_POST['carteira_id'] ?? '');
+$qsCarteiraBulk = !empty($carteiraIdQS) ? '&carteira=' . urlencode($carteiraIdQS) : '';
+
+// Preenche em lote a meta das categorias que ainda não têm uma definida, usando o
+// gasto/receita efetivado do mês passado como sugestão — "automatizar recomendação de
+// metas". Nunca sobrescreve uma meta que a pessoa já definiu.
+if ($acao === 'aplicar_sugestoes') {
+    try {
+        if (!empty($carteiraIdQS)) {
+            // Só o dono da carteira mexe nas categorias dela — mesma regra de sempre.
+            $stmtDono = $pdo->prepare("SELECT FKUsuarioDono FROM Carteira WHERE IDCarteira = :cid");
+            $stmtDono->execute([':cid' => $carteiraIdQS]);
+            if ($stmtDono->fetchColumn() !== $usuario_id) {
+                header("Location: gerenciar_categorias.php?erro_meta=categoria_invalida");
+                exit;
+            }
+            $stmtCats = $pdo->prepare("SELECT IDCategoria FROM Categoria WHERE FKCarteira = :cid");
+            $stmtCats->execute([':cid' => $carteiraIdQS]);
+        } else {
+            $stmtCats = $pdo->prepare("SELECT IDCategoria FROM Categoria WHERE FKUsuario = :uid AND FKCarteira IS NULL");
+            $stmtCats->execute([':uid' => $usuario_id]);
+        }
+        $idsCategorias = $stmtCats->fetchAll(PDO::FETCH_COLUMN);
+
+        $stmtMetasAtuais = $pdo->prepare("SELECT FKCategoria FROM MetaCategoria WHERE FKUsuario = :uid");
+        $stmtMetasAtuais->execute([':uid' => $usuario_id]);
+        $jaTemMeta = array_flip($stmtMetasAtuais->fetchAll(PDO::FETCH_COLUMN));
+
+        $gastos = obterGastoMesPassadoPorCategoria($pdo, $idsCategorias);
+
+        $qtdAplicadas = 0;
+        $stmtIns = $pdo->prepare("INSERT INTO MetaCategoria (IDMeta, FKUsuario, FKCategoria, ValorMeta) VALUES (:id, :uid, :cat, :valor)");
+        foreach ($idsCategorias as $idCat) {
+            if (isset($jaTemMeta[$idCat])) continue;
+            $valor = $gastos[$idCat] ?? 0;
+            if ($valor <= 0) continue;
+            $stmtIns->execute([':id' => gerarUuid(), ':uid' => $usuario_id, ':cat' => $idCat, ':valor' => $valor]);
+            $qtdAplicadas++;
+        }
+
+        header("Location: gerenciar_categorias.php?sucesso_meta=sugestoes_aplicadas&qtd={$qtdAplicadas}{$qsCarteiraBulk}");
+        exit;
+    } catch (PDOException $e) {
+        header("Location: gerenciar_categorias.php?erro_meta=banco{$qsCarteiraBulk}");
+        exit;
+    }
+}
 
 if (empty($categoriaId)) {
     header("Location: gerenciar_categorias.php?erro_meta=categoria_invalida");
