@@ -619,7 +619,8 @@ require_once '../geral/header.php';
                         <input type="text" name="novo_total" id="ajusteValorInput"
                             class="form-control border-secondary-subtle shadow-none"
                             style="background:var(--bg-card);color:var(--text-main);"
-                            placeholder="0,00" required>
+                            placeholder="0,00" required autocomplete="off"
+                            inputmode="numeric" oninput="mascaraMoedaSemPrefixo(this)">
                     </div>
                 </div>
                 <div class="modal-footer border-secondary-subtle px-4 py-3 gap-2">
@@ -636,7 +637,7 @@ require_once '../geral/header.php';
 <script>
 function abrirAjuste(faturaId, valorAtual) {
     document.getElementById('ajusteFaturaId').value = faturaId;
-    setCurrencyInputValue(document.getElementById('ajusteValorInput'), valorAtual);
+    setValorSemPrefixo(document.getElementById('ajusteValorInput'), valorAtual);
     new bootstrap.Modal(document.getElementById('modalAjustarValor')).show();
 }
 </script>
@@ -781,8 +782,8 @@ function abrirAjuste(faturaId, valorAtual) {
                         <input type="text" name="valor_manual" id="fecharFaturaValor"
                             class="form-control border-secondary-subtle shadow-none"
                             style="background:var(--bg-card);color:var(--text-main);font-variant-numeric:tabular-nums;letter-spacing:.02em;"
-                            placeholder="R$ 0,00" required autocomplete="off"
-                            inputmode="numeric" oninput="mascaraMoeda(this)">
+                            placeholder="0,00" required autocomplete="off"
+                            inputmode="numeric" oninput="mascaraMoedaSemPrefixo(this)">
                     </div>
                     <p class="text-secondary mt-2 mb-0" style="font-size:0.75rem;">O valor será congelado e um lembrete de pagamento será criado na agenda.</p>
                 </div>
@@ -874,43 +875,18 @@ document.addEventListener('click', function(e) {
     }
 });
 
-// ── ATM-style currency input ──────────────────────────────────────────────
-function setupCurrencyInput(el) {
-    if (!el || el._currencyReady) return;
-    el._currencyReady = true;
-    el._digits = '';
-    el.value = '0,00';
-    el.addEventListener('keydown', function(e) {
-        if (e.key >= '0' && e.key <= '9') {
-            e.preventDefault();
-            if (el._digits.length >= 11) return;
-            el._digits += e.key;
-            _fmtCurrency(el);
-        } else if (e.key === 'Backspace') {
-            e.preventDefault();
-            el._digits = el._digits.slice(0, -1);
-            _fmtCurrency(el);
-        } else if (e.key !== 'Tab' && e.key !== 'Enter') {
-            e.preventDefault();
-        }
-    });
-    el.addEventListener('click', function() { el.setSelectionRange(el.value.length, el.value.length); });
-    el.addEventListener('focus', function() { el.setSelectionRange(el.value.length, el.value.length); });
+// Mesma máscara de moeda usada no resto do site (geral/footer.php), só que sem o
+// prefixo "R$" embutido no valor — aqui o "R$" já aparece como selo fixo do input-group,
+// então embuti-lo de novo no value duplicava o prefixo. Digitar, apagar, selecionar tudo
+// e colar funcionam normalmente (nada de bloquear tecla por tecla feito antes).
+function mascaraMoedaSemPrefixo(el) {
+    var v = el.value.replace(/\D/g, '');
+    if (v === '') { el.value = ''; return; }
+    el.value = (parseInt(v, 10) / 100).toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 }
-function _fmtCurrency(el) {
-    var d = el._digits || '';
-    var padded = d.padStart(3, '0');
-    var cents = padded.slice(-2);
-    var reais = padded.slice(0, -2).replace(/^0+/, '') || '0';
-    reais = reais.replace(/\B(?=(\d{3})+(?!\d))/g, '.');
-    el.value = reais + ',' + cents;
-}
-function setCurrencyInputValue(el, floatVal) {
+function setValorSemPrefixo(el, floatVal) {
     if (!el) return;
-    if (!el._currencyReady) setupCurrencyInput(el);
-    var cents = Math.round(Math.abs(floatVal) * 100);
-    el._digits = cents === 0 ? '' : String(cents);
-    _fmtCurrency(el);
+    el.value = Math.abs(floatVal).toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 }
 
 function abrirModalReabrir(faturaId) {
@@ -922,14 +898,9 @@ function abrirModalFecharFatura(faturaId, totalStr) {
     document.getElementById('fecharFaturaId').value          = faturaId;
     document.getElementById('fecharFaturaTotal').textContent = 'R$ ' + totalStr;
     var floatVal = parseFloat(totalStr.replace(/\./g, '').replace(',', '.')) || 0;
-    setCurrencyInputValue(document.getElementById('fecharFaturaValor'), floatVal);
+    setValorSemPrefixo(document.getElementById('fecharFaturaValor'), floatVal);
     bsModal('modalFecharFatura').show();
 }
-
-document.addEventListener('DOMContentLoaded', function() {
-    setupCurrencyInput(document.getElementById('fecharFaturaValor'));
-    setupCurrencyInput(document.getElementById('ajusteValorInput'));
-});
 </script>
 
 <?php require_once '../geral/footer.php'; ?>
