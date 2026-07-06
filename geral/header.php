@@ -362,57 +362,7 @@ $_carteiraParam = (!empty($_SESSION['ultima_carteira']))
                         </a>
                         <?php endif; ?>
                     </li>
-                    <li>
-                        <a class="dropdown-item d-flex align-items-center py-2 transition-hover"
-                           href="/perfil.php" style="color:var(--text-main);">
-                            <i class="bi bi-person-circle me-2" style="color:#6366f1;"></i> Perfil
-                        </a>
-                    </li>
-                    <li>
-                        <a class="dropdown-item d-flex align-items-center py-2 transition-hover"
-                           href="/configuracoes.php" style="color:var(--text-main);">
-                            <i class="bi bi-gear me-2" style="color:gold;"></i> Configurações
-                        </a>
-                    </li>
-                    <li>
-                        <a class="dropdown-item d-flex align-items-center py-2 transition-hover"
-                           href="/notificacoes.php" style="color:var(--text-main);">
-                            <i class="bi bi-bell me-2" style="color:#60a5fa;"></i> Notificações
-                        </a>
-                    </li>
-                    <?php if ($_ehRevendedor): ?>
-                    <li>
-                        <a class="dropdown-item d-flex align-items-center py-2 fw-semibold transition-hover"
-                           href="/revendedor/dashboard.php" style="color:#d4af37;">
-                            <i class="bi bi-people-fill me-2" style="color:#d4af37;"></i> Painel do Revendedor
-                        </a>
-                    </li>
-                    <?php endif; ?>
-                    <li>
-                        <a class="dropdown-item d-flex align-items-center py-2 transition-hover"
-                           href="/ajuda.php" target="_blank" rel="noopener" style="color:var(--text-main);">
-                            <i class="bi bi-mortarboard me-2" style="color:gold;"></i> Tutoriais
-                        </a>
-                    </li>
-                    <li>
-                        <a class="dropdown-item d-flex align-items-center py-2 transition-hover"
-                           href="/contato.php" style="color:var(--text-main);">
-                            <i class="bi bi-headset me-2" style="color:gold;"></i> Contato & Suporte
-                        </a>
-                    </li>
-                    <li class="btn-instalar-app" style="display:none;">
-                        <a class="dropdown-item d-flex align-items-center py-2 transition-hover"
-                           href="#" onclick="auralisInstalar(); return false;" style="color:var(--text-main);">
-                            <i class="bi bi-download me-2" style="color:gold;"></i> Instalar como App
-                        </a>
-                    </li>
-                    <li><hr class="dropdown-divider border-secondary-subtle"></li>
-                    <li>
-                        <a class="dropdown-item d-flex align-items-center py-2 text-danger transition-hover"
-                           href="/usuario/logout.php">
-                            <i class="bi bi-box-arrow-right me-2"></i> Sair
-                        </a>
-                    </li>
+                    <?php include __DIR__ . '/_menu_usuario_itens.php'; ?>
                 </ul>
             </div>
 
@@ -654,17 +604,7 @@ $_carteiraParam = (!empty($_SESSION['ultima_carteira']))
                                     </a>
                                     <?php endif; ?>
                                 </li>
-                                <li><a class="dropdown-item text-light d-flex align-items-center py-2" href="/perfil.php"><i class="bi bi-person-circle me-2" style="color:#6366f1;"></i> Perfil</a></li>
-                                <li><a class="dropdown-item text-light d-flex align-items-center py-2" href="/configuracoes.php"><i class="bi bi-gear me-2" style="color:gold;"></i> Configurações</a></li>
-                                <li><a class="dropdown-item text-light d-flex align-items-center py-2" href="/notificacoes.php"><i class="bi bi-bell me-2" style="color:#60a5fa;"></i> Notificações</a></li>
-                                <?php if ($_ehRevendedor): ?>
-                                <li><a class="dropdown-item d-flex align-items-center py-2 fw-semibold" href="/revendedor/dashboard.php" style="color:#d4af37;"><i class="bi bi-people-fill me-2" style="color:#d4af37;"></i> Painel do Revendedor</a></li>
-                                <?php endif; ?>
-                                <li><a class="dropdown-item text-light d-flex align-items-center py-2" href="/ajuda.php" target="_blank" rel="noopener"><i class="bi bi-mortarboard me-2" style="color:gold;"></i> Tutoriais</a></li>
-                                <li><a class="dropdown-item text-light d-flex align-items-center py-2" href="/contato.php"><i class="bi bi-headset me-2" style="color:gold;"></i> Contato & Suporte</a></li>
-                                <li class="btn-instalar-app" style="display:none;"><a class="dropdown-item text-light d-flex align-items-center py-2" href="#" onclick="auralisInstalar();return false;"><i class="bi bi-download me-2" style="color:gold;"></i> Instalar como App</a></li>
-                                <li><hr class="dropdown-divider border-secondary-subtle"></li>
-                                <li><a class="dropdown-item d-flex align-items-center py-2 text-danger" href="/usuario/logout.php"><i class="bi bi-box-arrow-right me-2"></i> Sair</a></li>
+                                <?php include __DIR__ . '/_menu_usuario_itens.php'; ?>
                             </ul>
                         </div>
                     <?php else: ?>
