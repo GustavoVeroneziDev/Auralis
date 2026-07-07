@@ -1310,7 +1310,7 @@ function garantirTabelaMetaCategoria(PDO $pdo): void
               AtualizadoEm DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
               UNIQUE KEY uq_meta_usuario_categoria (FKUsuario, FKCategoria),
               KEY idx_meta_usuario (FKUsuario)
-            ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4
+            ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
         ");
     } catch (PDOException $e) {
     }
@@ -1355,7 +1355,7 @@ function garantirTabelaConfiguracaoFinanceira(PDO $pdo): void
               FKUsuario          CHAR(36) NOT NULL PRIMARY KEY,
               PercentualPoupanca DECIMAL(5,2) NOT NULL DEFAULT 0,
               AtualizadoEm       DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
-            ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4
+            ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
         ");
     } catch (PDOException $e) {
     }
@@ -1397,7 +1397,7 @@ function garantirEstruturaComissaoRevendedor(PDO $pdo): void
               CriadoEm            DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
               UNIQUE KEY uq_revendedor_comprador (FKRevendedor, FKUsuarioComprador),
               KEY idx_revendedor (FKRevendedor)
-            ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4
+            ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
         ");
     } catch (PDOException $e) {
     }
@@ -1424,7 +1424,7 @@ function garantirEstruturaComissaoRevendedor(PDO $pdo): void
             CREATE TABLE IF NOT EXISTS PagamentoProcessado (
               Referencia   VARCHAR(64) NOT NULL PRIMARY KEY,
               ProcessadoEm DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP
-            ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4
+            ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
         ");
     } catch (PDOException $e) {
     }
@@ -1500,7 +1500,7 @@ function garantirEstruturaCarteirasCompartilhadas(PDO $pdo): void
               UNIQUE KEY uq_membro_carteira_usuario (FKCarteira, FKUsuario),
               KEY idx_membro_usuario (FKUsuario),
               KEY idx_membro_carteira (FKCarteira)
-            ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4
+            ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
         ");
     } catch (PDOException $e) {
     }
@@ -1530,7 +1530,7 @@ function garantirEstruturaCarteirasCompartilhadas(PDO $pdo): void
               Categoria  VARCHAR(20) NOT NULL DEFAULT 'membro',
               CriadoEm   DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
               KEY idx_log_carteira (FKCarteira, CriadoEm)
-            ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4
+            ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
         ");
     } catch (PDOException $e) {
     }
@@ -1856,5 +1856,118 @@ function injetarKitCategoriasIniciais(PDO $pdo, string $usuarioId, ?string $cart
             ':uid'  => $usuarioId,
             ':cid'  => $carteiraId,
         ]);
+    }
+}
+
+// ==============================================================================
+// WEBAUTHN — login por biometria (Face ID / Windows Hello / digital). Usa a lib
+// lbuchs/webauthn (vendor/lbuchs/webauthn) pra nao ter que validar assinatura
+// criptografica na mao. So aceitamos atestado 'none' (nao valida fabricante do
+// autenticador, so confirma que e o mesmo dispositivo do cadastro) — e o modo
+// recomendado pela propria lib pra login comum de site publico.
+// ==============================================================================
+require_once __DIR__ . '/../vendor/autoload.php';
+
+if (!function_exists('garantirTabelaCredencialWebAuthn')) {
+    function garantirTabelaCredencialWebAuthn(PDO $pdo): void
+    {
+        try {
+            $pdo->exec("
+                CREATE TABLE IF NOT EXISTS CredencialWebAuthn (
+                  IDCredencial CHAR(36) NOT NULL PRIMARY KEY,
+                  FKUsuario    CHAR(36) NOT NULL,
+                  CredentialId VARCHAR(700) NOT NULL,
+                  PublicKey    TEXT NOT NULL,
+                  SignCounter  INT UNSIGNED NOT NULL DEFAULT 0,
+                  Apelido      VARCHAR(60) NULL,
+                  CriadoEm     DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+                  UltimoUso    DATETIME NULL,
+                  UNIQUE KEY uq_webauthn_credential (CredentialId),
+                  KEY idx_webauthn_usuario (FKUsuario)
+                ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
+            ");
+
+            // Tabela já existia (de uma tentativa anterior) com CredentialId curto demais —
+            // o Windows Hello costuma gerar IDs de credencial bem mais longos que os 255
+            // caracteres que a coluna suportava, e o INSERT falhava ("erro ao salvar").
+            $tamanho = $pdo->query("
+                SELECT CHARACTER_MAXIMUM_LENGTH FROM INFORMATION_SCHEMA.COLUMNS
+                WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'CredencialWebAuthn' AND COLUMN_NAME = 'CredentialId'
+            ")->fetchColumn();
+            if ($tamanho !== false && (int)$tamanho < 700) {
+                $pdo->exec("ALTER TABLE CredencialWebAuthn MODIFY COLUMN CredentialId VARCHAR(700) NOT NULL");
+            }
+        } catch (PDOException $e) {
+        }
+    }
+}
+
+// Instancia central da lib — RP ID precisa bater exatamente com o domínio que está
+// servindo a página (senão o navegador recusa o cadastro/login), então é lido do
+// host da requisição em vez de fixo, pra funcionar em localhost, beta e produção.
+if (!function_exists('obterWebAuthn')) {
+    function obterWebAuthn(): \lbuchs\WebAuthn\WebAuthn
+    {
+        $host = explode(':', $_SERVER['HTTP_HOST'] ?? 'localhost')[0];
+        // 4º parâmetro = usar base64url (em vez do formato RFC1342 padrão da lib) nos
+        // campos binários do JSON — mais simples de decodificar no JS de quem chama.
+        //
+        // Aceita todos os formatos de atestado suportados pela lib (não só 'none'):
+        // mesmo pedindo atestado 'none', Windows Hello costuma responder 'packed'/'tpm' e
+        // Android costuma responder 'android-safetynet'/'android-key' — restringir a
+        // 'none' fazia a lib rejeitar o cadastro vindo desses autenticadores. Sem CA raiz
+        // cadastrada, a lib não valida fabricante mesmo assim, só a estrutura/assinatura.
+        $formatos = ['android-key', 'android-safetynet', 'apple', 'fido-u2f', 'none', 'packed', 'tpm'];
+        return new \lbuchs\WebAuthn\WebAuthn('Auralis', $host, $formatos, true);
+    }
+}
+
+if (!function_exists('listarCredenciaisWebAuthn')) {
+    function listarCredenciaisWebAuthn(PDO $pdo, string $usuarioId): array
+    {
+        $stmt = $pdo->prepare("
+            SELECT IDCredencial, Apelido, CriadoEm, UltimoUso
+            FROM CredencialWebAuthn WHERE FKUsuario = :uid ORDER BY CriadoEm ASC
+        ");
+        $stmt->execute([':uid' => $usuarioId]);
+        return $stmt->fetchAll(PDO::FETCH_ASSOC);
+    }
+}
+
+// ── WhatsApp (Evolution API) ──────────────────────────────────────────────────
+
+if (!function_exists('sanitizarTelefone')) {
+    function sanitizarTelefone(string $telefone): ?string
+    {
+        $digits = preg_replace('/\D/', '', $telefone);
+        if (empty($digits)) return null;
+        // Remove leading zero (e.g. 011XXXXXXXX → 11XXXXXXXX)
+        if (strlen($digits) > 11 && $digits[0] === '0') {
+            $digits = ltrim($digits, '0');
+        }
+        // Add country code 55 if only DDD + number (10 or 11 digits)
+        if (strlen($digits) === 10 || strlen($digits) === 11) {
+            $digits = '55' . $digits;
+        }
+        // Valid BR numbers: 12 digits (landline) or 13 digits (mobile)
+        if (strlen($digits) < 12 || strlen($digits) > 13) return null;
+        return $digits;
+    }
+}
+
+if (!function_exists('enviarWhatsAppNotificacao')) {
+    function enviarWhatsAppNotificacao(string $numero, string $mensagem): bool
+    {
+        $url     = 'https://evolution.meuauralis.com/message/sendText/Auralis';
+        $payload = json_encode(['number' => $numero, 'text' => $mensagem]);
+        $ctx = stream_context_create(['http' => [
+            'method'        => 'POST',
+            'header'        => "Content-Type: application/json\r\napikey: 44c816e1478a4754e859bd609e4099aaab417cf60bf07bf9\r\n",
+            'content'       => $payload,
+            'timeout'       => 10,
+            'ignore_errors' => true,
+        ]]);
+        $result = @file_get_contents($url, false, $ctx);
+        return $result !== false;
     }
 }

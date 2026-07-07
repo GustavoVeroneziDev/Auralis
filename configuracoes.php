@@ -7,6 +7,7 @@ if (!isset($_SESSION['usuario_id'])) {
 }
 
 require_once 'config/conexao.php';
+require_once 'config/funcoes.php';
 
 $usuario_id = $_SESSION['usuario_id'];
 $mensagem = '';
@@ -19,15 +20,17 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
     // AÇÃO 1: ATUALIZAR DADOS PESSOAIS
     if (isset($_POST['action']) && $_POST['action'] === 'update_profile') {
-        $nome = trim($_POST['nome']);
+        $nome     = trim($_POST['nome']);
+        $telefone = function_exists('sanitizarTelefone') ? sanitizarTelefone(trim($_POST['telefone'] ?? '')) : null;
 
         if (!empty($nome)) {
             try {
-                $sqlUpd = "UPDATE Usuario SET Nome = :nome WHERE IDUsuario = :uid";
+                $sqlUpd = "UPDATE Usuario SET Nome = :nome, Telefone = :tel WHERE IDUsuario = :uid";
                 $stmtUpd = $pdo->prepare($sqlUpd);
                 $stmtUpd->execute([
                     ':nome' => $nome,
-                    ':uid' => $usuario_id
+                    ':tel'  => $telefone,
+                    ':uid'  => $usuario_id,
                 ]);
 
                 $_SESSION['usuario_nome'] = $nome;
@@ -220,7 +223,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 // 2. BUSCA OS DADOS ATUAIS (Incluindo Senha para a lógica do Front-end)
 // ==============================================================================
 try {
-    $sqlBusca = "SELECT Nome, Email, Senha, Tema, CodigoIndicacao FROM Usuario WHERE IDUsuario = :uid LIMIT 1";
+    $sqlBusca = "SELECT Nome, Email, Telefone, Senha, Tema, CodigoIndicacao FROM Usuario WHERE IDUsuario = :uid LIMIT 1";
     $stmtBusca = $pdo->prepare($sqlBusca);
     $stmtBusca->execute([':uid' => $usuario_id]);
     $dadosUsuario = $stmtBusca->fetch(PDO::FETCH_ASSOC);
@@ -241,6 +244,20 @@ try {
         if (isset($dashPrefsCfg[$key])) $dashPrefsCfg[$key] = $row['Valor'];
     }
 } catch (PDOException $e) {}
+
+// ── Biometria (WebAuthn) ─────────────────────────────────────────────────────
+garantirTabelaCredencialWebAuthn($pdo);
+$credenciaisWebAuthn = listarCredenciaisWebAuthn($pdo, $usuario_id);
+if (($_GET['sucesso'] ?? '') === 'webauthn_removido') {
+    $mensagem = 'Login rápido removido deste dispositivo.';
+    $tipo_mensagem = 'success';
+} elseif (($_GET['sucesso'] ?? '') === 'webauthn_renomeado') {
+    $mensagem = 'Nome do dispositivo atualizado.';
+    $tipo_mensagem = 'success';
+} elseif (!empty($_GET['sucesso_wa'])) {
+    $mensagem = 'Login rápido ativado com sucesso!';
+    $tipo_mensagem = 'success';
+}
 
 require_once 'geral/header.php';
 ?>
@@ -322,6 +339,33 @@ require_once 'geral/header.php';
                             <input type="text" name="nome" id="nome" class="form-control form-control-lg bg-transparent border-secondary-subtle text-light shadow-none" value="<?= htmlspecialchars($dadosUsuario['Nome']) ?>" required>
                         </div>
 
+                        <?php
+                        $telCfg = $dadosUsuario['Telefone'] ?? '';
+                        if ($telCfg && strlen($telCfg) >= 12 && substr($telCfg, 0, 2) === '55') {
+                            $d = substr($telCfg, 2);
+                            if (strlen($d) === 11)      $telCfg = '(' . substr($d,0,2) . ') ' . substr($d,2,5) . '-' . substr($d,7);
+                            elseif (strlen($d) === 10)  $telCfg = '(' . substr($d,0,2) . ') ' . substr($d,2,4) . '-' . substr($d,6);
+                        }
+                        ?>
+                        <div class="mb-4">
+                            <label for="cfg_telefone" class="form-label text-light fw-semibold mb-1 d-flex align-items-center gap-2">
+                                WhatsApp <span class="text-secondary fw-normal" style="font-size:.78rem;">(opcional)</span>
+                                <span tabindex="0" data-bs-toggle="tooltip" data-bs-placement="right"
+                                      title="Usado apenas para enviar alertas de vencimento de faturas. Deixe em branco para não receber."
+                                      style="cursor:help;line-height:1;">
+                                    <i class="bi bi-info-circle text-secondary" style="font-size:.85rem;"></i>
+                                </span>
+                            </label>
+                            <div class="input-group">
+                                <span class="input-group-text bg-transparent border-secondary-subtle text-secondary"><i class="bi bi-whatsapp"></i></span>
+                                <input type="tel" name="telefone" id="cfg_telefone"
+                                       class="form-control form-control-lg bg-transparent border-secondary-subtle text-light shadow-none"
+                                       value="<?= htmlspecialchars($telCfg) ?>"
+                                       maxlength="15" placeholder="(11) 99999-9999"
+                                       oninput="this.value=_maskTel(this.value)">
+                            </div>
+                        </div>
+
                         <div class="text-end">
                             <button type="submit" class="btn btn-outline-light rounded-pill px-4 fw-semibold transition-hover">
                                 Salvar Alterações
@@ -333,7 +377,7 @@ require_once 'geral/header.php';
         </div>
 
         <div class="col-lg-6">
-            <div class="card border-secondary-subtle shadow-sm rounded-4 h-100" style="background:var(--bg-card);">
+            <div class="card border-secondary-subtle shadow-sm rounded-4 h-100" id="seguranca" style="background:var(--bg-card);">
                 <div class="card-header border-bottom border-secondary-subtle bg-transparent p-4">
                     <h5 class="text-light fw-bold mb-0">Segurança</h5>
                 </div>
@@ -373,6 +417,46 @@ require_once 'geral/header.php';
                             </button>
                         </div>
                     </form>
+
+                    <hr class="border-secondary-subtle opacity-50 my-4">
+
+                    <div class="d-flex justify-content-between align-items-center mb-3">
+                        <h6 class="text-light fw-bold mb-0"><i class="bi bi-fingerprint me-2" style="color:var(--accent);"></i>Login rápido do dispositivo</h6>
+                        <button type="button" class="btn btn-sm btn-outline-warning rounded-pill px-3 fw-semibold" id="btnCadastrarBiometria" onclick="waCadastrarBiometria()">
+                            <i class="bi bi-plus-lg me-1"></i> Ativar neste dispositivo
+                        </button>
+                    </div>
+                    <p class="text-secondary small mb-3" id="waSemSuporte" style="display:none;">
+                        Este navegador/dispositivo não tem suporte a esse tipo de login.
+                    </p>
+
+                    <?php if (empty($credenciaisWebAuthn)): ?>
+                        <p class="text-secondary small mb-0" id="waListaVazia">Nenhum dispositivo cadastrado ainda. Use digital, reconhecimento facial, PIN ou outro método do aparelho pra entrar sem digitar senha.</p>
+                    <?php else: ?>
+                        <div class="d-flex flex-column gap-2">
+                            <?php foreach ($credenciaisWebAuthn as $cred): ?>
+                                <div class="d-flex align-items-center justify-content-between p-2 px-3 rounded-3" style="background:var(--bg-hover);">
+                                    <div>
+                                        <span class="text-light fw-semibold small"><?= htmlspecialchars($cred['Apelido'] ?: 'Dispositivo sem nome') ?></span>
+                                        <div class="text-secondary" style="font-size:0.75rem;">
+                                            Cadastrado em <?= date('d/m/Y', strtotime($cred['CriadoEm'])) ?>
+                                            <?php if ($cred['UltimoUso']): ?> · último uso em <?= date('d/m/Y', strtotime($cred['UltimoUso'])) ?><?php endif; ?>
+                                        </div>
+                                    </div>
+                                    <div class="d-flex align-items-center gap-1">
+                                        <button type="button" class="btn btn-sm btn-link text-secondary text-decoration-none p-1"
+                                            onclick="waAbrirEdicaoNome('<?= htmlspecialchars($cred['IDCredencial'], ENT_QUOTES) ?>', '<?= htmlspecialchars(addslashes($cred['Apelido'] ?? ''), ENT_QUOTES) ?>')">
+                                            <i class="bi bi-pencil"></i>
+                                        </button>
+                                        <button type="button" class="btn btn-sm btn-link text-danger text-decoration-none p-1"
+                                            onclick="waAbrirRemocao('<?= htmlspecialchars($cred['IDCredencial'], ENT_QUOTES) ?>')">
+                                            <i class="bi bi-trash3"></i>
+                                        </button>
+                                    </div>
+                                </div>
+                            <?php endforeach; ?>
+                        </div>
+                    <?php endif; ?>
                 </div>
             </div>
         </div>
@@ -734,6 +818,23 @@ require_once 'geral/header.php';
 </main>
 
 <script>
+function _maskTel(v) {
+    v = v.replace(/\D/g, '').slice(0, 11);
+    if (v.length > 6) {
+        v = '(' + v.slice(0,2) + ') ' + v.slice(2, v.length > 10 ? 7 : 6) + '-' + v.slice(v.length > 10 ? 7 : 6);
+    } else if (v.length > 2) {
+        v = '(' + v.slice(0,2) + ') ' + v.slice(2);
+    } else if (v.length > 0) {
+        v = '(' + v;
+    }
+    return v;
+}
+document.addEventListener('DOMContentLoaded', function() {
+    document.querySelectorAll('[data-bs-toggle="tooltip"]').forEach(function(el) { new bootstrap.Tooltip(el); });
+});
+</script>
+
+<script>
 function cfgCopiarLink() {
     var texto = document.getElementById('cfgLinkRef').textContent.trim();
     navigator.clipboard.writeText(texto).then(function() {
@@ -758,6 +859,74 @@ document.addEventListener('DOMContentLoaded', function() {
     }
 });
 </script>
+
+<div class="modal fade" id="modalCadastrarBiometria" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content border-secondary-subtle shadow-lg rounded-4" style="background:var(--bg-card);">
+            <div class="modal-header border-bottom border-secondary-subtle">
+                <h5 class="modal-title text-light fw-bold"><i class="bi bi-fingerprint me-2" style="color:var(--accent);"></i> Ativar login rápido</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body p-4">
+                <p class="text-secondary small mb-3">Dê um nome pra esse dispositivo, pra reconhecer depois na sua lista.</p>
+                <div class="mb-2">
+                    <label for="waApelidoInput" class="form-label text-light fw-semibold mb-1">Nome do dispositivo</label>
+                    <input type="text" id="waApelidoInput" class="form-control form-control-lg bg-transparent border-secondary-subtle text-light shadow-none" maxlength="60" placeholder="Ex.: Meu celular">
+                </div>
+                <div class="alert border-0 small mt-3 mb-0 d-none" id="waErro"></div>
+            </div>
+            <div class="modal-footer border-top border-secondary-subtle">
+                <button type="button" class="btn btn-secondary rounded-pill px-4 fw-semibold" data-bs-dismiss="modal">Cancelar</button>
+                <button type="button" class="btn btn-outline-warning rounded-pill px-4 fw-bold" id="btnConfirmarBiometria" onclick="waConfirmarCadastro()">
+                    <i class="bi bi-fingerprint me-1"></i> Ativar
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="modal fade" id="modalEditarNomeBiometria" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content border-secondary-subtle shadow-lg rounded-4" style="background:var(--bg-card);">
+            <form method="POST" action="usuario/webauthn_renomear.php">
+                <div class="modal-header border-bottom border-secondary-subtle">
+                    <h5 class="modal-title text-light fw-bold"><i class="bi bi-pencil me-2" style="color:var(--accent);"></i> Renomear dispositivo</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                </div>
+                <div class="modal-body p-4">
+                    <input type="hidden" name="id_credencial" id="waEditarId">
+                    <label for="waEditarApelidoInput" class="form-label text-light fw-semibold mb-1">Nome do dispositivo</label>
+                    <input type="text" name="apelido" id="waEditarApelidoInput" class="form-control form-control-lg bg-transparent border-secondary-subtle text-light shadow-none" maxlength="60" placeholder="Ex.: Meu celular">
+                </div>
+                <div class="modal-footer border-top border-secondary-subtle">
+                    <button type="button" class="btn btn-secondary rounded-pill px-4 fw-semibold" data-bs-dismiss="modal">Cancelar</button>
+                    <button type="submit" class="btn btn-outline-warning rounded-pill px-4 fw-bold">Salvar</button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+<div class="modal fade" id="modalRemoverBiometria" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content border-danger border-opacity-50 shadow-lg rounded-4" style="background:var(--bg-card);">
+            <form method="POST" action="usuario/webauthn_remover.php">
+                <div class="modal-header border-bottom border-secondary-subtle">
+                    <h5 class="modal-title text-danger fw-bold"><i class="bi bi-trash3 me-2"></i> Remover dispositivo</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                </div>
+                <div class="modal-body p-4">
+                    <input type="hidden" name="id_credencial" id="waRemoverId">
+                    <p class="text-light mb-0">Remover esse dispositivo? Você não vai mais poder entrar com ele sem senha.</p>
+                </div>
+                <div class="modal-footer border-top border-secondary-subtle">
+                    <button type="button" class="btn btn-secondary rounded-pill px-4 fw-semibold" data-bs-dismiss="modal">Cancelar</button>
+                    <button type="submit" class="btn btn-danger rounded-pill px-4 fw-bold">Remover</button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
 
 <div class="modal fade" id="modalExcluirConta" tabindex="-1" aria-hidden="true">
     <div class="modal-dialog modal-dialog-centered">
@@ -866,6 +1035,96 @@ window.addEventListener('beforeinstallprompt', function() {
 document.addEventListener('DOMContentLoaded', function() {
     setTimeout(atualizarCardInstalar, 600);
 });
+</script>
+
+<script>
+(function() {
+    if (!window.PublicKeyCredential) {
+        var btn = document.getElementById('btnCadastrarBiometria');
+        if (btn) btn.style.display = 'none';
+        var aviso = document.getElementById('waSemSuporte');
+        if (aviso) aviso.style.display = '';
+    }
+})();
+
+function waAbrirEdicaoNome(id, apelidoAtual) {
+    document.getElementById('waEditarId').value = id;
+    document.getElementById('waEditarApelidoInput').value = apelidoAtual;
+    new bootstrap.Modal(document.getElementById('modalEditarNomeBiometria')).show();
+}
+
+function waAbrirRemocao(id) {
+    document.getElementById('waRemoverId').value = id;
+    new bootstrap.Modal(document.getElementById('modalRemoverBiometria')).show();
+}
+
+function waCadastrarBiometria() {
+    var apelidoPadrao = /iPad|iPhone|iPod/.test(navigator.userAgent) ? 'iPhone/iPad'
+        : /Android/.test(navigator.userAgent) ? 'Celular Android'
+        : /Mac/.test(navigator.userAgent) ? 'Mac'
+        : 'Windows';
+    document.getElementById('waApelidoInput').value = apelidoPadrao;
+    document.getElementById('waErro').classList.add('d-none');
+    new bootstrap.Modal(document.getElementById('modalCadastrarBiometria')).show();
+}
+
+function waMostrarMensagem(box, texto, tipo) {
+    tipo = tipo || 'danger';
+    box.className = 'alert border-0 bg-' + tipo + ' bg-opacity-10 text-' + tipo + ' small mt-3 mb-0';
+    box.textContent = texto;
+}
+
+function waConfirmarCadastro() {
+    var apelido = document.getElementById('waApelidoInput').value.trim();
+    var btn = document.getElementById('btnConfirmarBiometria');
+    var erroBox = document.getElementById('waErro');
+    erroBox.classList.add('d-none');
+    btn.disabled = true;
+    btn.innerHTML = '<span class="spinner-border spinner-border-sm"></span>';
+
+    fetch('usuario/webauthn_criar_opcoes.php')
+        .then(function(r) { return r.json(); })
+        .then(function(args) {
+            if (args.success === false) throw new Error(args.msg || 'Erro ao iniciar.');
+            args.publicKey.challenge = waB64urlToBuf(args.publicKey.challenge);
+            args.publicKey.user.id   = waB64urlToBuf(args.publicKey.user.id);
+            (args.publicKey.excludeCredentials || []).forEach(function(c) { c.id = waB64urlToBuf(c.id); });
+            return navigator.credentials.create(args);
+        })
+        .then(function(cred) {
+            return fetch('usuario/webauthn_criar_verificar.php', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    clientDataJSON: waBufToB64(cred.response.clientDataJSON),
+                    attestationObject: waBufToB64(cred.response.attestationObject),
+                    apelido: apelido
+                })
+            });
+        })
+        .then(function(r) { return r.json(); })
+        .then(function(res) {
+            if (res.success) {
+                location.href = 'configuracoes.php?sucesso_wa=1#seguranca';
+            } else {
+                waMostrarMensagem(erroBox, res.msg || 'Não foi possível ativar o login rápido.', 'danger');
+                erroBox.classList.remove('d-none');
+            }
+        })
+        .catch(function(e) {
+            if (e.name === 'NotAllowedError') return;
+            if (e.name === 'InvalidStateError') {
+                waMostrarMensagem(erroBox, 'Esse dispositivo já está com login rápido ativado — não precisa cadastrar de novo.', 'info');
+            } else {
+                waMostrarMensagem(erroBox, 'Não foi possível ativar o login rápido: ' + e.message, 'danger');
+            }
+            erroBox.classList.remove('d-none');
+        })
+        .finally(function() {
+            btn.disabled = false;
+            btn.innerHTML = '<i class="bi bi-fingerprint me-1"></i> Ativar';
+        });
+}
 </script>
 
 <?php require_once 'geral/footer.php'; ?>

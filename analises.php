@@ -207,13 +207,37 @@ if ($carteira_selecionada) {
         $dtInicioHist = new DateTime(sprintf('%04d-%02d-01', $ano_atual, $mes_atual));
         $dtInicioHist->modify('-' . ($_qtdMesesHist - 1) . ' months');
 
+        // Saldo carregado de antes da janela do histórico — sem isso, o saldo do gráfico
+        // "reinicia do zero" a cada mês (só receita-despesa daquele mês) em vez de
+        // acompanhar o saldo real acumulado da carteira, e ainda ignorava cofrinho e
+        // transferências (mesmas 6 categorias que compõem o saldo real em dashboard.php).
+        $sqlSaldoInicial = "
+            SELECT COALESCE(SUM(
+                CASE
+                    WHEN TipoRegistro IN ('receita','cofrinho_retirada','transferencia_entrada') THEN Valor
+                    WHEN TipoRegistro IN ('despesa','cofrinho','transferencia_saida')            THEN -Valor
+                    ELSE 0
+                END
+            ), 0) as saldo_inicial
+            FROM Registro
+            WHERE FKCarteira = :carteira_id
+              AND StatusRegistro = 'efetivado'
+              AND MomentoRegistro < :data_inicio
+        ";
+        $stmtSaldoInicial = $pdo->prepare($sqlSaldoInicial);
+        $stmtSaldoInicial->execute([
+            ':carteira_id' => $carteira_selecionada,
+            ':data_inicio' => $dtInicioHist->format('Y-m-01'),
+        ]);
+        $saldoAcumuladoHist = (float) $stmtSaldoInicial->fetchColumn();
+
         $sqlHist = "
             SELECT YEAR(r.MomentoRegistro) as ano, MONTH(r.MomentoRegistro) as mes,
                    r.TipoRegistro, SUM(r.Valor) as total
             FROM Registro r
             WHERE r.FKCarteira = :carteira_id
               AND r.StatusRegistro = 'efetivado'
-              AND r.TipoRegistro IN ('receita','despesa')
+              AND r.TipoRegistro IN ('receita','despesa','cofrinho','cofrinho_retirada','transferencia_entrada','transferencia_saida')
               AND r.MomentoRegistro >= :data_inicio
             GROUP BY ano, mes, r.TipoRegistro
         ";
@@ -231,14 +255,21 @@ if ($carteira_selecionada) {
 
         $cursorHist = clone $dtInicioHist;
         for ($i = 0; $i < $_qtdMesesHist; $i++) {
-            $chave = $cursorHist->format('Y-m');
-            $rec   = $brutoHist[$chave]['receita'] ?? 0;
-            $desp  = $brutoHist[$chave]['despesa'] ?? 0;
+            $chave      = $cursorHist->format('Y-m');
+            $rec        = $brutoHist[$chave]['receita'] ?? 0;
+            $desp       = $brutoHist[$chave]['despesa'] ?? 0;
+            $cofDep     = $brutoHist[$chave]['cofrinho'] ?? 0;
+            $cofRet     = $brutoHist[$chave]['cofrinho_retirada'] ?? 0;
+            $transfIn   = $brutoHist[$chave]['transferencia_entrada'] ?? 0;
+            $transfOut  = $brutoHist[$chave]['transferencia_saida'] ?? 0;
+
+            $saldoAcumuladoHist += $rec - $desp - $cofDep + $cofRet + $transfIn - $transfOut;
+
             $historicoMensal[] = [
                 'label'    => mb_substr($meses_pt[(int)$cursorHist->format('n')], 0, 3) . '/' . $cursorHist->format('y'),
                 'receita'  => $rec,
                 'despesa'  => $desp,
-                'saldo'    => $rec - $desp,
+                'saldo'    => $saldoAcumuladoHist,
             ];
             $cursorHist->modify('+1 month');
         }

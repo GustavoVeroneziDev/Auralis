@@ -322,49 +322,6 @@ $erroPoupanca    = ($_GET['erro_poupanca'] ?? null);
 
 require_once 'geral/header.php';
 
-// Lista de ícones disponíveis
-$listaIcones = [
-    'bi-cart3',
-    'bi-basket',
-    'bi-cup-hot',
-    'bi-shop',
-    'bi-house-door',
-    'bi-lightning-charge',
-    'bi-droplet',
-    'bi-wifi',
-    'bi-wrench',
-    'bi-tools',
-    'bi-car-front',
-    'bi-fuel-pump',
-    'bi-bus-front',
-    'bi-bicycle',
-    'bi-airplane',
-    'bi-heart-pulse',
-    'bi-capsule',
-    'bi-controller',
-    'bi-film',
-    'bi-music-note-beamed',
-    'bi-bag-heart',
-    'bi-scissors',
-    'bi-sunglasses',
-    'bi-book',
-    'bi-mortarboard',
-    'bi-people',
-    'bi-gift',
-    'bi-balloon',
-    'bi-laptop',
-    'bi-phone',
-    'bi-briefcase',
-    'bi-bank',
-    'bi-cash-stack',
-    'bi-coin',
-    'bi-piggy-bank',
-    'bi-wallet2',
-    'bi-graph-up-arrow',
-    'bi-shield-check',
-    'bi-gear-fill',
-    'bi-three-dots'
-];
 ?>
 
 <main class="container py-4 mt-2 flex-grow-1" style="min-height: 100vh; padding-inline: var(--space-page-x);">
@@ -550,13 +507,16 @@ $listaIcones = [
                         </div>
                     <?php else: ?>
                         <?php
+                        // Ao agrupar os ícones por tema, vários da lista original ficaram de
+                        // fora sem querer (bi-phone entre eles) — restaurados aqui nos grupos
+                        // mais próximos do tema original.
                         $gruposIcones = [
-                            'Essenciais & Casa'   => ['bi-house-door', 'bi-cart3', 'bi-lightning-charge', 'bi-droplet', 'bi-wifi', 'bi-basket', 'bi-tools', 'bi-trash'],
+                            'Essenciais & Casa'   => ['bi-house-door', 'bi-cart3', 'bi-lightning-charge', 'bi-droplet', 'bi-wifi', 'bi-basket', 'bi-tools', 'bi-trash', 'bi-shop', 'bi-wrench', 'bi-phone'],
                             'Transporte'          => ['bi-car-front', 'bi-bus-front', 'bi-bicycle', 'bi-fuel-pump', 'bi-airplane', 'bi-train-front'],
                             'Saúde & Bem-estar'   => ['bi-heart-pulse', 'bi-capsule', 'bi-bandaid', 'bi-activity', 'bi-clipboard-pulse'],
-                            'Lazer & Estilo'      => ['bi-controller', 'bi-cup-hot', 'bi-ticket-perforated', 'bi-bag', 'bi-scissors', 'bi-palette', 'bi-music-note-beamed', 'bi-tv'],
-                            'Trabalho & Finanças' => ['bi-briefcase', 'bi-cash-stack', 'bi-bank', 'bi-piggy-bank', 'bi-graph-up-arrow', 'bi-laptop', 'bi-credit-card', 'bi-wallet2'],
-                            'Outros'              => ['bi-star', 'bi-box', 'bi-tag', 'bi-three-dots', 'bi-gift', 'bi-book', 'bi-shield-check']
+                            'Lazer & Estilo'      => ['bi-controller', 'bi-cup-hot', 'bi-ticket-perforated', 'bi-bag', 'bi-scissors', 'bi-palette', 'bi-music-note-beamed', 'bi-tv', 'bi-film', 'bi-bag-heart', 'bi-sunglasses'],
+                            'Trabalho & Finanças' => ['bi-briefcase', 'bi-cash-stack', 'bi-bank', 'bi-piggy-bank', 'bi-graph-up-arrow', 'bi-laptop', 'bi-credit-card', 'bi-wallet2', 'bi-coin'],
+                            'Outros'              => ['bi-star', 'bi-box', 'bi-tag', 'bi-three-dots', 'bi-gift', 'bi-book', 'bi-shield-check', 'bi-mortarboard', 'bi-people', 'bi-balloon', 'bi-gear-fill']
                         ];
                         ?>
                         <form method="POST" action="" class="auralis-premium-form">

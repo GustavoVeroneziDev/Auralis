@@ -29,7 +29,12 @@ if (!$_testeAgenda && !recursoDisponivelParaPlano('agenda')) {
     exit;
 }
 
+require_once 'config/funcoes_cartao.php';
+
 $usuario_id = $_SESSION['usuario_id'];
+// Sem isso, quem só usa a Agenda (nunca abre o Dashboard) nunca dispara o fechamento
+// automático de fatura — o cartão fica preso em "aberta" e não aparece aqui pra pagar.
+cartao_verificarFechamentos($pdo, $usuario_id);
 
 // Quem lançou o registro pode mexer nele; o dono da carteira compartilhada onde ele está
 // também pode — reaproveitado em todo UPDATE/DELETE de Registro feito por esta página.

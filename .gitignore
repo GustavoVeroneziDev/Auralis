@@ -1,8 +1,30 @@
+### Dependências (reinstaláveis via composer.lock, não precisa versionar) ###
+/vendor/
+
+### Uploads e arquivos gerados por usuário (dados sensíveis de clientes!) ###
+/uploads/*
+!/uploads/.gitkeep
+/comprovante/uploads/*
+!/comprovante/uploads/.gitkeep
+
+### Logs (saída em runtime, não é código) ###
+/logs/*.log
+/logs/*.txt
+!/logs/.gitkeep
+
+### Segredos e credenciais (padrão cobre arquivos futuros também) ###
+.env
+.env.*
 config/conexao.php
 config/vapid_keys.php
 config/mercadopago_keys.php
 config/smtp_keys.php
+config/*_keys.php
+config/*_secret*.php
+config/gemini.php
 usuario/chaves_google.php
+
+### Scripts SQL manuais/pontuais (fora do fluxo de migrations) ###
 upgrade_manual_vip.sql
 upgrade_manual_pro.sql
 downgrade_manual_free.sql
@@ -11,3 +33,13 @@ add_*.sql
 limpar_*.sql
 alter_*.sql
 retroativos_*.sql
+
+### Claude Code (config pessoal, não compartilhar com quem clonar) ###
+.claude/settings.local.json
+
+### Editor / Sistema Operacional ###
+.vscode/
+.idea/
+.DS_Store
+Thumbs.db
+*.swp
