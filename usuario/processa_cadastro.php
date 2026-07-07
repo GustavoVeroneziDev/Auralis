@@ -9,6 +9,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $email          = trim($_POST['email']);
     $senha          = $_POST['senha'];
     $confirma_senha = $_POST['confirma_senha'];
+    $telefone       = function_exists('sanitizarTelefone') ? sanitizarTelefone(trim($_POST['telefone'] ?? '')) : null;
 
     if ($senha !== $confirma_senha) {
         header("Location: cadastro.php?erro=senhas_diferentes");
@@ -53,10 +54,10 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
         // Insere com Status = 'pendente' e salva o Token
         $sql = "INSERT INTO Usuario (
-                    IDUsuario, Nome, Email, Senha, TipoPessoa, NivelAcesso, StatusConta, TokenAtivacao,
+                    IDUsuario, Nome, Email, Telefone, Senha, TipoPessoa, NivelAcesso, StatusConta, TokenAtivacao,
                     CodigoIndicacao, FKIndicadoPor, NavTipo
                 ) VALUES (
-                    :id_usuario, :nome, :email, :senha, 'PF', 'Titular', 'pendente', :token,
+                    :id_usuario, :nome, :email, :telefone, :senha, 'PF', 'Titular', 'pendente', :token,
                     :codigo, :fk_ind, 'sidebar'
                 )";
 
@@ -65,6 +66,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             ':id_usuario'   => $id_novo_usuario,
             ':nome'         => $nome,
             ':email'        => $email,
+            ':telefone'     => $telefone,
             ':senha'        => $senhaHash,
             ':token'        => $token_ativacao,
             ':codigo'       => $codigoIndicacao,

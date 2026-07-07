@@ -20,15 +20,17 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
     // AÇÃO 1: ATUALIZAR DADOS PESSOAIS
     if (isset($_POST['action']) && $_POST['action'] === 'update_profile') {
-        $nome = trim($_POST['nome']);
+        $nome     = trim($_POST['nome']);
+        $telefone = function_exists('sanitizarTelefone') ? sanitizarTelefone(trim($_POST['telefone'] ?? '')) : null;
 
         if (!empty($nome)) {
             try {
-                $sqlUpd = "UPDATE Usuario SET Nome = :nome WHERE IDUsuario = :uid";
+                $sqlUpd = "UPDATE Usuario SET Nome = :nome, Telefone = :tel WHERE IDUsuario = :uid";
                 $stmtUpd = $pdo->prepare($sqlUpd);
                 $stmtUpd->execute([
                     ':nome' => $nome,
-                    ':uid' => $usuario_id
+                    ':tel'  => $telefone,
+                    ':uid'  => $usuario_id,
                 ]);
 
                 $_SESSION['usuario_nome'] = $nome;
@@ -221,7 +223,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 // 2. BUSCA OS DADOS ATUAIS (Incluindo Senha para a lógica do Front-end)
 // ==============================================================================
 try {
-    $sqlBusca = "SELECT Nome, Email, Senha, Tema, CodigoIndicacao FROM Usuario WHERE IDUsuario = :uid LIMIT 1";
+    $sqlBusca = "SELECT Nome, Email, Telefone, Senha, Tema, CodigoIndicacao FROM Usuario WHERE IDUsuario = :uid LIMIT 1";
     $stmtBusca = $pdo->prepare($sqlBusca);
     $stmtBusca->execute([':uid' => $usuario_id]);
     $dadosUsuario = $stmtBusca->fetch(PDO::FETCH_ASSOC);
@@ -335,6 +337,33 @@ require_once 'geral/header.php';
                         <div class="mb-4">
                             <label for="nome" class="form-label text-light fw-semibold mb-1">Nome Completo</label>
                             <input type="text" name="nome" id="nome" class="form-control form-control-lg bg-transparent border-secondary-subtle text-light shadow-none" value="<?= htmlspecialchars($dadosUsuario['Nome']) ?>" required>
+                        </div>
+
+                        <?php
+                        $telCfg = $dadosUsuario['Telefone'] ?? '';
+                        if ($telCfg && strlen($telCfg) >= 12 && substr($telCfg, 0, 2) === '55') {
+                            $d = substr($telCfg, 2);
+                            if (strlen($d) === 11)      $telCfg = '(' . substr($d,0,2) . ') ' . substr($d,2,5) . '-' . substr($d,7);
+                            elseif (strlen($d) === 10)  $telCfg = '(' . substr($d,0,2) . ') ' . substr($d,2,4) . '-' . substr($d,6);
+                        }
+                        ?>
+                        <div class="mb-4">
+                            <label for="cfg_telefone" class="form-label text-light fw-semibold mb-1 d-flex align-items-center gap-2">
+                                WhatsApp <span class="text-secondary fw-normal" style="font-size:.78rem;">(opcional)</span>
+                                <span tabindex="0" data-bs-toggle="tooltip" data-bs-placement="right"
+                                      title="Usado apenas para enviar alertas de vencimento de faturas. Deixe em branco para não receber."
+                                      style="cursor:help;line-height:1;">
+                                    <i class="bi bi-info-circle text-secondary" style="font-size:.85rem;"></i>
+                                </span>
+                            </label>
+                            <div class="input-group">
+                                <span class="input-group-text bg-transparent border-secondary-subtle text-secondary"><i class="bi bi-whatsapp"></i></span>
+                                <input type="tel" name="telefone" id="cfg_telefone"
+                                       class="form-control form-control-lg bg-transparent border-secondary-subtle text-light shadow-none"
+                                       value="<?= htmlspecialchars($telCfg) ?>"
+                                       maxlength="15" placeholder="(11) 99999-9999"
+                                       oninput="this.value=_maskTel(this.value)">
+                            </div>
                         </div>
 
                         <div class="text-end">
@@ -787,6 +816,23 @@ require_once 'geral/header.php';
     </div>
 
 </main>
+
+<script>
+function _maskTel(v) {
+    v = v.replace(/\D/g, '').slice(0, 11);
+    if (v.length > 6) {
+        v = '(' + v.slice(0,2) + ') ' + v.slice(2, v.length > 10 ? 7 : 6) + '-' + v.slice(v.length > 10 ? 7 : 6);
+    } else if (v.length > 2) {
+        v = '(' + v.slice(0,2) + ') ' + v.slice(2);
+    } else if (v.length > 0) {
+        v = '(' + v;
+    }
+    return v;
+}
+document.addEventListener('DOMContentLoaded', function() {
+    document.querySelectorAll('[data-bs-toggle="tooltip"]').forEach(function(el) { new bootstrap.Tooltip(el); });
+});
+</script>
 
 <script>
 function cfgCopiarLink() {

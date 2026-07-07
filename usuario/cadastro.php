@@ -59,6 +59,23 @@ require_once '../geral/header.php';
                         </div>
                     </div>
 
+                    <div class="mb-4">
+                        <label for="telefone" class="form-label text-light opacity-75 fw-semibold d-flex align-items-center gap-2">
+                            WhatsApp <span class="text-secondary fw-normal" style="font-size:.82rem;">(opcional)</span>
+                            <span tabindex="0" data-bs-toggle="tooltip" data-bs-placement="right"
+                                  title="Usado apenas para enviar alertas de vencimento de faturas. Você pode deixar em branco."
+                                  style="cursor:help;line-height:1;">
+                                <i class="bi bi-info-circle text-secondary" style="font-size:.9rem;"></i>
+                            </span>
+                        </label>
+                        <div class="input-group">
+                            <span class="input-group-text bg-dark border-secondary text-secondary"><i class="bi bi-whatsapp"></i></span>
+                            <input type="tel" class="form-control form-control-lg bg-dark border-secondary text-light"
+                                id="telefone" name="telefone" maxlength="15" placeholder="(11) 99999-9999"
+                                oninput="this.value=_maskTel(this.value)">
+                        </div>
+                    </div>
+
                     <div class="row mb-4">
                         <div class="col-md-6 mb-4 mb-md-0">
                             <label for="senha" class="form-label text-light opacity-75 fw-semibold">Senha</label>
@@ -193,6 +210,26 @@ require_once '../geral/header.php';
             resizeTimeout = setTimeout(desenharBotaoGoogle, 200);
         });
     }
+
+    // Máscara brasileira para WhatsApp: (DDD) XXXXX-XXXX
+    function _maskTel(v) {
+        v = v.replace(/\D/g, '').slice(0, 11);
+        if (v.length > 6) {
+            v = '(' + v.slice(0,2) + ') ' + v.slice(2, v.length > 10 ? 7 : 6) + '-' + v.slice(v.length > 10 ? 7 : 6);
+        } else if (v.length > 2) {
+            v = '(' + v.slice(0,2) + ') ' + v.slice(2);
+        } else if (v.length > 0) {
+            v = '(' + v;
+        }
+        return v;
+    }
+
+    // Inicializa tooltips do Bootstrap
+    document.addEventListener('DOMContentLoaded', function() {
+        document.querySelectorAll('[data-bs-toggle="tooltip"]').forEach(function(el) {
+            new bootstrap.Tooltip(el);
+        });
+    });
 
     // Única Validação de Front-End necessária: Verificar se as senhas são iguais
     const formCadastro = document.getElementById('formCadastro');

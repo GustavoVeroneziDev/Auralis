@@ -1933,3 +1933,41 @@ if (!function_exists('listarCredenciaisWebAuthn')) {
         return $stmt->fetchAll(PDO::FETCH_ASSOC);
     }
 }
+
+// ── WhatsApp (Evolution API) ──────────────────────────────────────────────────
+
+if (!function_exists('sanitizarTelefone')) {
+    function sanitizarTelefone(string $telefone): ?string
+    {
+        $digits = preg_replace('/\D/', '', $telefone);
+        if (empty($digits)) return null;
+        // Remove leading zero (e.g. 011XXXXXXXX → 11XXXXXXXX)
+        if (strlen($digits) > 11 && $digits[0] === '0') {
+            $digits = ltrim($digits, '0');
+        }
+        // Add country code 55 if only DDD + number (10 or 11 digits)
+        if (strlen($digits) === 10 || strlen($digits) === 11) {
+            $digits = '55' . $digits;
+        }
+        // Valid BR numbers: 12 digits (landline) or 13 digits (mobile)
+        if (strlen($digits) < 12 || strlen($digits) > 13) return null;
+        return $digits;
+    }
+}
+
+if (!function_exists('enviarWhatsAppNotificacao')) {
+    function enviarWhatsAppNotificacao(string $numero, string $mensagem): bool
+    {
+        $url     = 'https://evolution.meuauralis.com/message/sendText/Auralis';
+        $payload = json_encode(['number' => $numero, 'text' => $mensagem]);
+        $ctx = stream_context_create(['http' => [
+            'method'        => 'POST',
+            'header'        => "Content-Type: application/json\r\napikey: 44c816e1478a4754e859bd609e4099aaab417cf60bf07bf9\r\n",
+            'content'       => $payload,
+            'timeout'       => 10,
+            'ignore_errors' => true,
+        ]]);
+        $result = @file_get_contents($url, false, $ctx);
+        return $result !== false;
+    }
+}
