@@ -158,7 +158,28 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         }
     }
 
-    // AÇÃO 5: EXCLUIR CONTA (A ZONA DE PERIGO)
+    // AÇÃO 5: PERSONALIDADE DO ASSISTENTE WHATSAPP
+    if (isset($_POST['action']) && $_POST['action'] === 'salvar_pref_wa') {
+        $pers = in_array($_POST['wa_personalidade'] ?? '', ['parceiro', 'profissional']) ? $_POST['wa_personalidade'] : 'parceiro';
+        try {
+            $stmtChkWa = $pdo->prepare("SELECT COUNT(*) FROM ConfiguracaoSistema WHERE Chave = 'wa_personalidade' AND FKUsuario = :uid");
+            $stmtChkWa->execute([':uid' => $usuario_id]);
+            if ($stmtChkWa->fetchColumn() > 0) {
+                $pdo->prepare("UPDATE ConfiguracaoSistema SET Valor = :v WHERE Chave = 'wa_personalidade' AND FKUsuario = :uid")
+                    ->execute([':v' => $pers, ':uid' => $usuario_id]);
+            } else {
+                $pdo->prepare("INSERT INTO ConfiguracaoSistema (Chave, Valor, FKUsuario) VALUES ('wa_personalidade', :v, :uid)")
+                    ->execute([':v' => $pers, ':uid' => $usuario_id]);
+            }
+            $mensagem = 'Preferência do assistente salva!';
+            $tipo_mensagem = 'success';
+        } catch (PDOException $e) {
+            $mensagem = 'Erro ao salvar preferência.';
+            $tipo_mensagem = 'danger';
+        }
+    }
+
+    // AÇÃO 6: EXCLUIR CONTA (A ZONA DE PERIGO)
     if (isset($_POST['action']) && $_POST['action'] === 'delete_account') {
         $senha_confirmacao = $_POST['senha_confirmacao'] ?? '';
 
@@ -243,6 +264,14 @@ try {
         $key = substr($row['Chave'], 5);
         if (isset($dashPrefsCfg[$key])) $dashPrefsCfg[$key] = $row['Valor'];
     }
+} catch (PDOException $e) {}
+
+// ── Personalidade do assistente WhatsApp ────────────────────────────────────
+$waPersonalidade = 'parceiro';
+try {
+    $stmtWaP = $pdo->prepare("SELECT Valor FROM ConfiguracaoSistema WHERE Chave = 'wa_personalidade' AND FKUsuario = :uid LIMIT 1");
+    $stmtWaP->execute([':uid' => $usuario_id]);
+    $waPersonalidade = $stmtWaP->fetchColumn() ?: 'parceiro';
 } catch (PDOException $e) {}
 
 // ── Biometria (WebAuthn) ─────────────────────────────────────────────────────
@@ -798,6 +827,68 @@ require_once 'geral/header.php';
             </div>
         </div>
 
+        <!-- ASSISTENTE WHATSAPP -->
+        <?php if (!empty($dadosUsuario['Telefone'])): ?>
+        <div class="col-12 mt-2">
+            <div class="card border-secondary-subtle shadow-sm rounded-4" style="background:var(--bg-card);">
+                <div class="card-header border-bottom border-secondary-subtle bg-transparent p-4">
+                    <h5 class="fw-bold text-light mb-0">
+                        <i class="bi bi-whatsapp me-2" style="color:#25d366;"></i> Assistente WhatsApp
+                    </h5>
+                </div>
+                <div class="card-body p-4">
+                    <p class="text-secondary small mb-4">Escolha como o assistente se comunica com você pelo WhatsApp.</p>
+                    <form method="POST" id="formPrefWa">
+                        <input type="hidden" name="action" value="salvar_pref_wa">
+                        <div class="row g-3 mb-4">
+                            <div class="col-sm-6">
+                                <label class="d-block cursor-pointer" style="cursor:pointer;">
+                                    <input type="radio" name="wa_personalidade" value="parceiro"
+                                           class="d-none wa-pers-radio"
+                                           <?= $waPersonalidade === 'parceiro' ? 'checked' : '' ?>>
+                                    <div class="rounded-4 p-4 h-100 wa-pers-option <?= $waPersonalidade === 'parceiro' ? 'wa-pers-active' : '' ?>"
+                                         style="border:2px solid <?= $waPersonalidade === 'parceiro' ? 'var(--accent)' : 'rgba(255,255,255,.12)' ?>;background:<?= $waPersonalidade === 'parceiro' ? 'rgba(212,175,55,.06)' : 'rgba(255,255,255,.03)' ?>;transition:.2s;">
+                                        <div class="d-flex align-items-center gap-3 mb-2">
+                                            <span style="font-size:1.5rem;">🤝</span>
+                                            <div class="fw-semibold text-light">Parceiro</div>
+                                        </div>
+                                        <div class="text-secondary small">Casual e descontraído. Responde como um amigo que entende de finanças — usa expressões naturais e emojis com moderação.</div>
+                                        <div class="mt-3 p-3 rounded-3" style="background:rgba(0,0,0,.25);font-size:.78rem;color:#adb5bd;font-style:italic;">
+                                            "Opa! Anotado 👍<br>📉 <b>Uber</b>: R$ 23,50 · hoje"
+                                        </div>
+                                    </div>
+                                </label>
+                            </div>
+                            <div class="col-sm-6">
+                                <label class="d-block" style="cursor:pointer;">
+                                    <input type="radio" name="wa_personalidade" value="profissional"
+                                           class="d-none wa-pers-radio"
+                                           <?= $waPersonalidade === 'profissional' ? 'checked' : '' ?>>
+                                    <div class="rounded-4 p-4 h-100 wa-pers-option <?= $waPersonalidade === 'profissional' ? 'wa-pers-active' : '' ?>"
+                                         style="border:2px solid <?= $waPersonalidade === 'profissional' ? 'var(--accent)' : 'rgba(255,255,255,.12)' ?>;background:<?= $waPersonalidade === 'profissional' ? 'rgba(212,175,55,.06)' : 'rgba(255,255,255,.03)' ?>;transition:.2s;">
+                                        <div class="d-flex align-items-center gap-3 mb-2">
+                                            <span style="font-size:1.5rem;">💼</span>
+                                            <div class="fw-semibold text-light">Profissional</div>
+                                        </div>
+                                        <div class="text-secondary small">Direto e objetivo. Respostas concisas sem expressões informais, ideal para quem prefere comunicação formal.</div>
+                                        <div class="mt-3 p-3 rounded-3" style="background:rgba(0,0,0,.25);font-size:.78rem;color:#adb5bd;font-style:italic;">
+                                            "✅ Registrado.<br>📉 <b>Uber</b>: R$ 23,50 · 07/07/2026"
+                                        </div>
+                                    </div>
+                                </label>
+                            </div>
+                        </div>
+                        <div class="text-end">
+                            <button type="submit" class="btn btn-outline-light rounded-pill px-4 fw-semibold transition-hover">
+                                Salvar Preferência
+                            </button>
+                        </div>
+                    </form>
+                </div>
+            </div>
+        </div>
+        <?php endif; ?>
+
         <!-- ZONA DE RISCO -->
         <div class="col-12 mt-2">
             <div class="card border-danger border-opacity-25 bg-transparent shadow-sm rounded-4">
@@ -831,6 +922,19 @@ function _maskTel(v) {
 }
 document.addEventListener('DOMContentLoaded', function() {
     document.querySelectorAll('[data-bs-toggle="tooltip"]').forEach(function(el) { new bootstrap.Tooltip(el); });
+
+    // Personalidade WA: highlight ao selecionar
+    document.querySelectorAll('.wa-pers-radio').forEach(function(radio) {
+        radio.addEventListener('change', function() {
+            document.querySelectorAll('.wa-pers-option').forEach(function(opt) {
+                opt.style.borderColor = 'rgba(255,255,255,.12)';
+                opt.style.background  = 'rgba(255,255,255,.03)';
+            });
+            var opt = this.closest('label').querySelector('.wa-pers-option');
+            opt.style.borderColor = 'var(--accent)';
+            opt.style.background  = 'rgba(212,175,55,.06)';
+        });
+    });
 });
 </script>
 
