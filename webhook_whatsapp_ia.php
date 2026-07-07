@@ -163,93 +163,150 @@ $catRec    = json_encode(array_values(array_map(fn($c) => ['id' => $c['IDCategor
 $cofList   = $cofrinhos ? json_encode(array_map(fn($c) => ['id' => $c['IDCofrinho'], 'nome' => $c['Nome'], 'meta' => (float)$c['ValorMeta'], 'saldo' => (float)$c['Saldo']], $cofrinhos), JSON_UNESCAPED_UNICODE) : '[]';
 
 $tomVoz = $personalidade === 'profissional'
-    ? "Seja conciso e profissional. Respostas diretas, sem expressões informais ou emojis desnecessários."
-    : "Seja natural e descontraído como um amigo que entende de dinheiro. Use linguagem casual, seja empático. Expressões como 'opa!', 'certinho!', 'anotado!' ficam ótimas. Emojis com moderação.";
+    ? "Seja direto e profissional. Sem expressões informais ou emojis desnecessários."
+    : "Seja natural como um amigo que manja de dinheiro. Linguagem casual, sem frescura. Emojis com moderação e só quando fizerem sentido.";
 
-$imgCtx = $imagemBase64 ? "O usuário também enviou uma imagem — pode ser comprovante ou nota fiscal, leia os dados financeiros dela." : "";
+$imgCtx = $imagemBase64 ? " O usuário enviou uma imagem — leia os dados financeiros dela (comprovante, nota fiscal, etc.)." : "";
 
 $perfilCtx = '';
 if ($perfilIA) {
     $perfilJson = json_encode($perfilIA, JSON_UNESCAPED_UNICODE);
-    $perfilCtx  = "\nPerfil que você aprendeu sobre {$nomeUser}: {$perfilJson}";
+    $perfilCtx  = "\nPerfil aprendido sobre {$nomeUser}: {$perfilJson}";
 }
 
-// Snapshot financeiro do mês
-$snapCtx = '';
+// ── Contexto rico pré-buscado (Gemini responde direto sem precisar de consultar) ──
+
+// Snapshot do mês
+$recEfet = 0; $despEfet = 0; $totalPendente = 0; $qtdPendente = 0;
 try {
     $stmtSnap = $pdo->prepare("
         SELECT
-            SUM(CASE WHEN TipoRegistro='receita' AND StatusRegistro='efetivado' THEN Valor ELSE 0 END) AS RecEfet,
-            SUM(CASE WHEN TipoRegistro='despesa' AND StatusRegistro='efetivado' THEN Valor ELSE 0 END) AS DespEfet,
-            SUM(CASE WHEN StatusRegistro='pendente' THEN Valor ELSE 0 END) AS Pendente,
-            COUNT(CASE WHEN StatusRegistro='pendente' THEN 1 END) AS QtdPend
-        FROM Registro
-        WHERE FKUsuario = :uid
+            SUM(CASE WHEN TipoRegistro IN ('receita') AND StatusRegistro='efetivado' THEN Valor ELSE 0 END) AS RecEfet,
+            SUM(CASE WHEN TipoRegistro IN ('despesa') AND StatusRegistro='efetivado' THEN Valor ELSE 0 END) AS DespEfet,
+            SUM(CASE WHEN StatusRegistro='pendente' AND TipoRegistro IN ('receita','despesa') THEN Valor ELSE 0 END) AS Pendente,
+            COUNT(CASE WHEN StatusRegistro='pendente' AND TipoRegistro IN ('receita','despesa') THEN 1 END) AS QtdPend
+        FROM Registro WHERE FKUsuario = :uid
           AND COALESCE(DataVencimento, DATE(MomentoRegistro)) BETWEEN :ini AND :fim
     ");
     $stmtSnap->execute([':uid' => $uid, ':ini' => date('Y-m-01'), ':fim' => date('Y-m-t')]);
     $snap = $stmtSnap->fetch(PDO::FETCH_ASSOC);
     if ($snap) {
-        $saldoMes = (float)$snap['RecEfet'] - (float)$snap['DespEfet'];
-        $snapCtx  = "\nFinanças do mês atual:" .
-            " receitas=R$" . number_format((float)$snap['RecEfet'],  2, ',', '.') .
-            ", despesas=R$" . number_format((float)$snap['DespEfet'], 2, ',', '.') .
-            ", saldo=R$" . number_format($saldoMes, 2, ',', '.') .
-            ", pendentes=" . (int)$snap['QtdPend'] . " (R$" . number_format((float)$snap['Pendente'], 2, ',', '.') . ").";
+        $recEfet      = (float)$snap['RecEfet'];
+        $despEfet     = (float)$snap['DespEfet'];
+        $totalPendente = (float)$snap['Pendente'];
+        $qtdPendente  = (int)$snap['QtdPend'];
     }
 } catch (Throwable $e) {}
 
-$systemPrompt = <<<EOT
-Você é o Auralis, assistente financeiro pessoal de {$nomeUser}. {$tomVoz} {$imgCtx}{$perfilCtx}
+$saldoMes = $recEfet - $despEfet;
 
-Contexto atual:
+// Pendentes próximos 14 dias (lista detalhada para o Gemini usar diretamente)
+$pendentesCtx = '';
+try {
+    $stmtPend = $pdo->prepare("
+        SELECT r.Descricao, r.Valor, r.TipoRegistro, r.DataVencimento, c.NomeCategoria
+        FROM Registro r LEFT JOIN Categoria c ON c.IDCategoria = r.FKCategoria
+        WHERE r.FKUsuario = :uid AND r.StatusRegistro = 'pendente'
+          AND r.DataVencimento BETWEEN :ini AND :fim
+          AND r.TipoRegistro IN ('receita','despesa')
+        ORDER BY r.DataVencimento ASC LIMIT 20
+    ");
+    $stmtPend->execute([':uid' => $uid, ':ini' => $hoje, ':fim' => date('Y-m-d', strtotime('+14 days'))]);
+    $pendRows = $stmtPend->fetchAll(PDO::FETCH_ASSOC);
+    if ($pendRows) {
+        $pendLines = array_map(fn($r) =>
+            date('d/m', strtotime($r['DataVencimento'])) . ' ' .
+            $r['Descricao'] . ' R$' . number_format($r['Valor'], 2, ',', '.') .
+            ($r['TipoRegistro'] === 'receita' ? ' [rec]' : '') .
+            ($r['NomeCategoria'] ? ' (' . $r['NomeCategoria'] . ')' : ''),
+            $pendRows
+        );
+        $pendentesCtx = "\nPendentes nos próximos 14 dias: " . implode('; ', $pendLines) . '.';
+    } else {
+        $pendentesCtx = "\nPendentes nos próximos 14 dias: nenhum.";
+    }
+} catch (Throwable $e) {}
+
+// Últimos 3 registros
+$ultimosCtx = '';
+try {
+    $stmtUlt = $pdo->prepare("
+        SELECT r.Descricao, r.Valor, r.TipoRegistro, r.DataVencimento, r.StatusRegistro
+        FROM Registro r WHERE r.FKUsuario = :uid AND r.StatusRegistro != 'cancelado'
+        ORDER BY r.MomentoRegistro DESC LIMIT 3
+    ");
+    $stmtUlt->execute([':uid' => $uid]);
+    $ultRows = $stmtUlt->fetchAll(PDO::FETCH_ASSOC);
+    if ($ultRows) {
+        $ultLines = array_map(fn($r) =>
+            $r['Descricao'] . ' R$' . number_format($r['Valor'], 2, ',', '.') .
+            ' [' . $r['TipoRegistro'] . '/' . $r['StatusRegistro'] . ']',
+            $ultRows
+        );
+        $ultimosCtx = "\nÚltimos lançamentos: " . implode('; ', $ultLines) . '.';
+    }
+} catch (Throwable $e) {}
+
+$saldoFmt    = 'R$' . number_format(abs($saldoMes), 2, ',', '.') . ($saldoMes < 0 ? ' (negativo)' : '');
+$recFmt      = 'R$' . number_format($recEfet,      2, ',', '.');
+$despFmt     = 'R$' . number_format($despEfet,     2, ',', '.');
+$pendFmt     = 'R$' . number_format($totalPendente, 2, ',', '.');
+
+$systemPrompt = <<<EOT
+Você é o Auralis, assistente financeiro de {$nomeUser}.{$imgCtx}{$perfilCtx}
+
+{$tomVoz}
+
+REGRAS DE COMPORTAMENTO — siga sem exceção:
+1. Responda DIRETAMENTE o que foi perguntado. Sem título, sem header, sem "aqui está o resumo", sem apresentação antes da resposta.
+2. Use os dados do contexto para responder conversacionalmente sempre que possível. Reserve a action "consultar" para consultas que precisem de cálculos agregados que não estão no contexto (ex: breakdown por categoria, períodos muito anteriores).
+3. Se a mensagem for ambígua ou você não tiver certeza do que a pessoa quer, use action "clarificar" — não tente adivinhar e errar.
+4. Uma reação casual ("kkk", "valeu", "tá bom") merece uma resposta casual curta. Não repita dados financeiros que já foram mostrados logo antes.
+5. Nunca invente dados. Se não tiver a informação no contexto e precisar de DB, use "consultar".
+6. Múltiplas intenções na mesma mensagem → use "acoes" array.
+
+Contexto financeiro atual de {$nomeUser}:
 - Hoje: {$hoje}
+- Mês atual: receitas efetivadas={$recFmt}, despesas efetivadas={$despFmt}, saldo={$saldoFmt}, pendentes={$qtdPendente} itens={$pendFmt}{$pendentesCtx}{$ultimosCtx}
 - Carteiras: {$cartsList}
 - Cofrinhos: {$cofList}
-- Categorias de despesa: {$catDesp}
-- Categorias de receita: {$catRec}{$snapCtx}
+- Categorias despesa: {$catDesp}
+- Categorias receita: {$catRec}
 
-Responda SEMPRE com JSON válido (sem markdown). Se a mensagem contiver MAIS DE UMA intenção distinta, use "acoes" (array). Caso contrário, use "action" (objeto único).
+ACTIONS disponíveis (responda SEMPRE com JSON válido, sem markdown):
 
-MÚLTIPLAS AÇÕES — use quando houver 2+ intenções distintas na mesma mensagem:
-{"acoes":[{acao1},{acao2},...]}
-Cada objeto em "acoes" segue o mesmo formato de sua action individual.
+"conversar" — resposta livre para perguntas, cálculos com dados do contexto, opiniões, reações, bate-papo. USE ISSO quando conseguir responder com o contexto acima:
+{"action":"conversar","resposta":"resposta direta e natural"}
 
-ACTIONS individuais disponíveis:
+"clarificar" — quando não entende ou a mensagem tem 2+ interpretações válidas:
+{"action":"clarificar","pergunta":"pergunta curta e objetiva","opcoes":["interpretação A","interpretação B"]}
 
-"registrar" — lançar 1 ou mais transações financeiras:
+"registrar" — lançar transações financeiras:
 {"action":"registrar","registros":[{"tipo":"despesa","valor":0.00,"descricao":"max 60 chars","data":"YYYY-MM-DD","id_carteira":"uuid","id_categoria":"uuid|null","nome_carteira":"nome","nome_categoria":"nome|null","parcelas":1}]}
-Regras: use primeira carteira se não mencionada; data relativa → YYYY-MM-DD exato; parcelas>1 para parcelamentos; comprovante enviado=despesa, recebido=receita.
+Regras: primeira carteira se não mencionada; data relativa → YYYY-MM-DD exato; parcelas>1 para parcelamentos.
 
-"efetivar" — marcar registro(s) pendente(s) como pago/recebido:
-{"action":"efetivar","descricoes":["texto parcial do registro"]}
-Exemplo: "paguei o Spotify" → {"action":"efetivar","descricoes":["Spotify"]}
-Pode efetivar múltiplos de uma vez: {"action":"efetivar","descricoes":["Vivo","Nubank"]}
+"efetivar" — marcar pendente(s) como pago/recebido:
+{"action":"efetivar","descricoes":["texto parcial"]}
 
-"cofrinho_depositar" — aportar valor em um cofrinho existente:
-{"action":"cofrinho_depositar","nome_cofrinho":"nome exato ou parcial","valor":0.00}
+"cofrinho_depositar":
+{"action":"cofrinho_depositar","nome_cofrinho":"nome","valor":0.00}
 
-"cofrinho_criar" — criar um novo cofrinho:
-{"action":"cofrinho_criar","nome":"nome do cofrinho","meta":0.00}
-meta=0 se não informada.
+"cofrinho_criar":
+{"action":"cofrinho_criar","nome":"nome","meta":0.00}
 
-"consultar" — consultar gastos, saldo, pendências, histórico:
+"consultar" — USE APENAS para cálculos que exigem DB: breakdown por categoria, períodos passados, totais não presentes no contexto:
 {"action":"consultar","consulta":{"tipo":"gastos|pendentes|saldo|ultimo","periodo":"hoje|semana|mes|ano","tipo_registro":"despesa|receita|null"}}
 
-"cancelar" — desfazer/cancelar o último lançamento:
+"cancelar":
 {"action":"cancelar"}
 
-"conversar" — para tudo que não é uma das ações acima: opiniões, conselhos, perguntas abertas, saudações, agradecimentos, bate-papo financeiro:
-{"action":"conversar","resposta":"texto livre adaptado à mensagem, use os dados financeiros quando relevante"}
-
-"ajuda" — SOMENTE quando o usuário pede explicitamente a lista de comandos:
+"ajuda" — SOMENTE se pedir lista de comandos explicitamente:
 {"action":"ajuda"}
 
-CAMPO OPCIONAL "_perfil_atualizado" — inclua APENAS quando aprender algo novo: apelido, forma de tratamento, contexto financeiro recorrente:
-{"apelido":"...","tom":"...","notas":["..."]}
-Se nada novo, OMITA completamente.
+"acoes" — múltiplas intenções distintas:
+{"acoes":[{acao1},{acao2}]}
 
-Histórico de conversa mostra trocas anteriores — use para contexto, mas resposta deve sempre ser JSON.
+CAMPO OPCIONAL "_perfil_atualizado" — só inclua se aprendeu algo novo (apelido, tom, contexto financeiro recorrente). OMITA se nada novo.
 EOT;
 
 // ── 8. Chama Gemini com histórico ─────────────────────────────────────────────
@@ -310,7 +367,8 @@ function _waDespachar(PDO $pdo, string $uid, array $acao, array $carteiras, arra
         'consultar'          => _waConsultar($pdo, $uid, $acao['consulta'] ?? [], $hoje),
         'cancelar'           => _waCancelar($pdo, $uid),
         'ajuda'              => _waAjuda($personalidade),
-        'conversar'          => !empty($acao['resposta']) ? (string)$acao['resposta'] : "Pode elaborar um pouco mais? 😅",
+        'clarificar'         => _waClarificar($acao),
+        'conversar'          => !empty($acao['resposta']) ? (string)$acao['resposta'] : "Pode elaborar mais?",
         default              => !empty($acao['resposta']) ? (string)$acao['resposta'] : "Não entendi bem. Pode repetir?",
     };
 }
@@ -545,6 +603,21 @@ function _waCofinhoCriar(PDO $pdo, string $uid, array $acao, array $carteiras, s
     return "🏦 *Cofrinho \"{$nome}\" criado!*{$metaTxt}\n\nAgora você pode mandar \"deposita X no {$nome}\" para começar a guardar. 💰";
 }
 
+function _waClarificar(array $acao): string
+{
+    $pergunta = trim($acao['pergunta'] ?? 'Pode explicar melhor?');
+    $opcoes   = array_filter((array)($acao['opcoes'] ?? []));
+
+    if (!$opcoes) return $pergunta;
+
+    $letras = ['a', 'b', 'c', 'd'];
+    $linhas = [];
+    foreach (array_values($opcoes) as $i => $op) {
+        $linhas[] = ($letras[$i] ?? ($i + 1)) . ') ' . $op;
+    }
+    return $pergunta . "\n\n" . implode("\n", $linhas);
+}
+
 function _waConsultar(PDO $pdo, string $uid, array $consulta, string $hoje): string
 {
     $tipo    = $consulta['tipo']          ?? 'gastos';
@@ -587,7 +660,7 @@ function _waConsultar(PDO $pdo, string $uid, array $consulta, string $hoje): str
                 $stmt->execute($p);
                 $rows = $stmt->fetchAll(PDO::FETCH_ASSOC);
 
-                if (!$rows) return "✅ Nenhuma conta pendente para {$label}!";
+                if (!$rows) return "Nada pendente pra {$label}. ✅";
 
                 $total  = array_sum(array_column($rows, 'Valor'));
                 $linhas = array_map(fn($r) =>
@@ -596,7 +669,8 @@ function _waConsultar(PDO $pdo, string $uid, array $consulta, string $hoje): str
                     ($r['NomeCategoria'] ? " ({$r['NomeCategoria']})" : ''),
                     $rows
                 );
-                return "📋 *Pendentes — {$label}*\n\n" . implode("\n", $linhas) .
+                $intro = count($rows) === 1 ? "Só uma pendência pra {$label}:" : count($rows) . " pendências pra {$label}:";
+                return "{$intro}\n\n" . implode("\n", $linhas) .
                        "\n\n💰 Total: R$ " . number_format($total, 2, ',', '.');
 
             case 'saldo':
@@ -611,13 +685,12 @@ function _waConsultar(PDO $pdo, string $uid, array $consulta, string $hoje): str
                 $rec   = (float)($rows['receita'] ?? 0);
                 $desp  = (float)($rows['despesa']  ?? 0);
                 $saldo = $rec - $desp;
-                $icon  = $saldo >= 0 ? '📈' : '📉';
 
-                return "💰 *Saldo — {$label}*\n\n" .
-                       "📈 Receitas: R$ " . number_format($rec,  2, ',', '.') . "\n" .
-                       "📉 Despesas: R$ " . number_format($desp, 2, ',', '.') . "\n" .
-                       "──────────────────\n" .
-                       "{$icon} *Saldo: R$ " . number_format(abs($saldo), 2, ',', '.') . ($saldo < 0 ? " (negativo)*" : "*");
+                $saldoStr = 'R$ ' . number_format(abs($saldo), 2, ',', '.');
+                $status   = $saldo >= 0 ? "positivo em {$saldoStr} 📈" : "negativo em {$saldoStr} 📉";
+                return "Saldo {$label}: {$status}\n\n" .
+                       "Receitas: R$ " . number_format($rec,  2, ',', '.') . "\n" .
+                       "Despesas: R$ " . number_format($desp, 2, ',', '.');
 
             case 'ultimo':
                 $stmt = $pdo->prepare("
@@ -629,15 +702,13 @@ function _waConsultar(PDO $pdo, string $uid, array $consulta, string $hoje): str
                 $stmt->execute([':uid' => $uid]);
                 $r = $stmt->fetch(PDO::FETCH_ASSOC);
 
-                if (!$r) return "Nenhum registro encontrado ainda.";
+                if (!$r) return "Nenhum registro ainda.";
 
                 $icon    = $r['TipoRegistro'] === 'receita' ? '📈' : '📉';
                 $dataFmt = $r['DataVencimento'] ? date('d/m/Y', strtotime($r['DataVencimento'])) : '—';
-                return "🔍 *Último registro*\n\n{$icon} *{$r['Descricao']}*\n" .
-                       "💵 R$ " . number_format($r['Valor'], 2, ',', '.') . "\n" .
-                       "📅 {$dataFmt}\n" .
-                       ($r['NomeCategoria'] ? "🏷️ {$r['NomeCategoria']}\n" : '') .
-                       "Status: {$r['StatusRegistro']}";
+                $catStr  = $r['NomeCategoria'] ? " · {$r['NomeCategoria']}" : '';
+                return "Último: {$icon} *{$r['Descricao']}* — R$ " . number_format($r['Valor'], 2, ',', '.') .
+                       " · {$dataFmt}{$catStr} · {$r['StatusRegistro']}";
 
             default: // gastos
                 $tipoQuery = $tipoReg ?? 'despesa';
@@ -652,16 +723,16 @@ function _waConsultar(PDO $pdo, string $uid, array $consulta, string $hoje): str
                 $stmt->execute([':uid' => $uid, ':tipo' => $tipoQuery, ':ini' => $ini, ':fim' => $fim]);
                 $rows = $stmt->fetchAll(PDO::FETCH_ASSOC);
 
-                if (!$rows) return "Nenhum(a) " . ($tipoQuery === 'receita' ? 'receita' : 'gasto') . " encontrado para {$label}.";
+                $tipoLabel = $tipoQuery === 'receita' ? 'receitas' : 'gastos';
+                if (!$rows) return "Sem {$tipoLabel} registrados pra {$label}.";
 
                 $total  = array_sum(array_column($rows, 'Total'));
-                $header = $tipoQuery === 'receita' ? '📈 Receitas' : '📉 Gastos';
                 $linhas = array_map(fn($r) =>
                     "• " . ($r['NomeCategoria'] ?? 'Sem categoria') . ": R$ " . number_format($r['Total'], 2, ',', '.'),
                     $rows
                 );
-                return "{$header} — *{$label}*\n\n" . implode("\n", $linhas) .
-                       "\n\n💰 Total: *R$ " . number_format($total, 2, ',', '.') . "*";
+                return ucfirst($tipoLabel) . " {$label}:\n\n" . implode("\n", $linhas) .
+                       "\n\nTotal: *R$ " . number_format($total, 2, ',', '.') . "*";
         }
     } catch (Throwable $e) {
         return "❌ Erro ao consultar. Tente novamente.";
