@@ -94,7 +94,7 @@ if (!$carteiras) {
     exit;
 }
 
-// ── 5. Personalidade e histórico ──────────────────────────────────────────────
+// ── 5. Personalidade, histórico e perfil permanente ──────────────────────────
 
 _waGarantirTabela($pdo);
 
@@ -106,6 +106,17 @@ try {
     $stmtPers->execute([':uid' => $uid]);
     $personalidade = $stmtPers->fetchColumn() ?: 'parceiro';
 } catch (Throwable $e) { $personalidade = 'parceiro'; }
+
+// Lê perfil permanente que a IA gerencia (apelido, observações, etc.)
+$perfilIA = [];
+try {
+    $stmtPerfil = $pdo->prepare(
+        "SELECT Valor FROM ConfiguracaoSistema WHERE Chave = 'wa_perfil_ia' AND FKUsuario = :uid LIMIT 1"
+    );
+    $stmtPerfil->execute([':uid' => $uid]);
+    $perfilRaw = $stmtPerfil->fetchColumn();
+    if ($perfilRaw) $perfilIA = json_decode($perfilRaw, true) ?: [];
+} catch (Throwable $e) {}
 
 // Últimas 10 mensagens (excluindo a atual)
 $historico = _waLoadHistory($pdo, $uid, 10);
@@ -132,8 +143,15 @@ $tomVoz = $personalidade === 'profissional'
 
 $imgCtx = $imagemBase64 ? "O usuário também enviou uma imagem — pode ser comprovante ou nota fiscal, leia os dados financeiros dela." : "";
 
+// Perfil permanente no prompt
+$perfilCtx = '';
+if ($perfilIA) {
+    $perfilJson = json_encode($perfilIA, JSON_UNESCAPED_UNICODE);
+    $perfilCtx  = "\nPerfil que você aprendeu sobre {$nomeUser}: {$perfilJson}\nUse essas informações para personalizar cada resposta (apelido, tom, contexto financeiro).";
+}
+
 $systemPrompt = <<<EOT
-Você é o Auralis, assistente financeiro pessoal de {$nomeUser}. {$tomVoz} {$imgCtx}
+Você é o Auralis, assistente financeiro pessoal de {$nomeUser}. {$tomVoz} {$imgCtx}{$perfilCtx}
 
 Contexto atual:
 - Hoje: {$hoje}
@@ -155,6 +173,14 @@ ACTION "cancelar" — quando pede pra desfazer/cancelar o último lançamento:
 
 ACTION "ajuda" — saudação, agradecimento, ou quando não entender:
 {"action":"ajuda"}
+
+CAMPO OPCIONAL "_perfil_atualizado" — inclua APENAS quando o usuário revelar algo relevante sobre si:
+- Como quer ser chamado (apelido, forma de tratamento)
+- Preferências de comunicação aprendidas pela conversa
+- Contexto financeiro recorrente útil (ex: "recebe salário dia 5", "Nubank = carteira principal")
+Formato: {"apelido":"nome ou expressão preferida","tom":"descrição do estilo","notas":["observação 1","observação 2"]}
+Exemplo: se o usuário disser "me chama de Guga", inclua: "_perfil_atualizado":{"apelido":"Guga","tom":"informal","notas":[]}
+Se não aprendeu nada novo, OMITA completamente o campo _perfil_atualizado.
 
 O histórico da conversa mostra trocas anteriores em linguagem natural — use para entender contexto, mas sua resposta deve sempre ser JSON.
 EOT;
@@ -191,6 +217,11 @@ $resposta = match($action) {
 
 _waReply($telefone, $resposta);
 _waSaveHistory($pdo, $uid, $texto, $resposta);
+
+// Atualiza perfil permanente se a IA aprendeu algo novo
+if (!empty($resultado['_perfil_atualizado']) && is_array($resultado['_perfil_atualizado'])) {
+    _waSalvarPerfil($pdo, $uid, $resultado['_perfil_atualizado']);
+}
 
 exit;
 
@@ -453,6 +484,30 @@ function _waAjuda(string $personalidade = 'parceiro'): string
 }
 
 // ── Histórico de conversa ─────────────────────────────────────────────────────
+
+function _waSalvarPerfil(PDO $pdo, string $uid, array $perfil): void
+{
+    // Garante que notas seja array e limita tamanho
+    if (!isset($perfil['notas']) || !is_array($perfil['notas'])) $perfil['notas'] = [];
+    $perfil['notas'] = array_slice(array_filter(array_map('strval', $perfil['notas'])), 0, 20);
+    if (isset($perfil['apelido']))  $perfil['apelido'] = mb_substr((string)$perfil['apelido'], 0, 60);
+    if (isset($perfil['tom']))      $perfil['tom']     = mb_substr((string)$perfil['tom'],     0, 200);
+
+    $json = json_encode($perfil, JSON_UNESCAPED_UNICODE);
+    if (!$json || strlen($json) > 4000) return;
+
+    try {
+        $stmtChk = $pdo->prepare("SELECT COUNT(*) FROM ConfiguracaoSistema WHERE Chave = 'wa_perfil_ia' AND FKUsuario = :uid");
+        $stmtChk->execute([':uid' => $uid]);
+        if ($stmtChk->fetchColumn() > 0) {
+            $pdo->prepare("UPDATE ConfiguracaoSistema SET Valor = :v WHERE Chave = 'wa_perfil_ia' AND FKUsuario = :uid")
+                ->execute([':v' => $json, ':uid' => $uid]);
+        } else {
+            $pdo->prepare("INSERT INTO ConfiguracaoSistema (Chave, Valor, FKUsuario) VALUES ('wa_perfil_ia', :v, :uid)")
+                ->execute([':v' => $json, ':uid' => $uid]);
+        }
+    } catch (Throwable $e) {}
+}
 
 function _waGarantirTabela(PDO $pdo): void
 {
