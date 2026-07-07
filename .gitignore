@@ -21,6 +21,7 @@ config/mercadopago_keys.php
 config/smtp_keys.php
 config/*_keys.php
 config/*_secret*.php
+config/gemini.php
 usuario/chaves_google.php
 
 ### Scripts SQL manuais/pontuais (fora do fluxo de migrations) ###
