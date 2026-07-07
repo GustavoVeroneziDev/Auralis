@@ -170,8 +170,26 @@ $resultado = _waGemini($prompt, $imagemBase64, $imagemMime);
 
 // ── 6. Trata resultado ────────────────────────────────────────────────────────
 
-if (!$resultado || !isset($resultado['ok'])) {
-    _waReply($telefone, "⚠️ Serviço de IA indisponível no momento. Tente novamente em instantes.");
+if (!$resultado) {
+    _waReply($telefone, "⚠️ Serviço de IA sem resposta. Tente novamente em instantes.");
+    exit;
+}
+
+if (!empty($resultado['_api_error'])) {
+    $code = $resultado['_code'];
+    $msg  = $resultado['_msg'];
+    if ($code === 429) {
+        _waReply($telefone, "⏳ Muitas requisições simultâneas. Aguarde 1 minuto e tente novamente.");
+    } elseif ($code === 400 || $code === 401 || $code === 403) {
+        _waReply($telefone, "❌ Erro de configuração da IA (código {$code}). Contate o suporte.");
+    } else {
+        _waReply($telefone, "⚠️ Erro da IA: {$msg} (código {$code}).");
+    }
+    exit;
+}
+
+if (!isset($resultado['ok'])) {
+    _waReply($telefone, "⚠️ A IA retornou uma resposta inesperada. Tente novamente.");
     exit;
 }
 
@@ -283,7 +301,16 @@ function _waGemini(string $prompt, ?string $base64 = null, string $mime = 'image
     $resp = @file_get_contents($url, false, $ctx);
     if (!$resp) return null;
 
-    $api  = json_decode($resp, true);
+    $api = json_decode($resp, true);
+
+    // Erro da API (chave inválida, quota, etc.)
+    if (isset($api['error'])) {
+        $code = $api['error']['code'] ?? 0;
+        $msg  = $api['error']['message'] ?? 'unknown';
+        // Retorna array especial para distinguir erro de API de resposta inválida
+        return ['_api_error' => true, '_code' => $code, '_msg' => $msg];
+    }
+
     $text = $api['candidates'][0]['content']['parts'][0]['text'] ?? null;
     if (!$text) return null;
 
