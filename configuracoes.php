@@ -158,7 +158,41 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         }
     }
 
-    // AÇÃO 5: EXCLUIR CONTA (A ZONA DE PERIGO)
+    // AÇÃO 5: PERSONALIDADE DO ASSISTENTE WHATSAPP
+    if (isset($_POST['action']) && $_POST['action'] === 'salvar_pref_wa') {
+        $pers = in_array($_POST['wa_personalidade'] ?? '', ['parceiro', 'profissional']) ? $_POST['wa_personalidade'] : 'parceiro';
+        try {
+            $stmtChkWa = $pdo->prepare("SELECT COUNT(*) FROM ConfiguracaoSistema WHERE Chave = 'wa_personalidade' AND FKUsuario = :uid");
+            $stmtChkWa->execute([':uid' => $usuario_id]);
+            if ($stmtChkWa->fetchColumn() > 0) {
+                $pdo->prepare("UPDATE ConfiguracaoSistema SET Valor = :v WHERE Chave = 'wa_personalidade' AND FKUsuario = :uid")
+                    ->execute([':v' => $pers, ':uid' => $usuario_id]);
+            } else {
+                $pdo->prepare("INSERT INTO ConfiguracaoSistema (Chave, Valor, FKUsuario) VALUES ('wa_personalidade', :v, :uid)")
+                    ->execute([':v' => $pers, ':uid' => $usuario_id]);
+            }
+            $mensagem = 'Preferência do assistente salva!';
+            $tipo_mensagem = 'success';
+        } catch (PDOException $e) {
+            $mensagem = 'Erro ao salvar preferência.';
+            $tipo_mensagem = 'danger';
+        }
+    }
+
+    // AÇÃO 6: RESETAR PERFIL DA IA
+    if (isset($_POST['action']) && $_POST['action'] === 'resetar_perfil_ia') {
+        try {
+            $pdo->prepare("DELETE FROM ConfiguracaoSistema WHERE Chave = 'wa_perfil_ia' AND FKUsuario = :uid")
+                ->execute([':uid' => $usuario_id]);
+            $mensagem = 'Memória do assistente apagada. Ele voltará do zero.';
+            $tipo_mensagem = 'success';
+        } catch (PDOException $e) {
+            $mensagem = 'Erro ao resetar memória.';
+            $tipo_mensagem = 'danger';
+        }
+    }
+
+    // AÇÃO 7: EXCLUIR CONTA (A ZONA DE PERIGO)
     if (isset($_POST['action']) && $_POST['action'] === 'delete_account') {
         $senha_confirmacao = $_POST['senha_confirmacao'] ?? '';
 
@@ -242,6 +276,20 @@ try {
     foreach ($stmtDP->fetchAll() as $row) {
         $key = substr($row['Chave'], 5);
         if (isset($dashPrefsCfg[$key])) $dashPrefsCfg[$key] = $row['Valor'];
+    }
+} catch (PDOException $e) {}
+
+// ── Personalidade + perfil do assistente WhatsApp ───────────────────────────
+$waPersonalidade = 'parceiro';
+$waPerfilIA      = [];
+try {
+    $stmtWaPrefs = $pdo->prepare(
+        "SELECT Chave, Valor FROM ConfiguracaoSistema WHERE Chave IN ('wa_personalidade','wa_perfil_ia') AND FKUsuario = :uid"
+    );
+    $stmtWaPrefs->execute([':uid' => $usuario_id]);
+    foreach ($stmtWaPrefs->fetchAll(PDO::FETCH_KEY_PAIR) as $chave => $valor) {
+        if ($chave === 'wa_personalidade') $waPersonalidade = $valor ?: 'parceiro';
+        if ($chave === 'wa_perfil_ia' && $valor) $waPerfilIA = json_decode($valor, true) ?: [];
     }
 } catch (PDOException $e) {}
 
@@ -798,6 +846,119 @@ require_once 'geral/header.php';
             </div>
         </div>
 
+        <!-- ASSISTENTE WHATSAPP -->
+        <?php if (!empty($dadosUsuario['Telefone'])): ?>
+        <div class="col-12 mt-2">
+            <div class="card border-secondary-subtle shadow-sm rounded-4" style="background:var(--bg-card);">
+                <div class="card-header border-bottom border-secondary-subtle bg-transparent p-4">
+                    <h5 class="fw-bold text-light mb-0">
+                        <i class="bi bi-whatsapp me-2" style="color:#25d366;"></i> Assistente WhatsApp
+                    </h5>
+                </div>
+                <div class="card-body p-4">
+                    <p class="text-secondary small mb-4">Escolha como o assistente se comunica com você pelo WhatsApp.</p>
+                    <form method="POST" id="formPrefWa">
+                        <input type="hidden" name="action" value="salvar_pref_wa">
+                        <div class="row g-3 mb-4">
+                            <div class="col-sm-6">
+                                <label class="d-block cursor-pointer" style="cursor:pointer;">
+                                    <input type="radio" name="wa_personalidade" value="parceiro"
+                                           class="d-none wa-pers-radio"
+                                           <?= $waPersonalidade === 'parceiro' ? 'checked' : '' ?>>
+                                    <div class="rounded-4 p-4 h-100 wa-pers-option <?= $waPersonalidade === 'parceiro' ? 'wa-pers-active' : '' ?>"
+                                         style="border:2px solid <?= $waPersonalidade === 'parceiro' ? 'var(--accent)' : 'rgba(255,255,255,.12)' ?>;background:<?= $waPersonalidade === 'parceiro' ? 'rgba(212,175,55,.06)' : 'rgba(255,255,255,.03)' ?>;transition:.2s;">
+                                        <div class="d-flex align-items-center gap-3 mb-2">
+                                            <span style="font-size:1.5rem;">🤝</span>
+                                            <div class="fw-semibold text-light">Parceiro</div>
+                                        </div>
+                                        <div class="text-secondary small">Casual e descontraído. Responde como um amigo que entende de finanças — usa expressões naturais e emojis com moderação.</div>
+                                        <div class="mt-3 p-3 rounded-3" style="background:rgba(0,0,0,.25);font-size:.78rem;color:#adb5bd;font-style:italic;">
+                                            "Opa! Anotado 👍<br>📉 <b>Uber</b>: R$ 23,50 · hoje"
+                                        </div>
+                                    </div>
+                                </label>
+                            </div>
+                            <div class="col-sm-6">
+                                <label class="d-block" style="cursor:pointer;">
+                                    <input type="radio" name="wa_personalidade" value="profissional"
+                                           class="d-none wa-pers-radio"
+                                           <?= $waPersonalidade === 'profissional' ? 'checked' : '' ?>>
+                                    <div class="rounded-4 p-4 h-100 wa-pers-option <?= $waPersonalidade === 'profissional' ? 'wa-pers-active' : '' ?>"
+                                         style="border:2px solid <?= $waPersonalidade === 'profissional' ? 'var(--accent)' : 'rgba(255,255,255,.12)' ?>;background:<?= $waPersonalidade === 'profissional' ? 'rgba(212,175,55,.06)' : 'rgba(255,255,255,.03)' ?>;transition:.2s;">
+                                        <div class="d-flex align-items-center gap-3 mb-2">
+                                            <span style="font-size:1.5rem;">💼</span>
+                                            <div class="fw-semibold text-light">Profissional</div>
+                                        </div>
+                                        <div class="text-secondary small">Direto e objetivo. Respostas concisas sem expressões informais, ideal para quem prefere comunicação formal.</div>
+                                        <div class="mt-3 p-3 rounded-3" style="background:rgba(0,0,0,.25);font-size:.78rem;color:#adb5bd;font-style:italic;">
+                                            "✅ Registrado.<br>📉 <b>Uber</b>: R$ 23,50 · 07/07/2026"
+                                        </div>
+                                    </div>
+                                </label>
+                            </div>
+                        </div>
+                        <div class="text-end">
+                            <button type="submit" class="btn btn-outline-light rounded-pill px-4 fw-semibold transition-hover">
+                                Salvar Preferência
+                            </button>
+                        </div>
+                    </form>
+
+                    <!-- O que a IA sabe sobre você -->
+                    <hr class="border-secondary-subtle opacity-50 my-4">
+                    <div class="d-flex justify-content-between align-items-start gap-3 flex-wrap mb-3">
+                        <div>
+                            <div class="fw-semibold text-light mb-1" style="font-size:.9rem;">
+                                <i class="bi bi-brain me-2" style="color:var(--accent);"></i>Memória do assistente
+                            </div>
+                            <div class="text-secondary small">O assistente aprende sobre você ao longo das conversas e usa esse conhecimento para personalizar as respostas.</div>
+                        </div>
+                        <?php if ($waPerfilIA): ?>
+                        <form method="POST" onsubmit="return confirm('Apagar a memória do assistente? Ele voltará a não saber nada sobre você.')">
+                            <input type="hidden" name="action" value="resetar_perfil_ia">
+                            <button type="submit" class="btn btn-sm btn-outline-secondary rounded-pill px-3" style="font-size:.8rem;">
+                                <i class="bi bi-arrow-counterclockwise me-1"></i> Resetar memória
+                            </button>
+                        </form>
+                        <?php endif; ?>
+                    </div>
+
+                    <?php if ($waPerfilIA): ?>
+                    <div class="d-flex flex-column gap-2">
+                        <?php if (!empty($waPerfilIA['apelido'])): ?>
+                        <div class="d-flex align-items-start gap-3 py-2 px-3 rounded-3" style="background:rgba(255,255,255,.04);">
+                            <span class="text-secondary small" style="min-width:80px;">Como te chama</span>
+                            <span class="text-light small fw-semibold"><?= htmlspecialchars($waPerfilIA['apelido']) ?></span>
+                        </div>
+                        <?php endif; ?>
+                        <?php if (!empty($waPerfilIA['tom'])): ?>
+                        <div class="d-flex align-items-start gap-3 py-2 px-3 rounded-3" style="background:rgba(255,255,255,.04);">
+                            <span class="text-secondary small" style="min-width:80px;">Tom</span>
+                            <span class="text-light small"><?= htmlspecialchars($waPerfilIA['tom']) ?></span>
+                        </div>
+                        <?php endif; ?>
+                        <?php if (!empty($waPerfilIA['notas'])): ?>
+                        <div class="d-flex align-items-start gap-3 py-2 px-3 rounded-3" style="background:rgba(255,255,255,.04);">
+                            <span class="text-secondary small" style="min-width:80px;">Notas</span>
+                            <ul class="mb-0 ps-3" style="font-size:.82rem;color:#cdd2d8;">
+                                <?php foreach ((array)$waPerfilIA['notas'] as $nota): ?>
+                                <li><?= htmlspecialchars($nota) ?></li>
+                                <?php endforeach; ?>
+                            </ul>
+                        </div>
+                        <?php endif; ?>
+                    </div>
+                    <?php else: ?>
+                    <p class="text-secondary small mb-0" style="opacity:.7;">
+                        <i class="bi bi-info-circle me-1"></i> Ainda sem memória. Converse com o assistente pelo WhatsApp — ele vai aprendendo sobre você automaticamente.
+                    </p>
+                    <?php endif; ?>
+
+                </div>
+            </div>
+        </div>
+        <?php endif; ?>
+
         <!-- ZONA DE RISCO -->
         <div class="col-12 mt-2">
             <div class="card border-danger border-opacity-25 bg-transparent shadow-sm rounded-4">
@@ -831,6 +992,19 @@ function _maskTel(v) {
 }
 document.addEventListener('DOMContentLoaded', function() {
     document.querySelectorAll('[data-bs-toggle="tooltip"]').forEach(function(el) { new bootstrap.Tooltip(el); });
+
+    // Personalidade WA: highlight ao selecionar
+    document.querySelectorAll('.wa-pers-radio').forEach(function(radio) {
+        radio.addEventListener('change', function() {
+            document.querySelectorAll('.wa-pers-option').forEach(function(opt) {
+                opt.style.borderColor = 'rgba(255,255,255,.12)';
+                opt.style.background  = 'rgba(255,255,255,.03)';
+            });
+            var opt = this.closest('label').querySelector('.wa-pers-option');
+            opt.style.borderColor = 'var(--accent)';
+            opt.style.background  = 'rgba(212,175,55,.06)';
+        });
+    });
 });
 </script>
 
