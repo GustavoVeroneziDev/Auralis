@@ -137,6 +137,31 @@ $cartsList = json_encode(array_map(fn($c) => ['id' => $c['IDCarteira'], 'nome' =
 $catDesp   = json_encode(array_values(array_map(fn($c) => ['id' => $c['IDCategoria'], 'nome' => $c['NomeCategoria']], array_filter($categorias, fn($c) => $c['TipoCategoria'] === 'despesa'))), JSON_UNESCAPED_UNICODE);
 $catRec    = json_encode(array_values(array_map(fn($c) => ['id' => $c['IDCategoria'], 'nome' => $c['NomeCategoria']], array_filter($categorias, fn($c) => $c['TipoCategoria'] === 'receita'))), JSON_UNESCAPED_UNICODE);
 
+// Snapshot financeiro do mês (para a IA poder opinar em conversas)
+$snapCtx = '';
+try {
+    $stmtSnap = $pdo->prepare("
+        SELECT
+            SUM(CASE WHEN TipoRegistro='receita' AND StatusRegistro='efetivado' THEN Valor ELSE 0 END) AS RecEfet,
+            SUM(CASE WHEN TipoRegistro='despesa' AND StatusRegistro='efetivado' THEN Valor ELSE 0 END) AS DespEfet,
+            SUM(CASE WHEN StatusRegistro='pendente' THEN Valor ELSE 0 END) AS Pendente,
+            COUNT(CASE WHEN StatusRegistro='pendente' THEN 1 END) AS QtdPend
+        FROM Registro
+        WHERE FKUsuario = :uid
+          AND COALESCE(DataVencimento, DATE(MomentoRegistro)) BETWEEN :ini AND :fim
+    ");
+    $stmtSnap->execute([':uid' => $uid, ':ini' => date('Y-m-01'), ':fim' => date('Y-m-t')]);
+    $snap = $stmtSnap->fetch(PDO::FETCH_ASSOC);
+    if ($snap) {
+        $saldoMes = (float)$snap['RecEfet'] - (float)$snap['DespEfet'];
+        $snapCtx  = "\nFinanças de {$nomeUser} no mês atual:" .
+            " receitas efetivadas=R$" . number_format((float)$snap['RecEfet'],  2, ',', '.') .
+            ", despesas efetivadas=R$" . number_format((float)$snap['DespEfet'], 2, ',', '.') .
+            ", saldo=R$" . number_format($saldoMes, 2, ',', '.') .
+            ", a pagar=" . (int)$snap['QtdPend'] . " item(s) totalizando R$" . number_format((float)$snap['Pendente'], 2, ',', '.') . ".";
+    }
+} catch (Throwable $e) {}
+
 $tomVoz = $personalidade === 'profissional'
     ? "Seja conciso e profissional. Respostas diretas, sem expressões informais ou emojis desnecessários."
     : "Seja natural e descontraído como um amigo que entende de dinheiro. Use linguagem casual, seja empático. Expressões como 'opa!', 'certinho!', 'anotado!' ficam ótimas. Emojis com moderação.";
@@ -157,11 +182,11 @@ Contexto atual:
 - Hoje: {$hoje}
 - Carteiras de {$nomeUser}: {$cartsList}
 - Categorias de despesa: {$catDesp}
-- Categorias de receita: {$catRec}
+- Categorias de receita: {$catRec}{$snapCtx}
 
-Você precisa identificar a intenção e responder SEMPRE com JSON válido (sem markdown):
+Responda SEMPRE com JSON válido (sem markdown). Escolha a action correta:
 
-ACTION "registrar" — quando há 1 ou mais transações financeiras:
+ACTION "registrar" — quando há 1 ou mais transações financeiras para lançar:
 {"action":"registrar","registros":[{"tipo":"despesa","valor":0.00,"descricao":"max 60 chars","data":"YYYY-MM-DD","id_carteira":"uuid","id_categoria":"uuid|null","nome_carteira":"nome","nome_categoria":"nome|null","parcelas":1}]}
 Regras: use primeira carteira se não mencionada; data relativa → YYYY-MM-DD exato; "parcelas">1 para parcelamentos; comprovante enviado=despesa, recebido=receita; múltiplas transações=múltiplos objetos em registros.
 
@@ -171,7 +196,10 @@ ACTION "consultar" — quando pergunta sobre gastos, saldo, pendências, histór
 ACTION "cancelar" — quando pede pra desfazer/cancelar o último lançamento:
 {"action":"cancelar"}
 
-ACTION "ajuda" — saudação, agradecimento, ou quando não entender:
+ACTION "conversar" — para TUDO que não for registrar/consultar/cancelar: opiniões, conselhos, perguntas abertas, dúvidas financeiras, saudações, bate-papo, "o que você acha de...", "encaixa no meu orçamento?", agradecimentos, etc. Use os dados financeiros disponíveis para dar respostas relevantes e personalizadas. Seja genuinamente útil, não apenas repita o menu de ajuda:
+{"action":"conversar","resposta":"texto livre adaptado à mensagem — pode ser uma opinião, conselho, resposta direta, etc."}
+
+ACTION "ajuda" — SOMENTE quando o usuário pede EXPLICITAMENTE a lista de comandos/funcionalidades (ex: "o que você faz?", "quais os comandos?", "como funciona?"):
 {"action":"ajuda"}
 
 CAMPO OPCIONAL "_perfil_atualizado" — inclua APENAS quando o usuário revelar algo relevante sobre si:
@@ -206,13 +234,15 @@ if (!empty($resultado['_api_error'])) {
 
 // ── 8. Executa action e captura resposta ──────────────────────────────────────
 
-$action = $resultado['action'] ?? 'ajuda';
+$action = $resultado['action'] ?? 'conversar';
 
 $resposta = match($action) {
     'registrar' => _waRegistrar($pdo, $uid, $resultado['registros'] ?? [], $carteiras, $hoje),
     'consultar' => _waConsultar($pdo, $uid, $resultado['consulta'] ?? [], $hoje),
     'cancelar'  => _waCancelar($pdo, $uid),
-    default     => _waAjuda($personalidade),
+    'ajuda'     => _waAjuda($personalidade),
+    'conversar' => !empty($resultado['resposta']) ? (string)$resultado['resposta'] : "Pode elaborar um pouco mais? 😅",
+    default     => !empty($resultado['resposta']) ? (string)$resultado['resposta'] : _waAjuda($personalidade),
 };
 
 _waReply($telefone, $resposta);
