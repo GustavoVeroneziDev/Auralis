@@ -91,8 +91,8 @@ if (!$texto && !$imagemBase64) exit;
 
 try {
     $stmtC = $pdo->prepare(
-        "SELECT IDCarteira, NomeCarteira FROM Carteira
-         WHERE FKUsuarioDono = :uid ORDER BY MomentoCriacao ASC LIMIT 10"
+        "SELECT IDCarteira, TipoCarteira AS NomeCarteira FROM Carteira
+         WHERE FKUsuarioDono = :uid ORDER BY Principal DESC, TipoCarteira ASC LIMIT 10"
     );
     $stmtC->execute([':uid' => $uid]);
     $carteiras = $stmtC->fetchAll(PDO::FETCH_ASSOC);
