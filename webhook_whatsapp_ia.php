@@ -47,7 +47,21 @@ if (!$usuario) exit;
 $uid     = $usuario['IDUsuario'];
 $msgType = $data['messageType'] ?? 'conversation';
 
-// ── 3. Extrai conteúdo ────────────────────────────────────────────────────────
+// ── 3. Rate limiting — proteção contra bot/spam ───────────────────────────────
+// Máximo 15 mensagens em 2 minutos (humano normal: 1-3/min). Drop silencioso.
+
+_waGarantirTabela($pdo);
+
+try {
+    $stmtRate = $pdo->prepare(
+        "SELECT COUNT(*) FROM MensagemWA
+         WHERE FKUsuario = :uid AND Role = 'user' AND CriadoEm > DATE_SUB(NOW(), INTERVAL 2 MINUTE)"
+    );
+    $stmtRate->execute([':uid' => $uid]);
+    if ((int)$stmtRate->fetchColumn() >= 15) exit;
+} catch (Throwable $e) {}
+
+// ── 4. Extrai conteúdo ────────────────────────────────────────────────────────
 
 $texto        = '';
 $imagemBase64 = null;
@@ -71,7 +85,7 @@ switch ($msgType) {
 
 if (!$texto && !$imagemBase64) exit;
 
-// ── 4. Contexto do usuário ────────────────────────────────────────────────────
+// ── 5. Contexto do usuário ────────────────────────────────────────────────────
 
 try {
     $stmtC = $pdo->prepare(
@@ -94,34 +108,44 @@ if (!$carteiras) {
     exit;
 }
 
-// ── 5. Personalidade, histórico e perfil permanente ──────────────────────────
-
-_waGarantirTabela($pdo);
-
-// Lê personalidade salva (padrão: parceiro)
+// Cofrinhos ativos
+$cofrinhos = [];
 try {
-    $stmtPers = $pdo->prepare(
-        "SELECT Valor FROM ConfiguracaoSistema WHERE Chave = 'wa_personalidade' AND FKUsuario = :uid LIMIT 1"
-    );
-    $stmtPers->execute([':uid' => $uid]);
-    $personalidade = $stmtPers->fetchColumn() ?: 'parceiro';
-} catch (Throwable $e) { $personalidade = 'parceiro'; }
-
-// Lê perfil permanente que a IA gerencia (apelido, observações, etc.)
-$perfilIA = [];
-try {
-    $stmtPerfil = $pdo->prepare(
-        "SELECT Valor FROM ConfiguracaoSistema WHERE Chave = 'wa_perfil_ia' AND FKUsuario = :uid LIMIT 1"
-    );
-    $stmtPerfil->execute([':uid' => $uid]);
-    $perfilRaw = $stmtPerfil->fetchColumn();
-    if ($perfilRaw) $perfilIA = json_decode($perfilRaw, true) ?: [];
+    $stmtCof = $pdo->prepare("
+        SELECT c.IDCofrinho, c.Nome, c.ValorMeta,
+               COALESCE(SUM(CASE WHEN r.TipoRegistro='cofrinho'          THEN r.Valor
+                                 WHEN r.TipoRegistro='cofrinho_retirada' THEN -r.Valor
+                                 ELSE 0 END), 0) AS Saldo
+        FROM Cofrinho c
+        LEFT JOIN Registro r ON r.FKCofrinho = c.IDCofrinho AND r.FKUsuario = :uid
+        WHERE c.FKUsuario = :uid2 AND c.Ativo = 1
+        GROUP BY c.IDCofrinho, c.Nome, c.ValorMeta
+        ORDER BY c.Nome ASC
+    ");
+    $stmtCof->execute([':uid' => $uid, ':uid2' => $uid]);
+    $cofrinhos = $stmtCof->fetchAll(PDO::FETCH_ASSOC);
 } catch (Throwable $e) {}
 
-// Últimas 10 mensagens (excluindo a atual)
+// ── 6. Personalidade, histórico e perfil permanente ──────────────────────────
+
+// Lê personalidade + perfil em uma query
+$personalidade = 'parceiro';
+$perfilIA      = [];
+try {
+    $stmtPrefs = $pdo->prepare(
+        "SELECT Chave, Valor FROM ConfiguracaoSistema WHERE Chave IN ('wa_personalidade','wa_perfil_ia') AND FKUsuario = :uid"
+    );
+    $stmtPrefs->execute([':uid' => $uid]);
+    foreach ($stmtPrefs->fetchAll(PDO::FETCH_KEY_PAIR) as $k => $v) {
+        if ($k === 'wa_personalidade' && $v) $personalidade = $v;
+        if ($k === 'wa_perfil_ia'     && $v) $perfilIA = json_decode($v, true) ?: [];
+    }
+} catch (Throwable $e) {}
+
+// Histórico de conversa (últimas 10 mensagens)
 $historico = _waLoadHistory($pdo, $uid, 10);
 
-// Cleanup probabilístico (~5% das requests) — sem cron
+// Cleanup probabilístico (~5%) — sem cron
 if (mt_rand(1, 20) === 1) {
     try {
         $pdo->prepare("DELETE FROM MensagemWA WHERE FKUsuario = :uid AND CriadoEm < DATE_SUB(NOW(), INTERVAL 30 DAY)")
@@ -129,15 +153,28 @@ if (mt_rand(1, 20) === 1) {
     } catch (Throwable $e) {}
 }
 
-// ── 6. Monta system prompt ────────────────────────────────────────────────────
+// ── 7. Monta system prompt ────────────────────────────────────────────────────
 
 $hoje      = date('Y-m-d');
 $nomeUser  = explode(' ', $usuario['Nome'])[0];
 $cartsList = json_encode(array_map(fn($c) => ['id' => $c['IDCarteira'], 'nome' => $c['NomeCarteira']], $carteiras), JSON_UNESCAPED_UNICODE);
 $catDesp   = json_encode(array_values(array_map(fn($c) => ['id' => $c['IDCategoria'], 'nome' => $c['NomeCategoria']], array_filter($categorias, fn($c) => $c['TipoCategoria'] === 'despesa'))), JSON_UNESCAPED_UNICODE);
 $catRec    = json_encode(array_values(array_map(fn($c) => ['id' => $c['IDCategoria'], 'nome' => $c['NomeCategoria']], array_filter($categorias, fn($c) => $c['TipoCategoria'] === 'receita'))), JSON_UNESCAPED_UNICODE);
+$cofList   = $cofrinhos ? json_encode(array_map(fn($c) => ['id' => $c['IDCofrinho'], 'nome' => $c['Nome'], 'meta' => (float)$c['ValorMeta'], 'saldo' => (float)$c['Saldo']], $cofrinhos), JSON_UNESCAPED_UNICODE) : '[]';
 
-// Snapshot financeiro do mês (para a IA poder opinar em conversas)
+$tomVoz = $personalidade === 'profissional'
+    ? "Seja conciso e profissional. Respostas diretas, sem expressões informais ou emojis desnecessários."
+    : "Seja natural e descontraído como um amigo que entende de dinheiro. Use linguagem casual, seja empático. Expressões como 'opa!', 'certinho!', 'anotado!' ficam ótimas. Emojis com moderação.";
+
+$imgCtx = $imagemBase64 ? "O usuário também enviou uma imagem — pode ser comprovante ou nota fiscal, leia os dados financeiros dela." : "";
+
+$perfilCtx = '';
+if ($perfilIA) {
+    $perfilJson = json_encode($perfilIA, JSON_UNESCAPED_UNICODE);
+    $perfilCtx  = "\nPerfil que você aprendeu sobre {$nomeUser}: {$perfilJson}";
+}
+
+// Snapshot financeiro do mês
 $snapCtx = '';
 try {
     $stmtSnap = $pdo->prepare("
@@ -154,66 +191,68 @@ try {
     $snap = $stmtSnap->fetch(PDO::FETCH_ASSOC);
     if ($snap) {
         $saldoMes = (float)$snap['RecEfet'] - (float)$snap['DespEfet'];
-        $snapCtx  = "\nFinanças de {$nomeUser} no mês atual:" .
-            " receitas efetivadas=R$" . number_format((float)$snap['RecEfet'],  2, ',', '.') .
-            ", despesas efetivadas=R$" . number_format((float)$snap['DespEfet'], 2, ',', '.') .
+        $snapCtx  = "\nFinanças do mês atual:" .
+            " receitas=R$" . number_format((float)$snap['RecEfet'],  2, ',', '.') .
+            ", despesas=R$" . number_format((float)$snap['DespEfet'], 2, ',', '.') .
             ", saldo=R$" . number_format($saldoMes, 2, ',', '.') .
-            ", a pagar=" . (int)$snap['QtdPend'] . " item(s) totalizando R$" . number_format((float)$snap['Pendente'], 2, ',', '.') . ".";
+            ", pendentes=" . (int)$snap['QtdPend'] . " (R$" . number_format((float)$snap['Pendente'], 2, ',', '.') . ").";
     }
 } catch (Throwable $e) {}
-
-$tomVoz = $personalidade === 'profissional'
-    ? "Seja conciso e profissional. Respostas diretas, sem expressões informais ou emojis desnecessários."
-    : "Seja natural e descontraído como um amigo que entende de dinheiro. Use linguagem casual, seja empático. Expressões como 'opa!', 'certinho!', 'anotado!' ficam ótimas. Emojis com moderação.";
-
-$imgCtx = $imagemBase64 ? "O usuário também enviou uma imagem — pode ser comprovante ou nota fiscal, leia os dados financeiros dela." : "";
-
-// Perfil permanente no prompt
-$perfilCtx = '';
-if ($perfilIA) {
-    $perfilJson = json_encode($perfilIA, JSON_UNESCAPED_UNICODE);
-    $perfilCtx  = "\nPerfil que você aprendeu sobre {$nomeUser}: {$perfilJson}\nUse essas informações para personalizar cada resposta (apelido, tom, contexto financeiro).";
-}
 
 $systemPrompt = <<<EOT
 Você é o Auralis, assistente financeiro pessoal de {$nomeUser}. {$tomVoz} {$imgCtx}{$perfilCtx}
 
 Contexto atual:
 - Hoje: {$hoje}
-- Carteiras de {$nomeUser}: {$cartsList}
+- Carteiras: {$cartsList}
+- Cofrinhos: {$cofList}
 - Categorias de despesa: {$catDesp}
 - Categorias de receita: {$catRec}{$snapCtx}
 
-Responda SEMPRE com JSON válido (sem markdown). Escolha a action correta:
+Responda SEMPRE com JSON válido (sem markdown). Se a mensagem contiver MAIS DE UMA intenção distinta, use "acoes" (array). Caso contrário, use "action" (objeto único).
 
-ACTION "registrar" — quando há 1 ou mais transações financeiras para lançar:
+MÚLTIPLAS AÇÕES — use quando houver 2+ intenções distintas na mesma mensagem:
+{"acoes":[{acao1},{acao2},...]}
+Cada objeto em "acoes" segue o mesmo formato de sua action individual.
+
+ACTIONS individuais disponíveis:
+
+"registrar" — lançar 1 ou mais transações financeiras:
 {"action":"registrar","registros":[{"tipo":"despesa","valor":0.00,"descricao":"max 60 chars","data":"YYYY-MM-DD","id_carteira":"uuid","id_categoria":"uuid|null","nome_carteira":"nome","nome_categoria":"nome|null","parcelas":1}]}
-Regras: use primeira carteira se não mencionada; data relativa → YYYY-MM-DD exato; "parcelas">1 para parcelamentos; comprovante enviado=despesa, recebido=receita; múltiplas transações=múltiplos objetos em registros.
+Regras: use primeira carteira se não mencionada; data relativa → YYYY-MM-DD exato; parcelas>1 para parcelamentos; comprovante enviado=despesa, recebido=receita.
 
-ACTION "consultar" — quando pergunta sobre gastos, saldo, pendências, histórico:
+"efetivar" — marcar registro(s) pendente(s) como pago/recebido:
+{"action":"efetivar","descricoes":["texto parcial do registro"]}
+Exemplo: "paguei o Spotify" → {"action":"efetivar","descricoes":["Spotify"]}
+Pode efetivar múltiplos de uma vez: {"action":"efetivar","descricoes":["Vivo","Nubank"]}
+
+"cofrinho_depositar" — aportar valor em um cofrinho existente:
+{"action":"cofrinho_depositar","nome_cofrinho":"nome exato ou parcial","valor":0.00}
+
+"cofrinho_criar" — criar um novo cofrinho:
+{"action":"cofrinho_criar","nome":"nome do cofrinho","meta":0.00}
+meta=0 se não informada.
+
+"consultar" — consultar gastos, saldo, pendências, histórico:
 {"action":"consultar","consulta":{"tipo":"gastos|pendentes|saldo|ultimo","periodo":"hoje|semana|mes|ano","tipo_registro":"despesa|receita|null"}}
 
-ACTION "cancelar" — quando pede pra desfazer/cancelar o último lançamento:
+"cancelar" — desfazer/cancelar o último lançamento:
 {"action":"cancelar"}
 
-ACTION "conversar" — para TUDO que não for registrar/consultar/cancelar: opiniões, conselhos, perguntas abertas, dúvidas financeiras, saudações, bate-papo, "o que você acha de...", "encaixa no meu orçamento?", agradecimentos, etc. Use os dados financeiros disponíveis para dar respostas relevantes e personalizadas. Seja genuinamente útil, não apenas repita o menu de ajuda:
-{"action":"conversar","resposta":"texto livre adaptado à mensagem — pode ser uma opinião, conselho, resposta direta, etc."}
+"conversar" — para tudo que não é uma das ações acima: opiniões, conselhos, perguntas abertas, saudações, agradecimentos, bate-papo financeiro:
+{"action":"conversar","resposta":"texto livre adaptado à mensagem, use os dados financeiros quando relevante"}
 
-ACTION "ajuda" — SOMENTE quando o usuário pede EXPLICITAMENTE a lista de comandos/funcionalidades (ex: "o que você faz?", "quais os comandos?", "como funciona?"):
+"ajuda" — SOMENTE quando o usuário pede explicitamente a lista de comandos:
 {"action":"ajuda"}
 
-CAMPO OPCIONAL "_perfil_atualizado" — inclua APENAS quando o usuário revelar algo relevante sobre si:
-- Como quer ser chamado (apelido, forma de tratamento)
-- Preferências de comunicação aprendidas pela conversa
-- Contexto financeiro recorrente útil (ex: "recebe salário dia 5", "Nubank = carteira principal")
-Formato: {"apelido":"nome ou expressão preferida","tom":"descrição do estilo","notas":["observação 1","observação 2"]}
-Exemplo: se o usuário disser "me chama de Guga", inclua: "_perfil_atualizado":{"apelido":"Guga","tom":"informal","notas":[]}
-Se não aprendeu nada novo, OMITA completamente o campo _perfil_atualizado.
+CAMPO OPCIONAL "_perfil_atualizado" — inclua APENAS quando aprender algo novo: apelido, forma de tratamento, contexto financeiro recorrente:
+{"apelido":"...","tom":"...","notas":["..."]}
+Se nada novo, OMITA completamente.
 
-O histórico da conversa mostra trocas anteriores em linguagem natural — use para entender contexto, mas sua resposta deve sempre ser JSON.
+Histórico de conversa mostra trocas anteriores — use para contexto, mas resposta deve sempre ser JSON.
 EOT;
 
-// ── 7. Chama Gemini com histórico ─────────────────────────────────────────────
+// ── 8. Chama Gemini com histórico ─────────────────────────────────────────────
 
 $resultado = _waGemini($systemPrompt, $historico, $texto, $imagemBase64, $imagemMime);
 
@@ -232,18 +271,21 @@ if (!empty($resultado['_api_error'])) {
     exit;
 }
 
-// ── 8. Executa action e captura resposta ──────────────────────────────────────
+// ── 9. Despacha actions (simples ou múltiplas) ────────────────────────────────
 
-$action = $resultado['action'] ?? 'conversar';
+// Normaliza para sempre trabalhar com array de ações
+if (!empty($resultado['acoes']) && is_array($resultado['acoes'])) {
+    $acoes = $resultado['acoes'];
+} else {
+    $acoes = [$resultado];
+}
 
-$resposta = match($action) {
-    'registrar' => _waRegistrar($pdo, $uid, $resultado['registros'] ?? [], $carteiras, $hoje),
-    'consultar' => _waConsultar($pdo, $uid, $resultado['consulta'] ?? [], $hoje),
-    'cancelar'  => _waCancelar($pdo, $uid),
-    'ajuda'     => _waAjuda($personalidade),
-    'conversar' => !empty($resultado['resposta']) ? (string)$resultado['resposta'] : "Pode elaborar um pouco mais? 😅",
-    default     => !empty($resultado['resposta']) ? (string)$resultado['resposta'] : _waAjuda($personalidade),
-};
+$respostas = [];
+foreach ($acoes as $acao) {
+    $respostas[] = _waDespachar($pdo, $uid, $acao, $carteiras, $cofrinhos, $hoje, $personalidade);
+}
+
+$resposta = implode("\n\n", $respostas);
 
 _waReply($telefone, $resposta);
 _waSaveHistory($pdo, $uid, $texto, $resposta);
@@ -254,6 +296,24 @@ if (!empty($resultado['_perfil_atualizado']) && is_array($resultado['_perfil_atu
 }
 
 exit;
+
+// ── Despachante central ───────────────────────────────────────────────────────
+
+function _waDespachar(PDO $pdo, string $uid, array $acao, array $carteiras, array $cofrinhos, string $hoje, string $personalidade): string
+{
+    $action = $acao['action'] ?? 'conversar';
+    return match($action) {
+        'registrar'          => _waRegistrar($pdo, $uid, $acao['registros'] ?? [], $carteiras, $hoje),
+        'efetivar'           => _waEfetivar($pdo, $uid, $acao['descricoes'] ?? []),
+        'cofrinho_depositar' => _waCofrinhoDepositar($pdo, $uid, $acao, $cofrinhos, $carteiras, $hoje),
+        'cofrinho_criar'     => _waCofinhoCriar($pdo, $uid, $acao, $carteiras, $hoje),
+        'consultar'          => _waConsultar($pdo, $uid, $acao['consulta'] ?? [], $hoje),
+        'cancelar'           => _waCancelar($pdo, $uid),
+        'ajuda'              => _waAjuda($personalidade),
+        'conversar'          => !empty($acao['resposta']) ? (string)$acao['resposta'] : "Pode elaborar um pouco mais? 😅",
+        default              => !empty($acao['resposta']) ? (string)$acao['resposta'] : "Não entendi bem. Pode repetir?",
+    };
+}
 
 // ── Handlers ──────────────────────────────────────────────────────────────────
 
@@ -312,10 +372,10 @@ function _waRegistrar(PDO $pdo, string $uid, array $registros, array $carteiras,
             } catch (Throwable $e) { $erros++; continue 2; }
         }
 
-        $icon     = $tipo === 'receita' ? '📈' : '📉';
-        $valFmt   = 'R$ ' . number_format($valor, 2, ',', '.');
-        $dataFmt  = date('d/m/Y', strtotime($dataBase));
-        $catNome  = !empty($r['nome_categoria']) ? " · " . $r['nome_categoria'] : '';
+        $icon    = $tipo === 'receita' ? '📈' : '📉';
+        $valFmt  = 'R$ ' . number_format($valor, 2, ',', '.');
+        $dataFmt = date('d/m/Y', strtotime($dataBase));
+        $catNome = !empty($r['nome_categoria']) ? " · " . $r['nome_categoria'] : '';
         $cartNome = $r['nome_carteira'] ?? $carteiras[0]['NomeCarteira'];
         $pendente = $dataBase > $hoje ? ' _(pendente)_' : '';
 
@@ -334,6 +394,155 @@ function _waRegistrar(PDO $pdo, string $uid, array $registros, array $carteiras,
     $erroTxt = $erros ? "\n\n⚠️ {$erros} item(ns) não salvo(s)." : '';
 
     return $header . "\n\n" . implode("\n", $confirmacoes) . $erroTxt . "\n\n_meuauralis.com_ 👆";
+}
+
+function _waEfetivar(PDO $pdo, string $uid, array $descricoes): string
+{
+    if (!$descricoes) return "❌ Não identifiquei qual registro efetivar.";
+
+    $efetivados = [];
+    $naoEncontrados = [];
+
+    $stmtBusca = $pdo->prepare("
+        SELECT IDRegistro, Descricao, Valor, TipoRegistro, DataVencimento
+        FROM Registro
+        WHERE FKUsuario = :uid AND StatusRegistro = 'pendente' AND Descricao LIKE :desc
+        ORDER BY DataVencimento ASC LIMIT 3
+    ");
+    $stmtUpd = $pdo->prepare("UPDATE Registro SET StatusRegistro = 'efetivado' WHERE IDRegistro = :id");
+
+    foreach ($descricoes as $desc) {
+        $desc = trim((string)$desc);
+        if (!$desc) continue;
+
+        try {
+            $stmtBusca->execute([':uid' => $uid, ':desc' => '%' . $desc . '%']);
+            $rows = $stmtBusca->fetchAll(PDO::FETCH_ASSOC);
+
+            if (!$rows) {
+                $naoEncontrados[] = $desc;
+                continue;
+            }
+
+            // Se encontrou mais de um, pega o mais próximo da data atual
+            $row = $rows[0];
+            $stmtUpd->execute([':id' => $row['IDRegistro']]);
+
+            $icon   = $row['TipoRegistro'] === 'receita' ? '📈' : '📉';
+            $val    = 'R$ ' . number_format((float)$row['Valor'], 2, ',', '.');
+            $dtFmt  = $row['DataVencimento'] ? date('d/m', strtotime($row['DataVencimento'])) : '—';
+            $efetivados[] = "{$icon} *{$row['Descricao']}*: {$val} (📅 {$dtFmt})";
+        } catch (Throwable $e) { $naoEncontrados[] = $desc; }
+    }
+
+    $msg = '';
+    if ($efetivados) {
+        $msg .= "✅ *Efetivado" . (count($efetivados) > 1 ? "s" : "") . "!*\n\n" . implode("\n", $efetivados);
+    }
+    if ($naoEncontrados) {
+        $msg .= ($msg ? "\n\n" : "") . "⚠️ Não encontrei pendente com: " . implode(', ', array_map(fn($d) => "*{$d}*", $naoEncontrados));
+    }
+
+    return $msg ?: "❌ Nenhum registro pendente encontrado.";
+}
+
+function _waCofrinhoDepositar(PDO $pdo, string $uid, array $acao, array $cofrinhos, array $carteiras, string $hoje): string
+{
+    $nomeBusca = trim($acao['nome_cofrinho'] ?? '');
+    $valor     = abs((float)($acao['valor'] ?? 0));
+
+    if (!$nomeBusca || !$valor) return "❌ Informe o nome do cofrinho e o valor.";
+
+    // Busca cofrinho por nome parcial (case insensitive)
+    $cofrinho = null;
+    foreach ($cofrinhos as $c) {
+        if (stripos($c['Nome'], $nomeBusca) !== false) {
+            $cofrinho = $c;
+            break;
+        }
+    }
+
+    if (!$cofrinho) {
+        $lista = implode(', ', array_map(fn($c) => "*{$c['Nome']}*", $cofrinhos));
+        return "❌ Cofrinho \"{$nomeBusca}\" não encontrado.\n\nSeus cofrinhos: " . ($lista ?: "nenhum ainda.");
+    }
+
+    // Busca carteira vinculada ao cofrinho
+    try {
+        $stmtCofDet = $pdo->prepare("SELECT FKCarteira FROM Cofrinho WHERE IDCofrinho = :id AND FKUsuario = :uid AND Ativo = 1");
+        $stmtCofDet->execute([':id' => $cofrinho['IDCofrinho'], ':uid' => $uid]);
+        $cofDet = $stmtCofDet->fetch(PDO::FETCH_ASSOC);
+    } catch (Throwable $e) { return "❌ Erro ao acessar o cofrinho."; }
+
+    if (!$cofDet) return "❌ Cofrinho não encontrado ou inativo.";
+
+    $idCarteira = $cofDet['FKCarteira'] ?? ($carteiras[0]['IDCarteira'] ?? null);
+
+    try {
+        $pdo->prepare("
+            INSERT INTO Registro (IDRegistro, TipoRegistro, Valor, Descricao, MomentoRegistro, DataVencimento,
+                                  StatusRegistro, Recorrente, DiaVencimento, FKCarteira, FKUsuario, FKCofrinho)
+            VALUES (:id, 'cofrinho', :val, :desc, NOW(), :hoje,
+                    'efetivado', 0, NULL, :cart, :uid, :cof)
+        ")->execute([
+            ':id'   => gerarUuid(),
+            ':val'  => $valor,
+            ':desc' => 'Aporte via WhatsApp',
+            ':hoje' => $hoje,
+            ':cart' => $idCarteira,
+            ':uid'  => $uid,
+            ':cof'  => $cofrinho['IDCofrinho'],
+        ]);
+    } catch (Throwable $e) { return "❌ Erro ao registrar aporte."; }
+
+    $valFmt      = 'R$ ' . number_format($valor, 2, ',', '.');
+    $novoSaldo   = (float)$cofrinho['Saldo'] + $valor;
+    $saldoFmt    = 'R$ ' . number_format($novoSaldo, 2, ',', '.');
+    $meta        = (float)$cofrinho['ValorMeta'];
+    $progresso   = '';
+    if ($meta > 0) {
+        $pct       = min(100, round($novoSaldo / $meta * 100));
+        $faltaFmt  = 'R$ ' . number_format(max(0, $meta - $novoSaldo), 2, ',', '.');
+        $progresso = "\n🎯 Meta: " . 'R$ ' . number_format($meta, 2, ',', '.') . " · {$pct}% atingido" . ($novoSaldo >= $meta ? " 🎉" : " (falta {$faltaFmt})");
+    }
+
+    return "🏦 *Aporte no cofrinho \"{$cofrinho['Nome']}\"!*\n\n+{$valFmt} · saldo: {$saldoFmt}{$progresso}";
+}
+
+function _waCofinhoCriar(PDO $pdo, string $uid, array $acao, array $carteiras, string $hoje): string
+{
+    $nome = mb_substr(trim($acao['nome'] ?? ''), 0, 100);
+    $meta = abs((float)($acao['meta'] ?? 0));
+
+    if (!$nome) return "❌ Informe um nome para o cofrinho.";
+
+    $cart = $carteiras[0]['IDCarteira'] ?? null;
+    if (!$cart) return "❌ Nenhuma carteira encontrada para vincular o cofrinho.";
+
+    // Garante que ENUM inclui cofrinho (auto-migrate igual ao processa_cofrinho)
+    try {
+        $enumRow = $pdo->query("SHOW COLUMNS FROM Registro LIKE 'TipoRegistro'")->fetch(PDO::FETCH_ASSOC);
+        if ($enumRow && strpos($enumRow['Type'] ?? '', 'cofrinho') === false) {
+            $pdo->exec("ALTER TABLE Registro MODIFY COLUMN TipoRegistro ENUM('receita','despesa','cofrinho','cofrinho_retirada') NOT NULL DEFAULT 'despesa'");
+        }
+    } catch (Throwable $e) {}
+
+    try {
+        $pdo->prepare("
+            INSERT INTO Cofrinho (IDCofrinho, FKUsuario, FKCarteira, Nome, Icone, Cor, ValorMeta, DataLimite)
+            VALUES (:id, :uid, :cart, :nome, '🏦', '#d4af37', :meta, NULL)
+        ")->execute([
+            ':id'   => gerarUuid(),
+            ':uid'  => $uid,
+            ':cart' => $cart,
+            ':nome' => $nome,
+            ':meta' => $meta,
+        ]);
+    } catch (Throwable $e) { return "❌ Erro ao criar cofrinho. Tente pelo app."; }
+
+    $metaTxt = $meta > 0 ? "\n🎯 Meta: R$ " . number_format($meta, 2, ',', '.') : '';
+
+    return "🏦 *Cofrinho \"{$nome}\" criado!*{$metaTxt}\n\nAgora você pode mandar \"deposita X no {$nome}\" para começar a guardar. 💰";
 }
 
 function _waConsultar(PDO $pdo, string $uid, array $consulta, string $hoje): string
@@ -486,25 +695,31 @@ function _waAjuda(string $personalidade = 'parceiro'): string
 {
     if ($personalidade === 'profissional') {
         return "Comandos disponíveis:\n\n" .
-               "• Registrar despesa: \"Paguei 50 de uber\"\n" .
-               "• Registrar receita: \"Recebi 2000 de salário\"\n" .
+               "• Registrar: \"Paguei 50 de uber\"\n" .
+               "• Efetivar pendente: \"Paguei o Spotify\"\n" .
                "• Parcelamento: \"Comprei em 12x de 150\"\n" .
                "• Múltiplos: \"Paguei 50 de uber e 30 de almoço\"\n" .
-               "• Consultar gastos: \"Quanto gastei esse mês?\"\n" .
-               "• Contas pendentes: \"Tenho conta pra pagar?\"\n" .
+               "• Cofrinho: \"Deposita 200 no cofrinho Viagem\"\n" .
+               "• Criar cofrinho: \"Cria cofrinho Carro com meta 6000\"\n" .
+               "• Consultar: \"Quanto gastei esse mês?\"\n" .
                "• Saldo: \"Qual meu saldo?\"\n" .
+               "• Pendentes: \"Tenho conta pra pagar?\"\n" .
                "• Cancelar: \"Cancela o último lançamento\"\n" .
                "• Comprovantes: envie a foto diretamente";
     }
 
-    return "Opa! 👋 Pode mandar à vontade, funciona assim:\n\n" .
+    return "Opa! 👋 Pode mandar à vontade:\n\n" .
            "📝 *Registrar:*\n" .
            "• _\"Paguei 55 no corte de cabelo\"_\n" .
            "• _\"Recebi 2000 de salário hoje\"_\n" .
-           "• _\"Uber 23,50 ontem\"_\n" .
            "• _\"Comprei celular em 12x de 150\"_\n" .
            "• _\"Paguei 50 de uber e 30 de almoço\"_\n" .
            "• _[foto de comprovante PIX]_\n\n" .
+           "✅ *Efetivar pendente:*\n" .
+           "• _\"Paguei o Spotify\"_ / _\"Recebi o salário\"_\n\n" .
+           "🏦 *Cofrinhos:*\n" .
+           "• _\"Deposita 200 no cofrinho Viagem\"_\n" .
+           "• _\"Cria cofrinho Carro com meta 6000\"_\n\n" .
            "📊 *Consultar:*\n" .
            "• _\"Quanto gastei esse mês?\"_\n" .
            "• _\"Tenho conta pra pagar essa semana?\"_\n" .
@@ -513,11 +728,10 @@ function _waAjuda(string $personalidade = 'parceiro'): string
            "• _\"Cancela o último lançamento\"_";
 }
 
-// ── Histórico de conversa ─────────────────────────────────────────────────────
+// ── Perfil permanente ─────────────────────────────────────────────────────────
 
 function _waSalvarPerfil(PDO $pdo, string $uid, array $perfil): void
 {
-    // Garante que notas seja array e limita tamanho
     if (!isset($perfil['notas']) || !is_array($perfil['notas'])) $perfil['notas'] = [];
     $perfil['notas'] = array_slice(array_filter(array_map('strval', $perfil['notas'])), 0, 20);
     if (isset($perfil['apelido']))  $perfil['apelido'] = mb_substr((string)$perfil['apelido'], 0, 60);
@@ -539,16 +753,18 @@ function _waSalvarPerfil(PDO $pdo, string $uid, array $perfil): void
     } catch (Throwable $e) {}
 }
 
+// ── Histórico de conversa ─────────────────────────────────────────────────────
+
 function _waGarantirTabela(PDO $pdo): void
 {
     try {
         $pdo->exec("
             CREATE TABLE IF NOT EXISTS MensagemWA (
-                IDMensagem  VARCHAR(36)         NOT NULL,
-                FKUsuario   VARCHAR(36)         NOT NULL,
+                IDMensagem  VARCHAR(36)          NOT NULL,
+                FKUsuario   VARCHAR(36)          NOT NULL,
                 Role        ENUM('user','model') NOT NULL DEFAULT 'user',
-                Conteudo    TEXT                NOT NULL,
-                CriadoEm   TIMESTAMP           NOT NULL DEFAULT CURRENT_TIMESTAMP,
+                Conteudo    TEXT                 NOT NULL,
+                CriadoEm   TIMESTAMP            NOT NULL DEFAULT CURRENT_TIMESTAMP,
                 PRIMARY KEY (IDMensagem),
                 KEY idx_usuario_data (FKUsuario, CriadoEm)
             ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
@@ -567,7 +783,6 @@ function _waLoadHistory(PDO $pdo, string $uid, int $limit = 10): array
         $stmt->bindValue(':uid', $uid);
         $stmt->bindValue(':lim', $limit, PDO::PARAM_INT);
         $stmt->execute();
-        // Inverte para ordem cronológica
         return array_reverse($stmt->fetchAll(PDO::FETCH_ASSOC));
     } catch (Throwable $e) { return []; }
 }
@@ -596,16 +811,11 @@ function _waGemini(string $sysPrompt, array $historico, string $textoAtual, ?str
 {
     if (!defined('GEMINI_API_KEY')) return null;
 
-    // Monta contents com histórico
     $contents = [];
     foreach ($historico as $msg) {
-        $contents[] = [
-            'role'  => $msg['Role'],
-            'parts' => [['text' => $msg['Conteudo']]],
-        ];
+        $contents[] = ['role' => $msg['Role'], 'parts' => [['text' => $msg['Conteudo']]]];
     }
 
-    // Mensagem atual (com imagem se houver)
     $partsAtual = [['text' => $textoAtual]];
     if ($base64) {
         $partsAtual[] = ['inline_data' => ['mime_type' => $mime, 'data' => $base64]];
