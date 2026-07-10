@@ -109,11 +109,15 @@ foreach ($grupos as $grupo) {
 
     $ok = enviarWhatsAppNotificacao($telefone, $mensagem);
 
-    foreach ($grupo as $c) {
-        $marcar->execute([':id' => $c['IDRegistro']]);
+    // Só marca como notificado quando o envio realmente deu certo — se falhar (Evolution API
+    // fora do ar, instância desconectada etc.), tenta de novo no cron do dia seguinte em vez
+    // de marcar como enviado e perder o aviso silenciosamente pra sempre.
+    if ($ok) {
+        foreach ($grupo as $c) {
+            $marcar->execute([':id' => $c['IDRegistro']]);
+        }
+        $enviados++;
     }
-
-    if ($ok) $enviados++;
 }
 
 $total = count($contas);

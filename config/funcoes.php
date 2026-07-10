@@ -1968,6 +1968,16 @@ if (!function_exists('enviarWhatsAppNotificacao')) {
             'ignore_errors' => true,
         ]]);
         $result = @file_get_contents($url, false, $ctx);
-        return $result !== false;
+        if ($result === false) return false;
+
+        // ignore_errors faz file_get_contents "não falhar" mesmo em erro HTTP (401, 400,
+        // instância desconectada etc.) — sem checar o status de verdade, uma falha do
+        // Evolution API sempre retornava true, e a mensagem era dada como enviada mesmo
+        // sem ter saído.
+        $status = 0;
+        if (isset($http_response_header[0]) && preg_match('/\s(\d{3})\s/', $http_response_header[0], $m)) {
+            $status = (int)$m[1];
+        }
+        return $status >= 200 && $status < 300;
     }
 }
