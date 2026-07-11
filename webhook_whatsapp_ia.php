@@ -967,7 +967,6 @@ function _waEscalarSuporte(PDO $pdo, string $uid, array $acao, array $usuario, s
     // Evita bombardear o dono se a pessoa insistir várias vezes seguidas na mesma
     // conversa — só reenvia o alerta se já fez 15+ minutos desde o último dessa pessoa.
     $podeEnviar = true;
-    $ultimo = null;
     try {
         $stmtChk = $pdo->prepare("SELECT Valor FROM ConfiguracaoSistema WHERE Chave = 'wa_ultimo_suporte' AND FKUsuario = :uid");
         $stmtChk->execute([':uid' => $uid]);
@@ -975,25 +974,30 @@ function _waEscalarSuporte(PDO $pdo, string $uid, array $acao, array $usuario, s
         if ($ultimo && strtotime($ultimo) > strtotime('-15 minutes')) $podeEnviar = false;
     } catch (Throwable $e) {}
 
-    // DEBUG TEMPORÁRIO — some depois de confirmar a causa
-    $diag = " [diag: podeEnviar=" . ($podeEnviar ? '1' : '0') . " ultimo=" . ($ultimo ?: 'null') . "]";
+    if (!$podeEnviar) {
+        // Já tem um alerta recente pra essa pessoa — não é erro, é o cooldown funcionando
+        // de propósito. Mas responder igual "já chamei" de novo confunde quem tá do outro
+        // lado achando que nada aconteceu; deixa claro que já está encaminhado.
+        return "Relaxa, já avisei o suporte sobre isso agora há pouco — não precisa repetir, assim que alguém puder já te chama por aqui. 🙏";
+    }
 
-    if ($podeEnviar) {
+    $msgDono = "🆘 *Alerta de suporte — Auralis*\n\n" .
+               "Cliente: *{$usuario['Nome']}*\n" .
+               "WhatsApp: {$telefoneCliente}\n\n" .
+               "Situação: {$motivo}";
+    // Isolado num try/catch próprio: mesmo se o envio pro dono falhar por algum motivo,
+    // o cliente ainda tem que receber a resposta tranquilizando ele — isso não pode
+    // derrubar a função inteira.
+    $okEnvio = false;
+    try {
+        $okEnvio = enviarWhatsAppNotificacao(WA_SUPORTE_TELEFONE, $msgDono);
+    } catch (Throwable $e) {}
+
+    // Só grava o cooldown se o envio realmente saiu — se falhou, mais vale deixar a
+    // próxima tentativa (dessa mesma pessoa ou outra) tentar de novo do que travar 15min
+    // à toa achando que já foi avisado quando na verdade não chegou em lugar nenhum.
+    if ($okEnvio) {
         $agora = date('Y-m-d H:i:s');
-        $msgDono = "🆘 *Alerta de suporte — Auralis*\n\n" .
-                   "Cliente: *{$usuario['Nome']}*\n" .
-                   "WhatsApp: {$telefoneCliente}\n\n" .
-                   "Situação: {$motivo}";
-        // Isolado num try/catch próprio: mesmo se o envio pro dono falhar por algum motivo,
-        // o cliente ainda tem que receber a resposta tranquilizando ele — isso não pode
-        // derrubar a função inteira.
-        try {
-            $okEnvio = enviarWhatsAppNotificacao(WA_SUPORTE_TELEFONE, $msgDono);
-            $diag .= " envio=" . ($okEnvio ? 'ok' : 'falhou'); // DEBUG TEMPORÁRIO
-        } catch (Throwable $e) {
-            $diag .= " envio=excecao:" . $e->getMessage(); // DEBUG TEMPORÁRIO
-        }
-
         // Mesmo padrão check-then-insert-or-update do resto do arquivo (_waSalvarPerfil) —
         // ConfiguracaoSistema não tem UNIQUE KEY em (Chave, FKUsuario), então ON DUPLICATE
         // KEY simplesmente não dispara e ficaria inserindo linha nova toda vez.
@@ -1010,7 +1014,7 @@ function _waEscalarSuporte(PDO $pdo, string $uid, array $acao, array $usuario, s
         } catch (Throwable $e) {}
     }
 
-    return $respostaCliente . $diag; // DEBUG TEMPORÁRIO — tira o ". $diag" depois
+    return $respostaCliente;
 }
 
 function _waAjuda(string $personalidade = 'parceiro'): string
