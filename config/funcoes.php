@@ -312,6 +312,39 @@ if (!function_exists('obterHorasRestantesTeste')) {
     }
 }
 
+if (!function_exists('planoEfetivoUsuario')) {
+    // Igual a obterPlanoEfetivo(), mas sem depender de sessão — recebe o uid
+    // diretamente. Usado em contextos sem login (ex: webhook do WhatsApp),
+    // onde não existe $_SESSION do usuário que está mandando mensagem.
+    function planoEfetivoUsuario(PDO $pdo, string $uid): string
+    {
+        try {
+            $stmt = $pdo->prepare("SELECT Plano, MomentoCriacao FROM Usuario WHERE IDUsuario = ?");
+            $stmt->execute([$uid]);
+            $user = $stmt->fetch(PDO::FETCH_ASSOC);
+        } catch (PDOException $e) {
+            return 'free';
+        }
+        if (!$user) return 'free';
+
+        $plano = $user['Plano'] ?: 'free';
+        if ($plano !== 'free') return $plano;
+
+        $horasTrial = limitesDoPlano('free')['horas_teste'] ?? 50;
+        if ($horasTrial <= 0 || empty($user['MomentoCriacao'])) return 'free';
+
+        try {
+            $criacao = new DateTime($user['MomentoCriacao']);
+            $diff    = (new DateTime())->diff($criacao);
+            $horas   = ($diff->days * 24) + $diff->h;
+            if ($horas < $horasTrial) return 'vip_trial';
+        } catch (Exception $e) {
+        }
+
+        return 'free';
+    }
+}
+
 // ── Configuração dinâmica de recursos por plano ──────────────────────────
 
 if (!function_exists('recursoDisponivelParaPlano')) {
@@ -1968,6 +2001,16 @@ if (!function_exists('enviarWhatsAppNotificacao')) {
             'ignore_errors' => true,
         ]]);
         $result = @file_get_contents($url, false, $ctx);
-        return $result !== false;
+        if ($result === false) return false;
+
+        // ignore_errors faz file_get_contents "não falhar" mesmo em erro HTTP (401, 400,
+        // instância desconectada etc.) — sem checar o status de verdade, uma falha do
+        // Evolution API sempre retornava true, e a mensagem era dada como enviada mesmo
+        // sem ter saído.
+        $status = 0;
+        if (isset($http_response_header[0]) && preg_match('/\s(\d{3})\s/', $http_response_header[0], $m)) {
+            $status = (int)$m[1];
+        }
+        return $status >= 200 && $status < 300;
     }
 }

@@ -47,6 +47,15 @@ if (!$usuario) exit;
 $uid     = $usuario['IDUsuario'];
 $msgType = $data['messageType'] ?? 'conversation';
 
+// ── 2.1 Restrição de plano — só VIP e quem está no período de teste grátis ────
+
+$planoEfetivo = planoEfetivoUsuario($pdo, $uid);
+if (!in_array($planoEfetivo, ['vip', 'vip_trial'], true)) {
+    $nomeUserGate = explode(' ', $usuario['Nome'])[0];
+    _waReply($telefone, "Oi, {$nomeUserGate}! 👋\n\nEsse assistente por WhatsApp é um recurso exclusivo do plano *VIP* (e também fica liberado durante o seu período de teste grátis).\n\nPra continuar registrando suas contas por aqui, dá uma olhada no plano VIP:\nmeuauralis.com/planos.php\n\nO app continua 100% disponível pelo site normalmente! 🙂");
+    exit;
+}
+
 // ── 3. Rate limiting — proteção contra bot/spam ───────────────────────────────
 // Máximo 15 mensagens em 2 minutos (humano normal: 1-3/min). Drop silencioso.
 
