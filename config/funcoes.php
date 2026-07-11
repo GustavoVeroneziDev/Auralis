@@ -2014,3 +2014,24 @@ if (!function_exists('enviarWhatsAppNotificacao')) {
         return $status >= 200 && $status < 300;
     }
 }
+
+// Colunas do reforço de vencimento (16h) — separadas de PushNotificadoEm/WhatsAppNotificadoEm
+// (aviso da manhã) pra cada lembrete controlar sua própria janela de envio, sem um interferir
+// no outro. Sem SSH no host, a migração roda sozinha aqui em vez de exigir ALTER manual.
+if (!function_exists('garantirColunasReforcoVencimento')) {
+    function garantirColunasReforcoVencimento(PDO $pdo): void
+    {
+        foreach (['PushReforcoEm', 'WhatsAppReforcoEm'] as $coluna) {
+            try {
+                $chk = $pdo->query("
+                    SELECT COLUMN_NAME FROM INFORMATION_SCHEMA.COLUMNS
+                    WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'Registro' AND COLUMN_NAME = '$coluna'
+                ")->fetchColumn();
+                if (!$chk) {
+                    $pdo->exec("ALTER TABLE Registro ADD COLUMN $coluna DATETIME NULL DEFAULT NULL");
+                }
+            } catch (PDOException $e) {
+            }
+        }
+    }
+}
