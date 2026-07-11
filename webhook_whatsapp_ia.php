@@ -260,10 +260,11 @@ Você é o Auralis, assistente financeiro de {$nomeUser}.{$imgCtx}{$perfilCtx}
 REGRAS DE COMPORTAMENTO — siga sem exceção:
 1. Responda DIRETAMENTE o que foi perguntado. Sem título, sem header, sem "aqui está o resumo", sem apresentação antes da resposta.
 2. Use os dados do contexto para responder conversacionalmente sempre que possível. Reserve a action "consultar" para consultas que precisem de cálculos agregados que não estão no contexto (ex: breakdown por categoria, períodos muito anteriores).
-3. Se a mensagem for ambígua ou você não tiver certeza do que a pessoa quer, use action "clarificar" — não tente adivinhar e errar.
+3. Se a mensagem for ambígua ou você não tiver certeza do que a pessoa quer, use action "clarificar" — não tente adivinhar e errar. Isso vale especialmente pra "registrar": se o parcelamento tem datas ou valores que não são regulares (ex: "metade agora, metade só no mês que vem em outro dia"; parcelas de valores diferentes sem explicação de por quê), NÃO tente forçar num parcelamento padrão — pergunte primeiro, ou registre normal e explique que dá pra ajustar depois com "editar".
 4. Uma reação casual ("kkk", "valeu", "tá bom") merece uma resposta casual curta. Não repita dados financeiros que já foram mostrados logo antes.
 5. Nunca invente dados. Se não tiver a informação no contexto e precisar de DB, use "consultar".
 6. Múltiplas intenções na mesma mensagem → use "acoes" array.
+7. Formatação do WhatsApp no campo "resposta" (texto livre): use *negrito* pra valores/nomes importantes, _itálico_ pra observações secundárias, ~riscado~ só se fizer sentido (ex: algo cancelado), e "• " no início da linha pra listas. WhatsApp NÃO tem sublinhado — não tente simular com outra coisa, use negrito no lugar quando quiser destacar.
 
 Contexto financeiro atual de {$nomeUser}:
 - Hoje: {$hoje}
@@ -282,11 +283,22 @@ ACTIONS disponíveis (responda SEMPRE com JSON válido, sem markdown):
 {"action":"clarificar","pergunta":"pergunta curta e objetiva","opcoes":["interpretação A","interpretação B"]}
 
 "registrar" — lançar transações financeiras:
-{"action":"registrar","registros":[{"tipo":"despesa","valor":0.00,"descricao":"max 60 chars","data":"YYYY-MM-DD","id_carteira":"uuid","id_categoria":"uuid|null","nome_carteira":"nome","nome_categoria":"nome|null","parcelas":1}]}
-Regras: primeira carteira se não mencionada; data relativa → YYYY-MM-DD exato; parcelas>1 para parcelamentos.
+{"action":"registrar","registros":[{"tipo":"despesa","valor":0.00,"valor_total":0.00,"descricao":"max 60 chars","data":"YYYY-MM-DD","id_carteira":"uuid","id_categoria":"uuid|null","nome_carteira":"nome","nome_categoria":"nome|null","parcelas":1,"recorrente":false,"dia_vencimento":0}]}
+Regras:
+- primeira carteira se não mencionada; data relativa → YYYY-MM-DD exato.
+- parcelas>1 para parcelamentos — cada parcela cai automaticamente no mesmo dia dos meses seguintes (ex: base dia 20 → parcela 2 também cai dia 20). Se o parcelamento tiver datas diferentes por parcela, use "clarificar" ou registre e avise que dá pra ajustar com "editar" (regra 3).
+- "valor" = valor de CADA parcela, quando a pessoa já fala o valor por parcela (ex: "12x de 150" → valor=150). "valor_total" = preço cheio a dividir (ex: "comprei uma TV de 3000 em 10x" → valor_total=3000, sem valor). Use SÓ um dos dois.
+- Compra parcelada "com juros": se a pessoa já disser o valor final por parcela (ex: "fica 220 por mês"), use valor=220 direto. Se ela só souber o total final com juros incluso (ex: "no total com juros dá 3300"), use valor_total=3300 — o sistema divide certinho, não faça a conta de cabeça.
+- "recorrente":true + "dia_vencimento" (1-31) para contas que se repetem todo mês (assinatura, aluguel, mensalidade) SEM ser parcelamento — não usa "parcelas" nesse caso. Nunca marque recorrente E parcelas>1 ao mesmo tempo.
 
 "efetivar" — marcar pendente(s) como pago/recebido:
 {"action":"efetivar","descricoes":["texto parcial"]}
+
+"desefetivar" — desfazer, marcar de volta como pendente algo que foi pago/recebido por engano:
+{"action":"desefetivar","descricoes":["texto parcial"]}
+
+"editar" — mudar nome, valor, data, tipo ou categoria de um registro já existente (ex: "era outra coisa, muda o nome pra X", "muda a data da parcela 2 pra dia 5", "esse valor tá errado, era 80"). Inclua só os campos que realmente mudam. Parcelas ficam salvas com sufixo "nome N/total" (ex: "TV 2/2") — se a pessoa falar de uma parcela específica, inclua esse número no "descricao_busca" pra achar a certa (ex: "TV 2/2" em vez de só "TV"):
+{"action":"editar","descricao_busca":"texto pra achar o registro","descricao_nova":"novo nome|omitir","valor_novo":0.00,"data_nova":"YYYY-MM-DD","tipo_novo":"despesa|receita","id_categoria_nova":"uuid","nome_categoria_nova":"nome"}
 
 "cofrinho_depositar":
 {"action":"cofrinho_depositar","nome_cofrinho":"nome","valor":0.00}
@@ -362,6 +374,8 @@ function _waDespachar(PDO $pdo, string $uid, array $acao, array $carteiras, arra
     return match($action) {
         'registrar'          => _waRegistrar($pdo, $uid, $acao['registros'] ?? [], $carteiras, $hoje),
         'efetivar'           => _waEfetivar($pdo, $uid, $acao['descricoes'] ?? []),
+        'desefetivar'        => _waDesefetivar($pdo, $uid, $acao['descricoes'] ?? []),
+        'editar'             => _waEditar($pdo, $uid, $acao),
         'cofrinho_depositar' => _waCofrinhoDepositar($pdo, $uid, $acao, $cofrinhos, $carteiras, $hoje),
         'cofrinho_criar'     => _waCofinhoCriar($pdo, $uid, $acao, $carteiras, $hoje),
         'consultar'          => _waConsultar($pdo, $uid, $acao['consulta'] ?? [], $hoje),
@@ -385,29 +399,49 @@ function _waRegistrar(PDO $pdo, string $uid, array $registros, array $carteiras,
     $stmtIns = $pdo->prepare("
         INSERT INTO Registro
             (IDRegistro, Valor, Descricao, FKCarteira, FKUsuario, FKCategoria,
-             TipoRegistro, DataVencimento, StatusRegistro, Recorrente,
+             TipoRegistro, DataVencimento, StatusRegistro, Recorrente, DiaVencimento,
              GrupoParcela, ParcelaAtual, TotalParcelas)
-        VALUES (:id, :val, :desc, :cart, :uid, :cat, :tipo, :data, :status, 0,
+        VALUES (:id, :val, :desc, :cart, :uid, :cat, :tipo, :data, :status, :recorrente, :dia,
                 :grupo, :parc_atual, :total_parc)
     ");
 
     foreach ($registros as $r) {
-        $valor    = abs((float)($r['valor'] ?? 0));
         $descricao = mb_substr(trim($r['descricao'] ?? ''), 0, 200);
-        $tipo     = in_array($r['tipo'] ?? '', ['receita', 'despesa']) ? $r['tipo'] : 'despesa';
-        $dataBase = $r['data'] ?? $hoje;
-        $cart     = $r['id_carteira'] ?? $carteiras[0]['IDCarteira'];
-        $cat      = !empty($r['id_categoria']) ? $r['id_categoria'] : null;
-        $parcelas = max(1, (int)($r['parcelas'] ?? 1));
+        $tipo      = in_array($r['tipo'] ?? '', ['receita', 'despesa']) ? $r['tipo'] : 'despesa';
+        $dataBase  = $r['data'] ?? $hoje;
+        $cart      = $r['id_carteira'] ?? $carteiras[0]['IDCarteira'];
+        $cat       = !empty($r['id_categoria']) ? $r['id_categoria'] : null;
+        $parcelas  = max(1, (int)($r['parcelas'] ?? 1));
+        // Recorrente e parcelado não fazem sentido juntos — recorrente vence sempre que
+        // ambos vierem preenchidos, igual ao toggle do app (nova_transacao.php:1641-1644).
+        $recorrente = $parcelas <= 1 && !empty($r['recorrente']);
+        $diaVenc    = $recorrente ? max(1, min(31, (int)($r['dia_vencimento'] ?? date('j', strtotime($dataBase))))) : null;
 
-        if (!$valor || !$descricao) { $erros++; continue; }
+        // valor = já é o valor de CADA parcela (ex: "12x de 150" → 150).
+        // valor_total = preço cheio a dividir pelas parcelas (ex: "3000 em 10x com juros,
+        // fica 3300 no total" → valor_total=3300) — mesmo arredondamento do app (a 1ª
+        // parcela absorve a sobra de centavos), pra não deixar a IA fazer conta de cabeça.
+        if (!empty($r['valor_total']) && $parcelas > 1) {
+            $valorTotal   = abs((float)$r['valor_total']);
+            $valorParcela = floor(($valorTotal / $parcelas) * 100) / 100;
+            $resto        = round($valorTotal - ($valorParcela * $parcelas), 2);
+        } else {
+            $valorParcela = abs((float)($r['valor'] ?? 0));
+            $resto        = 0;
+        }
 
+        if (!$valorParcela || !$descricao) { $erros++; continue; }
+
+        // GrupoParcela só é usado pra ligar parcelas entre si — numa recorrente pura (sem
+        // parcelamento) o app sempre deixa NULL (nova_transacao.php:654-677); o rollout
+        // mensal de dashboard.php:69 exige exatamente isso pra reconhecer e repetir.
         $grupoParcela = $parcelas > 1 ? gerarUuid() : null;
 
         for ($i = 1; $i <= $parcelas; $i++) {
             $dataParcela = $parcelas > 1
                 ? date('Y-m-d', strtotime($dataBase . ' +' . ($i - 1) . ' month'))
                 : $dataBase;
+            $valorEssaParcela = ($i === 1) ? round($valorParcela + $resto, 2) : $valorParcela;
 
             $status      = $dataParcela > $hoje ? 'pendente' : 'efetivado';
             $descParcela = $parcelas > 1 ? mb_substr($descricao, 0, 50) . " {$i}/{$parcelas}" : $descricao;
@@ -415,7 +449,7 @@ function _waRegistrar(PDO $pdo, string $uid, array $registros, array $carteiras,
             try {
                 $stmtIns->execute([
                     ':id'         => gerarUuid(),
-                    ':val'        => $valor,
+                    ':val'        => $valorEssaParcela,
                     ':desc'       => $descParcela,
                     ':cart'       => $cart,
                     ':uid'        => $uid,
@@ -423,6 +457,8 @@ function _waRegistrar(PDO $pdo, string $uid, array $registros, array $carteiras,
                     ':tipo'       => $tipo,
                     ':data'       => $dataParcela,
                     ':status'     => $status,
+                    ':recorrente' => $recorrente ? 1 : 0,
+                    ':dia'        => $diaVenc,
                     ':grupo'      => $grupoParcela,
                     ':parc_atual' => $parcelas > 1 ? $i : null,
                     ':total_parc' => $parcelas > 1 ? $parcelas : null,
@@ -431,16 +467,18 @@ function _waRegistrar(PDO $pdo, string $uid, array $registros, array $carteiras,
         }
 
         $icon    = $tipo === 'receita' ? '📈' : '📉';
-        $valFmt  = 'R$ ' . number_format($valor, 2, ',', '.');
+        $valFmt  = 'R$ ' . number_format($valorParcela, 2, ',', '.');
         $dataFmt = date('d/m/Y', strtotime($dataBase));
         $catNome = !empty($r['nome_categoria']) ? " · " . $r['nome_categoria'] : '';
         $cartNome = $r['nome_carteira'] ?? $carteiras[0]['NomeCarteira'];
         $pendente = $dataBase > $hoje ? ' _(pendente)_' : '';
 
         if ($parcelas > 1) {
-            $totalFmt = 'R$ ' . number_format($valor * $parcelas, 2, ',', '.');
+            $totalFmt = 'R$ ' . number_format(($valorParcela * $parcelas) + $resto, 2, ',', '.');
             $fimFmt   = date('d/m/Y', strtotime($dataBase . ' +' . ($parcelas - 1) . ' month'));
-            $confirmacoes[] = "{$icon} *{$descricao}*\n   {$valFmt}/mês × {$parcelas} = {$totalFmt}{$catNome} · {$cartNome}\n   📅 {$dataFmt} → {$fimFmt}";
+            $confirmacoes[] = "{$icon} *{$descricao}*\n   {$valFmt}/mês × {$parcelas} = {$totalFmt}{$catNome} · {$cartNome}\n   📅 {$dataFmt} → {$fimFmt}\n   _Datas de cada parcela caem sempre no mesmo dia do mês seguinte — se alguma vencer em dia diferente, me fala qual parcela e a nova data que eu ajusto._";
+        } elseif ($recorrente) {
+            $confirmacoes[] = "{$icon} *{$descricao}* 🔁 _recorrente_\n   {$valFmt}/mês · todo dia {$diaVenc}{$catNome} · {$cartNome}";
         } else {
             $confirmacoes[] = "{$icon} *{$descricao}*: {$valFmt}{$catNome} · {$cartNome} · 📅 {$dataFmt}{$pendente}";
         }
@@ -452,6 +490,136 @@ function _waRegistrar(PDO $pdo, string $uid, array $registros, array $carteiras,
     $erroTxt = $erros ? "\n\n⚠️ {$erros} item(ns) não salvo(s)." : '';
 
     return $header . "\n\n" . implode("\n", $confirmacoes) . $erroTxt . "\n\n_meuauralis.com_ 👆";
+}
+
+function _waDesefetivar(PDO $pdo, string $uid, array $descricoes): string
+{
+    if (!$descricoes) return "❌ Não identifiquei qual registro desfazer.";
+
+    $desfeitos = [];
+    $naoEncontrados = [];
+
+    $stmtBusca = $pdo->prepare("
+        SELECT IDRegistro, Descricao, Valor, TipoRegistro, DataVencimento, MomentoRegistro
+        FROM Registro
+        WHERE FKUsuario = :uid AND StatusRegistro = 'efetivado' AND Descricao LIKE :desc
+        ORDER BY MomentoRegistro DESC LIMIT 3
+    ");
+    $stmtUpd = $pdo->prepare("UPDATE Registro SET StatusRegistro = 'pendente' WHERE IDRegistro = :id");
+
+    foreach ($descricoes as $desc) {
+        $desc = trim((string)$desc);
+        if (!$desc) continue;
+
+        try {
+            $stmtBusca->execute([':uid' => $uid, ':desc' => '%' . $desc . '%']);
+            $rows = $stmtBusca->fetchAll(PDO::FETCH_ASSOC);
+
+            if (!$rows) {
+                $naoEncontrados[] = $desc;
+                continue;
+            }
+
+            // Mais de um efetivado com esse nome — assume o mais recente (o mais provável de
+            // ter sido marcado como pago por engano agora há pouco).
+            $row = $rows[0];
+            $stmtUpd->execute([':id' => $row['IDRegistro']]);
+
+            $icon   = $row['TipoRegistro'] === 'receita' ? '📈' : '📉';
+            $val    = 'R$ ' . number_format((float)$row['Valor'], 2, ',', '.');
+            $dtFmt  = $row['DataVencimento'] ? date('d/m', strtotime($row['DataVencimento'])) : '—';
+            $desfeitos[] = "{$icon} *{$row['Descricao']}*: {$val} (📅 {$dtFmt}) voltou pra pendente";
+        } catch (Throwable $e) { $naoEncontrados[] = $desc; }
+    }
+
+    $msg = '';
+    if ($desfeitos) {
+        $msg .= "↩️ *Desfeito" . (count($desfeitos) > 1 ? "s" : "") . "!*\n\n" . implode("\n", $desfeitos);
+    }
+    if ($naoEncontrados) {
+        $msg .= ($msg ? "\n\n" : "") . "⚠️ Não encontrei pago/recebido com: " . implode(', ', array_map(fn($d) => "*{$d}*", $naoEncontrados));
+    }
+
+    return $msg ?: "❌ Nenhum registro efetivado encontrado com esse nome.";
+}
+
+function _waEditar(PDO $pdo, string $uid, array $acao): string
+{
+    $desc = trim($acao['descricao_busca'] ?? '');
+    if (!$desc) return "❌ Não identifiquei qual registro editar.";
+
+    $temAlgo = array_key_exists('descricao_nova', $acao) || array_key_exists('valor_novo', $acao)
+        || array_key_exists('data_nova', $acao) || array_key_exists('nome_categoria_nova', $acao)
+        || array_key_exists('id_categoria_nova', $acao) || array_key_exists('tipo_novo', $acao);
+    if (!$temAlgo) return "❌ Não identifiquei o que mudar em \"{$desc}\".";
+
+    try {
+        $stmtBusca = $pdo->prepare("
+            SELECT IDRegistro, Descricao, Valor, TipoRegistro, DataVencimento, StatusRegistro,
+                   ParcelaAtual, TotalParcelas
+            FROM Registro
+            WHERE FKUsuario = :uid AND StatusRegistro != 'cancelado' AND Descricao LIKE :desc
+            ORDER BY MomentoRegistro DESC LIMIT 5
+        ");
+        $stmtBusca->execute([':uid' => $uid, ':desc' => '%' . $desc . '%']);
+        $rows = $stmtBusca->fetchAll(PDO::FETCH_ASSOC);
+    } catch (Throwable $e) { return "❌ Erro ao buscar o registro."; }
+
+    if (!$rows) return "⚠️ Não encontrei nenhum registro com \"{$desc}\".";
+
+    // Mais de um resultado ainda ambíguo (ex: duas parcelas com nome parecido) — melhor
+    // listar e pedir pra especificar do que arriscar editar o item errado.
+    if (count($rows) > 1) {
+        $linhas = array_map(function ($r) {
+            $dt = $r['DataVencimento'] ? date('d/m', strtotime($r['DataVencimento'])) : '—';
+            $parc = $r['TotalParcelas'] ? " ({$r['ParcelaAtual']}/{$r['TotalParcelas']})" : '';
+            return "• {$r['Descricao']}{$parc} — R$ " . number_format((float)$r['Valor'], 2, ',', '.') . " · 📅 {$dt}";
+        }, $rows);
+        return "⚠️ Encontrei mais de um com \"{$desc}\", me diz qual (ex: com a data ou o número da parcela):\n\n" . implode("\n", $linhas);
+    }
+
+    $row = $rows[0];
+
+    $sets = [];
+    $params = [':id' => $row['IDRegistro'], ':uid' => $uid];
+    $mudancas = [];
+
+    if (array_key_exists('descricao_nova', $acao) && trim((string)$acao['descricao_nova']) !== '') {
+        $novaDesc = mb_substr(trim((string)$acao['descricao_nova']), 0, 200);
+        $sets[] = 'Descricao = :nova_desc';
+        $params[':nova_desc'] = $novaDesc;
+        $mudancas[] = "nome → *{$novaDesc}*";
+    }
+    if (array_key_exists('valor_novo', $acao) && (float)$acao['valor_novo'] > 0) {
+        $novoValor = abs((float)$acao['valor_novo']);
+        $sets[] = 'Valor = :novo_valor';
+        $params[':novo_valor'] = $novoValor;
+        $mudancas[] = "valor → R$ " . number_format($novoValor, 2, ',', '.');
+    }
+    if (array_key_exists('data_nova', $acao) && preg_match('/^\d{4}-\d{2}-\d{2}$/', (string)$acao['data_nova'])) {
+        $sets[] = 'DataVencimento = :nova_data';
+        $params[':nova_data'] = $acao['data_nova'];
+        $mudancas[] = "data → " . date('d/m/Y', strtotime($acao['data_nova']));
+    }
+    if (array_key_exists('tipo_novo', $acao) && in_array($acao['tipo_novo'], ['receita', 'despesa'], true)) {
+        $sets[] = 'TipoRegistro = :novo_tipo';
+        $params[':novo_tipo'] = $acao['tipo_novo'];
+        $mudancas[] = "tipo → {$acao['tipo_novo']}";
+    }
+    if (!empty($acao['id_categoria_nova'])) {
+        $sets[] = 'FKCategoria = :nova_cat';
+        $params[':nova_cat'] = $acao['id_categoria_nova'];
+        $mudancas[] = "categoria → " . ($acao['nome_categoria_nova'] ?? '(nova)');
+    }
+
+    if (!$sets) return "❌ Não identifiquei nenhuma mudança válida pra \"{$desc}\".";
+
+    try {
+        $pdo->prepare("UPDATE Registro SET " . implode(', ', $sets) . " WHERE IDRegistro = :id AND FKUsuario = :uid")
+            ->execute($params);
+    } catch (Throwable $e) { return "❌ Erro ao editar o registro."; }
+
+    return "✏️ *Editado!* {$row['Descricao']}\n\n" . implode("\n", $mudancas);
 }
 
 function _waEfetivar(PDO $pdo, string $uid, array $descricoes): string
@@ -768,14 +936,17 @@ function _waAjuda(string $personalidade = 'parceiro'): string
         return "Comandos disponíveis:\n\n" .
                "• Registrar: \"Paguei 50 de uber\"\n" .
                "• Efetivar pendente: \"Paguei o Spotify\"\n" .
-               "• Parcelamento: \"Comprei em 12x de 150\"\n" .
+               "• Desfazer pagamento: \"Não paguei o Spotify ainda\"\n" .
+               "• Editar: \"O lançamento era de 80, não 50\" / \"Muda a data pra dia 5\"\n" .
+               "• Parcelamento: \"Comprei em 12x de 150\" / \"3000 em 10x com juros, fica 3300\"\n" .
+               "• Recorrente: \"Todo mês pago 40 de academia dia 10\"\n" .
                "• Múltiplos: \"Paguei 50 de uber e 30 de almoço\"\n" .
                "• Cofrinho: \"Deposita 200 no cofrinho Viagem\"\n" .
                "• Criar cofrinho: \"Cria cofrinho Carro com meta 6000\"\n" .
                "• Consultar: \"Quanto gastei esse mês?\"\n" .
                "• Saldo: \"Qual meu saldo?\"\n" .
                "• Pendentes: \"Tenho conta pra pagar?\"\n" .
-               "• Cancelar: \"Cancela o último lançamento\"\n" .
+               "• Cancelar último: \"Cancela o último lançamento\"\n" .
                "• Comprovantes: envie a foto diretamente";
     }
 
@@ -784,10 +955,16 @@ function _waAjuda(string $personalidade = 'parceiro'): string
            "• _\"Paguei 55 no corte de cabelo\"_\n" .
            "• _\"Recebi 2000 de salário hoje\"_\n" .
            "• _\"Comprei celular em 12x de 150\"_\n" .
+           "• _\"3000 em 10x com juros, fica 3300\"_\n" .
+           "• _\"Todo mês pago 40 de academia dia 10\"_ (recorrente)\n" .
            "• _\"Paguei 50 de uber e 30 de almoço\"_\n" .
            "• _[foto de comprovante PIX]_\n\n" .
-           "✅ *Efetivar pendente:*\n" .
-           "• _\"Paguei o Spotify\"_ / _\"Recebi o salário\"_\n\n" .
+           "✅ *Efetivar / desfazer:*\n" .
+           "• _\"Paguei o Spotify\"_ / _\"Recebi o salário\"_\n" .
+           "• _\"Não paguei o Spotify ainda\"_ (volta pra pendente)\n\n" .
+           "✏️ *Editar um lançamento:*\n" .
+           "• _\"Era outra coisa, muda o nome pra Mercado\"_\n" .
+           "• _\"O valor tá errado, era 80\"_ / _\"Muda a data da parcela 2 pra dia 5\"_\n\n" .
            "🏦 *Cofrinhos:*\n" .
            "• _\"Deposita 200 no cofrinho Viagem\"_\n" .
            "• _\"Cria cofrinho Carro com meta 6000\"_\n\n" .
@@ -795,7 +972,7 @@ function _waAjuda(string $personalidade = 'parceiro'): string
            "• _\"Quanto gastei esse mês?\"_\n" .
            "• _\"Tenho conta pra pagar essa semana?\"_\n" .
            "• _\"Qual meu saldo?\"_\n\n" .
-           "↩️ *Desfazer:*\n" .
+           "↩️ *Cancelar o último lançamento:*\n" .
            "• _\"Cancela o último lançamento\"_";
 }
 
