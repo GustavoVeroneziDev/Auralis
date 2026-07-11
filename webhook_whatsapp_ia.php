@@ -352,9 +352,17 @@ if (!empty($resultado['acoes']) && is_array($resultado['acoes'])) {
     $acoes = [$resultado];
 }
 
+// Rede de segurança: se QUALQUER handler de action explodir com um erro não previsto,
+// isso não pode travar a resposta pro cliente em silêncio total (o webhook já respondeu
+// 200 pro Evolution API lá em cima, então um fatal aqui simplesmente nunca chega a chamar
+// _waReply — a pessoa manda mensagem e nunca mais recebe nada, sem nenhum aviso de erro).
 $respostas = [];
 foreach ($acoes as $acao) {
-    $respostas[] = _waDespachar($pdo, $uid, $acao, $carteiras, $cofrinhos, $hoje, $personalidade, $usuario, $telefone);
+    try {
+        $respostas[] = _waDespachar($pdo, $uid, $acao, $carteiras, $cofrinhos, $hoje, $personalidade, $usuario, $telefone);
+    } catch (Throwable $e) {
+        $respostas[] = "❌ Deu um erro aqui do meu lado processando isso. Tenta de novo, ou me chama que eu aciono o suporte.";
+    }
 }
 
 $resposta = implode("\n\n", $respostas);
@@ -959,7 +967,12 @@ function _waEscalarSuporte(PDO $pdo, string $uid, array $acao, array $usuario, s
                    "Cliente: *{$usuario['Nome']}*\n" .
                    "WhatsApp: {$telefoneCliente}\n\n" .
                    "Situação: {$motivo}";
-        enviarWhatsAppNotificacao(WA_SUPORTE_TELEFONE, $msgDono);
+        // Isolado num try/catch próprio: mesmo se o envio pro dono falhar por algum motivo,
+        // o cliente ainda tem que receber a resposta tranquilizando ele — isso não pode
+        // derrubar a função inteira.
+        try {
+            enviarWhatsAppNotificacao(WA_SUPORTE_TELEFONE, $msgDono);
+        } catch (Throwable $e) {}
 
         // Mesmo padrão check-then-insert-or-update do resto do arquivo (_waSalvarPerfil) —
         // ConfiguracaoSistema não tem UNIQUE KEY em (Chave, FKUsuario), então ON DUPLICATE
