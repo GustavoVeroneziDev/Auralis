@@ -120,7 +120,8 @@ if (!function_exists('badgePlano')) {
 }
 
 if (!function_exists('exibirLimite')) {
-    function exibirLimite(int $valor): string {
+    function exibirLimite(int $valor): string
+    {
         return $valor === PHP_INT_MAX ? 'ilimitado' : (string)$valor;
     }
 }
@@ -196,7 +197,8 @@ if (!function_exists('verificarExpiracao')) {
             if (!$assinatura || $assinatura['Status'] !== 'ativa') {
                 $planoAnterior = strtoupper($_SESSION['plano']);
                 criarNotificacaoSistema(
-                    $pdo, $_SESSION['usuario_id'],
+                    $pdo,
+                    $_SESSION['usuario_id'],
                     "Seu plano {$planoAnterior} foi encerrado",
                     "Seu acesso ao plano {$planoAnterior} foi encerrado e você voltou para o plano gratuito.\n\nVocê ainda pode usar os recursos do plano Free. Para continuar com todos os recursos, considere renovar sua assinatura.",
                     3
@@ -212,7 +214,8 @@ if (!function_exists('verificarExpiracao')) {
                     ->execute([':uid' => $_SESSION['usuario_id']]);
                 $planoAnterior = strtoupper($_SESSION['plano']);
                 criarNotificacaoSistema(
-                    $pdo, $_SESSION['usuario_id'],
+                    $pdo,
+                    $_SESSION['usuario_id'],
                     "Seu plano {$planoAnterior} expirou",
                     "Seu plano {$planoAnterior} expirou e você foi automaticamente movido para o plano gratuito.\n\nRenove sua assinatura para recuperar o acesso a todos os recursos!",
                     3
@@ -225,7 +228,8 @@ if (!function_exists('verificarExpiracao')) {
                     $dataFmt   = date('d/m/Y', $expTimestamp);
                     $plural    = $diasRestantes > 1 ? 's' : '';
                     criarNotificacaoSistema(
-                        $pdo, $_SESSION['usuario_id'],
+                        $pdo,
+                        $_SESSION['usuario_id'],
                         "Seu plano {$planoNome} expira em {$diasRestantes} dia{$plural}!",
                         "Atenção: seu plano {$planoNome} expira em {$diasRestantes} dia{$plural} ({$dataFmt}).\n\nRenove agora para não perder o acesso aos seus recursos.",
                         1
@@ -561,7 +565,8 @@ if (!function_exists('concederConquistaParaUsuario')) {
                         0
                     );
                 }
-            } catch (Throwable $e) { /* silencia — notificação nunca deve bloquear a concessão */ }
+            } catch (Throwable $e) { /* silencia — notificação nunca deve bloquear a concessão */
+            }
 
             return true;
         } catch (Throwable $e) {
@@ -1034,7 +1039,8 @@ if (!function_exists('criarNotificacaoSistema')) {
                 INSERT IGNORE INTO NotificacaoDestinatario (FKNotificacao, FKUsuario)
                 VALUES (:nid, :uid)
             ")->execute([':nid' => $nid, ':uid' => $uid]);
-        } catch (Throwable $e) { /* silent — notificações não devem quebrar o fluxo principal */ }
+        } catch (Throwable $e) { /* silent — notificações não devem quebrar o fluxo principal */
+        }
     }
 }
 
@@ -1290,7 +1296,6 @@ function processarIndicacaoConversao(PDO $pdo, string $emailComprador, float $va
             'Você ganhou uma recompensa por indicação!',
             "Suas indicações renderam " . (int)$recompensa['DuracaoDias'] . " dias do plano " . strtoupper($recompensa['PlanoRecompensa']) . " — já está ativo na sua conta!"
         );
-
     } catch (Exception $e) {
         if ($pdo->inTransaction()) $pdo->rollBack();
     }
@@ -1979,5 +1984,26 @@ if (!function_exists('enviarWhatsAppNotificacao')) {
             $status = (int)$m[1];
         }
         return $status >= 200 && $status < 300;
+    }
+}
+
+// Colunas do reforço de vencimento (16h) — separadas de PushNotificadoEm/WhatsAppNotificadoEm
+// (aviso da manhã) pra cada lembrete controlar sua própria janela de envio, sem um interferir
+// no outro. Sem SSH no host, a migração roda sozinha aqui em vez de exigir ALTER manual.
+if (!function_exists('garantirColunasReforcoVencimento')) {
+    function garantirColunasReforcoVencimento(PDO $pdo): void
+    {
+        foreach (['PushReforcoEm', 'WhatsAppReforcoEm'] as $coluna) {
+            try {
+                $chk = $pdo->query("
+                    SELECT COLUMN_NAME FROM INFORMATION_SCHEMA.COLUMNS
+                    WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'Registro' AND COLUMN_NAME = '$coluna'
+                ")->fetchColumn();
+                if (!$chk) {
+                    $pdo->exec("ALTER TABLE Registro ADD COLUMN $coluna DATETIME NULL DEFAULT NULL");
+                }
+            } catch (PDOException $e) {
+            }
+        }
     }
 }
