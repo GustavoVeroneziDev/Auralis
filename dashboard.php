@@ -21,6 +21,15 @@ garantirEstruturaCarteirasCompartilhadas($pdo);
 $usuario_id = $_SESSION['usuario_id'];
 cartao_verificarFechamentos($pdo, $usuario_id);
 
+// Quem entra pelo Google nunca passa pelo campo de telefone do cadastro normal —
+// sem isso, a pessoa nunca fica sabendo que dá pra usar o Auralis pelo WhatsApp.
+$usuarioTelefone = '';
+try {
+    $stmtTel = $pdo->prepare("SELECT Telefone FROM Usuario WHERE IDUsuario = :uid");
+    $stmtTel->execute([':uid' => $usuario_id]);
+    $usuarioTelefone = $stmtTel->fetchColumn() ?: '';
+} catch (PDOException $e) {}
+
 // $carteirasProprias: só as que o usuário é DONO — usada pra Transferência entre Carteiras
 // (que continua exigindo posse das duas). $carteiras: donas + compartilhadas aceitas — usada
 // pro seletor de carteira no topo, pra um convidado conseguir ver/selecionar a carteira.
@@ -1758,6 +1767,43 @@ require_once 'geral/header.php';
     </div>
 </div>
 
+<!-- ONBOARDING 3: TELEFONE (WhatsApp) -->
+<div class="modal fade" id="modalTelefoneOnboarding" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered modal-lg">
+        <div class="modal-content modal-boas-vindas-content border-0 rounded-4 overflow-hidden position-relative">
+            <div class="position-absolute top-0 start-0 w-100 h-100" style="background: radial-gradient(circle at top left, rgba(37, 211, 102, 0.15), transparent 60%); pointer-events: none;"></div>
+
+            <div class="modal-body p-5 text-center position-relative z-1">
+                <div class="mb-4 d-inline-flex justify-content-center align-items-center bg-dark border border-secondary-subtle rounded-circle shadow-lg" style="width: 90px; height: 90px;">
+                    <i class="bi bi-whatsapp" style="color: #25d366; font-size: 2.5rem;"></i>
+                </div>
+
+                <h2 class="text-light fw-bold mb-3">Quer registrar tudo pelo WhatsApp, <?php echo htmlspecialchars($primeiroNome) ?>?</h2>
+                <p class="text-secondary fs-5 mb-5 mx-auto" style="max-width: 600px;">
+                    Cadastre seu número e você poderá mandar mensagens tipo <em>"gastei 50 reais no mercado"</em> direto pelo WhatsApp — sem precisar abrir o site toda vez.
+                </p>
+
+                <form method="POST" action="usuario/salvar_telefone.php" class="bg-dark border border-secondary-subtle rounded-4 p-4 text-start mx-auto shadow-sm" style="max-width: 500px;">
+                    <label class="form-label text-light fw-semibold mb-2 fs-5">Seu número de WhatsApp</label>
+                    <div class="input-group input-group-lg mb-4 shadow-sm">
+                        <span class="input-group-text bg-body-tertiary border-secondary-subtle text-secondary border-end-0"><i class="bi bi-phone"></i></span>
+                        <input type="tel" name="telefone" class="form-control bg-body-tertiary border-secondary-subtle border-start-0 text-light fw-bold shadow-none fs-5 py-3" required placeholder="(11) 91234-5678" autofocus>
+                    </div>
+                    <button type="submit" class="btn btn-gold btn-lg w-100 fw-bold text-dark rounded-pill py-3 shadow-lg transition-hover">
+                        Ativar WhatsApp <i class="bi bi-check2 ms-2"></i>
+                    </button>
+
+                    <div class="text-center mt-4">
+                        <button type="button" class="btn btn-link text-secondary text-decoration-none small transition-hover" data-bs-dismiss="modal">
+                            Agora não
+                        </button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
+
 <!-- ── Modal: Transferência entre Carteiras ─────────────────────────────── -->
 <?php if ($totalCarteirasProprias >= 2): ?>
 <div class="modal fade" id="modalTransferencia" tabindex="-1" aria-hidden="true">
@@ -1964,6 +2010,10 @@ require_once 'geral/header.php';
                 keyboard: false
             });
             modal2.show();
+        <?php elseif (empty($usuarioTelefone)): ?>
+            // Cena 3: Tem carteira e saldo, mas não tem telefone? Convida a ativar o WhatsApp
+            var modal3 = new bootstrap.Modal(document.getElementById('modalTelefoneOnboarding'));
+            modal3.show();
         <?php endif; ?>
     });
     // Script para alimentar o Modal de Exclusão de Recorrência
