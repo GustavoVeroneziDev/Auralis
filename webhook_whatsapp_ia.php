@@ -967,12 +967,16 @@ function _waEscalarSuporte(PDO $pdo, string $uid, array $acao, array $usuario, s
     // Evita bombardear o dono se a pessoa insistir várias vezes seguidas na mesma
     // conversa — só reenvia o alerta se já fez 15+ minutos desde o último dessa pessoa.
     $podeEnviar = true;
+    $ultimo = null;
     try {
         $stmtChk = $pdo->prepare("SELECT Valor FROM ConfiguracaoSistema WHERE Chave = 'wa_ultimo_suporte' AND FKUsuario = :uid");
         $stmtChk->execute([':uid' => $uid]);
         $ultimo = $stmtChk->fetchColumn();
         if ($ultimo && strtotime($ultimo) > strtotime('-15 minutes')) $podeEnviar = false;
     } catch (Throwable $e) {}
+
+    // DEBUG TEMPORÁRIO — some depois de confirmar a causa
+    $diag = " [diag: podeEnviar=" . ($podeEnviar ? '1' : '0') . " ultimo=" . ($ultimo ?: 'null') . "]";
 
     if ($podeEnviar) {
         $agora = date('Y-m-d H:i:s');
@@ -984,8 +988,11 @@ function _waEscalarSuporte(PDO $pdo, string $uid, array $acao, array $usuario, s
         // o cliente ainda tem que receber a resposta tranquilizando ele — isso não pode
         // derrubar a função inteira.
         try {
-            enviarWhatsAppNotificacao(WA_SUPORTE_TELEFONE, $msgDono);
-        } catch (Throwable $e) {}
+            $okEnvio = enviarWhatsAppNotificacao(WA_SUPORTE_TELEFONE, $msgDono);
+            $diag .= " envio=" . ($okEnvio ? 'ok' : 'falhou'); // DEBUG TEMPORÁRIO
+        } catch (Throwable $e) {
+            $diag .= " envio=excecao:" . $e->getMessage(); // DEBUG TEMPORÁRIO
+        }
 
         // Mesmo padrão check-then-insert-or-update do resto do arquivo (_waSalvarPerfil) —
         // ConfiguracaoSistema não tem UNIQUE KEY em (Chave, FKUsuario), então ON DUPLICATE
@@ -1003,7 +1010,7 @@ function _waEscalarSuporte(PDO $pdo, string $uid, array $acao, array $usuario, s
         } catch (Throwable $e) {}
     }
 
-    return $respostaCliente;
+    return $respostaCliente . $diag; // DEBUG TEMPORÁRIO — tira o ". $diag" depois
 }
 
 function _waAjuda(string $personalidade = 'parceiro'): string
