@@ -315,6 +315,9 @@ Regras:
 "ajuda" — SOMENTE se pedir lista de comandos explicitamente:
 {"action":"ajuda"}
 
+"escalar_suporte" — USE quando a situação precisa de um humano de verdade, não de uma action do sistema: pedido explícito pra falar com suporte/atendente/pessoa real; reclamação sobre cobrança, bug ou o serviço em si; alguém visivelmente frustrado/insistindo que a IA não está resolvendo. NÃO use pra dúvida comum que "clarificar" ou "conversar" já resolvem — é só pra quando ninguém dessas duas dá conta.
+{"action":"escalar_suporte","motivo":"resumo curto e objetivo da situação/reclamação, em 1-2 frases","resposta_cliente":"mensagem tranquilizando a pessoa, avisando que o suporte foi acionado"}
+
 "acoes" — múltiplas intenções distintas:
 {"acoes":[{acao1},{acao2}]}
 
@@ -351,7 +354,7 @@ if (!empty($resultado['acoes']) && is_array($resultado['acoes'])) {
 
 $respostas = [];
 foreach ($acoes as $acao) {
-    $respostas[] = _waDespachar($pdo, $uid, $acao, $carteiras, $cofrinhos, $hoje, $personalidade);
+    $respostas[] = _waDespachar($pdo, $uid, $acao, $carteiras, $cofrinhos, $hoje, $personalidade, $usuario, $telefone);
 }
 
 $resposta = implode("\n\n", $respostas);
@@ -368,7 +371,7 @@ exit;
 
 // ── Despachante central ───────────────────────────────────────────────────────
 
-function _waDespachar(PDO $pdo, string $uid, array $acao, array $carteiras, array $cofrinhos, string $hoje, string $personalidade): string
+function _waDespachar(PDO $pdo, string $uid, array $acao, array $carteiras, array $cofrinhos, string $hoje, string $personalidade, array $usuario, string $telefoneCliente): string
 {
     $action = $acao['action'] ?? 'conversar';
     return match($action) {
@@ -382,6 +385,7 @@ function _waDespachar(PDO $pdo, string $uid, array $acao, array $carteiras, arra
         'cancelar'           => _waCancelar($pdo, $uid),
         'ajuda'              => _waAjuda($personalidade),
         'clarificar'         => _waClarificar($acao),
+        'escalar_suporte'    => _waEscalarSuporte($pdo, $uid, $acao, $usuario, $telefoneCliente),
         'conversar'          => !empty($acao['resposta']) ? (string)$acao['resposta'] : "Pode elaborar mais?",
         default              => !empty($acao['resposta']) ? (string)$acao['resposta'] : "Não entendi bem. Pode repetir?",
     };
@@ -930,6 +934,52 @@ function _waCancelar(PDO $pdo, string $uid): string
     }
 }
 
+// Número do dono do Auralis — recebe o aviso quando a IA identifica que a situação
+// precisa de um humano de verdade (reclamação, pedido explícito de suporte etc.).
+const WA_SUPORTE_TELEFONE = '5517996660665';
+
+function _waEscalarSuporte(PDO $pdo, string $uid, array $acao, array $usuario, string $telefoneCliente): string
+{
+    $motivo = trim($acao['motivo'] ?? 'Sem detalhes — a IA sinalizou que precisa de ajuda humana.');
+    $respostaCliente = trim($acao['resposta_cliente'] ?? "Entendi — já chamei o suporte aqui, alguém te retorna em breve. 🙏");
+
+    // Evita bombardear o dono se a pessoa insistir várias vezes seguidas na mesma
+    // conversa — só reenvia o alerta se já fez 15+ minutos desde o último dessa pessoa.
+    $podeEnviar = true;
+    try {
+        $stmtChk = $pdo->prepare("SELECT Valor FROM ConfiguracaoSistema WHERE Chave = 'wa_ultimo_suporte' AND FKUsuario = :uid");
+        $stmtChk->execute([':uid' => $uid]);
+        $ultimo = $stmtChk->fetchColumn();
+        if ($ultimo && strtotime($ultimo) > strtotime('-15 minutes')) $podeEnviar = false;
+    } catch (Throwable $e) {}
+
+    if ($podeEnviar) {
+        $agora = date('Y-m-d H:i:s');
+        $msgDono = "🆘 *Alerta de suporte — Auralis*\n\n" .
+                   "Cliente: *{$usuario['Nome']}*\n" .
+                   "WhatsApp: {$telefoneCliente}\n\n" .
+                   "Situação: {$motivo}";
+        enviarWhatsAppNotificacao(WA_SUPORTE_TELEFONE, $msgDono);
+
+        // Mesmo padrão check-then-insert-or-update do resto do arquivo (_waSalvarPerfil) —
+        // ConfiguracaoSistema não tem UNIQUE KEY em (Chave, FKUsuario), então ON DUPLICATE
+        // KEY simplesmente não dispara e ficaria inserindo linha nova toda vez.
+        try {
+            $stmtChkIns = $pdo->prepare("SELECT COUNT(*) FROM ConfiguracaoSistema WHERE Chave = 'wa_ultimo_suporte' AND FKUsuario = :uid");
+            $stmtChkIns->execute([':uid' => $uid]);
+            if ($stmtChkIns->fetchColumn() > 0) {
+                $pdo->prepare("UPDATE ConfiguracaoSistema SET Valor = :ts WHERE Chave = 'wa_ultimo_suporte' AND FKUsuario = :uid")
+                    ->execute([':ts' => $agora, ':uid' => $uid]);
+            } else {
+                $pdo->prepare("INSERT INTO ConfiguracaoSistema (Chave, Valor, FKUsuario) VALUES ('wa_ultimo_suporte', :ts, :uid)")
+                    ->execute([':ts' => $agora, ':uid' => $uid]);
+            }
+        } catch (Throwable $e) {}
+    }
+
+    return $respostaCliente;
+}
+
 function _waAjuda(string $personalidade = 'parceiro'): string
 {
     if ($personalidade === 'profissional') {
@@ -947,7 +997,8 @@ function _waAjuda(string $personalidade = 'parceiro'): string
                "• Saldo: \"Qual meu saldo?\"\n" .
                "• Pendentes: \"Tenho conta pra pagar?\"\n" .
                "• Cancelar último: \"Cancela o último lançamento\"\n" .
-               "• Comprovantes: envie a foto diretamente";
+               "• Comprovantes: envie a foto diretamente\n" .
+               "• Falar com suporte: peça diretamente a qualquer momento";
     }
 
     return "Opa! 👋 Pode mandar à vontade:\n\n" .
@@ -973,7 +1024,8 @@ function _waAjuda(string $personalidade = 'parceiro'): string
            "• _\"Tenho conta pra pagar essa semana?\"_\n" .
            "• _\"Qual meu saldo?\"_\n\n" .
            "↩️ *Cancelar o último lançamento:*\n" .
-           "• _\"Cancela o último lançamento\"_";
+           "• _\"Cancela o último lançamento\"_\n\n" .
+           "🆘 *Precisa falar com gente de verdade?* É só pedir a qualquer momento.";
 }
 
 // ── Perfil permanente ─────────────────────────────────────────────────────────
