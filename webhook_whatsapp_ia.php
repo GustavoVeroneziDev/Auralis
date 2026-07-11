@@ -317,6 +317,7 @@ Regras:
 
 "escalar_suporte" — USE quando a situação precisa de um humano de verdade, não de uma action do sistema: pedido explícito pra falar com suporte/atendente/pessoa real; reclamação sobre cobrança, bug ou o serviço em si; alguém visivelmente frustrado/insistindo que a IA não está resolvendo. NÃO use pra dúvida comum que "clarificar" ou "conversar" já resolvem — é só pra quando ninguém dessas duas dá conta.
 {"action":"escalar_suporte","motivo":"resumo curto e objetivo da situação/reclamação, em 1-2 frases","resposta_cliente":"mensagem tranquilizando a pessoa, avisando que o suporte foi acionado"}
+IMPORTANTE: isso SÓ funciona de verdade com esse JSON exato. NUNCA diga em texto solto (action "conversar") frases como "já chamei o suporte" ou "já acionei a equipe" sem USAR essa action — isso engana a pessoa, porque nada é avisado de verdade. Se você disse ou vai dizer algo do tipo, use "escalar_suporte" nesse mesmo momento.
 
 "acoes" — múltiplas intenções distintas:
 {"acoes":[{acao1},{acao2}]}
@@ -350,6 +351,18 @@ if (!empty($resultado['acoes']) && is_array($resultado['acoes'])) {
     $acoes = $resultado['acoes'];
 } else {
     $acoes = [$resultado];
+}
+
+// Rede de segurança: a IA às vezes NARRA que "já chamou o suporte" numa resposta comum
+// (action "conversar") sem de fato disparar "escalar_suporte" — a pessoa fica achando
+// que foi avisado e ninguém recebe nada. Pra um pedido explícito e inequívoco desses,
+// não depende só do modelo lembrar de fazer certo: força a ação por regra fixa.
+$jaTemEscalada = false;
+foreach ($acoes as $a) {
+    if (($a['action'] ?? '') === 'escalar_suporte') { $jaTemEscalada = true; break; }
+}
+if (!$jaTemEscalada && preg_match('/falar\s+com\s+(o\s+|a\s+)?(suporte|equipe|um\s+humano|humano|uma\s+pessoa|atendente|algu[ée]m)/iu', $texto)) {
+    $acoes[] = ['action' => 'escalar_suporte', 'motivo' => 'Pediu explicitamente pra falar com humano/suporte: "' . mb_substr($texto, 0, 150) . '"'];
 }
 
 // Rede de segurança: se QUALQUER handler de action explodir com um erro não previsto,
