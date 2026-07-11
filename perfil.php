@@ -505,13 +505,27 @@ require_once 'geral/header.php';
         <?php else: ?>
         <div class="rounded-4 overflow-hidden" style="background:var(--bg-card);border:1px solid var(--bs-border-color);">
             <?php foreach ($amigosAceitos as $i => $a): ?>
-            <div class="d-flex align-items-center gap-2 px-3 py-2" style="<?= $i > 0 ? 'border-top:1px solid var(--bs-border-color);' : '' ?>">
+            <div class="d-flex align-items-center gap-2 px-3 py-2 amigo-linha" style="<?= $i > 0 ? 'border-top:1px solid var(--bs-border-color);' : '' ?>"
+                 oncontextmenu="return perfilAbrirMenuAmigo(event, '<?= htmlspecialchars($a['IDUsuario'], ENT_QUOTES) ?>', '<?= htmlspecialchars(addslashes($a['Nome']), ENT_QUOTES) ?>')">
                 <?= renderAvatarUsuario($a, 34) ?>
-                <span class="fw-semibold" style="font-size:.85rem;"><?= htmlspecialchars($a['Nome']) ?></span>
+                <span class="fw-semibold flex-grow-1" style="font-size:.85rem;"><?= htmlspecialchars($a['Nome']) ?></span>
+                <button type="button" class="btn btn-sm btn-link text-secondary p-1" title="Mais opções"
+                        onclick="perfilAbrirMenuAmigo(event, '<?= htmlspecialchars($a['IDUsuario'], ENT_QUOTES) ?>', '<?= htmlspecialchars(addslashes($a['Nome']), ENT_QUOTES) ?>')">
+                    <i class="bi bi-three-dots-vertical"></i>
+                </button>
             </div>
             <?php endforeach; ?>
         </div>
         <?php endif; ?>
+
+        <!-- Menu de contexto do amigo (botão direito ou "⋮") -->
+        <div id="menuAmigoContexto" class="d-none rounded-3 shadow-lg overflow-hidden"
+             style="position:fixed;z-index:2000;background:var(--bg-card);border:1px solid var(--bs-border-color);min-width:180px;">
+            <button type="button" class="dropdown-item d-flex align-items-center gap-2 py-2 px-3 text-danger w-100 border-0 bg-transparent text-start"
+                    onclick="perfilRemoverAmigo()">
+                <i class="bi bi-person-dash-fill"></i> Remover amigo
+            </button>
+        </div>
     </div>
 
     <!-- ── Meu Personagem ─────────────────────────────────────────────────────
@@ -1199,6 +1213,43 @@ function perfilResponderPedido(idAmizade, acao) {
     fd.append('amizade_id', idAmizade);
     fd.append('acao', acao);
     fetch('/usuario/amizade_responder.php', { method: 'POST', body: fd })
+        .then(function (r) { return r.json(); })
+        .then(function (data) {
+            if (data.ok) location.reload();
+        });
+}
+
+// ── Amigos: menu de contexto (botão direito ou "⋮") pra remover ─────────────
+var PERFIL_AMIGO_ALVO = null;
+
+function perfilAbrirMenuAmigo(e, uid, nome) {
+    e.preventDefault();
+    e.stopPropagation();
+    PERFIL_AMIGO_ALVO = { uid: uid, nome: nome };
+
+    var menu = document.getElementById('menuAmigoContexto');
+    menu.classList.remove('d-none');
+
+    var x = Math.min(e.clientX, window.innerWidth - 200);
+    var y = Math.min(e.clientY, window.innerHeight - 60);
+    menu.style.left = x + 'px';
+    menu.style.top  = y + 'px';
+    return false;
+}
+
+document.addEventListener('click', function () {
+    var menu = document.getElementById('menuAmigoContexto');
+    if (menu) menu.classList.add('d-none');
+});
+
+function perfilRemoverAmigo() {
+    if (!PERFIL_AMIGO_ALVO) return;
+    document.getElementById('menuAmigoContexto').classList.add('d-none');
+    if (!confirm('Remover ' + PERFIL_AMIGO_ALVO.nome + ' da sua lista de amigos?')) return;
+
+    var fd = new FormData();
+    fd.append('amigo_id', PERFIL_AMIGO_ALVO.uid);
+    fetch('/usuario/amizade_remover.php', { method: 'POST', body: fd })
         .then(function (r) { return r.json(); })
         .then(function (data) {
             if (data.ok) location.reload();
