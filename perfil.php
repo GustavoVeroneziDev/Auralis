@@ -14,6 +14,7 @@ verificarExpiracao($pdo);
 garantirColunaFotoPerfilReal($pdo);
 garantirColunaInsigniasDestaque($pdo);
 garantirEstruturaCarteirasCompartilhadas($pdo);
+garantirTabelaAmizade($pdo);
 
 $uid = $_SESSION['usuario_id'];
 
@@ -49,6 +50,32 @@ $stmtStats = $pdo->prepare("
 ");
 $stmtStats->execute([':uid' => $uid, ':uid2' => $uid, ':uid3' => $uid]);
 $stats = $stmtStats->fetch(PDO::FETCH_ASSOC);
+
+// ── Amigos ──────────────────────────────────────────────────────────────────
+$pedidosRecebidos = [];
+$amigosAceitos    = [];
+try {
+    $stmtPed = $pdo->prepare("
+        SELECT a.IDAmizade, u.IDUsuario, u.Nome, u.FotoPerfil, u.FotoPerfilReal
+        FROM Amizade a
+        JOIN Usuario u ON u.IDUsuario = a.FKUsuarioSolicitante
+        WHERE a.FKUsuarioDestinatario = :uid AND a.Status = 'pendente'
+        ORDER BY a.CriadoEm DESC
+    ");
+    $stmtPed->execute([':uid' => $uid]);
+    $pedidosRecebidos = $stmtPed->fetchAll(PDO::FETCH_ASSOC);
+
+    $stmtAmigos = $pdo->prepare("
+        SELECT u.IDUsuario, u.Nome, u.FotoPerfil, u.FotoPerfilReal
+        FROM Amizade a
+        JOIN Usuario u ON u.IDUsuario = (CASE WHEN a.FKUsuarioSolicitante = :uid THEN a.FKUsuarioDestinatario ELSE a.FKUsuarioSolicitante END)
+        WHERE (a.FKUsuarioSolicitante = :uid2 OR a.FKUsuarioDestinatario = :uid3) AND a.Status = 'aceito'
+        ORDER BY a.RespondidoEm DESC
+    ");
+    $stmtAmigos->execute([':uid' => $uid, ':uid2' => $uid, ':uid3' => $uid]);
+    $amigosAceitos = $stmtAmigos->fetchAll(PDO::FETCH_ASSOC);
+} catch (Throwable $e) {
+}
 
 // ── Conquistas ───────────────────────────────────────────────────────────────
 $conquistas = [];
@@ -443,6 +470,48 @@ require_once 'geral/header.php';
                 <div class="stat-label"><i class="bi bi-tag me-1"></i>Categorias</div>
             </div>
         </div>
+    </div>
+
+    <!-- ── Amigos ──────────────────────────────────────────────────────────── -->
+    <div id="amigos" class="mb-4">
+        <div class="d-flex align-items-center justify-content-between mb-3 flex-wrap gap-2">
+            <h5 class="fw-bold mb-0"><i class="bi bi-people-fill me-2" style="color:#60a5fa;"></i>Amigos</h5>
+            <span class="text-muted small"><?= count($amigosAceitos) ?> amigo<?= count($amigosAceitos) !== 1 ? 's' : '' ?></span>
+        </div>
+
+        <?php if (!empty($pedidosRecebidos)): ?>
+        <div class="rounded-4 p-3 mb-3" style="background:rgba(96,165,250,.05);border:1px solid rgba(96,165,250,.18);">
+            <p class="text-secondary small mb-2 fw-semibold">Pedidos de amizade</p>
+            <div class="d-flex flex-column gap-2">
+                <?php foreach ($pedidosRecebidos as $p): ?>
+                <div class="d-flex align-items-center gap-2" id="pedidoAmizade_<?= htmlspecialchars($p['IDAmizade']) ?>">
+                    <?= renderAvatarUsuario($p, 36) ?>
+                    <span class="flex-grow-1 fw-semibold" style="font-size:.88rem;"><?= htmlspecialchars(explode(' ', $p['Nome'])[0]) ?></span>
+                    <button type="button" class="btn btn-sm rounded-pill px-3" style="background:var(--accent);color:#000;font-weight:600;"
+                        onclick="perfilResponderPedido('<?= htmlspecialchars($p['IDAmizade'], ENT_QUOTES) ?>','aceitar')">Aceitar</button>
+                    <button type="button" class="btn btn-sm btn-outline-secondary rounded-pill px-3"
+                        onclick="perfilResponderPedido('<?= htmlspecialchars($p['IDAmizade'], ENT_QUOTES) ?>','recusar')">Recusar</button>
+                </div>
+                <?php endforeach; ?>
+            </div>
+        </div>
+        <?php endif; ?>
+
+        <?php if (empty($amigosAceitos)): ?>
+        <div class="text-center py-4 text-muted rounded-4" style="background:var(--bg-card);border:1px solid var(--bs-border-color);">
+            <i class="bi bi-people" style="font-size:1.8rem;opacity:.3;display:block;margin-bottom:.5rem;"></i>
+            <p class="mb-0 small">Nenhum amigo ainda — clique em alguém no Ranking pra adicionar.</p>
+        </div>
+        <?php else: ?>
+        <div class="rounded-4 overflow-hidden" style="background:var(--bg-card);border:1px solid var(--bs-border-color);">
+            <?php foreach ($amigosAceitos as $i => $a): ?>
+            <div class="d-flex align-items-center gap-2 px-3 py-2" style="<?= $i > 0 ? 'border-top:1px solid var(--bs-border-color);' : '' ?>">
+                <?= renderAvatarUsuario($a, 34) ?>
+                <span class="fw-semibold" style="font-size:.85rem;"><?= htmlspecialchars($a['Nome']) ?></span>
+            </div>
+            <?php endforeach; ?>
+        </div>
+        <?php endif; ?>
     </div>
 
     <!-- ── Meu Personagem ─────────────────────────────────────────────────────
@@ -1122,6 +1191,18 @@ function mostrarEditorPersonagem() {
 function esconderEditorPersonagem() {
     var sec = document.getElementById('personagem');
     if (sec) sec.classList.add('d-none');
+}
+
+// ── Amigos: aceitar/recusar pedido direto do perfil ──────────────────────────
+function perfilResponderPedido(idAmizade, acao) {
+    var fd = new FormData();
+    fd.append('amizade_id', idAmizade);
+    fd.append('acao', acao);
+    fetch('/usuario/amizade_responder.php', { method: 'POST', body: fd })
+        .then(function (r) { return r.json(); })
+        .then(function (data) {
+            if (data.ok) location.reload();
+        });
 }
 
 // ── Código de convite (movido de Configurações pra cá) ───────────────────────

@@ -2040,3 +2040,90 @@ if (!function_exists('garantirColunasReforcoVencimento')) {
         }
     }
 }
+
+// ── Avatar de usuário (foto real > personagem DiceBear > iniciais) ──────────
+// Extraído do Ranking pra ser reaproveitado também no modal de perfil público.
+if (!function_exists('renderAvatarUsuario')) {
+    function renderAvatarUsuario(array $row, int $size = 40): string
+    {
+        if (!empty($row['FotoPerfilReal'])) {
+            return "<img src=\"" . htmlspecialchars($row['FotoPerfilReal']) . "\" width=\"{$size}\" height=\"{$size}\" "
+                . "style=\"border-radius:50%;object-fit:cover;flex-shrink:0;\">";
+        }
+        if (function_exists('getAvatarUrl')) {
+            $fp = json_decode($row['FotoPerfil'] ?? '', true);
+            if (is_array($fp) && ($fp['style'] ?? '') === 'avataaars') {
+                $url = getAvatarUrl($fp);
+                return "<img src=\"" . htmlspecialchars($url) . "\" width=\"{$size}\" height=\"{$size}\" "
+                    . "style=\"border-radius:50%;object-fit:cover;flex-shrink:0;\">";
+            }
+        }
+        $nome   = $row['Nome'] ?? '?';
+        $partes = array_filter(explode(' ', trim($nome)));
+        $ini    = implode('', array_map(fn($p) => strtoupper($p[0] ?? ''), $partes));
+        $ini    = mb_substr($ini, 0, 2);
+        $pal    = ['#6366f1', '#8b5cf6', '#ec4899', '#f59e0b', '#10b981', '#3b82f6', '#ef4444', '#06b6d4'];
+        $bg     = $pal[abs(crc32($nome)) % count($pal)];
+        $fs     = (int)round($size * 0.38);
+        return "<div style=\"width:{$size}px;height:{$size}px;border-radius:50%;background:{$bg};"
+            . "display:inline-flex;align-items:center;justify-content:center;"
+            . "font-size:{$fs}px;font-weight:700;color:#fff;flex-shrink:0;\">{$ini}</div>";
+    }
+}
+
+// ── Amizades ──────────────────────────────────────────────────────────────
+if (!function_exists('garantirTabelaAmizade')) {
+    function garantirTabelaAmizade(PDO $pdo): void
+    {
+        try {
+            $pdo->exec("
+                CREATE TABLE IF NOT EXISTS Amizade (
+                  IDAmizade             CHAR(36) NOT NULL PRIMARY KEY,
+                  FKUsuarioSolicitante  CHAR(36) NOT NULL,
+                  FKUsuarioDestinatario CHAR(36) NOT NULL,
+                  Status                ENUM('pendente','aceito','recusado') NOT NULL DEFAULT 'pendente',
+                  CriadoEm              DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+                  RespondidoEm          DATETIME NULL,
+                  UNIQUE KEY uq_amizade_par (FKUsuarioSolicitante, FKUsuarioDestinatario),
+                  KEY idx_amizade_destinatario (FKUsuarioDestinatario, Status),
+                  KEY idx_amizade_solicitante (FKUsuarioSolicitante, Status)
+                ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
+            ");
+        } catch (PDOException $e) {
+        }
+    }
+}
+
+// Status da amizade entre dois usuários, do ponto de vista de quem está olhando (uidViewer).
+// Retorna: proprio | nenhuma | pendente_enviado | pendente_recebido | amigos
+if (!function_exists('obterStatusAmizade')) {
+    function obterStatusAmizade(PDO $pdo, string $uidViewer, string $uidAlvo): array
+    {
+        if ($uidViewer === $uidAlvo) return ['status' => 'proprio', 'idAmizade' => null];
+
+        try {
+            $stmt = $pdo->prepare("
+                SELECT IDAmizade, FKUsuarioSolicitante, Status
+                FROM Amizade
+                WHERE (FKUsuarioSolicitante = :a AND FKUsuarioDestinatario = :b)
+                   OR (FKUsuarioSolicitante = :b2 AND FKUsuarioDestinatario = :a2)
+                LIMIT 1
+            ");
+            $stmt->execute([':a' => $uidViewer, ':b' => $uidAlvo, ':b2' => $uidAlvo, ':a2' => $uidViewer]);
+            $row = $stmt->fetch(PDO::FETCH_ASSOC);
+        } catch (PDOException $e) {
+            return ['status' => 'nenhuma', 'idAmizade' => null];
+        }
+
+        if (!$row) return ['status' => 'nenhuma', 'idAmizade' => null];
+        if ($row['Status'] === 'aceito') return ['status' => 'amigos', 'idAmizade' => $row['IDAmizade']];
+        if ($row['Status'] === 'recusado') return ['status' => 'nenhuma', 'idAmizade' => null];
+
+        // pendente
+        $souEuQueMandei = $row['FKUsuarioSolicitante'] === $uidViewer;
+        return [
+            'status'    => $souEuQueMandei ? 'pendente_enviado' : 'pendente_recebido',
+            'idAmizade' => $row['IDAmizade'],
+        ];
+    }
+}
