@@ -7,7 +7,7 @@ if (isset($_GET['token']) && !empty($_GET['token'])) {
 
     try {
         // Busca se existe alguém com esse token específico
-        $sql = "SELECT IDUsuario, Nome FROM Usuario WHERE TokenAtivacao = :token AND StatusConta = 'pendente' LIMIT 1";
+        $sql = "SELECT IDUsuario, Nome, Telefone FROM Usuario WHERE TokenAtivacao = :token AND StatusConta = 'pendente' LIMIT 1";
         $stmt = $pdo->prepare($sql);
         $stmt->execute([':token' => $token]);
         $usuario = $stmt->fetch(PDO::FETCH_ASSOC);
@@ -42,6 +42,22 @@ if (isset($_GET['token']) && !empty($_GET['token'])) {
                     VALUES (:nid, :uid)
                 ")->execute([':nid' => $nidBV, ':uid' => $usuario['IDUsuario']]);
             } catch (Throwable $e) { /* silencia — boas-vindas não devem bloquear a ativação */ }
+
+            // Boas-vindas por WhatsApp — só quem já cadastrou telefone no formulário de cadastro
+            if (!empty($usuario['Telefone'])) {
+                try {
+                    $primeiroNome = explode(' ', $usuario['Nome'])[0];
+                    $mensagem = "Oi, {$primeiroNome}! Bem-vindo(a) ao *Auralis* 🎉\n\n"
+                              . "Aqui é bem simples: eu te ajudo a organizar sua vida financeira sem complicação. Com o Auralis você pode:\n\n"
+                              . "• 💰 Registrar receitas e despesas\n"
+                              . "• 📅 Não esquecer nenhuma conta (te aviso quando tiver vencendo)\n"
+                              . "• 🐷 Guardar dinheiro em cofrinhos com metas\n"
+                              . "• 📊 Ver pra onde seu dinheiro tá indo, com gráficos fáceis de entender\n\n"
+                              . "E o melhor: *dá pra fazer tudo isso direto por aqui pelo WhatsApp* — é só me mandar uma mensagem tipo \"gastei 50 reais no mercado\" que eu já registro pra você, sem precisar abrir o site toda vez!\n\n"
+                              . "Qualquer dúvida, é só chamar por aqui. Bora organizar essa grana? 💪";
+                    enviarWhatsAppNotificacao($usuario['Telefone'], $mensagem);
+                } catch (Throwable $e) { /* silencia — boas-vindas não devem bloquear a ativação */ }
+            }
 
             // Manda pro login com sucesso
             header("Location: login.php?ativacao=sucesso");
