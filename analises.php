@@ -107,7 +107,7 @@ if ($carteira_selecionada) {
                 LEFT JOIN Categoria c ON r.FKCategoria = c.IDCategoria
                 WHERE r.FKCarteira = :carteira_id
                   AND r.StatusRegistro = 'efetivado'
-                  AND r.TipoRegistro IN ('receita','despesa')
+                  AND r.TipoRegistro IN ('receita','despesa','transferencia_entrada','transferencia_saida')
                   AND MONTH(r.MomentoRegistro) = :mes
                   AND YEAR(r.MomentoRegistro) = :ano
                 ORDER BY r.MomentoRegistro DESC
@@ -124,7 +124,10 @@ if ($carteira_selecionada) {
             $valor = (float) $t['Valor'];
             $cat   = $t['Categoria'];
 
-            if ($t['TipoRegistro'] === 'despesa') {
+            // transferencia_saida sai da carteira igual uma despesa; transferencia_entrada
+            // entra igual uma receita — do ponto de vista de uma carteira só (que é o escopo
+            // desta página), é exatamente esse o efeito real no saldo dela.
+            if ($t['TipoRegistro'] === 'despesa' || $t['TipoRegistro'] === 'transferencia_saida') {
                 $totalDespesas += $valor;
                 if (!isset($gastosPorCategoria[$cat])) {
                     $gastosPorCategoria[$cat] = 0;
@@ -164,7 +167,7 @@ if ($carteira_selecionada) {
                 LEFT JOIN Categoria c ON r.FKCategoria = c.IDCategoria
                 WHERE r.FKCarteira  = :carteira_id
                   AND r.StatusRegistro = 'efetivado'
-                  AND r.TipoRegistro IN ('receita','despesa')
+                  AND r.TipoRegistro IN ('receita','despesa','transferencia_entrada','transferencia_saida')
                   AND MONTH(r.MomentoRegistro) = :mes
                   AND YEAR(r.MomentoRegistro)  = :ano
             ";
@@ -176,7 +179,7 @@ if ($carteira_selecionada) {
         ]);
         foreach ($stmtAnt->fetchAll(PDO::FETCH_ASSOC) as $t) {
             $cat = $t['Categoria'];
-            if ($t['TipoRegistro'] === 'despesa') {
+            if ($t['TipoRegistro'] === 'despesa' || $t['TipoRegistro'] === 'transferencia_saida') {
                 $gastosPorCategoriaAnt[$cat] = ($gastosPorCategoriaAnt[$cat] ?? 0) + (float)$t['Valor'];
             } else {
                 $receitasPorCategoriaAnt[$cat] = ($receitasPorCategoriaAnt[$cat] ?? 0) + (float)$t['Valor'];
@@ -1705,9 +1708,12 @@ require_once 'geral/header.php';
         badgeCategoria.innerText = categoriaFiltro;
         badgeCategoria.className = tipo === 'despesa' ? 'badge bg-warning text-dark' : 'badge bg-info text-dark';
 
-        const transacoesFiltradas = transacoesBrutas.filter(t =>
-            t.TipoRegistro === tipo && t.Categoria === categoriaFiltro
-        );
+        const transacoesFiltradas = transacoesBrutas.filter(t => {
+            const mesmoGrupo = tipo === 'despesa'
+                ? (t.TipoRegistro === 'despesa' || t.TipoRegistro === 'transferencia_saida')
+                : (t.TipoRegistro === 'receita' || t.TipoRegistro === 'transferencia_entrada');
+            return mesmoGrupo && t.Categoria === categoriaFiltro;
+        });
 
         const totalAtual = tipo === 'despesa' ?
             (gastosCatAtual[categoriaFiltro] || 0) :
