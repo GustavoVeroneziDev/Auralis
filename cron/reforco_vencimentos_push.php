@@ -37,7 +37,9 @@ try {
     exit(1);
 }
 
-$marcarProcessado = $pdo->prepare("UPDATE Registro SET PushReforcoEm = NOW() WHERE IDRegistro = :id");
+// WHERE ...IS NULL torna a marcação atômica por linha — protege contra o cron rodar
+// duplicado (ex: entrada repetida no cPanel) e mandar a mesma notificação duas vezes.
+$marcarProcessado = $pdo->prepare("UPDATE Registro SET PushReforcoEm = NOW() WHERE IDRegistro = :id AND PushReforcoEm IS NULL");
 
 $grupos = [];
 foreach ($contas as $c) {
@@ -47,28 +49,32 @@ foreach ($contas as $c) {
 
 $usuariosNotificados = [];
 foreach ($grupos as $grupo) {
-    $usuarioId  = $grupo[0]['FKUsuario'];
-    $ehDespesa  = $grupo[0]['TipoRegistro'] === 'despesa';
+    $itens = [];
+    foreach ($grupo as $c) {
+        $marcarProcessado->execute([':id' => $c['IDRegistro']]);
+        if ($marcarProcessado->rowCount() > 0) $itens[] = $c;
+    }
+    if (!$itens) continue;
+
+    $usuarioId  = $itens[0]['FKUsuario'];
+    $ehDespesa  = $itens[0]['TipoRegistro'] === 'despesa';
     $sinal      = $ehDespesa ? '-' : '+';
-    $totalValor = array_sum(array_map(fn($c) => (float)$c['Valor'], $grupo));
+    $totalValor = array_sum(array_map(fn($c) => (float)$c['Valor'], $itens));
     $totalFmt   = '(' . $sinal . ' R$ ' . number_format($totalValor, 2, ',', '.') . ')';
 
-    if (count($grupo) === 1) {
+    if (count($itens) === 1) {
         $tipoLabel = $ehDespesa ? 'Conta' : 'Recebimento';
         $titulo    = $tipoLabel . ' ainda pendente hoje';
-        $corpo     = $grupo[0]['Descricao'] . ' ' . $totalFmt;
+        $corpo     = $itens[0]['Descricao'] . ' ' . $totalFmt;
     } else {
         $tipoLabel  = $ehDespesa ? 'contas' : 'recebimentos';
-        $descricoes = array_map(fn($c) => $c['Descricao'], $grupo);
+        $descricoes = array_map(fn($c) => $c['Descricao'], $itens);
         $listaDesc  = implode(', ', array_slice($descricoes, 0, 3)) . (count($descricoes) > 3 ? '…' : '');
-        $titulo     = count($grupo) . ' ' . $tipoLabel . ' ainda pendentes hoje';
+        $titulo     = count($itens) . ' ' . $tipoLabel . ' ainda pendentes hoje';
         $corpo      = $listaDesc . ' ' . $totalFmt . ' no total';
     }
 
     $enviados = enviarPushParaUsuario($pdo, $usuarioId, $titulo, $corpo, '/agenda.php');
-    foreach ($grupo as $c) {
-        $marcarProcessado->execute([':id' => $c['IDRegistro']]);
-    }
     if ($enviados > 0) $usuariosNotificados[$usuarioId] = true;
 }
 

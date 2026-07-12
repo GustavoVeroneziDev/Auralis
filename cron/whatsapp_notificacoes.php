@@ -48,7 +48,13 @@ try {
     exit(1);
 }
 
-$marcar = $pdo->prepare("UPDATE Registro SET WhatsAppNotificadoEm = NOW() WHERE IDRegistro = :id");
+// WHERE ...IS NULL torna essa marcação atômica por linha: se o cron rodar duas vezes ao
+// mesmo tempo (ex: entrada duplicada no cPanel), só um dos processos consegue reivindicar
+// cada registro — o outro tenta, rowCount() vem 0, e ele simplesmente não manda nada pra
+// aquele item. Sem isso, os dois liam a mesma lista antes de qualquer um marcar e mandavam
+// a mesma mensagem em duplicidade.
+$marcar  = $pdo->prepare("UPDATE Registro SET WhatsAppNotificadoEm = NOW() WHERE IDRegistro = :id AND WhatsAppNotificadoEm IS NULL");
+$liberar = $pdo->prepare("UPDATE Registro SET WhatsAppNotificadoEm = NULL WHERE IDRegistro = :id");
 
 // Agrupa por usuário + tipo para condensar múltiplos registros em uma mensagem
 $grupos = [];
@@ -59,13 +65,20 @@ foreach ($contas as $c) {
 
 $enviados = 0;
 foreach ($grupos as $grupo) {
-    $telefone  = $grupo[0]['Telefone'];
-    $ehDespesa = $grupo[0]['TipoRegistro'] === 'despesa';
+    $itens = [];
+    foreach ($grupo as $c) {
+        $marcar->execute([':id' => $c['IDRegistro']]);
+        if ($marcar->rowCount() > 0) $itens[] = $c;
+    }
+    if (!$itens) continue;
+
+    $telefone  = $itens[0]['Telefone'];
+    $ehDespesa = $itens[0]['TipoRegistro'] === 'despesa';
     $sinal     = $ehDespesa ? '-' : '+';
 
     // Separa vencendo hoje dos vencidos
-    $hoje    = array_filter($grupo, fn($c) => (int)$c['DiasAtraso'] === 0);
-    $vencido = array_filter($grupo, fn($c) => (int)$c['DiasAtraso'] > 0);
+    $hoje    = array_filter($itens, fn($c) => (int)$c['DiasAtraso'] === 0);
+    $vencido = array_filter($itens, fn($c) => (int)$c['DiasAtraso'] > 0);
 
     $partes = [];
 
@@ -109,14 +122,14 @@ foreach ($grupos as $grupo) {
 
     $ok = enviarWhatsAppNotificacao($telefone, $mensagem);
 
-    // Só marca como notificado quando o envio realmente deu certo — se falhar (Evolution API
-    // fora do ar, instância desconectada etc.), tenta de novo no cron do dia seguinte em vez
-    // de marcar como enviado e perder o aviso silenciosamente pra sempre.
     if ($ok) {
-        foreach ($grupo as $c) {
-            $marcar->execute([':id' => $c['IDRegistro']]);
-        }
         $enviados++;
+    } else {
+        // Envio falhou depois de já reivindicado — libera pra tentar de novo no cron seguinte
+        // em vez de marcar como enviado e perder o aviso silenciosamente pra sempre.
+        foreach ($itens as $c) {
+            $liberar->execute([':id' => $c['IDRegistro']]);
+        }
     }
 }
 

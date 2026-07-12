@@ -44,7 +44,10 @@ try {
     exit(1);
 }
 
-$marcar = $pdo->prepare("UPDATE Registro SET WhatsAppReforcoEm = NOW() WHERE IDRegistro = :id");
+// WHERE ...IS NULL torna a marcação atômica por linha — protege contra o cron rodar
+// duplicado (ex: entrada repetida no cPanel) e mandar a mesma mensagem duas vezes.
+$marcar  = $pdo->prepare("UPDATE Registro SET WhatsAppReforcoEm = NOW() WHERE IDRegistro = :id AND WhatsAppReforcoEm IS NULL");
+$liberar = $pdo->prepare("UPDATE Registro SET WhatsAppReforcoEm = NULL WHERE IDRegistro = :id");
 
 $grupos = [];
 foreach ($contas as $c) {
@@ -54,22 +57,29 @@ foreach ($contas as $c) {
 
 $enviados = 0;
 foreach ($grupos as $grupo) {
-    $telefone  = $grupo[0]['Telefone'];
-    $ehDespesa = $grupo[0]['TipoRegistro'] === 'despesa';
+    $itens = [];
+    foreach ($grupo as $c) {
+        $marcar->execute([':id' => $c['IDRegistro']]);
+        if ($marcar->rowCount() > 0) $itens[] = $c;
+    }
+    if (!$itens) continue;
+
+    $telefone  = $itens[0]['Telefone'];
+    $ehDespesa = $itens[0]['TipoRegistro'] === 'despesa';
     $sinal     = $ehDespesa ? '-' : '+';
 
-    $totalValor = array_sum(array_map(fn($c) => (float)$c['Valor'], $grupo));
+    $totalValor = array_sum(array_map(fn($c) => (float)$c['Valor'], $itens));
     $fmtValor   = 'R$ ' . number_format($totalValor, 2, ',', '.');
 
-    if (count($grupo) === 1) {
-        $item      = reset($grupo);
+    if (count($itens) === 1) {
+        $item      = reset($itens);
         $tipoLabel = $ehDespesa ? 'conta' : 'recebimento';
         $texto     = "*{$item['Descricao']}* ({$sinal}{$fmtValor})";
     } else {
         $tipoLabel = $ehDespesa ? 'contas' : 'recebimentos';
-        $nomes = implode(', ', array_map(fn($c) => $c['Descricao'], array_slice($grupo, 0, 3)));
-        $extra = count($grupo) > 3 ? ' e mais ' . (count($grupo) - 3) . '...' : '';
-        $texto = count($grupo) . " {$tipoLabel}: {$nomes}{$extra} ({$sinal}{$fmtValor} total)";
+        $nomes = implode(', ', array_map(fn($c) => $c['Descricao'], array_slice($itens, 0, 3)));
+        $extra = count($itens) > 3 ? ' e mais ' . (count($itens) - 3) . '...' : '';
+        $texto = count($itens) . " {$tipoLabel}: {$nomes}{$extra} ({$sinal}{$fmtValor} total)";
     }
 
     $mensagem  = "Passando pra lembrar de novo 🔔 *Auralis*\n\n";
@@ -79,10 +89,11 @@ foreach ($grupos as $grupo) {
     $ok = enviarWhatsAppNotificacao($telefone, $mensagem);
 
     if ($ok) {
-        foreach ($grupo as $c) {
-            $marcar->execute([':id' => $c['IDRegistro']]);
-        }
         $enviados++;
+    } else {
+        foreach ($itens as $c) {
+            $liberar->execute([':id' => $c['IDRegistro']]);
+        }
     }
 }
 
