@@ -111,6 +111,19 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && ($_POST['action'] ?? '') === 'mover
         echo json_encode(['ok' => false, 'erro' => 'Dados inválidos']); exit;
     }
     try {
+        // Confirma existência/permissão ANTES de mexer — não dá pra confiar em rowCount()
+        // depois do UPDATE pra isso: o driver do PDO_MYSQL conta linhas REALMENTE alteradas,
+        // não linhas encontradas, então mover pro mesmo dia (sem mudar nada) reportaria "0"
+        // mesmo com tudo certo. Sem essa checagem antes, um WHERE que não batia com nada
+        // (permissão, ID já apagado etc.) ainda respondia "ok" — a interface achava que
+        // moveu, mas o banco nunca mudou.
+        $stmtChk = $pdo->prepare("SELECT 1 FROM Registro WHERE IDRegistro = :id AND $_whereRegPermitido");
+        $stmtChk->execute([':id' => $id, ':uid' => $usuario_id, ':uid2' => $usuario_id]);
+        if (!$stmtChk->fetch()) {
+            echo json_encode(['ok' => false, 'erro' => 'Registro não encontrado ou sem permissão']);
+            exit;
+        }
+
         $pdo->prepare("
             UPDATE Registro
             SET DataVencimento  = CASE WHEN DataVencimento IS NOT NULL THEN :nd1 ELSE NULL END,

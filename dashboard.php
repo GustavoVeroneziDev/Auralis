@@ -75,9 +75,26 @@ try {
         $mesAnterior = date('Y-m', strtotime('-1 month'));
 
         // CORREÇÃO: TO_CHAR trocado por DATE_FORMAT e booleano para 1
-        $sqlRec  = "SELECT * FROM Registro WHERE FKUsuario = :uid AND Recorrente = 1 AND (GrupoParcela IS NULL OR TotalParcelas IS NOT NULL) AND DATE_FORMAT(MomentoRegistro, '%Y-%m') = :mes_ant";
+        // O NOT EXISTS é a proteção de verdade contra duplicar — antes disso, a única
+        // barreira era a trava "ultima_recorrencia" abaixo; se aquela gravação falhasse
+        // por qualquer motivo (e o catch engolia o erro), esse bloco recriava a mesma
+        // conta recorrente a cada carregamento do Dashboard, sem parar nunca.
+        $sqlRec  = "SELECT r.* FROM Registro r
+                    WHERE r.FKUsuario = :uid AND r.Recorrente = 1
+                      AND (r.GrupoParcela IS NULL OR r.TotalParcelas IS NOT NULL)
+                      AND DATE_FORMAT(r.MomentoRegistro, '%Y-%m') = :mes_ant
+                      AND NOT EXISTS (
+                          SELECT 1 FROM Registro r2
+                          WHERE r2.FKUsuario = r.FKUsuario
+                            AND r2.FKCarteira = r.FKCarteira
+                            AND r2.Recorrente = 1
+                            AND r2.TipoRegistro = r.TipoRegistro
+                            AND r2.Descricao = r.Descricao
+                            AND r2.Valor = r.Valor
+                            AND DATE_FORMAT(r2.MomentoRegistro, '%Y-%m') = :mes_atual
+                      )";
         $stmtRec = $pdo->prepare($sqlRec);
-        $stmtRec->execute([':uid' => $usuario_id, ':mes_ant' => $mesAnterior]);
+        $stmtRec->execute([':uid' => $usuario_id, ':mes_ant' => $mesAnterior, ':mes_atual' => $mesAnoAtual]);
         $contas = $stmtRec->fetchAll();
 
         if (!empty($contas)) {
