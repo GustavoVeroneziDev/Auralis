@@ -111,27 +111,34 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && ($_POST['action'] ?? '') === 'mover
         echo json_encode(['ok' => false, 'erro' => 'Dados inválidos']); exit;
     }
     try {
-        // Confirma existência/permissão ANTES de mexer — não dá pra confiar em rowCount()
-        // depois do UPDATE pra isso: o driver do PDO_MYSQL conta linhas REALMENTE alteradas,
-        // não linhas encontradas, então mover pro mesmo dia (sem mudar nada) reportaria "0"
-        // mesmo com tudo certo. Sem essa checagem antes, um WHERE que não batia com nada
-        // (permissão, ID já apagado etc.) ainda respondia "ok" — a interface achava que
-        // moveu, mas o banco nunca mudou.
-        $stmtChk = $pdo->prepare("SELECT 1 FROM Registro WHERE IDRegistro = :id AND $_whereRegPermitido");
+        // Confirma existência/permissão ANTES de mexer, e já traz as duas datas — precisa
+        // delas em PHP pra calcular o deslocamento (não dá pra confiar em rowCount() depois
+        // do UPDATE pra validar sucesso: o driver do PDO_MYSQL conta linhas REALMENTE
+        // alteradas, não linhas encontradas, então mover pro mesmo dia reportaria "0" mesmo
+        // com tudo certo).
+        $stmtChk = $pdo->prepare("SELECT MomentoRegistro, DataVencimento FROM Registro WHERE IDRegistro = :id AND $_whereRegPermitido");
         $stmtChk->execute([':id' => $id, ':uid' => $usuario_id, ':uid2' => $usuario_id]);
-        if (!$stmtChk->fetch()) {
+        $reg = $stmtChk->fetch(PDO::FETCH_ASSOC);
+        if (!$reg) {
             echo json_encode(['ok' => false, 'erro' => 'Registro não encontrado ou sem permissão']);
             exit;
         }
 
-        $pdo->prepare("
-            UPDATE Registro
-            SET DataVencimento  = CASE WHEN DataVencimento IS NOT NULL THEN :nd1 ELSE NULL END,
-                MomentoRegistro = CASE WHEN DataVencimento IS NULL
-                                       THEN CONCAT(:nd2, ' ', TIME(MomentoRegistro))
-                                       ELSE MomentoRegistro END
-            WHERE IDRegistro = :id AND $_whereRegPermitido
-        ")->execute([':nd1' => $novaData, ':nd2' => $novaData, ':id' => $id, ':uid' => $usuario_id, ':uid2' => $usuario_id]);
+        if ($reg['DataVencimento'] !== null) {
+            // Desloca as duas datas pelo mesmo número de dias, preservando o intervalo entre
+            // registro e vencimento — antes só o vencimento pulava pro dia solto e a data de
+            // registro (a que a listagem principal do Dashboard exibe/ordena) ficava travada
+            // na original, fazendo parecer que o item nunca se moveu.
+            $deltaDias   = (int) round((strtotime($novaData) - strtotime(substr($reg['DataVencimento'], 0, 10))) / 86400);
+            $hora        = date('H:i:s', strtotime($reg['MomentoRegistro']));
+            $novoMomento = date('Y-m-d', strtotime(substr($reg['MomentoRegistro'], 0, 10)) + $deltaDias * 86400) . ' ' . $hora;
+            $pdo->prepare("UPDATE Registro SET DataVencimento = :nd, MomentoRegistro = :nm WHERE IDRegistro = :id AND $_whereRegPermitido")
+                ->execute([':nd' => $novaData, ':nm' => $novoMomento, ':id' => $id, ':uid' => $usuario_id, ':uid2' => $usuario_id]);
+        } else {
+            $hora = date('H:i:s', strtotime($reg['MomentoRegistro']));
+            $pdo->prepare("UPDATE Registro SET MomentoRegistro = :nm WHERE IDRegistro = :id AND $_whereRegPermitido")
+                ->execute([':nm' => $novaData . ' ' . $hora, ':id' => $id, ':uid' => $usuario_id, ':uid2' => $usuario_id]);
+        }
         echo json_encode(['ok' => true]);
     } catch (PDOException $e) {
         echo json_encode(['ok' => false, 'erro' => $e->getMessage()]);
@@ -167,7 +174,16 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && ($_POST['action'] ?? '') === 'dupli
 
         if ($novaData !== '') {
             if ($vencimento !== null) {
+                // Desloca as duas datas pelo mesmo número de dias, preservando o intervalo
+                // entre registro e vencimento — antes só o vencimento pulava pra nova data e
+                // a data de registro ficava travada na original, quebrando a relação entre as
+                // duas (ex: registro e vencimento no mesmo dia viravam dias diferentes depois
+                // de duplicar, e a listagem principal — que exibe pela data de registro —
+                // continuava mostrando a cópia no dia velho).
+                $deltaDias  = (int) round((strtotime($novaData) - strtotime(substr($vencimento, 0, 10))) / 86400);
                 $vencimento = $novaData;
+                $hora       = date('H:i:s', strtotime($momento));
+                $momento    = date('Y-m-d', strtotime(substr($momento, 0, 10)) + $deltaDias * 86400) . ' ' . $hora;
             } else {
                 $hora    = date('H:i:s', strtotime($momento));
                 $momento = $novaData . ' ' . $hora;
