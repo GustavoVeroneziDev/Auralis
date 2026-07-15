@@ -518,16 +518,16 @@ require_once 'geral/header.php';
             <span class="text-muted small"><?= count($amigosAceitos) ?> amigo<?= count($amigosAceitos) !== 1 ? 's' : '' ?></span>
         </div>
 
-        <?php if (!empty($r_amigosComum)): ?>
         <button type="button" class="btn btn-sm w-100 mb-3 rounded-4 d-flex align-items-center gap-2 py-2 px-3"
             style="background:rgba(167,139,250,.08);border:1px solid rgba(167,139,250,.25);color:#a78bfa;"
             data-bs-toggle="modal" data-bs-target="#modalAmigoDoMeuAmigo">
             <i class="bi bi-people-fill"></i>
             <span class="fw-semibold flex-grow-1 text-start">Amigo do Meu Amigo</span>
+            <?php if (!empty($r_amigosComum)): ?>
             <span class="badge rounded-pill" style="background:#a78bfa22;color:#a78bfa;"><?= count($r_amigosComum) ?></span>
+            <?php endif; ?>
             <i class="bi bi-chevron-right small"></i>
         </button>
-        <?php endif; ?>
 
         <?php if (!empty($pedidosRecebidos)): ?>
         <div class="rounded-4 p-3 mb-3" style="background:rgba(96,165,250,.05);border:1px solid rgba(96,165,250,.18);">
