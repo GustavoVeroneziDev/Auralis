@@ -182,6 +182,48 @@ $pos_categorias = !_usuarioNaLista($r_categorias, $uid) ? _minhaPosicao(
     $uid
 ) : null;
 
+// ── "Amigo do Meu Amigo" — sugestões por amizade em comum ────────────────────
+// Não é uma disputa/ranking de verdade (não faz sentido "sua posição" aqui), é uma
+// lista de descoberta: gente que tem pelo menos 1 amigo em comum com você e que
+// você ainda não é amigo nem já tem convite pendente. Cada linha da junção abaixo
+// representa exatamente 1 amigo em comum, então COUNT(*) já é a contagem certa —
+// nem precisa de HAVING, quem não tem nenhum amigo em comum simplesmente não
+// aparece no resultado.
+$r_amigosComum = [];
+try {
+    $stmtAC = $pdo->prepare("
+        SELECT candidato.IDUsuario, candidato.Nome, candidato.FotoPerfil, candidato.FotoPerfilReal,
+               COUNT(*) AS total
+        FROM (
+            SELECT CASE WHEN FKUsuarioSolicitante = :uid1 THEN FKUsuarioDestinatario ELSE FKUsuarioSolicitante END AS FKAmigo
+            FROM Amizade
+            WHERE Status = 'aceito' AND (FKUsuarioSolicitante = :uid2 OR FKUsuarioDestinatario = :uid3)
+        ) meus_amigos
+        JOIN Amizade a2
+             ON a2.Status = 'aceito'
+            AND (a2.FKUsuarioSolicitante = meus_amigos.FKAmigo OR a2.FKUsuarioDestinatario = meus_amigos.FKAmigo)
+        JOIN Usuario candidato
+             ON candidato.IDUsuario = CASE WHEN a2.FKUsuarioSolicitante = meus_amigos.FKAmigo
+                                            THEN a2.FKUsuarioDestinatario ELSE a2.FKUsuarioSolicitante END
+        WHERE candidato.IDUsuario != :uid4
+          AND candidato.StatusConta = 'ativo'
+          AND candidato.IDUsuario NOT IN (
+              SELECT CASE WHEN FKUsuarioSolicitante = :uid5 THEN FKUsuarioDestinatario ELSE FKUsuarioSolicitante END
+              FROM Amizade
+              WHERE Status IN ('aceito','pendente') AND (FKUsuarioSolicitante = :uid6 OR FKUsuarioDestinatario = :uid7)
+          )
+        GROUP BY candidato.IDUsuario, candidato.Nome, candidato.FotoPerfil, candidato.FotoPerfilReal
+        ORDER BY total DESC, candidato.Nome ASC
+        LIMIT 20
+    ");
+    $stmtAC->execute([
+        ':uid1' => $uid, ':uid2' => $uid, ':uid3' => $uid, ':uid4' => $uid,
+        ':uid5' => $uid, ':uid6' => $uid, ':uid7' => $uid,
+    ]);
+    $r_amigosComum = $stmtAC->fetchAll(PDO::FETCH_ASSOC);
+} catch (Throwable $e) {
+}
+
 require_once 'geral/header.php';
 ?>
 
@@ -211,6 +253,7 @@ require_once 'geral/header.php';
             ['id' => 'comprovantes', 'icon' => 'bi-receipt',               'cor' => '#10b981', 'label' => 'Comprovantes'],
             ['id' => 'veteranos',   'icon' => 'bi-calendar-heart-fill',   'cor' => '#ec4899', 'label' => 'Veteranos'],
             ['id' => 'categorias',  'icon' => 'bi-tags-fill',             'cor' => '#60a5fa', 'label' => 'Categorias'],
+            ['id' => 'amigos-comum', 'icon' => 'bi-people-fill',          'cor' => '#a78bfa', 'label' => 'Amigo do Meu Amigo'],
         ];
         foreach ($tabs as $i => $t): ?>
             <li class="nav-item flex-shrink-0" role="presentation">
@@ -477,10 +520,49 @@ require_once 'geral/header.php';
                         </div>
                     <?php endif; ?>
 
-                <?php endif; // empty check 
+                <?php endif; // empty check
                 ?>
             </div>
         <?php endforeach; ?>
+
+        <!-- ── Amigo do Meu Amigo — não é disputa, é descoberta ────────────────── -->
+        <div class="tab-pane fade" id="pane-amigos-comum" role="tabpanel">
+            <div class="d-flex align-items-center gap-2 mb-4">
+                <i class="bi bi-people-fill fs-5" style="color:#a78bfa;"></i>
+                <div>
+                    <h2 class="fw-bold mb-0" style="font-size:1.15rem;color:var(--text-main);">Amigo do Meu Amigo</h2>
+                    <p class="text-secondary mb-0" style="font-size:.78rem;">Essa galera já é praticamente sua também</p>
+                </div>
+            </div>
+
+            <?php if (empty($r_amigosComum)): ?>
+                <div class="text-center py-5 text-secondary">
+                    <i class="bi bi-people fs-1 opacity-25 d-block mb-3" style="color:#a78bfa;"></i>
+                    <p class="mb-0">Ninguém em comum por enquanto — adicione alguns amigos e a galera deles vai aparecer aqui.</p>
+                </div>
+            <?php else: ?>
+                <div class="rounded-4 overflow-hidden" style="border:1px solid var(--card-border-color);">
+                    <?php foreach ($r_amigosComum as $ri => $entry): ?>
+                        <div class="d-flex align-items-center gap-3 px-4 py-3"
+                            style="<?= $ri > 0 ? 'border-top:1px solid var(--card-border-color);' : '' ?>cursor:pointer;"
+                            onclick="abrirPerfilPublico('<?= htmlspecialchars($entry['IDUsuario'], ENT_QUOTES) ?>')">
+
+                            <?= _rankAvatar($entry, 36) ?>
+
+                            <div class="flex-grow-1 min-w-0">
+                                <span class="fw-semibold text-truncate d-block" style="font-size:.88rem;color:var(--text-main);">
+                                    <?= htmlspecialchars(_primeiroNome($entry['Nome'])) ?>
+                                </span>
+                            </div>
+
+                            <span style="font-size:.78rem;font-weight:600;color:#a78bfa;white-space:nowrap;">
+                                <?= (int)$entry['total'] ?> amigo<?= (int)$entry['total'] > 1 ? 's' : '' ?> em comum
+                            </span>
+                        </div>
+                    <?php endforeach; ?>
+                </div>
+            <?php endif; ?>
+        </div>
     </div>
 
     <!-- ── Modal: Perfil público (aberto ao clicar em alguém no ranking) ────── -->
