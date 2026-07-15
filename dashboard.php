@@ -135,7 +135,7 @@ try {
 // ==============================================================================
 
 // ── Preferências do Dashboard ─────────────────────────────────────────────
-$dashPrefs = ['cofrinhos' => true, 'cartoes' => true, 'receita_pendente' => true, 'despesa_pendente' => true, 'saldo_projetado' => true];
+$dashPrefs = ['cofrinhos' => true, 'cartoes' => true, 'agenda' => true, 'receita_pendente' => true, 'despesa_pendente' => true, 'saldo_projetado' => true];
 try {
     $stmtPrefs = $pdo->prepare("SELECT Chave, Valor FROM ConfiguracaoSistema WHERE FKUsuario = :uid AND Chave LIKE 'dash_%'");
     $stmtPrefs->execute([':uid' => $usuario_id]);
@@ -624,6 +624,33 @@ try {
 } catch (PDOException $e) {
 }
 
+// ── Agenda: contas pendentes vencidas ou vencendo nos próximos 14 dias ────
+// Lista simples e curta de propósito (não um mini-calendário) — pensada pra ser
+// lida rápido, principalmente no celular. Quem quiser o painel completo (mover
+// dia, editar em lote etc.) clica em "Ver tudo" e vai pra agenda.php de verdade.
+$agendaDash = [];
+if ($carteira_selecionada) {
+    try {
+        $stmtAgenda = $pdo->prepare("
+            SELECT r.IDRegistro, r.Descricao, r.Valor, r.TipoRegistro, r.DataVencimento,
+                   COALESCE(c.IconeCategoria, 'bi-tag') AS Icone,
+                   DATEDIFF(r.DataVencimento, CURDATE()) AS DiasParaVencer
+            FROM Registro r
+            LEFT JOIN Categoria c ON r.FKCategoria = c.IDCategoria
+            WHERE r.FKCarteira = :carteira_id
+              AND r.StatusRegistro = 'pendente'
+              AND r.TipoRegistro IN ('receita','despesa')
+              AND r.DataVencimento IS NOT NULL
+              AND r.DataVencimento <= DATE_ADD(CURDATE(), INTERVAL 14 DAY)
+            ORDER BY r.DataVencimento ASC
+            LIMIT 8
+        ");
+        $stmtAgenda->execute([':carteira_id' => $carteira_selecionada]);
+        $agendaDash = $stmtAgenda->fetchAll(PDO::FETCH_ASSOC);
+    } catch (PDOException $e) {
+    }
+}
+
 // ── Verifica se assinatura ainda está válida (1x por sessão) ────────────
 verificarExpiracao($pdo);
 
@@ -1076,6 +1103,57 @@ require_once 'geral/header.php';
                             </div>
                         </a>
                     </div>
+                <?php endforeach; ?>
+            </div>
+        <?php endif; ?>
+
+        <?php if ($dashPrefs['agenda'] && !empty($agendaDash)): ?>
+            <!-- ── Seção de Agenda ───────────────────────────────────────────── -->
+            <div class="d-flex align-items-center justify-content-between mb-3 mt-4 no-print">
+                <button class="d-flex align-items-center gap-2 btn p-0 border-0 bg-transparent" onclick="toggleSection('agenda')">
+                    <i class="bi bi-calendar3" style="color:var(--primary-gold-analysis);font-size:1rem;"></i>
+                    <span class="fw-bold text-light" style="font-size:1.05rem;">Agenda</span>
+                    <span class="text-secondary fw-normal small"><?= count($agendaDash) ?> pendente<?= count($agendaDash) > 1 ? 's' : '' ?></span>
+                    <i class="bi bi-chevron-up text-secondary ms-1" id="chev-agenda" style="font-size:0.75rem;transition:transform .2s;"></i>
+                </button>
+                <a href="/agenda.php" class="text-decoration-none small flex-shrink-0" style="color:var(--text-muted);">
+                    Ver tudo <i class="bi bi-arrow-right ms-1"></i>
+                </a>
+            </div>
+
+            <div id="sec-agenda" class="rounded-4 overflow-hidden mb-4 no-print" style="background:var(--bg-card);border:1px solid var(--bs-border-color);">
+                <?php foreach ($agendaDash as $i => $ag):
+                    $diasAg     = (int)$ag['DiasParaVencer'];
+                    $ehDespesaAg = $ag['TipoRegistro'] === 'despesa';
+                    $sinalAg    = $ehDespesaAg ? '-' : '+';
+                    $valorFmtAg = 'R$ ' . number_format((float)$ag['Valor'], 2, ',', '.');
+
+                    if ($diasAg < 0) {
+                        $corStatusAg = '#ef4444';
+                        $txtStatusAg = 'Vencida há ' . abs($diasAg) . ' dia' . (abs($diasAg) > 1 ? 's' : '');
+                    } elseif ($diasAg === 0) {
+                        $corStatusAg = '#f59e0b';
+                        $txtStatusAg = 'Vence hoje';
+                    } else {
+                        $corStatusAg = 'var(--text-muted)';
+                        $txtStatusAg = 'Vence em ' . $diasAg . ' dia' . ($diasAg > 1 ? 's' : '');
+                    }
+                ?>
+                <a href="/nova_transacao.php?editar=<?= urlencode($ag['IDRegistro']) ?>&voltar=<?= urlencode('/dashboard.php') ?>"
+                   class="d-flex align-items-center gap-3 px-3 py-3 text-decoration-none transition-hover"
+                   style="<?= $i > 0 ? 'border-top:1px solid var(--bs-border-color);' : '' ?>">
+                    <span class="d-flex align-items-center justify-content-center rounded-circle flex-shrink-0"
+                          style="width:38px;height:38px;background:<?= $corStatusAg ?>18;">
+                        <i class="bi <?= htmlspecialchars($ag['Icone']) ?>" style="color:<?= $corStatusAg ?>;font-size:1rem;"></i>
+                    </span>
+                    <div class="flex-grow-1 min-w-0">
+                        <div class="fw-semibold text-light text-truncate" style="font-size:0.88rem;"><?= htmlspecialchars($ag['Descricao']) ?></div>
+                        <div style="font-size:0.72rem;color:<?= $corStatusAg ?>;font-weight:600;"><?= $txtStatusAg ?></div>
+                    </div>
+                    <span class="fw-bold flex-shrink-0" style="font-size:0.9rem;color:<?= $ehDespesaAg ? '#ef4444' : '#22c55e' ?>;">
+                        <?= $sinalAg . $valorFmtAg ?>
+                    </span>
+                </a>
                 <?php endforeach; ?>
             </div>
         <?php endif; ?>
@@ -2222,7 +2300,7 @@ require_once 'geral/header.php';
     }
 
     (function() {
-        ['cofrinhos','cartoes'].forEach(function(key) {
+        ['cofrinhos','cartoes','agenda'].forEach(function(key) {
             var saved = null;
             try { saved = localStorage.getItem('dash_sec_' + key); } catch(e) {}
             if (saved === '0') {

@@ -131,7 +131,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
     // AÇÃO 6: PREFERÊNCIAS DO DASHBOARD
     if (isset($_POST['action']) && $_POST['action'] === 'salvar_pref_dashboard') {
-        $campos = ['cofrinhos', 'cartoes', 'receita_pendente', 'despesa_pendente', 'saldo_projetado'];
+        $campos = ['cofrinhos', 'cartoes', 'agenda', 'receita_pendente', 'despesa_pendente', 'saldo_projetado'];
         try {
             foreach ($campos as $campo) {
                 $valor = isset($_POST["dash_$campo"]) ? '1' : '0';
@@ -269,7 +269,7 @@ try {
 }
 
 // ── Preferências do Dashboard ────────────────────────────────────────────────
-$dashPrefsCfg = ['cofrinhos' => '1', 'cartoes' => '1', 'receita_pendente' => '1', 'despesa_pendente' => '1', 'saldo_projetado' => '1'];
+$dashPrefsCfg = ['cofrinhos' => '1', 'cartoes' => '1', 'agenda' => '1', 'receita_pendente' => '1', 'despesa_pendente' => '1', 'saldo_projetado' => '1'];
 try {
     $stmtDP = $pdo->prepare("SELECT Chave, Valor FROM ConfiguracaoSistema WHERE FKUsuario = :uid AND Chave LIKE 'dash_%'");
     $stmtDP->execute([':uid' => $usuario_id]);
@@ -821,6 +821,7 @@ require_once 'geral/header.php';
                             $itensDash = [
                                 'cofrinhos'        => ['Cofrinhos',           'Exibe o resumo dos cofrinhos ativos'],
                                 'cartoes'          => ['Cartões de Crédito',  'Exibe faturas e cartões em aberto'],
+                                'agenda'           => ['Agenda',              'Mostra contas vencidas ou vencendo nos próximos 14 dias'],
                                 'receita_pendente' => ['Receita pendente',    'Mostra "A receber" no card de receitas'],
                                 'despesa_pendente' => ['Despesa pendente',    'Mostra "A pagar" no card de despesas'],
                                 'saldo_projetado'  => ['Saldo projetado',     'Mostra estimativa de saldo incluindo pendentes'],
