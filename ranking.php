@@ -12,34 +12,15 @@ require_once 'config/funcoes.php';
 
 verificarExpiracao($pdo);
 garantirColunaFotoPerfilReal($pdo);
+garantirTabelaAmizade($pdo);
 $uid = $_SESSION['usuario_id'];
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
+// _rankAvatar() foi extraído pra config/funcoes.php como renderAvatarUsuario() —
+// reaproveitado também no modal de perfil público.
 function _rankAvatar(array $row, int $size = 40): string
 {
-    // Foto real (se o usuário tiver enviado uma) sempre na frente do personagem.
-    if (!empty($row['FotoPerfilReal'])) {
-        return "<img src=\"" . htmlspecialchars($row['FotoPerfilReal']) . "\" width=\"{$size}\" height=\"{$size}\" "
-            . "style=\"border-radius:50%;object-fit:cover;flex-shrink:0;\">";
-    }
-    if (function_exists('getAvatarUrl')) {
-        $fp = json_decode($row['FotoPerfil'] ?? '', true);
-        if (is_array($fp) && ($fp['style'] ?? '') === 'avataaars') {
-            $url = getAvatarUrl($fp);
-            return "<img src=\"" . htmlspecialchars($url) . "\" width=\"{$size}\" height=\"{$size}\" "
-                . "style=\"border-radius:50%;object-fit:cover;flex-shrink:0;\">";
-        }
-    }
-    $nome   = $row['Nome'] ?? '?';
-    $partes = array_filter(explode(' ', trim($nome)));
-    $ini    = implode('', array_map(fn($p) => strtoupper($p[0] ?? ''), $partes));
-    $ini    = mb_substr($ini, 0, 2);
-    $pal    = ['#6366f1', '#8b5cf6', '#ec4899', '#f59e0b', '#10b981', '#3b82f6', '#ef4444', '#06b6d4'];
-    $bg     = $pal[abs(crc32($nome)) % count($pal)];
-    $fs     = (int)round($size * 0.38);
-    return "<div style=\"width:{$size}px;height:{$size}px;border-radius:50%;background:{$bg};"
-        . "display:inline-flex;align-items:center;justify-content:center;"
-        . "font-size:{$fs}px;font-weight:700;color:#fff;flex-shrink:0;\">{$ini}</div>";
+    return renderAvatarUsuario($row, $size);
 }
 
 function _primeiroNome(string $nome): string
@@ -370,9 +351,10 @@ require_once 'geral/header.php';
                             ?>
                             <div class="col-4">
                                 <div class="rounded-4 p-3 text-center position-relative"
-                                    style="<?= $cardStyle ?>"
+                                    style="<?= $cardStyle ?><?= $isMe ? '' : 'cursor:pointer;' ?>"
                                     onmouseenter="this.style.transform='translateY(-3px)'"
-                                    onmouseleave="this.style.transform=''">
+                                    onmouseleave="this.style.transform=''"
+                                    <?= $isMe ? '' : 'onclick="abrirPerfilPublico(\'' . htmlspecialchars($entry['IDUsuario'], ENT_QUOTES) . '\')"' ?>>
 
                                     <!-- Medalha -->
                                     <div class="d-flex justify-content-center mb-2">
@@ -432,7 +414,8 @@ require_once 'geral/header.php';
                                 <div class="d-flex align-items-center gap-3 px-4 py-3"
                                     style="<?= $ri > 0 ? 'border-top:1px solid var(--card-border-color);' : '' ?>
                                 background:<?= $isMe ? 'rgba(var(--bs-primary-rgb),.06)' : 'transparent' ?>;
-                                <?= $isMe ? 'border-left:3px solid var(--accent) !important;' : '' ?>">
+                                <?= $isMe ? 'border-left:3px solid var(--accent) !important;' : 'cursor:pointer;' ?>"
+                                    <?= $isMe ? '' : 'onclick="abrirPerfilPublico(\'' . htmlspecialchars($entry['IDUsuario'], ENT_QUOTES) . '\')"' ?>>
 
                                     <!-- Posição -->
                                     <div style="width:28px;text-align:center;flex-shrink:0;">
@@ -494,15 +477,90 @@ require_once 'geral/header.php';
                         </div>
                     <?php endif; ?>
 
-                <?php endif; // empty check 
+                <?php endif; // empty check
                 ?>
             </div>
         <?php endforeach; ?>
     </div>
 
+    <!-- ── Modal: Perfil público (aberto ao clicar em alguém no ranking) ────── -->
+    <div class="modal fade" id="modalPerfilPublico" tabindex="-1" aria-hidden="true">
+        <div class="modal-dialog modal-dialog-centered">
+            <div class="modal-content border-secondary-subtle shadow-lg rounded-4" style="background:var(--bg-card);">
+                <div class="modal-header border-bottom border-secondary-subtle">
+                    <h6 class="modal-title fw-bold text-light mb-0"><i class="bi bi-person-badge me-2" style="color:var(--accent);"></i>Perfil</h6>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                </div>
+                <div class="modal-body p-4">
+                    <div id="ppfLoading" class="text-center py-5">
+                        <div class="spinner-border text-secondary" role="status"></div>
+                    </div>
+                    <div id="ppfConteudo" class="d-none">
+
+                        <!-- Mini perfil -->
+                        <div class="d-flex align-items-center gap-3 mb-3">
+                            <div id="ppfAvatar"></div>
+                            <div class="flex-grow-1 min-w-0">
+                                <h5 class="fw-bold mb-1 text-truncate" id="ppfNome"></h5>
+                                <div class="d-flex align-items-center gap-2 flex-wrap">
+                                    <span id="ppfPlanoBadge"></span>
+                                    <span class="text-muted small" id="ppfTempo"></span>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Ação de amizade -->
+                        <div id="ppfAcaoAmizade" class="mb-3"></div>
+
+                        <button type="button" class="btn btn-sm btn-outline-secondary rounded-pill w-100 mb-3" id="ppfBtnCompleto" onclick="ppfAlternarCompleto()">
+                            <i class="bi bi-chevron-down me-1"></i> Ver perfil completo
+                        </button>
+
+                        <!-- Perfil completo (escondido até clicar acima) -->
+                        <div id="ppfCompleto" class="d-none">
+                            <div class="row g-2 mb-3">
+                                <div class="col-4">
+                                    <div class="rounded-3 text-center py-2" style="background:var(--bg-main);border:1px solid var(--bs-border-color);">
+                                        <div class="fw-bold" style="font-size:1.2rem;color:var(--accent);" id="ppfStatTransacoes"></div>
+                                        <div class="text-muted" style="font-size:.68rem;">Transações</div>
+                                    </div>
+                                </div>
+                                <div class="col-4">
+                                    <div class="rounded-3 text-center py-2" style="background:var(--bg-main);border:1px solid var(--bs-border-color);">
+                                        <div class="fw-bold" style="font-size:1.2rem;color:#06b6d4;" id="ppfStatCategorias"></div>
+                                        <div class="text-muted" style="font-size:.68rem;">Categorias</div>
+                                    </div>
+                                </div>
+                                <div class="col-4">
+                                    <div class="rounded-3 text-center py-2" style="background:var(--bg-main);border:1px solid var(--bs-border-color);">
+                                        <div class="fw-bold" style="font-size:1.2rem;color:#10b981;" id="ppfStatComprovantes"></div>
+                                        <div class="text-muted" style="font-size:.68rem;">Comprovantes</div>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <div class="d-flex align-items-center justify-content-between mb-2">
+                                <h6 class="fw-bold mb-0" style="font-size:.9rem;"><i class="bi bi-trophy-fill me-1" style="color:var(--accent);"></i>Conquistas</h6>
+                                <span class="text-muted small" id="ppfConquistasResumo"></span>
+                            </div>
+                            <div class="d-flex flex-wrap gap-2" id="ppfConquistasGrid" style="max-height:260px;overflow-y:auto;"></div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
 </main>
 
 <style>
+    .ppf-conquista-badge {
+        width: 46px; height: 46px; border-radius: 50%;
+        display: flex; align-items: center; justify-content: center;
+        font-size: 1.1rem; flex-shrink: 0; position: relative;
+    }
+    .ppf-conquista-badge.bloqueada { opacity: .35; filter: grayscale(1); }
+
     .nav-pills .nav-link.active {
         background: var(--accent) !important;
         color: #000 !important;
@@ -520,5 +578,135 @@ require_once 'geral/header.php';
         display: none;
     }
 </style>
+
+<script>
+var PPF_RARIDADE_COR = {
+    comum: '#808080', incomum: '#3eb23e', raro: '#0070dd',
+    epico: '#a335ee', lendario: '#ff8000', mitico: '#f3d3fd'
+};
+var PPF_UID_ATUAL = null;
+
+function abrirPerfilPublico(userId) {
+    PPF_UID_ATUAL = userId;
+    var modalEl = document.getElementById('modalPerfilPublico');
+    document.getElementById('ppfLoading').classList.remove('d-none');
+    document.getElementById('ppfConteudo').classList.add('d-none');
+    document.getElementById('ppfCompleto').classList.add('d-none');
+    document.getElementById('ppfBtnCompleto').innerHTML = '<i class="bi bi-chevron-down me-1"></i> Ver perfil completo';
+    bootstrap.Modal.getOrCreateInstance(modalEl).show();
+
+    fetch('usuario/perfil_publico_ajax.php?id=' + encodeURIComponent(userId))
+        .then(function (r) { return r.json(); })
+        .then(function (data) {
+            if (!data.ok) return;
+            document.getElementById('ppfLoading').classList.add('d-none');
+            document.getElementById('ppfConteudo').classList.remove('d-none');
+
+            document.getElementById('ppfAvatar').innerHTML = data.avatarHtml;
+            document.getElementById('ppfNome').textContent = data.nome;
+
+            var badges = { vip: ['VIP', '#d4af37', 'bi-gem'], pro: ['PRO', '#a78bfa', 'bi-crown-fill'] };
+            var b = badges[data.plano];
+            document.getElementById('ppfPlanoBadge').innerHTML = b
+                ? '<span class="badge" style="background:' + b[1] + '22;color:' + b[1] + ';border:1px solid ' + b[1] + '55;font-size:.68rem;"><i class="bi ' + b[2] + ' me-1"></i>' + b[0] + '</span>'
+                : '<span class="badge" style="background:#ffffff11;color:#9ca3af;border:1px solid #ffffff22;font-size:.68rem;">FREE</span>';
+
+            document.getElementById('ppfTempo').innerHTML =
+                '<i class="bi bi-calendar3 me-1"></i>Membro desde ' + data.dataMembro +
+                ' &middot; ' + data.diasAtivo + ' dia' + (data.diasAtivo !== 1 ? 's' : '') + ' no Auralis';
+
+            ppfMontarAcaoAmizade(data.id, data.amizade);
+
+            document.getElementById('ppfStatTransacoes').textContent = data.stats.transacoes;
+            document.getElementById('ppfStatCategorias').textContent = data.stats.categorias;
+            document.getElementById('ppfStatComprovantes').textContent = data.stats.comprovantes;
+            document.getElementById('ppfConquistasResumo').textContent = data.totalDesbloqueadas + ' de ' + data.totalConquistas;
+
+            var grid = document.getElementById('ppfConquistasGrid');
+            grid.innerHTML = '';
+            data.conquistas.forEach(function (c) {
+                var cor = c.desbloqueada ? c.cor : '#9ca3af';
+                var wrap = document.createElement('div');
+                wrap.className = 'ppf-conquista-badge' + (c.desbloqueada ? '' : ' bloqueada');
+                wrap.title = c.nome + ' — ' + c.descricao;
+                wrap.style.background = (PPF_RARIDADE_COR[c.raridade] || '#808080') + '1a';
+                wrap.style.border = '1.5px solid ' + (PPF_RARIDADE_COR[c.raridade] || '#808080') + '55';
+                if (!c.desbloqueada) {
+                    wrap.innerHTML = '<i class="bi bi-lock-fill" style="color:rgba(156,163,175,.6);font-size:1rem;"></i>';
+                } else if (c.imagem) {
+                    wrap.innerHTML = '<img src="' + c.imagem + '" style="width:78%;height:78%;object-fit:contain;border-radius:50%;">';
+                } else {
+                    wrap.innerHTML = '<i class="bi ' + c.icone + '" style="color:' + cor + ';"></i>';
+                }
+                grid.appendChild(wrap);
+            });
+        })
+        .catch(function () {
+            document.getElementById('ppfLoading').innerHTML = '<p class="text-secondary mb-0">Não consegui carregar esse perfil.</p>';
+        });
+}
+
+function ppfMontarAcaoAmizade(userId, amizade) {
+    var box = document.getElementById('ppfAcaoAmizade');
+    if (amizade.status === 'amigos') {
+        box.innerHTML = '<span class="badge bg-success-subtle text-success px-3 py-2 rounded-pill"><i class="bi bi-check2-circle me-1"></i>Vocês são amigos</span>';
+    } else if (amizade.status === 'pendente_enviado') {
+        box.innerHTML =
+            '<button type="button" class="btn btn-sm btn-outline-secondary rounded-pill" onclick="ppfCancelarPedido(\'' + amizade.idAmizade + '\')">' +
+            '<i class="bi bi-clock-history me-1"></i> Pedido enviado — cancelar</button>';
+    } else if (amizade.status === 'pendente_recebido') {
+        box.innerHTML =
+            '<div class="d-flex gap-2">' +
+            '<button type="button" class="btn btn-sm rounded-pill flex-grow-1" style="background:var(--accent);color:#000;font-weight:600;" onclick="ppfResponderPedido(\'' + amizade.idAmizade + '\',\'aceitar\')"><i class="bi bi-check2 me-1"></i>Aceitar</button>' +
+            '<button type="button" class="btn btn-sm btn-outline-secondary rounded-pill flex-grow-1" onclick="ppfResponderPedido(\'' + amizade.idAmizade + '\',\'recusar\')">Recusar</button>' +
+            '</div>';
+    } else {
+        box.innerHTML =
+            '<button type="button" class="btn btn-sm w-100 rounded-pill" style="background:var(--accent);color:#000;font-weight:600;" onclick="ppfAdicionarAmigo(\'' + userId + '\')">' +
+            '<i class="bi bi-person-plus-fill me-1"></i> Adicionar amigo</button>';
+    }
+}
+
+function ppfAdicionarAmigo(userId) {
+    var fd = new FormData();
+    fd.append('destinatario_id', userId);
+    fetch('usuario/amizade_solicitar.php', { method: 'POST', body: fd })
+        .then(function (r) { return r.json(); })
+        .then(function (data) {
+            if (data.ok) ppfMontarAcaoAmizade(userId, { status: data.status, idAmizade: data.idAmizade });
+        });
+}
+
+function ppfResponderPedido(idAmizade, acao) {
+    var fd = new FormData();
+    fd.append('amizade_id', idAmizade);
+    fd.append('acao', acao);
+    fetch('usuario/amizade_responder.php', { method: 'POST', body: fd })
+        .then(function (r) { return r.json(); })
+        .then(function (data) {
+            if (data.ok) ppfMontarAcaoAmizade(PPF_UID_ATUAL, { status: data.status });
+        });
+}
+
+function ppfCancelarPedido(idAmizade) {
+    var fd = new FormData();
+    fd.append('amizade_id', idAmizade);
+    fetch('usuario/amizade_cancelar.php', { method: 'POST', body: fd })
+        .then(function (r) { return r.json(); })
+        .then(function (data) {
+            if (data.ok) ppfMontarAcaoAmizade(PPF_UID_ATUAL, { status: data.status });
+        });
+}
+
+function ppfAlternarCompleto() {
+    var box = document.getElementById('ppfCompleto');
+    var btn = document.getElementById('ppfBtnCompleto');
+    var abrindo = box.classList.contains('d-none');
+    box.classList.toggle('d-none');
+    btn.innerHTML = abrindo
+        ? '<i class="bi bi-chevron-up me-1"></i> Fechar perfil completo'
+        : '<i class="bi bi-chevron-down me-1"></i> Ver perfil completo';
+}
+</script>
 
 <?php require_once 'geral/footer.php'; ?>

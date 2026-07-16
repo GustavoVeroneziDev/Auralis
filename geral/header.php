@@ -71,6 +71,17 @@ if (isset($_SESSION['usuario_id']) && isset($pdo)) {
     } catch (Throwable $e) {}
 }
 
+// Quantos pedidos de amizade estão esperando resposta (mesmo esquema de badge acima)
+$_qtdPedidosAmizadePendentes = 0;
+if (isset($_SESSION['usuario_id']) && isset($pdo)) {
+    try {
+        if (function_exists('garantirTabelaAmizade')) garantirTabelaAmizade($pdo);
+        $stmtAmizPend = $pdo->prepare("SELECT COUNT(*) FROM Amizade WHERE FKUsuarioDestinatario = :uid AND Status = 'pendente'");
+        $stmtAmizPend->execute([':uid' => $_SESSION['usuario_id']]);
+        $_qtdPedidosAmizadePendentes = (int) $stmtAmizPend->fetchColumn();
+    } catch (Throwable $e) {}
+}
+
 // ── Tema ─────────────────────────────────────────────────────────────────
 $_temasDisponiveis = function_exists('temasDisponiveis') ? temasDisponiveis() : [
     'dark'  => ['bs_mode' => 'dark'],
@@ -293,7 +304,12 @@ $_carteiraParam = (!empty($_SESSION['ultima_carteira']))
             </a>
             <a href="/perfil.php"
                class="sidebar-item <?= $paginaAtual === 'perfil.php' ? 'active' : '' ?>">
-                <i class="bi bi-person-circle"></i>
+                <span class="sidebar-icon-badge-wrap">
+                    <i class="bi bi-person-circle"></i>
+                    <?php if ($_qtdPedidosAmizadePendentes > 0): ?>
+                        <span class="sidebar-icon-badge" title="<?= $_qtdPedidosAmizadePendentes ?> pedido(s) de amizade pendente(s)"><?= $_qtdPedidosAmizadePendentes ?></span>
+                    <?php endif; ?>
+                </span>
                 <span class="sidebar-label">Perfil</span>
             </a>
             <a href="/ranking.php"

@@ -755,18 +755,18 @@ require_once 'geral/header.php';
                         <?php if (!$is_edicao): ?>
                             <div class="d-flex gap-2 mb-4 p-1 rounded-3" style="background:var(--bg-hover);border:1px solid var(--border-color-analysis);">
                                 <a href="?tipo=receita<?= !empty($_GET['data']) ? '&data=' . urlencode($_GET['data']) : '' ?><?= !empty($_GET['carteira_id']) ? '&carteira_id=' . urlencode($_GET['carteira_id']) : '' ?>&voltar=<?= urlencode($_GET['voltar'] ?? 'dashboard.php') ?>"
-                                    class="btn flex-grow-1 fw-bold rounded-3 py-2 d-flex align-items-center justify-content-center gap-1"
+                                    class="btn tipo-registro-btn flex-grow-1 fw-bold rounded-3 py-2 d-flex align-items-center justify-content-center gap-1"
                                     style="<?= $tipo_sugerido === 'receita' ? 'background:var(--color-income-bg);color:var(--color-income-text);border:1px solid var(--color-income-border);' : 'background:transparent;color:var(--text-muted);border:1px solid transparent;' ?>">
                                     <i class="bi bi-arrow-up-short" style="font-size:1.3rem;"></i> Receita
                                 </a>
                                 <a href="?tipo=despesa<?= !empty($_GET['data']) ? '&data=' . urlencode($_GET['data']) : '' ?><?= !empty($_GET['carteira_id']) ? '&carteira_id=' . urlencode($_GET['carteira_id']) : '' ?>&voltar=<?= urlencode($_GET['voltar'] ?? 'dashboard.php') ?>"
-                                    class="btn flex-grow-1 fw-bold rounded-3 py-2 d-flex align-items-center justify-content-center gap-1"
+                                    class="btn tipo-registro-btn flex-grow-1 fw-bold rounded-3 py-2 d-flex align-items-center justify-content-center gap-1"
                                     style="<?= $tipo_sugerido === 'despesa' ? 'background:var(--color-expense-bg);color:var(--color-expense-text);border:1px solid var(--color-expense-border);' : 'background:transparent;color:var(--text-muted);border:1px solid transparent;' ?>">
                                     <i class="bi bi-arrow-down-short" style="font-size:1.3rem;"></i> Despesa
                                 </a>
                                 <?php if (!empty($cartoes)): ?>
                                     <a href="?tipo=cartao<?= !empty($_GET['data']) ? '&data=' . urlencode($_GET['data']) : '' ?>&voltar=<?= urlencode($_GET['voltar'] ?? 'dashboard.php') ?><?= !empty($_GET['cartao_id']) ? '&cartao_id=' . urlencode($_GET['cartao_id']) : '' ?>"
-                                        class="btn flex-grow-1 fw-bold rounded-3 py-2 d-flex align-items-center justify-content-center gap-1"
+                                        class="btn tipo-registro-btn flex-grow-1 fw-bold rounded-3 py-2 d-flex align-items-center justify-content-center gap-1"
                                         style="<?= $tipo_sugerido === 'cartao' ? 'background:var(--color-card-bg);color:var(--color-card-text);border:1px solid var(--color-card-border);' : 'background:transparent;color:var(--text-muted);border:1px solid transparent;' ?>">
                                         <i class="bi bi-credit-card-2-front" style="font-size:1rem;"></i> Cartão
                                     </a>
@@ -1364,6 +1364,39 @@ require_once 'geral/header.php';
     .auralis-line-input .form-control,
     .auralis-line-input .form-select {
         color: var(--text-light-analysis) !important;
+    }
+
+    /* Sem isso, um nome de categoria comprido força a coluna a estourar 50% da tela em
+       telas estreitas — o item flex não encolhe abaixo do seu conteúdo por padrão (o
+       min-width automático é "min-content"), então o select "vaza" da coluna e gera
+       scroll horizontal na página inteira. */
+    .auralis-line-input .col-6 {
+        min-width: 0;
+    }
+    .auralis-line-input select.form-select {
+        min-width: 0;
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
+    }
+
+    /* Grupo Receita/Despesa/Cartão: mesmo problema de min-width em telas estreitas —
+       os 3 botões (ícone + texto) forçam largura mínima maior que a soma cabe no
+       celular, cortando o "Cartão" à direita. */
+    .tipo-registro-btn {
+        min-width: 0;
+        white-space: nowrap;
+    }
+    @media (max-width: 420px) {
+        .tipo-registro-btn {
+            font-size: 0.82rem;
+            padding-left: 0.5rem !important;
+            padding-right: 0.5rem !important;
+            gap: 0.3rem !important;
+        }
+        .tipo-registro-btn i {
+            font-size: 1.05rem !important;
+        }
     }
 
     .no-spinners::-webkit-outer-spin-button,

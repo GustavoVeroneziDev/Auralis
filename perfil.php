@@ -14,6 +14,7 @@ verificarExpiracao($pdo);
 garantirColunaFotoPerfilReal($pdo);
 garantirColunaInsigniasDestaque($pdo);
 garantirEstruturaCarteirasCompartilhadas($pdo);
+garantirTabelaAmizade($pdo);
 
 $uid = $_SESSION['usuario_id'];
 
@@ -49,6 +50,71 @@ $stmtStats = $pdo->prepare("
 ");
 $stmtStats->execute([':uid' => $uid, ':uid2' => $uid, ':uid3' => $uid]);
 $stats = $stmtStats->fetch(PDO::FETCH_ASSOC);
+
+// ── Amigos ──────────────────────────────────────────────────────────────────
+$pedidosRecebidos = [];
+$amigosAceitos    = [];
+try {
+    $stmtPed = $pdo->prepare("
+        SELECT a.IDAmizade, u.IDUsuario, u.Nome, u.FotoPerfil, u.FotoPerfilReal
+        FROM Amizade a
+        JOIN Usuario u ON u.IDUsuario = a.FKUsuarioSolicitante
+        WHERE a.FKUsuarioDestinatario = :uid AND a.Status = 'pendente'
+        ORDER BY a.CriadoEm DESC
+    ");
+    $stmtPed->execute([':uid' => $uid]);
+    $pedidosRecebidos = $stmtPed->fetchAll(PDO::FETCH_ASSOC);
+
+    $stmtAmigos = $pdo->prepare("
+        SELECT u.IDUsuario, u.Nome, u.FotoPerfil, u.FotoPerfilReal
+        FROM Amizade a
+        JOIN Usuario u ON u.IDUsuario = (CASE WHEN a.FKUsuarioSolicitante = :uid THEN a.FKUsuarioDestinatario ELSE a.FKUsuarioSolicitante END)
+        WHERE (a.FKUsuarioSolicitante = :uid2 OR a.FKUsuarioDestinatario = :uid3) AND a.Status = 'aceito'
+        ORDER BY a.RespondidoEm DESC
+    ");
+    $stmtAmigos->execute([':uid' => $uid, ':uid2' => $uid, ':uid3' => $uid]);
+    $amigosAceitos = $stmtAmigos->fetchAll(PDO::FETCH_ASSOC);
+} catch (Throwable $e) {
+}
+
+// "Amigo do Meu Amigo" — sugestões por amizade em comum. Não é disputa, é descoberta:
+// gente com pelo menos 1 amigo em comum que você ainda não é amigo nem tem convite
+// pendente. Cada linha da junção abaixo representa exatamente 1 amigo em comum, então
+// COUNT(*) já é a contagem certa — quem não tem nenhum simplesmente não aparece.
+$r_amigosComum = [];
+try {
+    $stmtAC = $pdo->prepare("
+        SELECT candidato.IDUsuario, candidato.Nome, candidato.FotoPerfil, candidato.FotoPerfilReal,
+               COUNT(*) AS total
+        FROM (
+            SELECT CASE WHEN FKUsuarioSolicitante = :uid1 THEN FKUsuarioDestinatario ELSE FKUsuarioSolicitante END AS FKAmigo
+            FROM Amizade
+            WHERE Status = 'aceito' AND (FKUsuarioSolicitante = :uid2 OR FKUsuarioDestinatario = :uid3)
+        ) meus_amigos
+        JOIN Amizade a2
+             ON a2.Status = 'aceito'
+            AND (a2.FKUsuarioSolicitante = meus_amigos.FKAmigo OR a2.FKUsuarioDestinatario = meus_amigos.FKAmigo)
+        JOIN Usuario candidato
+             ON candidato.IDUsuario = CASE WHEN a2.FKUsuarioSolicitante = meus_amigos.FKAmigo
+                                            THEN a2.FKUsuarioDestinatario ELSE a2.FKUsuarioSolicitante END
+        WHERE candidato.IDUsuario != :uid4
+          AND candidato.StatusConta = 'ativo'
+          AND candidato.IDUsuario NOT IN (
+              SELECT CASE WHEN FKUsuarioSolicitante = :uid5 THEN FKUsuarioDestinatario ELSE FKUsuarioSolicitante END
+              FROM Amizade
+              WHERE Status IN ('aceito','pendente') AND (FKUsuarioSolicitante = :uid6 OR FKUsuarioDestinatario = :uid7)
+          )
+        GROUP BY candidato.IDUsuario, candidato.Nome, candidato.FotoPerfil, candidato.FotoPerfilReal
+        ORDER BY total DESC, candidato.Nome ASC
+        LIMIT 30
+    ");
+    $stmtAC->execute([
+        ':uid1' => $uid, ':uid2' => $uid, ':uid3' => $uid, ':uid4' => $uid,
+        ':uid5' => $uid, ':uid6' => $uid, ':uid7' => $uid,
+    ]);
+    $r_amigosComum = $stmtAC->fetchAll(PDO::FETCH_ASSOC);
+} catch (Throwable $e) {
+}
 
 // ── Conquistas ───────────────────────────────────────────────────────────────
 $conquistas = [];
@@ -441,6 +507,114 @@ require_once 'geral/header.php';
             <div class="stat-card">
                 <div class="stat-value" style="color:#06b6d4;"><?= (int)$stats['categorias'] ?></div>
                 <div class="stat-label"><i class="bi bi-tag me-1"></i>Categorias</div>
+            </div>
+        </div>
+    </div>
+
+    <!-- ── Amigos ──────────────────────────────────────────────────────────── -->
+    <div id="amigos" class="mb-4">
+        <div class="d-flex align-items-center justify-content-between mb-3 flex-wrap gap-2">
+            <h5 class="fw-bold mb-0"><i class="bi bi-people-fill me-2" style="color:#60a5fa;"></i>Amigos</h5>
+            <span class="text-muted small"><?= count($amigosAceitos) ?> amigo<?= count($amigosAceitos) !== 1 ? 's' : '' ?></span>
+        </div>
+
+        <button type="button" class="btn btn-sm w-100 mb-3 rounded-4 d-flex align-items-center gap-2 py-2 px-3"
+            style="background:rgba(167,139,250,.08);border:1px solid rgba(167,139,250,.25);color:#a78bfa;"
+            data-bs-toggle="modal" data-bs-target="#modalAmigoDoMeuAmigo">
+            <i class="bi bi-people-fill"></i>
+            <span class="fw-semibold flex-grow-1 text-start">Amigo do Meu Amigo</span>
+            <?php if (!empty($r_amigosComum)): ?>
+            <span class="badge rounded-pill" style="background:#a78bfa22;color:#a78bfa;"><?= count($r_amigosComum) ?></span>
+            <?php endif; ?>
+            <i class="bi bi-chevron-right small"></i>
+        </button>
+
+        <?php if (!empty($pedidosRecebidos)): ?>
+        <div class="rounded-4 p-3 mb-3" style="background:rgba(96,165,250,.05);border:1px solid rgba(96,165,250,.18);">
+            <p class="text-secondary small mb-2 fw-semibold">Pedidos de amizade</p>
+            <div class="d-flex flex-column gap-2">
+                <?php foreach ($pedidosRecebidos as $p): ?>
+                <div class="d-flex align-items-center gap-2" id="pedidoAmizade_<?= htmlspecialchars($p['IDAmizade']) ?>">
+                    <?= renderAvatarUsuario($p, 36) ?>
+                    <span class="flex-grow-1 fw-semibold" style="font-size:.88rem;"><?= htmlspecialchars(explode(' ', $p['Nome'])[0]) ?></span>
+                    <button type="button" class="btn btn-sm rounded-pill px-3" style="background:var(--accent);color:#000;font-weight:600;"
+                        onclick="perfilResponderPedido('<?= htmlspecialchars($p['IDAmizade'], ENT_QUOTES) ?>','aceitar')">Aceitar</button>
+                    <button type="button" class="btn btn-sm btn-outline-secondary rounded-pill px-3"
+                        onclick="perfilResponderPedido('<?= htmlspecialchars($p['IDAmizade'], ENT_QUOTES) ?>','recusar')">Recusar</button>
+                </div>
+                <?php endforeach; ?>
+            </div>
+        </div>
+        <?php endif; ?>
+
+        <?php if (empty($amigosAceitos)): ?>
+        <div class="text-center py-4 text-muted rounded-4" style="background:var(--bg-card);border:1px solid var(--bs-border-color);">
+            <i class="bi bi-people" style="font-size:1.8rem;opacity:.3;display:block;margin-bottom:.5rem;"></i>
+            <p class="mb-0 small">Nenhum amigo ainda — clique em alguém no Ranking pra adicionar.</p>
+        </div>
+        <?php else: ?>
+        <div class="rounded-4 overflow-hidden" style="background:var(--bg-card);border:1px solid var(--bs-border-color);">
+            <?php foreach ($amigosAceitos as $i => $a): ?>
+            <div class="d-flex align-items-center gap-2 px-3 py-2 amigo-linha" style="<?= $i > 0 ? 'border-top:1px solid var(--bs-border-color);' : '' ?>"
+                 oncontextmenu="return perfilAbrirMenuAmigo(event, '<?= htmlspecialchars($a['IDUsuario'], ENT_QUOTES) ?>', '<?= htmlspecialchars(addslashes($a['Nome']), ENT_QUOTES) ?>')">
+                <?= renderAvatarUsuario($a, 34) ?>
+                <span class="fw-semibold flex-grow-1" style="font-size:.85rem;"><?= htmlspecialchars($a['Nome']) ?></span>
+                <button type="button" class="btn btn-sm btn-link text-secondary p-1" title="Mais opções"
+                        onclick="perfilAbrirMenuAmigo(event, '<?= htmlspecialchars($a['IDUsuario'], ENT_QUOTES) ?>', '<?= htmlspecialchars(addslashes($a['Nome']), ENT_QUOTES) ?>')">
+                    <i class="bi bi-three-dots-vertical"></i>
+                </button>
+            </div>
+            <?php endforeach; ?>
+        </div>
+        <?php endif; ?>
+
+        <!-- Menu de contexto do amigo (botão direito ou "⋮") -->
+        <div id="menuAmigoContexto" class="d-none rounded-3 shadow-lg overflow-hidden"
+             style="position:fixed;z-index:2000;background:var(--bg-card);border:1px solid var(--bs-border-color);min-width:180px;">
+            <button type="button" class="dropdown-item d-flex align-items-center gap-2 py-2 px-3 text-danger w-100 border-0 bg-transparent text-start"
+                    onclick="perfilRemoverAmigo()">
+                <i class="bi bi-person-dash-fill"></i> Remover amigo
+            </button>
+        </div>
+    </div>
+
+    <!-- ── Modal: Amigo do Meu Amigo — sugestões por amizade em comum ────────── -->
+    <div class="modal fade" id="modalAmigoDoMeuAmigo" tabindex="-1" aria-hidden="true">
+        <div class="modal-dialog modal-dialog-centered">
+            <div class="modal-content border-secondary-subtle shadow-lg rounded-4" style="background:var(--bg-card);">
+                <div class="modal-header border-bottom border-secondary-subtle">
+                    <div>
+                        <h6 class="modal-title fw-bold text-light mb-0"><i class="bi bi-people-fill me-2" style="color:#a78bfa;"></i>Amigo do Meu Amigo</h6>
+                        <p class="text-secondary mb-0" style="font-size:.78rem;">Essa galera já é praticamente sua também</p>
+                    </div>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                </div>
+                <div class="modal-body p-3" style="max-height:65vh;overflow-y:auto;">
+                    <?php if (empty($r_amigosComum)): ?>
+                        <div class="text-center py-4 text-secondary">
+                            <i class="bi bi-people fs-1 opacity-25 d-block mb-3" style="color:#a78bfa;"></i>
+                            <p class="mb-0 small">Ninguém em comum por enquanto — adicione alguns amigos e a galera deles vai aparecer aqui.</p>
+                        </div>
+                    <?php else: ?>
+                        <?php foreach ($r_amigosComum as $i => $entry): ?>
+                        <div class="d-flex align-items-center gap-2 py-2" id="sugestaoAmigo_<?= htmlspecialchars($entry['IDUsuario']) ?>"
+                             style="<?= $i > 0 ? 'border-top:1px solid var(--bs-border-color);' : '' ?>">
+                            <?= renderAvatarUsuario($entry, 40) ?>
+                            <div class="flex-grow-1 min-w-0">
+                                <div class="fw-semibold text-truncate" style="font-size:.88rem;"><?= htmlspecialchars(explode(' ', $entry['Nome'])[0]) ?></div>
+                                <div class="text-secondary" style="font-size:.72rem;">
+                                    <?= (int)$entry['total'] ?> amigo<?= (int)$entry['total'] > 1 ? 's' : '' ?> em comum
+                                </div>
+                            </div>
+                            <button type="button" class="btn btn-sm rounded-pill px-3 flex-shrink-0"
+                                style="background:var(--accent);color:#000;font-weight:600;"
+                                onclick="perfilAdicionarSugerido('<?= htmlspecialchars($entry['IDUsuario'], ENT_QUOTES) ?>', this)">
+                                Adicionar
+                            </button>
+                        </div>
+                        <?php endforeach; ?>
+                    <?php endif; ?>
+                </div>
             </div>
         </div>
     </div>
@@ -1122,6 +1296,77 @@ function mostrarEditorPersonagem() {
 function esconderEditorPersonagem() {
     var sec = document.getElementById('personagem');
     if (sec) sec.classList.add('d-none');
+}
+
+// ── Amigos: aceitar/recusar pedido direto do perfil ──────────────────────────
+function perfilResponderPedido(idAmizade, acao) {
+    var fd = new FormData();
+    fd.append('amizade_id', idAmizade);
+    fd.append('acao', acao);
+    fetch('/usuario/amizade_responder.php', { method: 'POST', body: fd })
+        .then(function (r) { return r.json(); })
+        .then(function (data) {
+            if (data.ok) location.reload();
+        });
+}
+
+// ── Amigo do Meu Amigo: adicionar direto da lista de sugestões ──────────────
+function perfilAdicionarSugerido(userId, btn) {
+    btn.disabled = true;
+    var fd = new FormData();
+    fd.append('destinatario_id', userId);
+    fetch('/usuario/amizade_solicitar.php', { method: 'POST', body: fd })
+        .then(function (r) { return r.json(); })
+        .then(function (data) {
+            if (data.ok) {
+                btn.textContent = data.status === 'amigos' ? 'Amigos ✓' : 'Pedido enviado';
+                btn.classList.remove('rounded-pill');
+                btn.classList.add('rounded-pill', 'btn-outline-secondary');
+                btn.style.background = 'transparent';
+                btn.style.color = '';
+                btn.style.fontWeight = '';
+            } else {
+                btn.disabled = false;
+            }
+        })
+        .catch(function () { btn.disabled = false; });
+}
+
+// ── Amigos: menu de contexto (botão direito ou "⋮") pra remover ─────────────
+var PERFIL_AMIGO_ALVO = null;
+
+function perfilAbrirMenuAmigo(e, uid, nome) {
+    e.preventDefault();
+    e.stopPropagation();
+    PERFIL_AMIGO_ALVO = { uid: uid, nome: nome };
+
+    var menu = document.getElementById('menuAmigoContexto');
+    menu.classList.remove('d-none');
+
+    var x = Math.min(e.clientX, window.innerWidth - 200);
+    var y = Math.min(e.clientY, window.innerHeight - 60);
+    menu.style.left = x + 'px';
+    menu.style.top  = y + 'px';
+    return false;
+}
+
+document.addEventListener('click', function () {
+    var menu = document.getElementById('menuAmigoContexto');
+    if (menu) menu.classList.add('d-none');
+});
+
+function perfilRemoverAmigo() {
+    if (!PERFIL_AMIGO_ALVO) return;
+    document.getElementById('menuAmigoContexto').classList.add('d-none');
+    if (!confirm('Remover ' + PERFIL_AMIGO_ALVO.nome + ' da sua lista de amigos?')) return;
+
+    var fd = new FormData();
+    fd.append('amigo_id', PERFIL_AMIGO_ALVO.uid);
+    fetch('/usuario/amizade_remover.php', { method: 'POST', body: fd })
+        .then(function (r) { return r.json(); })
+        .then(function (data) {
+            if (data.ok) location.reload();
+        });
 }
 
 // ── Código de convite (movido de Configurações pra cá) ───────────────────────

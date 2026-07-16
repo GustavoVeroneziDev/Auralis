@@ -13,7 +13,13 @@
 ?>
 <li>
     <a class="dropdown-item d-flex align-items-center py-2 transition-hover" href="/perfil.php" style="color:var(--text-main);">
-        <i class="bi bi-person-circle me-2 text-secondary"></i> Perfil
+        <span class="sidebar-icon-badge-wrap me-2">
+            <i class="bi bi-person-circle text-secondary"></i>
+            <?php if (!empty($_qtdPedidosAmizadePendentes)): ?>
+                <span class="sidebar-icon-badge" title="<?= $_qtdPedidosAmizadePendentes ?> pedido(s) de amizade pendente(s)"><?= $_qtdPedidosAmizadePendentes ?></span>
+            <?php endif; ?>
+        </span>
+        Perfil
     </a>
 </li>
 <li>
