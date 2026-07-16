@@ -615,7 +615,7 @@ require_once 'geral/header.php';
                                         <td class="py-3 border-secondary-subtle text-secondary small text-center fs-7">
                                             <?= $cat['total_usos'] ?> registro(s)
                                         </td>
-                                        <td class="py-3 border-secondary-subtle text-center fs-7" style="min-width:150px;">
+                                        <td class="py-3 border-secondary-subtle text-center fs-7" style="width:150px;min-width:150px;max-width:150px;">
                                             <?php $metaCat = $metasPorCategoria[$cat['IDCategoria']] ?? null; ?>
                                             <?php if ($_podeEditarCategoriasGC): ?>
                                                 <button type="button"
@@ -714,7 +714,7 @@ require_once 'geral/header.php';
                                         <td class="py-3 border-secondary-subtle text-secondary small text-center fs-7">
                                             <?= $cat['total_usos'] ?> registro(s)
                                         </td>
-                                        <td class="py-3 border-secondary-subtle text-center fs-7" style="min-width:150px;">
+                                        <td class="py-3 border-secondary-subtle text-center fs-7" style="width:150px;min-width:150px;max-width:150px;">
                                             <?php $metaCat = $metasPorCategoria[$cat['IDCategoria']] ?? null; ?>
                                             <?php if ($_podeEditarCategoriasGC): ?>
                                                 <button type="button"
@@ -877,13 +877,17 @@ require_once 'geral/header.php';
         justify-content: center;
     }
 
-    /* Sem max-width aqui, uma única meta com valor alto (ex: metas de receita tipo
-       salário, na casa das centenas/milhares) força a coluna inteira da tabela a crescer
-       — cada <table> calcula a largura de coluna com base no conteúdo mais largo entre
-       TODAS as suas linhas, empurrando a tabela de Receita pra fora da tela no mobile
-       mesmo quando a de Despesa (valores menores) cabe numa boa. */
+    /* Uma única meta com valor alto (ex: metas de receita tipo salário, na casa das
+       centenas/milhares) força a coluna inteira da tabela a crescer — cada <table> calcula
+       a largura de coluna com base no conteúdo mais largo entre TODAS as suas linhas,
+       empurrando a tabela de Receita pra fora da tela no mobile mesmo quando a de Despesa
+       (valores menores) cabe numa boa. max-width só no botão NÃO é garantia suficiente em
+       table-layout:auto (o <td> ainda pode crescer pra acomodar o filho em alguns
+       navegadores) — por isso o <td> em si também trava width/min-width/max-width em
+       150px. Padding padrão de célula do Bootstrap 5 é .5rem cada lado (16px total), então
+       a área útil é 134px; 128px aqui deixa 6px de folga de segurança. */
     .meta-cat-pill {
-        max-width: 140px;
+        max-width: 128px;
         overflow: hidden;
         text-overflow: ellipsis;
         white-space: nowrap;
