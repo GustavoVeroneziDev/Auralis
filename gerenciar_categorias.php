@@ -619,7 +619,7 @@ require_once 'geral/header.php';
                                             <?php $metaCat = $metasPorCategoria[$cat['IDCategoria']] ?? null; ?>
                                             <?php if ($_podeEditarCategoriasGC): ?>
                                                 <button type="button"
-                                                    class="btn btn-sm rounded-pill <?= $metaCat !== null ? 'btn-outline-info' : 'btn-outline-secondary' ?>"
+                                                    class="btn btn-sm rounded-pill meta-cat-pill <?= $metaCat !== null ? 'btn-outline-info' : 'btn-outline-secondary' ?>"
                                                     style="font-size:0.72rem;"
                                                     onclick="abrirModalMeta('<?= $cat['IDCategoria'] ?>','<?= htmlspecialchars(addslashes($cat['NomeCategoria'])) ?>','despesa',<?= $metaCat !== null ? $metaCat : 'null' ?>,<?= $gastoMesPassadoPorCategoria[$cat['IDCategoria']] ?? 0 ?>)">
                                                     <?php if ($metaCat !== null): ?>
@@ -629,7 +629,7 @@ require_once 'geral/header.php';
                                                     <?php endif; ?>
                                                 </button>
                                             <?php elseif ($metaCat !== null): ?>
-                                                <span class="text-secondary"><i class="bi bi-piggy-bank me-1"></i>R$ <?= number_format($metaCat, 2, ',', '.') ?></span>
+                                                <span class="text-secondary meta-cat-pill"><i class="bi bi-piggy-bank me-1"></i>R$ <?= number_format($metaCat, 2, ',', '.') ?></span>
                                             <?php else: ?>
                                                 <span class="text-secondary opacity-50">—</span>
                                             <?php endif; ?>
@@ -718,7 +718,7 @@ require_once 'geral/header.php';
                                             <?php $metaCat = $metasPorCategoria[$cat['IDCategoria']] ?? null; ?>
                                             <?php if ($_podeEditarCategoriasGC): ?>
                                                 <button type="button"
-                                                    class="btn btn-sm rounded-pill <?= $metaCat !== null ? 'btn-outline-info' : 'btn-outline-secondary' ?>"
+                                                    class="btn btn-sm rounded-pill meta-cat-pill <?= $metaCat !== null ? 'btn-outline-info' : 'btn-outline-secondary' ?>"
                                                     style="font-size:0.72rem;"
                                                     onclick="abrirModalMeta('<?= $cat['IDCategoria'] ?>','<?= htmlspecialchars(addslashes($cat['NomeCategoria'])) ?>','receita',<?= $metaCat !== null ? $metaCat : 'null' ?>,<?= $gastoMesPassadoPorCategoria[$cat['IDCategoria']] ?? 0 ?>)">
                                                     <?php if ($metaCat !== null): ?>
@@ -728,7 +728,7 @@ require_once 'geral/header.php';
                                                     <?php endif; ?>
                                                 </button>
                                             <?php elseif ($metaCat !== null): ?>
-                                                <span class="text-secondary"><i class="bi bi-flag-fill me-1"></i>R$ <?= number_format($metaCat, 2, ',', '.') ?></span>
+                                                <span class="text-secondary meta-cat-pill"><i class="bi bi-flag-fill me-1"></i>R$ <?= number_format($metaCat, 2, ',', '.') ?></span>
                                             <?php else: ?>
                                                 <span class="text-secondary opacity-50">—</span>
                                             <?php endif; ?>
@@ -875,6 +875,20 @@ require_once 'geral/header.php';
         display: flex;
         align-items: center;
         justify-content: center;
+    }
+
+    /* Sem max-width aqui, uma única meta com valor alto (ex: metas de receita tipo
+       salário, na casa das centenas/milhares) força a coluna inteira da tabela a crescer
+       — cada <table> calcula a largura de coluna com base no conteúdo mais largo entre
+       TODAS as suas linhas, empurrando a tabela de Receita pra fora da tela no mobile
+       mesmo quando a de Despesa (valores menores) cabe numa boa. */
+    .meta-cat-pill {
+        max-width: 140px;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+        display: inline-block;
+        vertical-align: middle;
     }
 </style>
 <div class="modal fade" id="modalExcluirCategoria" tabindex="-1" aria-hidden="true">
