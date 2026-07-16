@@ -256,6 +256,35 @@ try {
     }
 } catch (Throwable $e) {}
 
+// Resumo do mês por carteira — sem isso a IA só enxergava o agregado de todas as
+// carteiras juntas e não tinha como separar quando o cliente perguntava de uma específica.
+$carteirasResumoCtx = '';
+if (count($carteiras) > 1) {
+    try {
+        $stmtSnapCart = $pdo->prepare("
+            SELECT FKCarteira,
+                   SUM(CASE WHEN TipoRegistro='receita' AND StatusRegistro='efetivado' THEN Valor ELSE 0 END) AS RecEfet,
+                   SUM(CASE WHEN TipoRegistro='despesa' AND StatusRegistro='efetivado' THEN Valor ELSE 0 END) AS DespEfet
+            FROM Registro WHERE FKUsuario = :uid
+              AND COALESCE(DataVencimento, DATE(MomentoRegistro)) BETWEEN :ini AND :fim
+            GROUP BY FKCarteira
+        ");
+        $stmtSnapCart->execute([':uid' => $uid, ':ini' => date('Y-m-01'), ':fim' => date('Y-m-t')]);
+        $snapPorCarteira = [];
+        foreach ($stmtSnapCart->fetchAll(PDO::FETCH_ASSOC) as $row) {
+            $snapPorCarteira[$row['FKCarteira']] = $row;
+        }
+        $linhasCart = array_map(function ($c) use ($snapPorCarteira) {
+            $s  = $snapPorCarteira[$c['IDCarteira']] ?? ['RecEfet' => 0, 'DespEfet' => 0];
+            $rc = (float)$s['RecEfet']; $ds = (float)$s['DespEfet'];
+            return "{$c['NomeCarteira']}: receitas=R$" . number_format($rc, 2, ',', '.') .
+                   ", despesas=R$" . number_format($ds, 2, ',', '.') .
+                   ", saldo=R$" . number_format($rc - $ds, 2, ',', '.');
+        }, $carteiras);
+        $carteirasResumoCtx = "\nResumo do mês por carteira: " . implode('; ', $linhasCart) . '.';
+    } catch (Throwable $e) {}
+}
+
 $saldoFmt    = 'R$' . number_format(abs($saldoMes), 2, ',', '.') . ($saldoMes < 0 ? ' (negativo)' : '');
 $recFmt      = 'R$' . number_format($recEfet,      2, ',', '.');
 $despFmt     = 'R$' . number_format($despEfet,     2, ',', '.');
@@ -274,11 +303,12 @@ REGRAS DE COMPORTAMENTO — siga sem exceção:
 5. Nunca invente dados. Se não tiver a informação no contexto e precisar de DB, use "consultar".
 6. Múltiplas intenções na mesma mensagem → use "acoes" array.
 7. Formatação do WhatsApp no campo "resposta" (texto livre): use *negrito* pra valores/nomes importantes, _itálico_ pra observações secundárias, ~riscado~ só se fizer sentido (ex: algo cancelado), e "• " no início da linha pra listas. WhatsApp NÃO tem sublinhado — não tente simular com outra coisa, use negrito no lugar quando quiser destacar.
+8. Se {$nomeUser} tiver mais de uma carteira: quando ele mencionar uma pelo nome (ou já estiver claro pelo contexto da conversa qual carteira), responda só com os dados DAQUELA carteira — use o "Resumo do mês por carteira" abaixo pra respostas diretas, ou "id_carteira" na action "consultar" pra consultas no banco. Nunca some tudo por padrão quando uma carteira específica foi indicada. Sem menção a nenhuma carteira, aí sim vale o agregado de todas.
 
 Contexto financeiro atual de {$nomeUser}:
 - Hoje: {$hoje}
 - Mês atual: receitas efetivadas={$recFmt}, despesas efetivadas={$despFmt}, saldo={$saldoFmt}, pendentes={$qtdPendente} itens={$pendFmt}{$pendentesCtx}{$ultimosCtx}
-- Carteiras: {$cartsList}
+- Carteiras: {$cartsList}{$carteirasResumoCtx}
 - Cofrinhos: {$cofList}
 - Categorias despesa: {$catDesp}
 - Categorias receita: {$catRec}
@@ -316,7 +346,8 @@ Regras:
 {"action":"cofrinho_criar","nome":"nome","meta":0.00}
 
 "consultar" — USE APENAS para cálculos que exigem DB: breakdown por categoria, períodos passados, totais não presentes no contexto:
-{"action":"consultar","consulta":{"tipo":"gastos|pendentes|saldo|ultimo","periodo":"hoje|semana|mes|ano","tipo_registro":"despesa|receita|null"}}
+{"action":"consultar","consulta":{"tipo":"gastos|pendentes|saldo|ultimo","periodo":"hoje|semana|mes|ano","tipo_registro":"despesa|receita|null","id_carteira":"uuid|null"}}
+- "id_carteira": preencha com o id da carteira (lista de Carteiras acima) se o cliente mencionou uma específica pelo nome. Sem menção, deixe null — soma todas.
 
 "cancelar":
 {"action":"cancelar"}
@@ -822,9 +853,10 @@ function _waClarificar(array $acao): string
 
 function _waConsultar(PDO $pdo, string $uid, array $consulta, string $hoje): string
 {
-    $tipo    = $consulta['tipo']          ?? 'gastos';
-    $periodo = $consulta['periodo']       ?? 'mes';
-    $tipoReg = $consulta['tipo_registro'] ?? null;
+    $tipo       = $consulta['tipo']          ?? 'gastos';
+    $periodo    = $consulta['periodo']       ?? 'mes';
+    $tipoReg    = $consulta['tipo_registro'] ?? null;
+    $carteiraId = $consulta['id_carteira']   ?? null;
 
     switch ($periodo) {
         case 'hoje':
@@ -855,10 +887,12 @@ function _waConsultar(PDO $pdo, string $uid, array $consulta, string $hoje): str
                     WHERE r.FKUsuario = :uid AND r.StatusRegistro = 'pendente'
                       AND r.DataVencimento BETWEEN :ini AND :fim
                       " . ($tipoReg ? "AND r.TipoRegistro = :tipo" : "") . "
+                      " . ($carteiraId ? "AND r.FKCarteira = :carteira" : "") . "
                     ORDER BY r.DataVencimento ASC LIMIT 20
                 ");
                 $p = [':uid' => $uid, ':ini' => $ini, ':fim' => $fim];
                 if ($tipoReg) $p[':tipo'] = $tipoReg;
+                if ($carteiraId) $p[':carteira'] = $carteiraId;
                 $stmt->execute($p);
                 $rows = $stmt->fetchAll(PDO::FETCH_ASSOC);
 
@@ -880,9 +914,12 @@ function _waConsultar(PDO $pdo, string $uid, array $consulta, string $hoje): str
                     SELECT TipoRegistro, SUM(Valor) AS Total FROM Registro
                     WHERE FKUsuario = :uid AND StatusRegistro = 'efetivado'
                       AND COALESCE(DataVencimento, DATE(MomentoRegistro)) BETWEEN :ini AND :fim
+                      " . ($carteiraId ? "AND FKCarteira = :carteira" : "") . "
                     GROUP BY TipoRegistro
                 ");
-                $stmt->execute([':uid' => $uid, ':ini' => $ini, ':fim' => $fim]);
+                $p = [':uid' => $uid, ':ini' => $ini, ':fim' => $fim];
+                if ($carteiraId) $p[':carteira'] = $carteiraId;
+                $stmt->execute($p);
                 $rows  = $stmt->fetchAll(PDO::FETCH_KEY_PAIR);
                 $rec   = (float)($rows['receita'] ?? 0);
                 $desp  = (float)($rows['despesa']  ?? 0);
@@ -899,9 +936,12 @@ function _waConsultar(PDO $pdo, string $uid, array $consulta, string $hoje): str
                     SELECT r.Descricao, r.Valor, r.TipoRegistro, r.DataVencimento, r.StatusRegistro, c.NomeCategoria
                     FROM Registro r LEFT JOIN Categoria c ON c.IDCategoria = r.FKCategoria
                     WHERE r.FKUsuario = :uid AND r.StatusRegistro != 'cancelado'
+                      " . ($carteiraId ? "AND r.FKCarteira = :carteira" : "") . "
                     ORDER BY r.MomentoRegistro DESC LIMIT 1
                 ");
-                $stmt->execute([':uid' => $uid]);
+                $p = [':uid' => $uid];
+                if ($carteiraId) $p[':carteira'] = $carteiraId;
+                $stmt->execute($p);
                 $r = $stmt->fetch(PDO::FETCH_ASSOC);
 
                 if (!$r) return "Nenhum registro ainda.";
@@ -920,9 +960,12 @@ function _waConsultar(PDO $pdo, string $uid, array $consulta, string $hoje): str
                     WHERE r.FKUsuario = :uid AND r.TipoRegistro = :tipo
                       AND r.StatusRegistro = 'efetivado'
                       AND COALESCE(r.DataVencimento, DATE(r.MomentoRegistro)) BETWEEN :ini AND :fim
+                      " . ($carteiraId ? "AND r.FKCarteira = :carteira" : "") . "
                     GROUP BY r.FKCategoria ORDER BY Total DESC LIMIT 10
                 ");
-                $stmt->execute([':uid' => $uid, ':tipo' => $tipoQuery, ':ini' => $ini, ':fim' => $fim]);
+                $p = [':uid' => $uid, ':tipo' => $tipoQuery, ':ini' => $ini, ':fim' => $fim];
+                if ($carteiraId) $p[':carteira'] = $carteiraId;
+                $stmt->execute($p);
                 $rows = $stmt->fetchAll(PDO::FETCH_ASSOC);
 
                 $tipoLabel = $tipoQuery === 'receita' ? 'receitas' : 'gastos';
