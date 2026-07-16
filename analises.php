@@ -280,6 +280,23 @@ if ($carteira_selecionada) {
     }
 }
 
+// Corta os meses vazios do início da janela (sem receita nem despesa) — pra quem tem
+// poucos meses de conta, a janela de 6/12 meses ficava cheia de linha reta em zero antes
+// do primeiro lançamento real, deixando o gráfico apertado à toa (principalmente no
+// celular, onde cada rótulo de mês já disputa pouco espaço). Se TODOS os meses estiverem
+// vazios (conta nova, zero lançamento na janela inteira), não corta nada — melhor mostrar
+// a janela cheia do que sumir com o gráfico inteiro.
+$_primeiroMesComDado = null;
+foreach ($historicoMensal as $_idxHist => $_hMes) {
+    if ($_hMes['receita'] > 0 || $_hMes['despesa'] > 0) {
+        $_primeiroMesComDado = $_idxHist;
+        break;
+    }
+}
+if ($_primeiroMesComDado !== null && $_primeiroMesComDado > 0) {
+    $historicoMensal = array_slice($historicoMensal, $_primeiroMesComDado);
+}
+
 // ── Categorias do usuário + metas/orçamento definidos ───────────────────
 garantirTabelaMetaCategoria($pdo);
 
@@ -532,7 +549,7 @@ require_once 'geral/header.php';
     </div>
 
     <!-- ── Taxa de Poupança ────────────────────────────────────────────── -->
-    <div class="row g-4 mb-5">
+    <div class="row g-4 mb-5<?php echo (!$_mesEmAndamento && $taxaPoupancaAtual !== null) ? '' : ' poupanca-hide-mobile' ?>">
         <div class="col-12">
             <div class="card rounded-4 shadow-sm" style="background:var(--bg-card);border:1px solid var(--card-border-color);">
                 <div class="card-body p-4 d-flex align-items-center flex-wrap gap-4">
@@ -605,7 +622,7 @@ require_once 'geral/header.php';
                 </div>
                 <div class="card-body p-4">
                     <?php if (!empty($historicoMensal)): ?>
-                        <div style="height:320px;">
+                        <div class="grafico-historico-wrap">
                             <canvas id="graficoHistorico"></canvas>
                         </div>
                     <?php else: ?>
@@ -1125,6 +1142,19 @@ require_once 'geral/header.php';
     #lista-detalhes-receita::-webkit-scrollbar-thumb {
         background-color: var(--bs-border-color);
         border-radius: 10px;
+    }
+
+    .grafico-historico-wrap {
+        height: 320px;
+    }
+
+    @media (max-width: 767.98px) {
+        .poupanca-hide-mobile {
+            display: none !important;
+        }
+        .grafico-historico-wrap {
+            height: 220px;
+        }
     }
 </style>
 <div class="modal fade" id="modalSeletorMes" tabindex="-1" aria-hidden="true">
