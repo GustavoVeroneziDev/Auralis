@@ -173,6 +173,8 @@ $_carteiraParam = (!empty($_SESSION['ultima_carteira']))
     <meta name="apple-mobile-web-app-title" content="Auralis">
     <link rel="apple-touch-icon" href="/geral/img/LogoAuralisSemEscudo.png">
 
+    <link rel="preconnect" href="https://cdn.jsdelivr.net" crossorigin>
+    <link rel="preconnect" href="https://cdn-uicons.flaticon.com" crossorigin>
     <link href="/geral/fonts/inter.css" rel="stylesheet">
     <link href="/geral/fonts/aquire.css" rel="stylesheet">
     <link href="/geral/css/bootstrap.min.css" rel="stylesheet">

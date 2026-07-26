@@ -151,7 +151,7 @@ $_pvV   = max(
             ] as [$tab, $icon, $label, $sub]):
             ?>
                 <button class="preview-tab-btn <?= $tab === 'dashboard' ? 'active' : '' ?> d-flex align-items-center gap-2 px-3 py-2 rounded-3 border-0 transition-hover"
-                    data-preview="/geral/img/preview-<?= $tab ?>.png?v=<?= $_pvV ?>"
+                    data-preview="/geral/img/preview-<?= $tab ?>.webp?v=<?= $_pvV ?>"
                     data-label="auralis.app/<?= $tab ?>"
                     style="font-size:0.82rem;cursor:pointer;">
                     <i class="bi <?= $icon ?>"></i>
@@ -178,10 +178,15 @@ $_pvV   = max(
 
             <!-- Imagem -->
             <div class="rounded-bottom-4 overflow-hidden" style="border:1px solid #2d3139;border-top:0;background:#121418;line-height:0;">
-                <img id="previewImg"
-                    src="/geral/img/preview-dashboard.png?v=<?= $_pvV ?>"
-                    alt="Auralis Dashboard"
-                    style="width:100%;display:block;transition:opacity .2s ease,transform .2s ease;">
+                <picture>
+                    <source srcset="/geral/img/preview-dashboard.webp?v=<?= $_pvV ?>" type="image/webp">
+                    <img id="previewImg"
+                        src="/geral/img/preview-dashboard.png?v=<?= $_pvV ?>"
+                        alt="Auralis Dashboard"
+                        width="1151" height="937"
+                        fetchpriority="high"
+                        style="width:100%;height:auto;display:block;transition:opacity .2s ease,transform .2s ease;">
+                </picture>
                 <!-- Gradiente de fade na base (efeito "há mais abaixo") -->
                 <div class="position-absolute bottom-0 start-0 w-100" style="height:80px;background:linear-gradient(to top,#121418,transparent);pointer-events:none;"></div>
             </div>
