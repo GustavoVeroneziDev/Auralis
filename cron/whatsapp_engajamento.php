@@ -80,6 +80,15 @@ $enviados  = 0;
 $agora     = date('Y-m-d H:i:s');
 
 foreach ($candidatos as $u) {
+    // O nudge promete "me manda que eu registro pra você" — recurso exclusivo de
+    // VIP/teste grátis (mesmo gate de webhook_whatsapp_ia.php). Sem essa checagem, quem
+    // já caiu pro Free (ou é Pro, que também não tem acesso à IA do WhatsApp) recebia uma
+    // promessa que não funciona: a pessoa responde e esbarra no paywall.
+    $planoEfetivo = planoEfetivoUsuario($pdo, $u['IDUsuario']);
+    if (!in_array($planoEfetivo, ['vip', 'vip_trial'], true)) {
+        continue;
+    }
+
     $telefone      = $u['Telefone'];
     $personalidade = $u['Personalidade'] ?? 'parceiro';
 
