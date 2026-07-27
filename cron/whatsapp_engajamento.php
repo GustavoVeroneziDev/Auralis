@@ -80,15 +80,6 @@ $enviados  = 0;
 $agora     = date('Y-m-d H:i:s');
 
 foreach ($candidatos as $u) {
-    // O nudge promete "me manda que eu registro pra você" — recurso exclusivo de
-    // VIP/teste grátis (mesmo gate de webhook_whatsapp_ia.php). Sem essa checagem, quem
-    // já caiu pro Free (ou é Pro, que também não tem acesso à IA do WhatsApp) recebia uma
-    // promessa que não funciona: a pessoa responde e esbarra no paywall.
-    $planoEfetivo = planoEfetivoUsuario($pdo, $u['IDUsuario']);
-    if (!in_array($planoEfetivo, ['vip', 'vip_trial'], true)) {
-        continue;
-    }
-
     $telefone      = $u['Telefone'];
     $personalidade = $u['Personalidade'] ?? 'parceiro';
 
@@ -105,8 +96,15 @@ foreach ($candidatos as $u) {
         ? round($horasInativo / 24) . ' dias'
         : $horasInativo . 'h';
 
-    // Mensagem adaptada à personalidade
-    $mensagem = _montarMensagemEngajamento($apelido, $labelTempo, $personalidade);
+    // "Me manda que eu registro pra você" só é verdade pra quem tem acesso à IA do
+    // WhatsApp (VIP/teste grátis — mesmo gate de webhook_whatsapp_ia.php). Pra quem já
+    // caiu pro Free (ou é Pro), essa inatividade vira gancho de upsell pro VIP em vez de
+    // uma promessa que ia esbarrar no paywall se a pessoa respondesse.
+    $planoEfetivo = planoEfetivoUsuario($pdo, $u['IDUsuario']);
+    $temAcessoIA  = in_array($planoEfetivo, ['vip', 'vip_trial'], true);
+    $mensagem     = $temAcessoIA
+        ? _montarMensagemEngajamento($apelido, $labelTempo, $personalidade)
+        : _montarMensagemUpsellEngajamento($apelido, $labelTempo, $personalidade);
 
     $ok = enviarWhatsAppNotificacao($telefone, $mensagem);
 
@@ -148,5 +146,24 @@ function _montarMensagemEngajamento(string $apelido, string $labelTempo, string 
         ];
 
     // Sorteia uma variação para não parecer sempre a mesma mensagem
+    return $variacoes[array_rand($variacoes)];
+}
+
+// Variante pra quem não tem acesso à IA do WhatsApp (Free ou Pro) — mesma inatividade,
+// mas em vez de prometer "eu registro pra você" (não funciona sem VIP), usa o momento
+// pra apresentar o recurso como incentivo de upgrade.
+function _montarMensagemUpsellEngajamento(string $apelido, string $labelTempo, string $personalidade): string
+{
+    $variacoes = $personalidade === 'profissional'
+        ? [
+            "Olá, {$apelido}. Notamos {$labelTempo} sem registros no Auralis. No plano VIP, você pode enviar seus lançamentos diretamente por aqui, sem precisar abrir o aplicativo. Conheça: meuauralis.com/planos.php",
+            "Olá, {$apelido}. Há {$labelTempo} sem movimentações registradas. O plano VIP permite lançar despesas e receitas por mensagem, direto pelo WhatsApp. Mais detalhes: meuauralis.com/planos.php",
+        ]
+        : [
+            "Fala, {$apelido}! 👋 Faz {$labelTempo} sem nada novo no Auralis. Sabia que no *VIP* eu registro tudo pra você na hora, só de mandar mensagem aqui? Dá uma olhada: meuauralis.com/planos.php 💜",
+            "Ei, {$apelido}! Tô sentindo sua falta há {$labelTempo} 😅 No plano *VIP* eu viro seu assistente aqui no zap — você me manda, eu registro, sem abrir o app. Vale a pena conferir: meuauralis.com/planos.php",
+            "Oi, {$apelido}! 👀 Faz {$labelTempo} sem movimento. Ativando o *VIP* eu passo a lançar suas contas direto por aqui, na conversa mesmo. Dá uma olhada: meuauralis.com/planos.php",
+        ];
+
     return $variacoes[array_rand($variacoes)];
 }
