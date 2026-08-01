@@ -57,6 +57,21 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                          WHERE IDCartao=:id AND FKUsuario=:uid"
                     )->execute([':n'=>$nome,':b'=>$bandeira,':c'=>$cor,':l'=>$limite,
                                 ':df'=>$diaFech,':dv'=>$diaVenc,':cd'=>$carteiraDb,':id'=>$id,':uid'=>$uid]);
+
+                    // Sem isso, trocar a carteira de débito não refletia na fatura aberta —
+                    // o Registro de preview já existente continuava com a carteira antiga
+                    // até algum outro evento (novo lançamento, etc.) forçar um resync.
+                    try {
+                        $stmtFAberta = $pdo->prepare(
+                            "SELECT IDFatura FROM FaturaCartao WHERE FKCartao = :cid AND FKUsuario = :uid AND Status = 'aberta'"
+                        );
+                        $stmtFAberta->execute([':cid' => $id, ':uid' => $uid]);
+                        $faturaAbertaId = $stmtFAberta->fetchColumn();
+                        if ($faturaAbertaId) {
+                            cartao_sincronizarPreview($pdo, $faturaAbertaId, $uid, ['Nome' => $nome, 'FKCarteiraDebito' => $carteiraDb]);
+                        }
+                    } catch (PDOException $e) {}
+
                     $sucesso = 'Cartão atualizado com sucesso.';
                 } else {
                     // Criação — verifica limite do plano (trial tem acesso total)
