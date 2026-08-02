@@ -196,16 +196,21 @@ function cartao_sincronizarPreview(PDO $pdo, string $faturaId, string $uid, arra
     }
 
     if (!empty($fatura['FKRegistroPreview'])) {
+        // FKCarteira também precisa ser resincronizado aqui — sem isso, trocar a carteira
+        // de débito do cartão (cartao_credito/index.php) não refletia no Registro de preview
+        // já existente, e a fatura continuava aparecendo na agenda vinculada à carteira antiga.
         $pdo->prepare(
-            "UPDATE Registro SET Valor = :v, Descricao = :d, MomentoRegistro = :m, DataVencimento = :dv
+            "UPDATE Registro SET Valor = :v, Descricao = :d, MomentoRegistro = :m, DataVencimento = :dv,
+             FKCarteira = :cart
              WHERE IDRegistro = :id AND FKUsuario = :uid"
         )->execute([
-            ':v'   => $total,
-            ':d'   => $desc,
-            ':m'   => $dataRef,
-            ':dv'  => $dataVenc,
-            ':id'  => $fatura['FKRegistroPreview'],
-            ':uid' => $uid,
+            ':v'    => $total,
+            ':d'    => $desc,
+            ':m'    => $dataRef,
+            ':dv'   => $dataVenc,
+            ':cart' => $cartao['FKCarteiraDebito'],
+            ':id'   => $fatura['FKRegistroPreview'],
+            ':uid'  => $uid,
         ]);
     } else {
         // INSERT e UPDATE devem ser atômicos para evitar Registros órfãos

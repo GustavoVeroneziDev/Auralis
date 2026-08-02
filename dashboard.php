@@ -2404,6 +2404,13 @@ require_once 'geral/header.php';
 @media (max-width: 767.98px) {
     .pills-filtro-mobile { display: none; }
     .pills-filtro-mobile.mostrar { display: flex; }
+
+    /* iOS Safari força zoom da página ao focar um input com font-size < 16px —
+       o inline style do #buscaInput usa 0.82rem (~13px), disparando o zoom e
+       deixando a tela fora de enquadramento até o usuário voltar manualmente. */
+    #buscaInput {
+        font-size: 16px !important;
+    }
 }
 </style>
 <script>

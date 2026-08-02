@@ -1342,6 +1342,10 @@ function perfilAbrirMenuAmigo(e, uid, nome) {
 
     var menu = document.getElementById('menuAmigoContexto');
     menu.classList.remove('d-none');
+    // Trava o scroll do fundo enquanto o menu está aberto — sem isso, no mobile a
+    // página continua rolando livremente atrás do menu, que fica "flutuando" solto
+    // em vez de parecer preso à tela.
+    document.body.style.overflow = 'hidden';
 
     var x = Math.min(e.clientX, window.innerWidth - 200);
     var y = Math.min(e.clientY, window.innerHeight - 60);
@@ -1353,11 +1357,13 @@ function perfilAbrirMenuAmigo(e, uid, nome) {
 document.addEventListener('click', function () {
     var menu = document.getElementById('menuAmigoContexto');
     if (menu) menu.classList.add('d-none');
+    document.body.style.overflow = '';
 });
 
 function perfilRemoverAmigo() {
     if (!PERFIL_AMIGO_ALVO) return;
     document.getElementById('menuAmigoContexto').classList.add('d-none');
+    document.body.style.overflow = '';
     if (!confirm('Remover ' + PERFIL_AMIGO_ALVO.nome + ' da sua lista de amigos?')) return;
 
     var fd = new FormData();
