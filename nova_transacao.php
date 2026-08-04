@@ -17,6 +17,10 @@ $categorias = [];
 $cartoes = [];
 $erro = null;
 
+// Precisa rodar antes de qualquer SELECT * FROM Registro nesta página (edição lê as
+// colunas novas via SELECT *) e antes de qualquer criação de recorrência.
+garantirColunasRecorrenciaGeneralizada($pdo);
+
 // URL de retorno após salvar — whitelist para evitar open redirect
 $_urlVoltar = (function ($raw) {
     if (empty($raw)) return 'dashboard.php';
@@ -306,8 +310,12 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $carteiraId     = trim($_POST['carteira_id'] ?? '');
     $categoriaId    = trim($_POST['categoria_id'] ?? '') ?: null;
     $subCategoriaId = trim($_POST['subcategoria_id'] ?? '') ?: null;
-    $recorrente     = isset($_POST['recorrente']) ? 1 : 0;
-    $diaVencimento  = $recorrente ? intval($_POST['dia_vencimento'] ?? 0) : null;
+    $recorrente      = isset($_POST['recorrente']) ? 1 : 0;
+    $tipoRecorrencia = $recorrente
+        ? (in_array($_POST['tipo_recorrencia'] ?? '', ['dias', 'semanas', 'meses'], true) ? $_POST['tipo_recorrencia'] : 'meses')
+        : null;
+    $intervaloRecorrencia = $recorrente ? max(1, min(365, intval($_POST['intervalo_recorrencia'] ?? 1))) : null;
+    $diaVencimento  = ($recorrente && $tipoRecorrencia === 'meses') ? intval($_POST['dia_vencimento'] ?? 0) : null;
     $parcelado      = isset($_POST['parcelado']) ? 1 : 0;
     $numParcelas    = $parcelado ? max(2, min(48, intval($_POST['num_parcelas'] ?? 2))) : 1;
     // Compra/recebimento que já vinha de antes do Auralis — gera só as parcelas restantes.
@@ -334,7 +342,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     elseif (!in_array($statusRegistro, ['pendente', 'efetivado'])) $erro = "Status inválido.";
     elseif (empty($carteiraId)) $erro = "Selecione uma carteira.";
     elseif (!empty($_cartsBloqNT) && in_array($carteiraId, $_cartsBloqNT)) $erro = "Esta carteira está bloqueada no plano {$_nomePlanoNT}. Assine o {$_nomeUpgradeNT} para usá-la.";
-    elseif ($recorrente && ($diaVencimento < 1 || $diaVencimento > 31)) $erro = "Dia de vencimento inválido (1 a 31).";
+    elseif ($recorrente && $tipoRecorrencia === 'meses' && ($diaVencimento < 1 || $diaVencimento > 31)) $erro = "Dia de vencimento inválido (1 a 31).";
     elseif ($parcelado && intval($_POST['num_parcelas'] ?? 0) === 1) $erro = "O número de parcelas não pode ser 1. Se não quiser parcelar, desative a opção de parcelamento.";
     elseif ($parcelado && $recorrente) $erro = "Uma transação não pode ser parcelada E recorrente ao mesmo tempo.";
     elseif ($parcelado && intval($_POST['parcela_inicial'] ?? 1) > $numParcelas) $erro = "A parcela inicial não pode ser maior que o total de parcelas.";
@@ -593,53 +601,24 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                     exit;
                 }
             } elseif ($recorrente) {
-                // ── CRIAÇÃO RECORRENTE (Fix NULL e Pulo de Mês) ──────────────
-                $grupoRecorrencia = gerarUuid();
-                $dataBase         = new DateTime($dataRegistro);
-                $limiteMeses      = 24;
-
-                // Removemos explicitamente ParcelaAtual e TotalParcelas para usar o DEFAULT do banco e evitar crash
-                $sqlInsert = "
-                    INSERT INTO Registro (
-                        IDRegistro, TipoRegistro, Valor, Descricao, MomentoRegistro, DataVencimento,
-                        StatusRegistro, Recorrente, DiaVencimento, FKCarteira, FKUsuario, FKCategoria,
-                        GrupoParcela
-                    ) VALUES (
-                        :id, :tipo, :valor, :descricao, :momento, :vencimento,
-                        :status, 1, :dia, :carteira, :usuario, :categoria, :grupo
-                    )
-                ";
-                $stmtR = $pdo->prepare($sqlInsert);
-
-                $primeiroIdRec = null;
-                for ($i = 0; $i < $limiteMeses; $i++) {
-                    // Cálculo matemático para forçar o mês e ano corretos sequencialmente
-                    $mesAlvo = (int)$dataBase->format('m') + $i;
-                    $anoAlvo = (int)$dataBase->format('Y') + floor(($mesAlvo - 1) / 12);
-                    $mesAlvo = (($mesAlvo - 1) % 12) + 1;
-
-                    $diaCorreto = min($diaVencimento, date('t', strtotime(sprintf('%04d-%02d-01', $anoAlvo, $mesAlvo))));
-                    $dataStr = sprintf('%04d-%02d-%02d', $anoAlvo, $mesAlvo, $diaCorreto);
-
-                    $statusRec = ($i === 0) ? $statusRegistro : 'pendente';
-
-                    $idRec = gerarUuid();
-                    if ($primeiroIdRec === null) $primeiroIdRec = $idRec;
-                    $stmtR->execute([
-                        ':id'         => $idRec,
-                        ':tipo'      => $tipoRegistro,
-                        ':valor'      => $valor,
-                        ':descricao' => $descricao,
-                        ':momento'    => $dataStr,
-                        ':vencimento' => $dataStr,
-                        ':status'     => $statusRec,
-                        ':dia'       => $diaCorreto,
-                        ':carteira'   => $carteiraId,
-                        ':usuario'   => $usuario_id,
-                        ':categoria'  => $categoriaId,
-                        ':grupo'     => $grupoRecorrencia
-                    ]);
-                }
+                // ── CRIAÇÃO RECORRENTE ────────────────────────────────────────
+                // criarSerieRecorrente() centraliza o cálculo de data (com clamping de fim
+                // de mês) e garante GrupoParcela sempre preenchido — sem isso, "excluir este
+                // e os futuros" não consegue localizar as ocorrências da série depois.
+                $resRec = criarSerieRecorrente($pdo, [
+                    'usuario_id'            => $usuario_id,
+                    'carteira_id'           => $carteiraId,
+                    'categoria_id'          => $categoriaId,
+                    'tipo_registro'         => $tipoRegistro,
+                    'valor'                 => $valor,
+                    'descricao'             => $descricao,
+                    'data_inicio'           => $dataRegistro,
+                    'status_inicial'        => $statusRegistro,
+                    'tipo_recorrencia'      => $tipoRecorrencia,
+                    'intervalo_recorrencia' => $intervaloRecorrencia,
+                    'dia_vencimento'        => $diaVencimento,
+                ]);
+                $primeiroIdRec = $resRec['primeiro_id'];
                 if ($primeiroIdRec) processarComprovantes($pdo, $primeiroIdRec, $usuario_id);
                 concederConquista('primeira_transacao');
                 verificarConquistasRegistros($pdo, $usuario_id);
@@ -709,6 +688,8 @@ $val_cat    = $_POST['categoria_id'] ?? ($transacao_edit ? $transacao_edit['FKCa
 $val_venc   = $_POST['data_vencimento'] ?? ($transacao_edit ? $transacao_edit['DataVencimento'] : ($_GET['data'] ?? ''));
 $val_rec    = isset($_POST['recorrente']) ? true : ($transacao_edit ? $transacao_edit['Recorrente'] : false);
 $val_dia        = $_POST['dia_vencimento'] ?? ($transacao_edit ? $transacao_edit['DiaVencimento'] : '');
+$val_tipo_rec   = $_POST['tipo_recorrencia'] ?? ($transacao_edit['TipoRecorrencia'] ?? 'meses');
+$val_intervalo_rec = $_POST['intervalo_recorrencia'] ?? ($transacao_edit['IntervaloRecorrencia'] ?? 1);
 $val_parcelado  = isset($_POST['parcelado']) ? true : false;
 $val_num_parc   = $_POST['num_parcelas'] ?? 2;
 $val_parc_ini   = $_POST['parcela_inicial'] ?? 1;
@@ -1061,16 +1042,42 @@ require_once 'geral/header.php';
                                                     <div id="bloco_recorrencia" style="display:<?= $val_rec ? 'block' : 'none' ?>;"
                                                         class="mt-3 ps-3 border-start border-border-color">
                                                         <label class="form-label text-secondary-analysis fs-7 mb-1">
-                                                            todo mês vence em <span class="text-light fw-semibold">qual</span> dia?
+                                                            repete a cada
                                                         </label>
-                                                        <input type="number" name="dia_vencimento" id="dia_vencimento"
-                                                            class="form-control bg-dark border-border-color text-light-analysis form-control-sm no-spinners fs-7"
-                                                            style="max-width:100px;"
-                                                            min="1" max="31" placeholder="Ex: 10"
-                                                            value="<?= htmlspecialchars($val_dia) ?>"
-                                                            <?= $is_recorrente ? 'readonly' : '' ?>>
-                                                        <div class="text-secondary mt-1" style="font-size:0.72rem;">
-                                                            Insira o dia que a cobrança cai todo mês (1 a 31).
+                                                        <div class="d-flex align-items-center gap-2">
+                                                            <input type="number" name="intervalo_recorrencia" id="intervalo_recorrencia"
+                                                                class="form-control bg-dark border-border-color text-light-analysis form-control-sm no-spinners fs-7"
+                                                                style="max-width:80px;"
+                                                                min="1" max="365"
+                                                                value="<?= htmlspecialchars($val_intervalo_rec) ?>"
+                                                                <?= $is_recorrente ? 'readonly' : '' ?>>
+                                                            <select name="tipo_recorrencia" id="tipo_recorrencia"
+                                                                class="form-select bg-dark border-border-color text-light-analysis form-control-sm fs-7"
+                                                                style="max-width:140px;"
+                                                                <?= $is_recorrente ? 'disabled' : '' ?>>
+                                                                <option value="dias" <?= $val_tipo_rec === 'dias' ? 'selected' : '' ?>>dia(s)</option>
+                                                                <option value="semanas" <?= $val_tipo_rec === 'semanas' ? 'selected' : '' ?>>semana(s)</option>
+                                                                <option value="meses" <?= $val_tipo_rec === 'meses' ? 'selected' : '' ?>>mês(es)</option>
+                                                            </select>
+                                                        </div>
+                                                        <?php if ($is_recorrente): ?>
+                                                            <!-- <select disabled> não envia valor no POST — replica o valor real pra não perder na edição -->
+                                                            <input type="hidden" name="tipo_recorrencia" value="<?= htmlspecialchars($val_tipo_rec) ?>">
+                                                        <?php endif; ?>
+
+                                                        <div id="bloco_dia_vencimento" style="display:<?= $val_tipo_rec === 'meses' ? 'block' : 'none' ?>;" class="mt-2">
+                                                            <label class="form-label text-secondary-analysis fs-7 mb-1">
+                                                                vence em <span class="text-light fw-semibold">qual</span> dia do mês?
+                                                            </label>
+                                                            <input type="number" name="dia_vencimento" id="dia_vencimento"
+                                                                class="form-control bg-dark border-border-color text-light-analysis form-control-sm no-spinners fs-7"
+                                                                style="max-width:100px;"
+                                                                min="1" max="31" placeholder="Ex: 10"
+                                                                value="<?= htmlspecialchars($val_dia) ?>"
+                                                                <?= $is_recorrente ? 'readonly' : '' ?>>
+                                                        </div>
+                                                        <div id="texto_ancora_recorrencia" class="text-secondary mt-2" style="font-size:0.72rem;display:<?= $val_tipo_rec === 'meses' ? 'none' : 'block' ?>;">
+                                                            Repete a partir da própria data deste lançamento.
                                                         </div>
                                                     </div>
                                                 </div>
@@ -1517,12 +1524,28 @@ require_once 'geral/header.php';
     const checkRecorrente = document.getElementById('recorrente');
     const blocoRecorrencia = document.getElementById('bloco_recorrencia');
     const inputDia = document.getElementById('dia_vencimento');
+    const selectTipoRecorrencia = document.getElementById('tipo_recorrencia');
+    const blocoDiaVencimento = document.getElementById('bloco_dia_vencimento');
+    const textoAncoraRecorrencia = document.getElementById('texto_ancora_recorrencia');
+
+    // "dia do mês" só faz sentido pra tipo_recorrencia === "meses" — pra dias/semanas
+    // a recorrência ancora na própria data do lançamento.
+    function atualizarBlocoDiaVencimento() {
+        if (!selectTipoRecorrencia || !blocoDiaVencimento) return;
+        const isMensal = selectTipoRecorrencia.value === 'meses';
+        blocoDiaVencimento.style.display = isMensal ? 'block' : 'none';
+        if (textoAncoraRecorrencia) textoAncoraRecorrencia.style.display = isMensal ? 'none' : 'block';
+        if (inputDia) inputDia.required = !!(checkRecorrente && checkRecorrente.checked && isMensal);
+    }
+    if (selectTipoRecorrencia) {
+        selectTipoRecorrencia.addEventListener('change', atualizarBlocoDiaVencimento);
+    }
 
     // ── Recorrente toggle ────────────────────────────────────────────────────
     if (checkRecorrente) {
         checkRecorrente.addEventListener('change', function() {
             blocoRecorrencia.style.display = this.checked ? 'block' : 'none';
-            inputDia.required = this.checked;
+            atualizarBlocoDiaVencimento();
             // Esconde vencimento (recorrente usa o próprio dia de recorrência)
             const blocoVenc = document.getElementById('bloco-vencimento');
             if (blocoVenc) blocoVenc.style.display = this.checked ? 'none' : '';

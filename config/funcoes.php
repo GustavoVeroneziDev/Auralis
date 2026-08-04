@@ -2041,6 +2041,277 @@ if (!function_exists('garantirColunasReforcoVencimento')) {
     }
 }
 
+// ── Recorrência generalizada (dias/semanas/meses) ────────────────────────────
+// Recorrência sempre foi "todo mês, dia fixo" — essas 3 colunas generalizam sem
+// tocar nas linhas já existentes: o DEFAULT reproduz exatamente o comportamento
+// legado (mensal, intervalo 1), então todo Registro recorrente antigo continua
+// se comportando igual sem precisar de UPDATE em massa. Sem SSH no host, a
+// migração roda sozinha aqui, mesmo padrão de garantirColunasReforcoVencimento.
+if (!function_exists('garantirColunasRecorrenciaGeneralizada')) {
+    function garantirColunasRecorrenciaGeneralizada(PDO $pdo): void
+    {
+        $colunas = [
+            'TipoRecorrencia'      => "ENUM('dias','semanas','meses') NOT NULL DEFAULT 'meses'",
+            'IntervaloRecorrencia' => "SMALLINT UNSIGNED NOT NULL DEFAULT 1",
+            'RecorrenciaAtiva'     => "TINYINT(1) NOT NULL DEFAULT 1",
+        ];
+        foreach ($colunas as $coluna => $definicao) {
+            try {
+                $chk = $pdo->query("
+                    SELECT COLUMN_NAME FROM INFORMATION_SCHEMA.COLUMNS
+                    WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'Registro' AND COLUMN_NAME = '$coluna'
+                ")->fetchColumn();
+                if (!$chk) {
+                    $pdo->exec("ALTER TABLE Registro ADD COLUMN $coluna $definicao");
+                }
+            } catch (PDOException $e) {
+            }
+        }
+    }
+}
+
+// Único lugar que calcula "qual a próxima data" de uma recorrência, pros 3 tipos.
+// Usado tanto na criação (pré-gerar o lote inicial) quanto no reabastecimento —
+// antes disso existiam 2 cálculos de data divergentes (form web com clamping de
+// fim de mês, motor do dashboard sem) e um deles gerava datas inválidas tipo
+// "2026-02-31" silenciosamente engolidas pelo catch. Agora só existe um cálculo.
+if (!function_exists('calcularProximaOcorrenciaRecorrente')) {
+    function calcularProximaOcorrenciaRecorrente(
+        DateTime $dataReferencia,
+        string $tipoRecorrencia,
+        int $intervaloRecorrencia,
+        ?int $diaVencimento
+    ): DateTime {
+        $intervalo = max(1, $intervaloRecorrencia);
+
+        switch ($tipoRecorrencia) {
+            case 'dias':
+                return (clone $dataReferencia)->modify("+{$intervalo} days");
+
+            case 'semanas':
+                return (clone $dataReferencia)->modify("+{$intervalo} weeks");
+
+            case 'meses':
+            default:
+                $mesAlvo = (int)$dataReferencia->format('m') + $intervalo;
+                $anoAlvo = (int)$dataReferencia->format('Y') + intdiv($mesAlvo - 1, 12);
+                $mesAlvo = (($mesAlvo - 1) % 12) + 1;
+
+                $diaAlvo        = $diaVencimento ?: (int)$dataReferencia->format('d');
+                $ultimoDiaDoMes = (int)date('t', strtotime(sprintf('%04d-%02d-01', $anoAlvo, $mesAlvo)));
+                $diaCorreto     = min($diaAlvo, $ultimoDiaDoMes);
+
+                return new DateTime(sprintf('%04d-%02d-%02d', $anoAlvo, $mesAlvo, $diaCorreto));
+        }
+    }
+}
+
+// Texto amigável pra confirmações (WhatsApp, sucesso do form, modal de exclusão).
+if (!function_exists('descreverRecorrencia')) {
+    function descreverRecorrencia(string $tipoRecorrencia, int $intervaloRecorrencia, ?int $diaVencimento): string
+    {
+        $intervalo = max(1, $intervaloRecorrencia);
+        switch ($tipoRecorrencia) {
+            case 'dias':
+                return $intervalo === 1 ? 'todo dia' : "a cada {$intervalo} dias";
+            case 'semanas':
+                return $intervalo === 1 ? 'toda semana' : "a cada {$intervalo} semanas";
+            case 'meses':
+            default:
+                return $intervalo === 1
+                    ? "todo mês, dia {$diaVencimento}"
+                    : "a cada {$intervalo} meses, dia {$diaVencimento}";
+        }
+    }
+}
+
+// Quantas ocorrências pré-gerar na criação. Mantém o hábito atual (~24) pro caso
+// mensal e cobre um horizonte de ~180 dias pra dias/semanas, com teto de 60 — sem
+// isso, "a cada 1 dia" viraria centenas de linhas de uma vez só na criação.
+if (!function_exists('tamanhoLoteInicialRecorrencia')) {
+    function tamanhoLoteInicialRecorrencia(string $tipoRecorrencia, int $intervaloRecorrencia): int
+    {
+        $intervalo = max(1, $intervaloRecorrencia);
+        switch ($tipoRecorrencia) {
+            case 'dias':
+                return (int) max(7, min(60, intdiv(180, $intervalo)));
+            case 'semanas':
+                return (int) max(4, min(52, intdiv(180, $intervalo * 7)));
+            case 'meses':
+            default:
+                return (int) max(6, min(24, intdiv(24, $intervalo)));
+        }
+    }
+}
+
+// Ponto único de criação de uma série recorrente — substitui os 3 pontos de
+// criação divergentes que existiam antes (form web pré-gerando 24 meses com
+// GrupoParcela próprio, IA do WhatsApp criando 1 linha solta com GrupoParcela
+// NULL, motor do dashboard nem gravando GrupoParcela na ocorrência seguinte).
+// GrupoParcela SEMPRE sai preenchido daqui — é o que garante que "excluir este e
+// os futuros" sempre tenha um grupo real pra filtrar.
+if (!function_exists('criarSerieRecorrente')) {
+    function criarSerieRecorrente(PDO $pdo, array $dados): array
+    {
+        $tipoRecorrencia = in_array($dados['tipo_recorrencia'] ?? '', ['dias', 'semanas', 'meses'], true)
+            ? $dados['tipo_recorrencia'] : 'meses';
+        $intervalo = max(1, (int)($dados['intervalo_recorrencia'] ?? 1));
+        $dataBase  = new DateTime($dados['data_inicio']);
+        $diaVenc   = $tipoRecorrencia === 'meses'
+            ? (int)($dados['dia_vencimento'] ?: $dataBase->format('d'))
+            : null;
+        $qtd    = (int)($dados['quantidade_lote'] ?? tamanhoLoteInicialRecorrencia($tipoRecorrencia, $intervalo));
+        $grupo  = gerarUuid();
+
+        $stmt = $pdo->prepare("
+            INSERT INTO Registro (
+                IDRegistro, TipoRegistro, Valor, Descricao, MomentoRegistro, DataVencimento,
+                StatusRegistro, Recorrente, DiaVencimento, TipoRecorrencia, IntervaloRecorrencia,
+                RecorrenciaAtiva, FKCarteira, FKUsuario, FKCategoria, GrupoParcela
+            ) VALUES (
+                :id, :tipo, :valor, :desc, :momento, :venc,
+                :status, 1, :dia, :tipo_rec, :interv,
+                1, :cart, :uid, :cat, :grupo
+            )
+        ");
+
+        $dataOcorrencia = $dataBase;
+        $primeiroId     = null;
+
+        $pdo->beginTransaction();
+        try {
+            for ($i = 0; $i < $qtd; $i++) {
+                if ($i > 0) {
+                    $dataOcorrencia = calcularProximaOcorrenciaRecorrente($dataOcorrencia, $tipoRecorrencia, $intervalo, $diaVenc);
+                }
+                $id = gerarUuid();
+                if ($primeiroId === null) $primeiroId = $id;
+                $dataStr = $dataOcorrencia->format('Y-m-d');
+
+                $stmt->execute([
+                    ':id'       => $id,
+                    ':tipo'     => $dados['tipo_registro'],
+                    ':valor'    => $dados['valor'],
+                    ':desc'     => $dados['descricao'],
+                    ':momento'  => $dataStr,
+                    ':venc'     => $dataStr,
+                    ':status'   => $i === 0 ? $dados['status_inicial'] : 'pendente',
+                    ':dia'      => $diaVenc,
+                    ':tipo_rec' => $tipoRecorrencia,
+                    ':interv'   => $intervalo,
+                    ':cart'     => $dados['carteira_id'],
+                    ':uid'      => $dados['usuario_id'],
+                    ':cat'      => $dados['categoria_id'] ?? null,
+                    ':grupo'    => $grupo,
+                ]);
+            }
+            $pdo->commit();
+        } catch (PDOException $e) {
+            $pdo->rollBack();
+            throw $e;
+        }
+
+        return ['grupo_parcela' => $grupo, 'primeiro_id' => $primeiroId, 'quantidade_gerada' => $qtd];
+    }
+}
+
+// Motor de reabastecimento — substitui o antigo motor embutido no dashboard.php
+// que só entendia "1x por mês, olhar o mês anterior". Agora ancorado por
+// GrupoParcela (nunca mais em "que mês é hoje"), funciona igual pra qualquer
+// intervalo. RecorrenciaAtiva=0 tira a série do escopo — é isso que garante que
+// uma série "excluída (futuros)" realmente pare de ser recriada.
+if (!function_exists('reabastecerRecorrencias')) {
+    function reabastecerRecorrencias(PDO $pdo, ?string $usuarioId = null, int $horizonteDias = 180): int
+    {
+        $sql = "
+            SELECT GrupoParcela, FKUsuario, FKCarteira, FKCategoria, TipoRegistro, Valor, Descricao,
+                   TipoRecorrencia, IntervaloRecorrencia, DiaVencimento,
+                   MAX(MomentoRegistro) AS UltimaOcorrencia
+            FROM Registro
+            WHERE Recorrente = 1 AND RecorrenciaAtiva = 1
+              AND GrupoParcela IS NOT NULL AND TotalParcelas IS NULL"
+            . ($usuarioId ? " AND FKUsuario = :uid" : "") . "
+            GROUP BY GrupoParcela, FKUsuario, FKCarteira, FKCategoria, TipoRegistro, Valor, Descricao,
+                     TipoRecorrencia, IntervaloRecorrencia, DiaVencimento
+            HAVING UltimaOcorrencia < DATE_ADD(CURDATE(), INTERVAL :horizonte DAY)
+        ";
+        $stmt   = $pdo->prepare($sql);
+        $params = [':horizonte' => $horizonteDias];
+        if ($usuarioId) $params[':uid'] = $usuarioId;
+        $stmt->execute($params);
+        $grupos = $stmt->fetchAll(PDO::FETCH_ASSOC);
+
+        if (!$grupos) return 0;
+
+        $hoje = new DateTime('today');
+        $stmtChk = $pdo->prepare("SELECT 1 FROM Registro WHERE GrupoParcela = :g AND MomentoRegistro = :d LIMIT 1");
+        $stmtIns = $pdo->prepare("
+            INSERT INTO Registro (
+                IDRegistro, TipoRegistro, Valor, Descricao, MomentoRegistro, DataVencimento,
+                StatusRegistro, Recorrente, DiaVencimento, TipoRecorrencia, IntervaloRecorrencia,
+                RecorrenciaAtiva, FKCarteira, FKUsuario, FKCategoria, GrupoParcela
+            ) VALUES (
+                :id, :tipo, :valor, :desc, :momento, :venc,
+                'pendente', 1, :dia, :tipo_rec, :interv,
+                1, :cart, :uid, :cat, :grupo
+            )
+        ");
+
+        $totalGerado = 0;
+
+        foreach ($grupos as $g) {
+            $ultima = new DateTime($g['UltimaOcorrencia']);
+
+            // Série sem rodar há muito tempo (ambiente sem cron configurado por meses,
+            // por ex.) não recria o passado inteiro — salta direto pra próxima ocorrência
+            // a partir de hoje, preservando o padrão/intervalo da série.
+            $saltos = 0;
+            while ($ultima < $hoje && $saltos < 500) {
+                $ultima = calcularProximaOcorrenciaRecorrente(
+                    $ultima, $g['TipoRecorrencia'], (int)$g['IntervaloRecorrencia'], $g['DiaVencimento'] !== null ? (int)$g['DiaVencimento'] : null
+                );
+                $saltos++;
+            }
+
+            $limiteHorizonte  = (clone $hoje)->modify("+{$horizonteDias} days");
+            $qtdMaxPorExecucao = 60;
+            $geradoNesteGrupo  = 0;
+
+            while ($ultima < $limiteHorizonte && $geradoNesteGrupo < $qtdMaxPorExecucao) {
+                $dataStr = $ultima->format('Y-m-d');
+                $stmtChk->execute([':g' => $g['GrupoParcela'], ':d' => $dataStr]);
+                if (!$stmtChk->fetchColumn()) {
+                    try {
+                        $stmtIns->execute([
+                            ':id'       => gerarUuid(),
+                            ':tipo'     => $g['TipoRegistro'],
+                            ':valor'    => $g['Valor'],
+                            ':desc'     => $g['Descricao'],
+                            ':momento'  => $dataStr,
+                            ':venc'     => $dataStr,
+                            ':dia'      => $g['DiaVencimento'],
+                            ':tipo_rec' => $g['TipoRecorrencia'],
+                            ':interv'   => $g['IntervaloRecorrencia'],
+                            ':cart'     => $g['FKCarteira'],
+                            ':uid'      => $g['FKUsuario'],
+                            ':cat'      => $g['FKCategoria'],
+                            ':grupo'    => $g['GrupoParcela'],
+                        ]);
+                        $geradoNesteGrupo++;
+                        $totalGerado++;
+                    } catch (PDOException $e) {
+                    }
+                }
+                $ultima = calcularProximaOcorrenciaRecorrente(
+                    $ultima, $g['TipoRecorrencia'], (int)$g['IntervaloRecorrencia'], $g['DiaVencimento'] !== null ? (int)$g['DiaVencimento'] : null
+                );
+            }
+        }
+
+        return $totalGerado;
+    }
+}
+
 // ── Avatar de usuário (foto real > personagem DiceBear > iniciais) ──────────
 // Extraído do Ranking pra ser reaproveitado também no modal de perfil público.
 if (!function_exists('renderAvatarUsuario')) {
