@@ -61,73 +61,29 @@ try {
 // ==============================================================================
 // MOTOR DE RECORRÊNCIA AURALIS (Executado no carregamento do Dashboard)
 // ==============================================================================
-$mesAnoAtual = date('Y-m');
-
+// Rede de segurança pra quem ainda não configurou cron/reabastecer_recorrencias.php
+// no cPanel — reabastecerRecorrencias() é a mesma função que o cron chama, agora
+// ancorada por GrupoParcela (não mais "olhar o mês passado"), então funciona igual
+// pra qualquer intervalo (dias/semanas/meses), não só mensal. Travado 1x/dia por
+// usuário pra não pesar em todo carregamento.
 try {
-    // 1. Verifica se o sistema já rodou este mês
+    garantirColunasRecorrenciaGeneralizada($pdo);
+
+    $hojeStr    = date('Y-m-d');
     $sqlConfig  = "SELECT Valor FROM ConfiguracaoSistema WHERE Chave = 'ultima_recorrencia' AND FKUsuario = :uid";
     $stmtConfig = $pdo->prepare($sqlConfig);
     $stmtConfig->execute([':uid' => $usuario_id]);
     $ultimaExecucao = $stmtConfig->fetchColumn();
 
-    if ($ultimaExecucao !== $mesAnoAtual) {
-        // 2. Busca contas recorrentes do mês passado (para evitar gaps)
-        $mesAnterior = date('Y-m', strtotime('-1 month'));
+    if ($ultimaExecucao !== $hojeStr) {
+        reabastecerRecorrencias($pdo, $usuario_id);
 
-        // CORREÇÃO: TO_CHAR trocado por DATE_FORMAT e booleano para 1
-        // O NOT EXISTS é a proteção de verdade contra duplicar — antes disso, a única
-        // barreira era a trava "ultima_recorrencia" abaixo; se aquela gravação falhasse
-        // por qualquer motivo (e o catch engolia o erro), esse bloco recriava a mesma
-        // conta recorrente a cada carregamento do Dashboard, sem parar nunca.
-        $sqlRec  = "SELECT r.* FROM Registro r
-                    WHERE r.FKUsuario = :uid AND r.Recorrente = 1
-                      AND (r.GrupoParcela IS NULL OR r.TotalParcelas IS NOT NULL)
-                      AND DATE_FORMAT(r.MomentoRegistro, '%Y-%m') = :mes_ant
-                      AND NOT EXISTS (
-                          SELECT 1 FROM Registro r2
-                          WHERE r2.FKUsuario = r.FKUsuario
-                            AND r2.FKCarteira = r.FKCarteira
-                            AND r2.Recorrente = 1
-                            AND r2.TipoRegistro = r.TipoRegistro
-                            AND r2.Descricao = r.Descricao
-                            AND r2.Valor = r.Valor
-                            AND DATE_FORMAT(r2.MomentoRegistro, '%Y-%m') = :mes_atual
-                      )";
-        $stmtRec = $pdo->prepare($sqlRec);
-        $stmtRec->execute([':uid' => $usuario_id, ':mes_ant' => $mesAnterior, ':mes_atual' => $mesAnoAtual]);
-        $contas = $stmtRec->fetchAll();
-
-        if (!empty($contas)) {
-            // CORREÇÃO: Adicionado IDRegistro manual
-            $sqlInsert = "INSERT INTO Registro (IDRegistro, TipoRegistro, Valor, Descricao, MomentoRegistro, DataVencimento, StatusRegistro, Recorrente, DiaVencimento, FKCarteira, FKUsuario, FKCategoria)
-                              VALUES (:id, :tipo, :valor, :desc, :momento, :venc, 'pendente', 1, :dia, :cart, :uid, :cat)";
-            $stmtInsert = $pdo->prepare($sqlInsert);
-
-            foreach ($contas as $c) {
-                $novaData = date('Y-m') . '-' . str_pad($c['DiaVencimento'], 2, '0', STR_PAD_LEFT);
-
-                $stmtInsert->execute([
-                    ':id'       => gerarUuid(),
-                    ':tipo'     => $c['TipoRegistro'],
-                    ':valor'    => $c['Valor'],
-                    ':desc'     => $c['Descricao'],
-                    ':momento'  => $novaData,
-                    ':venc'     => $novaData,
-                    ':dia'      => $c['DiaVencimento'],
-                    ':cart'     => $c['FKCarteira'],
-                    ':uid'      => $usuario_id,
-                    ':cat'      => $c['FKCategoria'],
-                ]);
-            }
-        }
-
-        // 3. Atualiza a "memória" do sistema
         if ($ultimaExecucao === false) {
             $sqlUpd = "INSERT INTO ConfiguracaoSistema (Chave, Valor, FKUsuario) VALUES ('ultima_recorrencia', :v, :uid)";
         } else {
             $sqlUpd = "UPDATE ConfiguracaoSistema SET Valor = :v WHERE Chave = 'ultima_recorrencia' AND FKUsuario = :uid";
         }
-        $pdo->prepare($sqlUpd)->execute([':v' => $mesAnoAtual, ':uid' => $usuario_id]);
+        $pdo->prepare($sqlUpd)->execute([':v' => $hojeStr, ':uid' => $usuario_id]);
     }
 } catch (PDOException $e) {
     // Falha silenciosa
@@ -256,8 +212,24 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'])) {
         }
 
         try {
+            // Self-heal: registro recorrente que por algum motivo ainda não tem grupo
+            // (linha órfã que escapou do backfill) ganha um agora — sem isso, "excluir
+            // futuros" caía silenciosamente em "excluir só este" quando GrupoParcela era
+            // NULL, e a série continuava sendo recriada pelo motor de reabastecimento.
+            if (empty($grupo_id)) {
+                $grupo_id = gerarUuid();
+                $pdo->prepare("UPDATE Registro SET GrupoParcela = :g WHERE IDRegistro = :id AND $_whereRegPermitido")
+                    ->execute([':g' => $grupo_id, ':id' => $id_registro, ':uid' => $usuario_id, ':uid2' => $usuario_id]);
+            }
+
             logAtividadeRegistroSeCompartilhada($pdo, $id_registro, $usuario_id, 'lancamento_excluido');
-            if ($tipo_exclusao === 'futuros' && !empty($grupo_id)) {
+
+            if ($tipo_exclusao === 'futuros') {
+                $pdo->beginTransaction();
+                // Encerra a série antes de excluir — sem isso, o motor de reabastecimento
+                // recria a próxima ocorrência no primeiro carregamento do dashboard.
+                $pdo->prepare("UPDATE Registro SET RecorrenciaAtiva = 0 WHERE GrupoParcela = :grupo AND $_whereRegPermitido")
+                    ->execute([':grupo' => $grupo_id, ':uid' => $usuario_id, ':uid2' => $usuario_id]);
                 // Exclui o registro selecionado E todas as projeções futuras pendentes do grupo
                 $sqlDel = "
                     DELETE FROM Registro
@@ -273,8 +245,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'])) {
                     ':id'        => $id_registro,
                     ':data_base' => $data_base
                 ]);
+                $pdo->commit();
             } else {
-                // Comportamento padrão: exclui apenas o mês selecionado
+                // "apenas_este": não mexe em RecorrenciaAtiva — a série continua ativa
                 $sqlDel  = "DELETE FROM Registro WHERE IDRegistro = :id AND $_whereRegPermitido";
                 $stmtDel = $pdo->prepare($sqlDel);
                 $stmtDel->execute([':id' => $id_registro, ':uid' => $usuario_id, ':uid2' => $usuario_id]);
@@ -282,6 +255,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'])) {
             header("Location: " . $redirectBase . "&sucesso=excluido");
             exit;
         } catch (PDOException $e) {
+            if ($pdo->inTransaction()) $pdo->rollBack();
         }
     }
 
@@ -1665,16 +1639,16 @@ require_once 'geral/header.php';
                     <div class="form-check mb-3">
                         <input class="form-check-input" type="radio" name="tipo_exclusao" id="excluir_apenas_este" value="apenas_este" checked>
                         <label class="form-check-label text-light fw-semibold fs-7" for="excluir_apenas_este">
-                            Excluir apenas este mês
+                            Excluir apenas esta ocorrência
                         </label>
-                        <div class="text-secondary opacity-75" style="font-size: 0.75rem;">Os demais meses futuros continuam ativos.</div>
+                        <div class="text-secondary opacity-75" style="font-size: 0.75rem;">As demais ocorrências futuras continuam ativas.</div>
                     </div>
                     <div class="form-check">
                         <input class="form-check-input" type="radio" name="tipo_exclusao" id="excluir_todos_futuros" value="futuros">
                         <label class="form-check-label text-light fw-semibold fs-7" for="excluir_todos_futuros">
-                            Excluir este e os meses futuros pendentes
+                            Excluir esta e as ocorrências futuras pendentes
                         </label>
-                        <div class="text-secondary opacity-75" style="font-size: 0.75rem;">Remove esta transação e todas as projeções não pagas/recebidas adiante.</div>
+                        <div class="text-secondary opacity-75" style="font-size: 0.75rem;">Encerra a recorrência: remove esta transação e todas as projeções não pagas/recebidas adiante.</div>
                     </div>
                 </div>
                 <div class="modal-footer border-top border-secondary-subtle d-flex justify-content-between p-2">

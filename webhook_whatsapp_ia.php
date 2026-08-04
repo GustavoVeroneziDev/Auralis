@@ -60,6 +60,7 @@ if (!in_array($planoEfetivo, ['vip', 'vip_trial'], true)) {
 // Máximo 15 mensagens em 2 minutos (humano normal: 1-3/min). Drop silencioso.
 
 _waGarantirTabela($pdo);
+garantirColunasRecorrenciaGeneralizada($pdo);
 
 try {
     $stmtRate = $pdo->prepare(
@@ -322,13 +323,13 @@ ACTIONS disponíveis (responda SEMPRE com JSON válido, sem markdown):
 {"action":"clarificar","pergunta":"pergunta curta e objetiva","opcoes":["interpretação A","interpretação B"]}
 
 "registrar" — lançar transações financeiras:
-{"action":"registrar","registros":[{"tipo":"despesa","valor":0.00,"valor_total":0.00,"descricao":"max 60 chars","data":"YYYY-MM-DD","id_carteira":"uuid","id_categoria":"uuid|null","nome_carteira":"nome","nome_categoria":"nome|null","parcelas":1,"recorrente":false,"dia_vencimento":0}]}
+{"action":"registrar","registros":[{"tipo":"despesa","valor":0.00,"valor_total":0.00,"descricao":"max 60 chars","data":"YYYY-MM-DD","id_carteira":"uuid","id_categoria":"uuid|null","nome_carteira":"nome","nome_categoria":"nome|null","parcelas":1,"recorrente":false,"dia_vencimento":0,"tipo_recorrencia":"meses","intervalo_recorrencia":1}]}
 Regras:
 - primeira carteira se não mencionada; data relativa → YYYY-MM-DD exato.
 - parcelas>1 para parcelamentos — cada parcela cai automaticamente no mesmo dia dos meses seguintes (ex: base dia 20 → parcela 2 também cai dia 20). Se o parcelamento tiver datas diferentes por parcela, use "clarificar" ou registre e avise que dá pra ajustar com "editar" (regra 3).
 - "valor" = valor de CADA parcela, quando a pessoa já fala o valor por parcela (ex: "12x de 150" → valor=150). "valor_total" = preço cheio a dividir (ex: "comprei uma TV de 3000 em 10x" → valor_total=3000, sem valor). Use SÓ um dos dois.
 - Compra parcelada "com juros": se a pessoa já disser o valor final por parcela (ex: "fica 220 por mês"), use valor=220 direto. Se ela só souber o total final com juros incluso (ex: "no total com juros dá 3300"), use valor_total=3300 — o sistema divide certinho, não faça a conta de cabeça.
-- "recorrente":true + "dia_vencimento" (1-31) para contas que se repetem todo mês (assinatura, aluguel, mensalidade) SEM ser parcelamento — não usa "parcelas" nesse caso. Nunca marque recorrente E parcelas>1 ao mesmo tempo.
+- "recorrente":true para contas que se repetem SEM ser parcelamento — não usa "parcelas" nesse caso. Nunca marque recorrente E parcelas>1 ao mesmo tempo. Por padrão repete todo mês ("tipo_recorrencia" omitido = "meses", "intervalo_recorrencia" omitido = 1) no "dia_vencimento" informado (1-31). Se a pessoa disser "a cada X dias" ou "toda semana"/"a cada X semanas" (ex: "me cobra a cada 15 dias"), use "tipo_recorrencia":"dias"|"semanas" com "intervalo_recorrencia":X e OMITA "dia_vencimento" (a recorrência ancora na própria "data" do lançamento). Se disser "bimestral"/"a cada 2 meses", use "tipo_recorrencia":"meses" com "intervalo_recorrencia":2.
 
 "efetivar" — marcar pendente(s) como pago/recebido:
 {"action":"efetivar","descricoes":["texto parcial"]}
@@ -480,7 +481,6 @@ function _waRegistrar(PDO $pdo, string $uid, array $registros, array $carteiras,
         // Recorrente e parcelado não fazem sentido juntos — recorrente vence sempre que
         // ambos vierem preenchidos, igual ao toggle do app (nova_transacao.php:1641-1644).
         $recorrente = $parcelas <= 1 && !empty($r['recorrente']);
-        $diaVenc    = $recorrente ? max(1, min(31, (int)($r['dia_vencimento'] ?? date('j', strtotime($dataBase))))) : null;
 
         // valor = já é o valor de CADA parcela (ex: "12x de 150" → 150).
         // valor_total = preço cheio a dividir pelas parcelas (ex: "3000 em 10x com juros,
@@ -497,10 +497,44 @@ function _waRegistrar(PDO $pdo, string $uid, array $registros, array $carteiras,
 
         if (!$valorParcela || !$descricao) { $erros++; continue; }
 
-        // GrupoParcela só é usado pra ligar parcelas entre si — numa recorrente pura (sem
-        // parcelamento) o app sempre deixa NULL (nova_transacao.php:654-677); o rollout
-        // mensal de dashboard.php:69 exige exatamente isso pra reconhecer e repetir.
+        if ($recorrente) {
+            // Ponto único de criação de recorrência — sempre com GrupoParcela real, nunca
+            // mais uma linha solta que o motor de reabastecimento não consegue localizar
+            // (era o bug: recorrente criado por aqui nascia com GrupoParcela NULL).
+            $tipoRec   = in_array($r['tipo_recorrencia'] ?? '', ['dias', 'semanas', 'meses'], true) ? $r['tipo_recorrencia'] : 'meses';
+            $intervRec = max(1, (int)($r['intervalo_recorrencia'] ?? 1));
+            $diaVenc   = $tipoRec === 'meses'
+                ? max(1, min(31, (int)($r['dia_vencimento'] ?? date('j', strtotime($dataBase)))))
+                : null;
+
+            try {
+                criarSerieRecorrente($pdo, [
+                    'usuario_id'            => $uid,
+                    'carteira_id'           => $cart,
+                    'categoria_id'          => $cat,
+                    'tipo_registro'         => $tipo,
+                    'valor'                 => $valorParcela,
+                    'descricao'             => $descricao,
+                    'data_inicio'           => $dataBase,
+                    'status_inicial'        => $dataBase > $hoje ? 'pendente' : 'efetivado',
+                    'tipo_recorrencia'      => $tipoRec,
+                    'intervalo_recorrencia' => $intervRec,
+                    'dia_vencimento'        => $diaVenc,
+                ]);
+            } catch (Throwable $e) { $erros++; continue; }
+
+            $icon     = $tipo === 'receita' ? '📈' : '📉';
+            $valFmt   = 'R$ ' . number_format($valorParcela, 2, ',', '.');
+            $catNome  = !empty($r['nome_categoria']) ? " · " . $r['nome_categoria'] : '';
+            $cartNome = $r['nome_carteira'] ?? $carteiras[0]['NomeCarteira'];
+            $confirmacoes[] = "{$icon} *{$descricao}* 🔁 _" . descreverRecorrencia($tipoRec, $intervRec, $diaVenc) . "_\n   {$valFmt}{$catNome} · {$cartNome}";
+            continue;
+        }
+
+        // GrupoParcela só é usado pra ligar parcelas entre si. DiaVencimento só existe pra
+        // recorrência (que já saiu por "continue" acima) — sempre NULL aqui.
         $grupoParcela = $parcelas > 1 ? gerarUuid() : null;
+        $diaVenc      = null;
 
         for ($i = 1; $i <= $parcelas; $i++) {
             $dataParcela = $parcelas > 1
@@ -542,8 +576,6 @@ function _waRegistrar(PDO $pdo, string $uid, array $registros, array $carteiras,
             $totalFmt = 'R$ ' . number_format(($valorParcela * $parcelas) + $resto, 2, ',', '.');
             $fimFmt   = date('d/m/Y', strtotime($dataBase . ' +' . ($parcelas - 1) . ' month'));
             $confirmacoes[] = "{$icon} *{$descricao}*\n   {$valFmt}/mês × {$parcelas} = {$totalFmt}{$catNome} · {$cartNome}\n   📅 {$dataFmt} → {$fimFmt}\n   _Datas de cada parcela caem sempre no mesmo dia do mês seguinte — se alguma vencer em dia diferente, me fala qual parcela e a nova data que eu ajusto._";
-        } elseif ($recorrente) {
-            $confirmacoes[] = "{$icon} *{$descricao}* 🔁 _recorrente_\n   {$valFmt}/mês · todo dia {$diaVenc}{$catNome} · {$cartNome}";
         } else {
             $confirmacoes[] = "{$icon} *{$descricao}*: {$valFmt}{$catNome} · {$cartNome} · 📅 {$dataFmt}{$pendente}";
         }
