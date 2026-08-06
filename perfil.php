@@ -28,6 +28,15 @@ if (!$usuario) { header("Location: /dashboard.php"); exit; }
 // Configurações) e pra convidar alguém pra carteira compartilhada, unificados num só.
 $codigoPessoal = obterOuGerarCodigoIndicacao($pdo, $uid);
 
+// Número de Pioneiro (se houver) — badge fixo ao lado do plano, não depende de destaque manual
+$numeroPioneiro = null;
+try {
+    garantirEstruturaComissaoExpandida($pdo);
+    $stmtPio = $pdo->prepare("SELECT Numero FROM Pioneiro WHERE FKUsuario = :uid LIMIT 1");
+    $stmtPio->execute([':uid' => $uid]);
+    $numeroPioneiro = $stmtPio->fetchColumn() ?: null;
+} catch (PDOException $e) {}
+
 $primeiroNome  = explode(' ', $usuario['Nome'])[0];
 $iniciais      = implode('', array_map(fn($p) => strtoupper($p[0]), array_filter(explode(' ', $usuario['Nome']))));
 $iniciais      = mb_substr($iniciais, 0, 2);
@@ -418,6 +427,11 @@ require_once 'geral/header.php';
                     </span>
                 <?php else: ?>
                     <span class="badge" style="background:#ffffff11;color:#9ca3af;border:1px solid #ffffff22;font-size:0.72rem;">FREE</span>
+                <?php endif; ?>
+                <?php if ($numeroPioneiro): ?>
+                    <span class="badge" style="background:#d4af3722;color:#d4af37;border:1px solid #d4af3755;font-size:0.72rem;" title="Um dos primeiros assinantes VIP do Auralis">
+                        <i class="bi bi-rocket-takeoff-fill me-1"></i>Pioneiro #<?= str_pad($numeroPioneiro, 3, '0', STR_PAD_LEFT) ?>
+                    </span>
                 <?php endif; ?>
                 <span class="text-muted small">
                     <i class="bi bi-calendar3 me-1"></i>Membro desde <?= $dataMembro ?>

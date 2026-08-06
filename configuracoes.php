@@ -324,9 +324,33 @@ require_once 'geral/header.php';
 
     <?php
     $codigoRef  = $dadosUsuario['CodigoIndicacao'] ?? null;
+    $saldoComissaoCfg = null;
     if ($codigoRef) {
         $protocolo = (isset($_SERVER['HTTPS']) && $_SERVER['HTTPS'] === 'on') ? 'https' : 'http';
         $linkRef   = $protocolo . '://' . $_SERVER['HTTP_HOST'] . '/usuario/cadastro.php?ref=' . $codigoRef;
+
+        // Modo 'dinheiro': mostra saldo de comissão junto do link, igual ao widget do dashboard
+        if (function_exists('obterModoRecompensaIndicacao') && obterModoRecompensaIndicacao($pdo) === 'dinheiro') {
+            try {
+                $stmtRevCfg = $pdo->prepare("SELECT IDRevendedor FROM Revendedor WHERE FKUsuario = :uid LIMIT 1");
+                $stmtRevCfg->execute([':uid' => $usuario_id]);
+                $revIdCfg = $stmtRevCfg->fetchColumn();
+                $pendCfg  = 0.0; $pagoCfg = 0.0;
+                if ($revIdCfg) {
+                    $stmtSaldoCfg = $pdo->prepare(
+                        "SELECT
+                             COALESCE(SUM(CASE WHEN Status = 'pendente' THEN ValorComissao ELSE 0 END), 0) as pendente,
+                             COALESCE(SUM(CASE WHEN Status = 'paga'     THEN ValorComissao ELSE 0 END), 0) as pago
+                         FROM ComissaoRevendedor WHERE FKRevendedor = :rid"
+                    );
+                    $stmtSaldoCfg->execute([':rid' => $revIdCfg]);
+                    $rowCfg  = $stmtSaldoCfg->fetch(PDO::FETCH_ASSOC);
+                    $pendCfg = (float)($rowCfg['pendente'] ?? 0);
+                    $pagoCfg = (float)($rowCfg['pago'] ?? 0);
+                }
+                $saldoComissaoCfg = ['pendente' => $pendCfg, 'pago' => $pagoCfg];
+            } catch (PDOException $e) {}
+        }
     }
     ?>
     <?php if (!empty($codigoRef)): ?>
@@ -363,6 +387,18 @@ require_once 'geral/header.php';
             <code style="color:#d4af37;font-size:.78rem;"><?= htmlspecialchars($codigoRef) ?></code>
             <span class="text-secondary" style="font-size:.72rem;">— esse mesmo código também serve pra convidar alguém pra uma carteira compartilhada.</span>
         </div>
+        <?php if ($saldoComissaoCfg !== null): ?>
+        <div class="mt-3 pt-3 d-flex align-items-center gap-4" style="border-top:1px solid rgba(212,175,55,.12);">
+            <div>
+                <div class="text-secondary" style="font-size:.7rem;">Saldo em comissão</div>
+                <div class="fw-bold" style="color:#fbbf24;font-size:1rem;">R$ <?= number_format($saldoComissaoCfg['pendente'], 2, ',', '.') ?></div>
+            </div>
+            <div>
+                <div class="text-secondary" style="font-size:.7rem;">Já recebido</div>
+                <div class="fw-semibold text-light" style="font-size:.9rem;">R$ <?= number_format($saldoComissaoCfg['pago'], 2, ',', '.') ?></div>
+            </div>
+        </div>
+        <?php endif; ?>
     </div>
     <?php endif; ?>
 

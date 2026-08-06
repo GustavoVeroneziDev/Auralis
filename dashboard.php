@@ -572,6 +572,30 @@ try {
     );
     $stmtReg->execute([':conv' => $dadosIndicacao['total_convertidos'], ':uid' => $usuario_id]);
     $dadosIndicacao['proxima_regra'] = $stmtReg->fetch(PDO::FETCH_ASSOC) ?: null;
+
+    // Modo 'dinheiro': widget mostra saldo de comissão em R$ em vez do progresso em dias
+    $dadosIndicacao['modo']           = function_exists('obterModoRecompensaIndicacao') ? obterModoRecompensaIndicacao($pdo) : 'dias';
+    $dadosIndicacao['saldo_pendente'] = 0.0;
+    $dadosIndicacao['saldo_pago']     = 0.0;
+    $dadosIndicacao['valor_minimo']   = 0.0;
+    if ($dadosIndicacao['modo'] === 'dinheiro') {
+        $dadosIndicacao['valor_minimo'] = function_exists('valorMinimoSaqueComissao') ? valorMinimoSaqueComissao($pdo) : 50.0;
+        $stmtRevSelf = $pdo->prepare("SELECT IDRevendedor FROM Revendedor WHERE FKUsuario = :uid LIMIT 1");
+        $stmtRevSelf->execute([':uid' => $usuario_id]);
+        $revSelfId = $stmtRevSelf->fetchColumn();
+        if ($revSelfId) {
+            $stmtSaldo = $pdo->prepare(
+                "SELECT
+                     COALESCE(SUM(CASE WHEN Status = 'pendente' THEN ValorComissao ELSE 0 END), 0) as pendente,
+                     COALESCE(SUM(CASE WHEN Status = 'paga'     THEN ValorComissao ELSE 0 END), 0) as pago
+                 FROM ComissaoRevendedor WHERE FKRevendedor = :rid"
+            );
+            $stmtSaldo->execute([':rid' => $revSelfId]);
+            $saldoInd = $stmtSaldo->fetch(PDO::FETCH_ASSOC);
+            $dadosIndicacao['saldo_pendente'] = (float)($saldoInd['pendente'] ?? 0);
+            $dadosIndicacao['saldo_pago']     = (float)($saldoInd['pago'] ?? 0);
+        }
+    }
 } catch (PDOException $e) {}
 
 // ── Cofrinhos: lista individual para cards no dashboard ─────────────────
@@ -1509,7 +1533,23 @@ require_once 'geral/header.php';
                     </div>
                 </div>
             </div>
-            <?php if ($proxRegra): ?>
+            <?php if ($dadosIndicacao['modo'] === 'dinheiro'): ?>
+            <div class="mt-3 pt-3" style="border-top:1px solid rgba(255,255,255,.06);">
+                <div class="d-flex align-items-center justify-content-between flex-wrap gap-2">
+                    <div>
+                        <div class="text-secondary" style="font-size:.7rem;">Saldo em comissão</div>
+                        <div class="fw-bold" style="color:#fbbf24;font-size:1.05rem;">R$ <?= number_format($dadosIndicacao['saldo_pendente'], 2, ',', '.') ?></div>
+                    </div>
+                    <div class="text-end">
+                        <div class="text-secondary" style="font-size:.7rem;">Já recebido</div>
+                        <div class="fw-semibold text-light" style="font-size:.9rem;">R$ <?= number_format($dadosIndicacao['saldo_pago'], 2, ',', '.') ?></div>
+                    </div>
+                </div>
+                <div class="text-secondary mt-2" style="font-size:.7rem;">
+                    A 1ª comissão é paga na hora. As seguintes acumulam e entram na fila assim que baterem R$ <?= number_format($dadosIndicacao['valor_minimo'], 2, ',', '.') ?>.
+                </div>
+            </div>
+            <?php elseif ($proxRegra): ?>
             <div class="mt-3">
                 <div class="d-flex justify-content-between mb-1" style="font-size:.73rem;">
                     <span class="text-secondary"><?= $conv ?>/<?= $proxRegra['MinIndicacoes'] ?> para ganhar <?= $proxRegra['DuracaoDias'] ?> dias <?= strtoupper($proxRegra['PlanoRecompensa']) ?></span>

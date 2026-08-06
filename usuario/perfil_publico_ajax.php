@@ -77,12 +77,22 @@ $totalDesbloqueadas = count(array_filter($conquistas, fn($c) => $c['DataConquist
 
 $amizade = obterStatusAmizade($pdo, $uidViewer, $uidAlvo);
 
+// Número de Pioneiro (se houver) — badge fixo, não depende de destaque manual
+$numeroPioneiro = null;
+try {
+    if (function_exists('garantirEstruturaComissaoExpandida')) garantirEstruturaComissaoExpandida($pdo);
+    $stmtPio = $pdo->prepare("SELECT Numero FROM Pioneiro WHERE FKUsuario = :uid LIMIT 1");
+    $stmtPio->execute([':uid' => $uidAlvo]);
+    $numeroPioneiro = $stmtPio->fetchColumn() ?: null;
+} catch (Throwable $e) {}
+
 echo json_encode([
     'ok'                 => true,
     'id'                 => $usuario['IDUsuario'],
     'nome'               => $usuario['Nome'],
     'avatarHtml'         => renderAvatarUsuario($usuario, 80),
     'plano'              => strtolower($usuario['Plano'] ?? 'free'),
+    'numeroPioneiro'     => $numeroPioneiro ? (int)$numeroPioneiro : null,
     'dataMembro'         => $dataMembro,
     'diasAtivo'          => $diasAtivo,
     'stats'              => [

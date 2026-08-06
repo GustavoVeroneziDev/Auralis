@@ -171,8 +171,19 @@ require_once '../geral/header.php';
         input.type = 'hidden';
         input.name = 'credential';
         input.value = response.credential;
-
         form.appendChild(input);
+
+        // Mesmo ?ref= usado no cadastro manual (indicação/revendedor) — sem isso, quem se
+        // cadastra pelo Google nunca fica vinculado a quem indicou.
+        const refCode = <?= json_encode(!empty($_GET['ref']) ? strtoupper(trim($_GET['ref'])) : '') ?>;
+        if (refCode) {
+            const inputRef = document.createElement('input');
+            inputRef.type = 'hidden';
+            inputRef.name = 'ref_code';
+            inputRef.value = refCode;
+            form.appendChild(inputRef);
+        }
+
         document.body.appendChild(form);
         form.submit();
     }

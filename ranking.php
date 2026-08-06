@@ -504,6 +504,7 @@ require_once 'geral/header.php';
                                 <h5 class="fw-bold mb-1 text-truncate" id="ppfNome"></h5>
                                 <div class="d-flex align-items-center gap-2 flex-wrap">
                                     <span id="ppfPlanoBadge"></span>
+                                    <span id="ppfPioneiroBadge"></span>
                                     <span class="text-muted small" id="ppfTempo"></span>
                                 </div>
                             </div>
@@ -610,6 +611,10 @@ function abrirPerfilPublico(userId) {
             document.getElementById('ppfPlanoBadge').innerHTML = b
                 ? '<span class="badge" style="background:' + b[1] + '22;color:' + b[1] + ';border:1px solid ' + b[1] + '55;font-size:.68rem;"><i class="bi ' + b[2] + ' me-1"></i>' + b[0] + '</span>'
                 : '<span class="badge" style="background:#ffffff11;color:#9ca3af;border:1px solid #ffffff22;font-size:.68rem;">FREE</span>';
+
+            document.getElementById('ppfPioneiroBadge').innerHTML = data.numeroPioneiro
+                ? '<span class="badge" style="background:#d4af3722;color:#d4af37;border:1px solid #d4af3755;font-size:.68rem;"><i class="bi bi-rocket-takeoff-fill me-1"></i>Pioneiro #' + String(data.numeroPioneiro).padStart(3, '0') + '</span>'
+                : '';
 
             document.getElementById('ppfTempo').innerHTML =
                 '<i class="bi bi-calendar3 me-1"></i>Membro desde ' + data.dataMembro +
