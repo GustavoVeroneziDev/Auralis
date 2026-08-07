@@ -462,12 +462,16 @@ function _waRegistrar(PDO $pdo, string $uid, array $registros, array $carteiras,
     $confirmacoes = [];
     $erros        = 0;
 
+    // MomentoRegistro precisa ir junto com DataVencimento — é ele que o dashboard usa pra
+    // separar/agrupar por dia (dashboard.php:1239-1240). Sem setar isso, o MySQL cai no
+    // default (agora/hoje), então um comprovante de uma compra de anteontem aparecia
+    // sempre em "hoje", mesmo com a data certa salva em DataVencimento.
     $stmtIns = $pdo->prepare("
         INSERT INTO Registro
             (IDRegistro, Valor, Descricao, FKCarteira, FKUsuario, FKCategoria,
-             TipoRegistro, DataVencimento, StatusRegistro, Recorrente, DiaVencimento,
+             TipoRegistro, MomentoRegistro, DataVencimento, StatusRegistro, Recorrente, DiaVencimento,
              GrupoParcela, ParcelaAtual, TotalParcelas)
-        VALUES (:id, :val, :desc, :cart, :uid, :cat, :tipo, :data, :status, :recorrente, :dia,
+        VALUES (:id, :val, :desc, :cart, :uid, :cat, :tipo, :momento, :data, :status, :recorrente, :dia,
                 :grupo, :parc_atual, :total_parc)
     ");
 
@@ -554,6 +558,7 @@ function _waRegistrar(PDO $pdo, string $uid, array $registros, array $carteiras,
                     ':uid'        => $uid,
                     ':cat'        => $cat,
                     ':tipo'       => $tipo,
+                    ':momento'    => $dataParcela,
                     ':data'       => $dataParcela,
                     ':status'     => $status,
                     ':recorrente' => $recorrente ? 1 : 0,
@@ -694,7 +699,11 @@ function _waEditar(PDO $pdo, string $uid, array $acao): string
         $mudancas[] = "valor → R$ " . number_format($novoValor, 2, ',', '.');
     }
     if (array_key_exists('data_nova', $acao) && preg_match('/^\d{4}-\d{2}-\d{2}$/', (string)$acao['data_nova'])) {
+        // MomentoRegistro junto com DataVencimento — é o campo que o dashboard usa pra
+        // separar por dia, senão a edição de data não move o item de dia lá.
+        $sets[] = 'MomentoRegistro = :nova_data_momento';
         $sets[] = 'DataVencimento = :nova_data';
+        $params[':nova_data_momento'] = $acao['data_nova'];
         $params[':nova_data'] = $acao['data_nova'];
         $mudancas[] = "data → " . date('d/m/Y', strtotime($acao['data_nova']));
     }
