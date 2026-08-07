@@ -24,6 +24,8 @@ require_once '../geral/header.php';
                         $mensagemErro = "Este e-mail já está cadastrado. Tente fazer login ou recupere sua senha.";
                     } elseif ($_GET['erro'] === 'senhas_diferentes') {
                         $mensagemErro = "As senhas digitadas não conferem. Digite novamente com atenção.";
+                    } elseif ($_GET['erro'] === 'telefone_obrigatorio') {
+                        $mensagemErro = "Informe seu WhatsApp para concluir o cadastro.";
                     } elseif ($_GET['erro'] === 'banco') {
                         $mensagemErro = "Ops! Nossos servidores estão um pouco lentos agora. Tente novamente em instantes.";
                     }
@@ -35,9 +37,6 @@ require_once '../geral/header.php';
                 <?php endif; ?>
 
                 <form action="processa_cadastro.php" method="POST" id="formCadastro">
-                    <?php if (!empty($_GET['ref'])): ?>
-                        <input type="hidden" name="ref_code" value="<?= htmlspecialchars(strtoupper(trim($_GET['ref']))) ?>">
-                    <?php endif; ?>
 
                     <div class="mb-4">
                         <label for="nome" class="form-label text-light opacity-75 fw-semibold">Nome Completo</label>
@@ -61,9 +60,9 @@ require_once '../geral/header.php';
 
                     <div class="mb-4">
                         <label for="telefone" class="form-label text-light opacity-75 fw-semibold d-flex align-items-center gap-2">
-                            WhatsApp <span class="text-secondary fw-normal" style="font-size:.82rem;">(opcional)</span>
+                            WhatsApp
                             <span tabindex="0" data-bs-toggle="tooltip" data-bs-placement="right"
-                                  title="Usado apenas para enviar alertas de vencimento de faturas. Você pode deixar em branco."
+                                  title="Usado para enviar alertas de vencimento de faturas e para o assistente de IA por WhatsApp."
                                   style="cursor:help;line-height:1;">
                                 <i class="bi bi-info-circle text-secondary" style="font-size:.9rem;"></i>
                             </span>
@@ -72,7 +71,7 @@ require_once '../geral/header.php';
                             <span class="input-group-text bg-dark border-secondary text-secondary"><i class="bi bi-whatsapp"></i></span>
                             <input type="tel" class="form-control form-control-lg bg-dark border-secondary text-light"
                                 id="telefone" name="telefone" maxlength="15" placeholder="(11) 99999-9999"
-                                oninput="this.value=_maskTel(this.value)">
+                                oninput="this.value=_maskTel(this.value)" required>
                         </div>
                     </div>
 
@@ -96,25 +95,19 @@ require_once '../geral/header.php';
                         </div>
                     </div>
 
-                    <?php if (empty($_GET['ref'])): ?>
                     <!-- Código pessoal de quem indicou — mesma "chave" usada pra convite de carteira
                          compartilhada, então serve tanto pra código de revendedor quanto de um
-                         usuário comum. Só aparece se não veio de um link de indicação (?ref=), que
-                         já anexa isso sozinho. -->
-                    <div class="form-check mb-3 text-start toggle-analysis">
-                        <input class="form-check-input bg-dark border-secondary shadow-none" type="checkbox" id="tem_codigo_parceiro"
-                            onchange="document.getElementById('blocoCodigoParceiro').classList.toggle('d-none', !this.checked)">
-                        <label class="form-check-label text-secondary small selection-none" for="tem_codigo_parceiro" style="font-size:0.85rem;">
-                            Possuo código de parceiro
+                         usuário comum. Sempre visível (pré-preenchido quando vem de um link ?ref=,
+                         mas continua editável) e opcional. -->
+                    <div class="mb-4">
+                        <label for="codigo_parceiro" class="form-label text-light opacity-75 fw-semibold d-flex align-items-center gap-2">
+                            Código de quem te indicou <span class="text-secondary fw-normal" style="font-size:.82rem;">(opcional)</span>
                         </label>
-                    </div>
-                    <div id="blocoCodigoParceiro" class="mb-4 d-none">
-                        <label for="codigo_parceiro" class="form-label text-light opacity-75 fw-semibold small">Código de quem te indicou</label>
                         <input type="text" class="form-control bg-dark border-secondary text-light" id="codigo_parceiro"
-                            name="codigo_parceiro" placeholder="Ex: AUR-AB12CD" maxlength="12" style="text-transform:uppercase;">
+                            name="codigo_parceiro" placeholder="Ex: AUR-AB12CD" maxlength="12" style="text-transform:uppercase;"
+                            value="<?= !empty($_GET['ref']) ? htmlspecialchars(strtoupper(trim($_GET['ref']))) : '' ?>">
                         <div class="form-text text-secondary" style="font-size:0.72rem;">Código de um revendedor ou de outro usuário do Auralis.</div>
                     </div>
-                    <?php endif; ?>
 
                     <div class="form-check mb-4 text-start toggle-analysis">
                         <input class="form-check-input bg-dark border-secondary shadow-none" type="checkbox" id="aceita_termos" name="aceita_termos" required>
@@ -173,9 +166,10 @@ require_once '../geral/header.php';
         input.value = response.credential;
         form.appendChild(input);
 
-        // Mesmo ?ref= usado no cadastro manual (indicação/revendedor) — sem isso, quem se
-        // cadastra pelo Google nunca fica vinculado a quem indicou.
-        const refCode = <?= json_encode(!empty($_GET['ref']) ? strtoupper(trim($_GET['ref'])) : '') ?>;
+        // Mesmo código de indicação do campo visível (pré-preenchido via ?ref= ou digitado à
+        // mão) — sem isso, quem se cadastra pelo Google nunca fica vinculado a quem indicou.
+        const campoCodigo = document.getElementById('codigo_parceiro');
+        const refCode = campoCodigo ? campoCodigo.value.trim().toUpperCase() : '';
         if (refCode) {
             const inputRef = document.createElement('input');
             inputRef.type = 'hidden';

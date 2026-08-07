@@ -16,6 +16,11 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         exit;
     }
 
+    if (empty($telefone)) {
+        header("Location: cadastro.php?erro=telefone_obrigatorio");
+        exit;
+    }
+
     try {
         // Verifica se o E-mail já existe
         $sqlCheck = "SELECT Email FROM Usuario WHERE Email = :email LIMIT 1";
