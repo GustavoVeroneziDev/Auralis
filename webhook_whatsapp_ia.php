@@ -47,31 +47,13 @@ if (!$usuario) exit;
 $uid     = $usuario['IDUsuario'];
 $msgType = $data['messageType'] ?? 'conversation';
 
-// ── 2.1 Restrição de plano — só VIP e quem está no período de teste grátis ────
-
-$planoEfetivo = planoEfetivoUsuario($pdo, $uid);
-if (!in_array($planoEfetivo, ['vip', 'vip_trial'], true)) {
-    $nomeUserGate = explode(' ', $usuario['Nome'])[0];
-    _waReply($telefone, "Oi, {$nomeUserGate}! 👋\n\nEsse assistente por WhatsApp é um recurso exclusivo do plano *VIP* (e também fica liberado durante o seu período de teste grátis).\n\nPra continuar registrando suas contas por aqui, dá uma olhada no plano VIP:\nmeuauralis.com/planos.php\n\nO app continua 100% disponível pelo site normalmente! 🙂");
-    exit;
-}
-
-// ── 3. Rate limiting — proteção contra bot/spam ───────────────────────────────
-// Máximo 15 mensagens em 2 minutos (humano normal: 1-3/min). Drop silencioso.
-
 _waGarantirTabela($pdo);
-garantirColunasRecorrenciaGeneralizada($pdo);
 
-try {
-    $stmtRate = $pdo->prepare(
-        "SELECT COUNT(*) FROM MensagemWA
-         WHERE FKUsuario = :uid AND Role = 'user' AND CriadoEm > DATE_SUB(NOW(), INTERVAL 2 MINUTE)"
-    );
-    $stmtRate->execute([':uid' => $uid]);
-    if ((int)$stmtRate->fetchColumn() >= 15) exit;
-} catch (Throwable $e) {}
-
-// ── 4. Extrai conteúdo ────────────────────────────────────────────────────────
+// ── 2.1 Extrai conteúdo ────────────────────────────────────────────────────────
+// Precisa vir antes da restrição de plano: o comando de "parar de mandar lembrete"
+// e o registro de "a pessoa respondeu algo" têm que funcionar pra QUALQUER usuário,
+// não só quem tem acesso à IA — senão não tem como saber se alguém sem IA reagiu
+// aos nudges de engajamento (cron/whatsapp_engajamento.php).
 
 $texto        = '';
 $imagemBase64 = null;
@@ -94,6 +76,59 @@ switch ($msgType) {
 }
 
 if (!$texto && !$imagemBase64) exit;
+
+// ── 2.2 "Pare"/"quero voltar a receber" — opt-out e opt-in dos lembretes ──────
+// Checado ANTES da restrição de plano e independente do Gemini: precisa funcionar
+// mesmo pra quem não tem acesso à IA (é justamente quem mais recebe os nudges de
+// engajamento). Só afeta os lembretes automáticos (cron/whatsapp_engajamento.php),
+// não avisos essenciais como vencimento de fatura ou confirmação de pagamento.
+if (_waEhPedidoDeParar($texto)) {
+    _waMarcarOptOutEngajamento($pdo, $uid, true);
+    $nomeUserOptOut = explode(' ', $usuario['Nome'])[0];
+    $respostaOptOut = "Combinado, {$nomeUserOptOut}! Não vou mais te mandar esses lembretes automáticos de \"faz tempo que você não registra nada\". 👍\n\nSe quiser voltar a receber, é só me mandar \"voltar a receber lembretes\" que eu reativo.";
+    _waReply($telefone, $respostaOptOut);
+    _waSaveHistory($pdo, $uid, $texto, $respostaOptOut);
+    exit;
+}
+
+if (_waEhPedidoDeVoltar($texto)) {
+    _waMarcarOptOutEngajamento($pdo, $uid, false);
+    $nomeUserOptIn = explode(' ', $usuario['Nome'])[0];
+    $respostaOptIn = "Reativado, {$nomeUserOptIn}! 👍 Volto a te lembrar se ficar um tempo sem registrar nada.";
+    _waReply($telefone, $respostaOptIn);
+    _waSaveHistory($pdo, $uid, $texto, $respostaOptIn);
+    exit;
+}
+
+// ── 2.3 Restrição de plano — só VIP e quem está no período de teste grátis ────
+
+$planoEfetivo = planoEfetivoUsuario($pdo, $uid);
+if (!in_array($planoEfetivo, ['vip', 'vip_trial'], true)) {
+    // Ainda registra a mensagem recebida (sem isso, o cron de engajamento nunca
+    // saberia que essa pessoa respondeu alguma coisa, mesmo sem ter IA liberada).
+    try {
+        $pdo->prepare("INSERT INTO MensagemWA (IDMensagem, FKUsuario, Role, Conteudo) VALUES (:id, :uid, 'user', :msg)")
+            ->execute([':id' => gerarUuid(), ':uid' => $uid, ':msg' => mb_substr($texto ?: '[imagem]', 0, 2000)]);
+    } catch (Throwable $e) {}
+
+    $nomeUserGate = explode(' ', $usuario['Nome'])[0];
+    _waReply($telefone, "Oi, {$nomeUserGate}! 👋\n\nEsse assistente por WhatsApp é um recurso exclusivo do plano *VIP* (e também fica liberado durante o seu período de teste grátis).\n\nPra continuar registrando suas contas por aqui, dá uma olhada no plano VIP:\nmeuauralis.com/planos.php\n\nO app continua 100% disponível pelo site normalmente! 🙂");
+    exit;
+}
+
+// ── 3. Rate limiting — proteção contra bot/spam ───────────────────────────────
+// Máximo 15 mensagens em 2 minutos (humano normal: 1-3/min). Drop silencioso.
+
+garantirColunasRecorrenciaGeneralizada($pdo);
+
+try {
+    $stmtRate = $pdo->prepare(
+        "SELECT COUNT(*) FROM MensagemWA
+         WHERE FKUsuario = :uid AND Role = 'user' AND CriadoEm > DATE_SUB(NOW(), INTERVAL 2 MINUTE)"
+    );
+    $stmtRate->execute([':uid' => $uid]);
+    if ((int)$stmtRate->fetchColumn() >= 15) exit;
+} catch (Throwable $e) {}
 
 // ── 5. Contexto do usuário ────────────────────────────────────────────────────
 
@@ -1199,6 +1234,59 @@ function _waGarantirTabela(PDO $pdo): void
                 KEY idx_usuario_data (FKUsuario, CriadoEm)
             ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
         ");
+    } catch (Throwable $e) {}
+}
+
+// Detecta pedido de "para de me mandar mensagem" — checado fora do fluxo do Gemini
+// (precisa funcionar até pra quem não tem acesso à IA). Cobre tanto o comando seco
+// que qualquer disparo em massa brasileiro já ensinou o usuário a mandar ("PARAR")
+// quanto frases mais naturais próximas de palavras de mensagem/lembrete, evitando
+// falso positivo em frases financeiras comuns tipo "parar de gastar".
+function _waEhPedidoDeParar(string $texto): bool
+{
+    $norm = mb_strtolower(trim($texto));
+    if ($norm === '') return false;
+    if (in_array($norm, ['parar', 'pare', 'stop', 'cancelar', 'sair'], true)) return true;
+    return (bool)preg_match(
+        '/\b(par[ae]|cancelar|não quero mais|nao quero mais)\b[^.!?]{0,25}\b(mensage|mandar|manda|receber|lembrete|notifica|zap|whats)/u',
+        $norm
+    );
+}
+
+// Contraparte do opt-out — precisa ser um pedido explícito (não qualquer mensagem
+// aleatória), pra bater com o que a gente promete na resposta de _waEhPedidoDeParar.
+function _waEhPedidoDeVoltar(string $texto): bool
+{
+    $norm = mb_strtolower(trim($texto));
+    if ($norm === '') return false;
+    return (bool)preg_match(
+        '/\b(voltar|reativar|ativar)\b[^.!?]{0,25}\b(receber|mensage|lembrete|notifica)/u',
+        $norm
+    );
+}
+
+// Liga/desliga o "não quero mais lembrete automático" — só afeta os nudges de
+// cron/whatsapp_engajamento.php, não avisos essenciais (fatura, pagamento etc).
+// Desligar (opt-out) é permanente até um pedido explícito de volta — não reativamos
+// sozinhos só porque a pessoa voltou a usar o app ou mandou qualquer outra mensagem.
+// Reativar também zera a contagem de tentativas, pra dar um ciclo de backoff novo
+// em vez de herdar o desgaste de antes do opt-out.
+function _waMarcarOptOutEngajamento(PDO $pdo, string $uid, bool $optOut): void
+{
+    $valorOut  = $optOut ? '1' : '0';
+    try {
+        foreach (['wa_engajamento_opt_out' => $valorOut, 'wa_engajamento_contagem' => '0'] as $chave => $valor) {
+            if ($chave === 'wa_engajamento_contagem' && $optOut) continue; // só zera contagem ao reativar
+            $existe = $pdo->prepare("SELECT 1 FROM ConfiguracaoSistema WHERE Chave = :chave AND FKUsuario = :uid");
+            $existe->execute([':chave' => $chave, ':uid' => $uid]);
+            if ($existe->fetchColumn()) {
+                $pdo->prepare("UPDATE ConfiguracaoSistema SET Valor = :v WHERE Chave = :chave AND FKUsuario = :uid")
+                    ->execute([':v' => $valor, ':chave' => $chave, ':uid' => $uid]);
+            } else {
+                $pdo->prepare("INSERT INTO ConfiguracaoSistema (Chave, Valor, FKUsuario) VALUES (:chave, :v, :uid)")
+                    ->execute([':chave' => $chave, ':v' => $valor, ':uid' => $uid]);
+            }
+        }
     } catch (Throwable $e) {}
 }
 
