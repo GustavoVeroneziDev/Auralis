@@ -172,16 +172,21 @@ foreach ($cartoes as $c) {
         $stmtTot = $pdo->prepare("SELECT COALESCE(SUM(Valor), 0) FROM LancamentoCartao WHERE FKFatura = :fid");
         $stmtTot->execute([':fid' => $fatura['IDFatura']]);
         $total   = (float)$stmtTot->fetchColumn();
-        $diasAte = (new DateTime('today'))->diff(new DateTime($fatura['DataFechamento']))->days;
+        // DateTime::diff()->days é sempre um valor absoluto (não diz direção) — por isso
+        // $jaFechou é calculado à parte, e a tela precisa saber dos dois pra não "mentir"
+        // dizendo "Hoje" quando na real já fechou há dias (defesa extra: no fluxo normal,
+        // cartao_verificarFechamentos() já fecha isso sozinho antes daqui).
+        $diasAte  = (new DateTime('today'))->diff(new DateTime($fatura['DataFechamento']))->days;
         $jaFechou = new DateTime('today') > new DateTime($fatura['DataFechamento']);
         $dadosCartoes[$c['IDCartao']] = [
-            'fatura'   => $fatura,
-            'total'    => $total,
-            'diasAte'  => $jaFechou ? 0 : $diasAte,
-            'pct'      => $c['Limite'] ? round(($total / $c['Limite']) * 100) : null,
+            'fatura'    => $fatura,
+            'total'     => $total,
+            'diasAte'   => $diasAte,
+            'jaFechou'  => $jaFechou,
+            'pct'       => $c['Limite'] ? round(($total / $c['Limite']) * 100) : null,
         ];
     } catch (Exception $e) {
-        $dadosCartoes[$c['IDCartao']] = ['fatura'=>null,'total'=>0,'diasAte'=>null,'pct'=>null];
+        $dadosCartoes[$c['IDCartao']] = ['fatura'=>null,'total'=>0,'diasAte'=>null,'jaFechou'=>null,'pct'=>null];
     }
 }
 
@@ -324,7 +329,8 @@ require_once '../geral/header.php';
                             <p class="text-secondary mb-0" style="font-size:0.68rem;text-transform:uppercase;letter-spacing:.06em;">Fecha em</p>
                             <p class="text-light fw-semibold mb-0 small">
                                 <?php
-                                if ($d['diasAte'] === 0) echo '<span style="color:var(--color-expense-text);">Hoje</span>';
+                                if ($d['jaFechou']) echo '<span style="color:var(--text-muted);">Fechada</span>';
+                                elseif ($d['diasAte'] === 0) echo '<span style="color:var(--color-expense-text);">Hoje</span>';
                                 elseif ($d['diasAte'] === 1) echo '<span style="color:var(--accent);">Amanhã</span>';
                                 else echo $d['diasAte'] . ' dias';
                                 ?>

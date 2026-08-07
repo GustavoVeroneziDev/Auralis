@@ -124,12 +124,17 @@ function cartao_criarFatura(PDO $pdo, string $cartaoId, string $uid, array $cart
 
 /**
  * Retorna a fatura ABERTA do cartão, criando-a se não existir.
+ *
+ * DESC (não ASC): quando o usuário reabre uma fatura antiga pra editar (cartao_reabrirFatura()),
+ * ela e a fatura do ciclo atual ficam as duas com Status='aberta' ao mesmo tempo — pegar a de
+ * DataFechamento mais RECENTE garante que a tela de cartões/fatura sempre mostre o ciclo atual,
+ * não a antiga que foi reaberta só pra corrigir um lançamento esquecido.
  */
 function cartao_obterFaturaAberta(PDO $pdo, string $cartaoId, string $uid, array $cartao): array
 {
     $stmt = $pdo->prepare(
         "SELECT * FROM FaturaCartao WHERE FKCartao = :cid AND FKUsuario = :uid AND Status = 'aberta'
-         ORDER BY DataFechamento ASC LIMIT 1"
+         ORDER BY DataFechamento DESC LIMIT 1"
     );
     $stmt->execute([':cid' => $cartaoId, ':uid' => $uid]);
     $f = $stmt->fetch(PDO::FETCH_ASSOC);
