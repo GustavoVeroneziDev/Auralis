@@ -966,6 +966,10 @@ if (!function_exists('mpAtivarPlano')) {
 
             $pdo->commit();
 
+            if (function_exists('avisarAdminNovaVenda')) {
+                avisarAdminNovaVenda($pdo, $uid, $config['plano'], $valorPago);
+            }
+
             $_ehPrimeiraVezVip = concederConquistaParaUsuario($pdo, $uid, $config['plano'] === 'vip' ? 'plano_vip' : 'plano_pro');
             // Só atribui número de Pioneiro na primeira vez de verdade que a pessoa vira VIP —
             // a idempotência de concederConquistaParaUsuario() (retorna false se já tinha)
@@ -2387,6 +2391,71 @@ if (!function_exists('enviarWhatsAppNotificacao')) {
             $status = (int)$m[1];
         }
         return $status >= 200 && $status < 300;
+    }
+}
+
+// Número do admin pra avisos de negócio (novo usuário, nova venda) — configurável via
+// ConfiguracaoSistema (Chave='telefone_admin_notificacoes', FKUsuario NULL = global),
+// com fallback pro número passado por Gustavo em 13/08/2026 pra não depender de alguém
+// inserir a linha no banco manualmente antes do recurso funcionar.
+if (!function_exists('telefoneAdminNotificacoes')) {
+    function telefoneAdminNotificacoes(PDO $pdo): string
+    {
+        static $cache = null;
+        if ($cache !== null) return $cache;
+        try {
+            $stmt = $pdo->prepare("SELECT Valor FROM ConfiguracaoSistema WHERE Chave = 'telefone_admin_notificacoes' AND FKUsuario IS NULL LIMIT 1");
+            $stmt->execute();
+            $valor = $stmt->fetchColumn();
+            $cache = $valor !== false ? $valor : '5517996660665';
+        } catch (PDOException $e) {
+            $cache = '5517996660665';
+        }
+        return $cache;
+    }
+}
+
+// Avisa o admin por WhatsApp sempre que um usuário novo é criado (cadastro manual ou
+// Google) — chamado logo após o INSERT em Usuario, com os dados já em mãos (evita nova
+// consulta ao banco). Falha de envio nunca deve travar o cadastro da pessoa.
+if (!function_exists('avisarAdminNovoUsuario')) {
+    function avisarAdminNovoUsuario(PDO $pdo, string $nome, string $email, ?string $telefone, string $origem): void
+    {
+        try {
+            $telefoneFmt = $telefone ? "\nTelefone: {$telefone}" : '';
+            $mensagem = "🆕 *Novo usuário no Auralis!*\n\n"
+                      . "Nome: {$nome}\n"
+                      . "E-mail: {$email}"
+                      . $telefoneFmt . "\n"
+                      . "Cadastro: {$origem}";
+            enviarWhatsAppNotificacao(telefoneAdminNotificacoes($pdo), $mensagem);
+        } catch (Throwable $e) {
+        }
+    }
+}
+
+// Avisa o admin por WhatsApp quando uma venda de verdade é confirmada (Mercado Pago) —
+// chamado de dentro de mpAtivarPlano() só no caminho de assinatura nova/upgrade, nunca em
+// renovação automática de quem já é assinante (senão vira aviso toda cobrança recorrente).
+if (!function_exists('avisarAdminNovaVenda')) {
+    function avisarAdminNovaVenda(PDO $pdo, string $uid, string $plano, float $valorPago): void
+    {
+        try {
+            $stmt = $pdo->prepare("SELECT Nome, Email, Telefone FROM Usuario WHERE IDUsuario = :uid LIMIT 1");
+            $stmt->execute([':uid' => $uid]);
+            $u = $stmt->fetch(PDO::FETCH_ASSOC);
+            if (!$u) return;
+
+            $telefoneFmt = $u['Telefone'] ? "\nTelefone: {$u['Telefone']}" : '';
+            $mensagem = "💰 *Nova venda no Auralis!*\n\n"
+                      . "Nome: {$u['Nome']}\n"
+                      . "E-mail: {$u['Email']}"
+                      . $telefoneFmt . "\n"
+                      . "Plano: " . strtoupper($plano) . "\n"
+                      . "Valor: R$ " . number_format($valorPago, 2, ',', '.');
+            enviarWhatsAppNotificacao(telefoneAdminNotificacoes($pdo), $mensagem);
+        } catch (Throwable $e) {
+        }
     }
 }
 

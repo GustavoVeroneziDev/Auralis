@@ -78,6 +78,10 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             ':fk_ind'       => $fkIndicadoPor,
         ]);
 
+        if (function_exists('avisarAdminNovoUsuario')) {
+            avisarAdminNovoUsuario($pdo, $nome, $email, $telefone, 'formulário');
+        }
+
         // Injeção do Kit Inicial de Categorias (Starter Pack Premium)
         $kitInicial = [
             // DESPESAS

@@ -325,6 +325,7 @@ require_once 'geral/header.php';
     <?php
     $codigoRef  = $dadosUsuario['CodigoIndicacao'] ?? null;
     $saldoComissaoCfg = null;
+    $linkRef = '';
     if ($codigoRef) {
         $protocolo = (isset($_SERVER['HTTPS']) && $_SERVER['HTTPS'] === 'on') ? 'https' : 'http';
         $linkRef   = $protocolo . '://' . $_SERVER['HTTP_HOST'] . '/usuario/cadastro.php?ref=' . $codigoRef;
