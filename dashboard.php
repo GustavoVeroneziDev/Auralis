@@ -5,7 +5,7 @@ if ($_SERVER['HTTP_HOST'] === 'localhost' || $_SERVER['HTTP_HOST'] === '127.0.0.
     ini_set('display_startup_errors', 1);
     error_reporting(E_ALL);
 }
-session_start();
+require_once 'config/sessao.php';
 
 if (!isset($_SESSION['usuario_id'])) {
     header("Location: usuario/login.php");

@@ -1,5 +1,5 @@
 <?php
-session_start();
+require_once '../config/sessao.php';
 if (!isset($_SESSION['usuario_id'])) { http_response_code(401); exit(json_encode(['ok' => false])); }
 require_once '../config/conexao.php';
 require_once '../config/funcoes.php';

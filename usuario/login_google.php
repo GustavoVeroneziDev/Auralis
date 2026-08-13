@@ -1,4 +1,13 @@
 <?php
+// Cookie de sessão com vida de 30 dias — mesma configuração de config/sessao.php,
+// pra login via Google também ficar "lembrado" e não cair sozinho no mesmo dia.
+session_set_cookie_params([
+    'lifetime' => 86400 * 30,
+    'path'     => '/',
+    'secure'   => isset($_SERVER['HTTPS']) && $_SERVER['HTTPS'] === 'on',
+    'httponly' => true,
+    'samesite' => 'Lax',
+]);
 session_start();
 require_once '../config/conexao.php';
 require_once '../config/funcoes.php';
@@ -52,6 +61,10 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && !empty($_POST['credential'])) {
                 $_SESSION['plano']        = strtolower($usuario['Plano'] ?? 'free');
                 $_SESSION['tema']         = strtolower($usuario['Tema'] ?? 'dark');
                 $_SESSION['nav_tipo']     = strtolower($usuario['NavTipo'] ?? 'sidebar');
+
+                // Login via Google não tem checkbox de "lembrar-me" — sempre lembra,
+                // não tem cenário de "computador compartilhado" nesse fluxo de 1 clique.
+                emitirCookieLembrarMe($usuario['IDUsuario']);
 
                 header("Location: ../dashboard.php");
                 exit;
@@ -174,6 +187,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && !empty($_POST['credential'])) {
                 $_SESSION['plano']        = 'free';
                 $_SESSION['tema']         = 'dark';
                 $_SESSION['nav_tipo']     = 'sidebar';
+
+                emitirCookieLembrarMe($id_novo_usuario);
 
                 header("Location: ../dashboard.php");
                 exit;

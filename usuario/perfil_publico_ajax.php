@@ -2,7 +2,7 @@
 // usuario/perfil_publico_ajax.php
 // Dados do perfil de outra pessoa pro modal aberto a partir do Ranking.
 
-session_start();
+require_once '../config/sessao.php';
 if (!isset($_SESSION['usuario_id'])) {
     http_response_code(403);
     echo json_encode(['ok' => false, 'erro' => 'Sem permissão']);

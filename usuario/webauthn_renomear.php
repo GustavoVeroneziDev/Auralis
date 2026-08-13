@@ -3,7 +3,7 @@
 // USUARIO/WEBAUTHN_RENOMEAR.PHP — renomeia o apelido de uma credencial já
 // cadastrada (não mexe na credencial em si, só no nome de exibição).
 // ==============================================================================
-session_start();
+require_once '../config/sessao.php';
 if (!isset($_SESSION['usuario_id'])) { header("Location: login.php"); exit; }
 require_once '../config/conexao.php';
 require_once '../config/funcoes.php';

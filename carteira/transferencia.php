@@ -1,5 +1,5 @@
 <?php
-session_start();
+require_once '../config/sessao.php';
 if (!isset($_SESSION['usuario_id'])) {
     echo json_encode(['ok' => false, 'erro' => 'nao_autenticado']);
     exit;

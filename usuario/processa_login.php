@@ -1,5 +1,14 @@
 <?php
-// 1. Inicia a "memória" da sessão
+// 1. Inicia a "memória" da sessão — cookie de sessão com vida de 30 dias (não
+// o padrão "até fechar o navegador"), mesma configuração usada em config/sessao.php
+// pras páginas já logadas.
+session_set_cookie_params([
+    'lifetime' => 86400 * 30,
+    'path'     => '/',
+    'secure'   => isset($_SERVER['HTTPS']) && $_SERVER['HTTPS'] === 'on',
+    'httponly' => true,
+    'samesite' => 'Lax',
+]);
 session_start();
 
 // 2. Puxa a conexão com o banco
@@ -56,10 +65,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             $_SESSION['nav_tipo'] = strtolower($usuario['NavTipo'] ?? 'sidebar');
 
             if ($lembrar_me) {
-                $assinatura = hash_hmac('sha256', $usuario['IDUsuario'], AURALIS_COOKIE_SECRET);
-                $conteudo_cookie = $usuario['IDUsuario'] . ':' . $assinatura;
-                // Cookie válido por 30 dias
-                setcookie('auralis_remember', $conteudo_cookie, time() + (86400 * 30), "/");
+                emitirCookieLembrarMe($usuario['IDUsuario']);
             }
 
             header("Location: ../dashboard.php");

@@ -3,7 +3,7 @@
 // CARTEIRA/ADMINISTRAR_CARTEIRA.PHP — Hub central de uma carteira compartilhada
 // (Membros, Atividade e Permissões pro dono; Atividade + Sair pro convidado)
 // ==============================================================================
-session_start();
+require_once '../config/sessao.php';
 if (!isset($_SESSION['usuario_id'])) {
     header("Location: ../usuario/login.php");
     exit;

@@ -3,7 +3,7 @@
 // USUARIO/PROCESSA_INSIGNIAS.PHP — Define/limpa um dos 3 espaços de insígnia em
 // destaque no perfil (Usuario.InsigniasDestaque)
 // ==============================================================================
-session_start();
+require_once '../config/sessao.php';
 if (!isset($_SESSION['usuario_id'])) { http_response_code(403); exit; }
 require_once '../config/conexao.php';
 require_once '../config/funcoes.php';

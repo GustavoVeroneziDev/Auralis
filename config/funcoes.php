@@ -51,6 +51,90 @@ if (!function_exists('gerarUuid')) {
     }
 }
 
+// ── Sessão "deslizante" + cookie lembrar-me ─────────────────────────────────
+// Sem isso, ficar logado dependia só do cookie padrão de sessão do PHP (que
+// morre ao fechar o navegador/app) e do session.gc_maxlifetime do servidor
+// (em hospedagem compartilhada costuma limpar sessão inativa em poucos
+// minutos) — por isso a pessoa caía do login várias vezes no mesmo dia mesmo
+// usando o sistema normalmente. O cookie "lembrar-me" já existia, mas só era
+// checado em index.php; agora config/sessao.php chama isso em toda página
+// protegida, então ele passa a valer de verdade em qualquer lugar.
+if (!function_exists('emitirCookieLembrarMe')) {
+    function emitirCookieLembrarMe(string $usuarioId): void
+    {
+        $assinatura = hash_hmac('sha256', $usuarioId, AURALIS_COOKIE_SECRET);
+        setcookie('auralis_remember', $usuarioId . ':' . $assinatura, [
+            'expires'  => time() + (86400 * 30),
+            'path'     => '/',
+            'secure'   => isset($_SERVER['HTTPS']) && $_SERVER['HTTPS'] === 'on',
+            'httponly' => true,
+            'samesite' => 'Lax',
+        ]);
+    }
+}
+
+if (!function_exists('renovarOuRestaurarSessao')) {
+    function renovarOuRestaurarSessao(PDO $pdo): void
+    {
+        // Já logado nesta sessão — só empurra a validade do cookie de sessão pra
+        // mais 30 dias a partir de AGORA. É isso que faz "renove a cada vez que
+        // ele entrar": quem usa o sistema regularmente nunca esbarra num prazo
+        // fixo de expiração contado desde o login original.
+        if (isset($_SESSION['usuario_id'])) {
+            if (session_id()) {
+                setcookie(session_name(), session_id(), [
+                    'expires'  => time() + (86400 * 30),
+                    'path'     => '/',
+                    'secure'   => isset($_SERVER['HTTPS']) && $_SERVER['HTTPS'] === 'on',
+                    'httponly' => true,
+                    'samesite' => 'Lax',
+                ]);
+            }
+            return;
+        }
+
+        // Sem sessão ativa — tenta restaurar pelo cookie "lembrar-me". Esse
+        // cookie vive fora do mecanismo de sessão do PHP, então sobrevive
+        // mesmo que o servidor tenha limpado a sessão por inatividade.
+        if (empty($_COOKIE['auralis_remember'])) return;
+
+        $partes = explode(':', $_COOKIE['auralis_remember']);
+        if (count($partes) !== 2) return;
+
+        [$usuarioId, $assinaturaFornecida] = $partes;
+        $assinaturaEsperada = hash_hmac('sha256', $usuarioId, AURALIS_COOKIE_SECRET);
+        if (!hash_equals($assinaturaEsperada, $assinaturaFornecida)) return;
+
+        try {
+            $stmt = $pdo->prepare(
+                "SELECT IDUsuario, Nome, NivelAcesso, Plano, Tema, NavTipo, StatusConta
+                 FROM Usuario WHERE IDUsuario = :id LIMIT 1"
+            );
+            $stmt->execute([':id' => $usuarioId]);
+            $usuario = $stmt->fetch(PDO::FETCH_ASSOC);
+        } catch (PDOException $e) {
+            return;
+        }
+
+        if (!$usuario || $usuario['StatusConta'] !== 'ativo') {
+            setcookie('auralis_remember', '', time() - 3600, '/');
+            return;
+        }
+
+        session_regenerate_id(true);
+        $_SESSION['usuario_id']   = $usuario['IDUsuario'];
+        $_SESSION['usuario_nome'] = $usuario['Nome'];
+        $_SESSION['nivel_acesso'] = strtolower($usuario['NivelAcesso']);
+        $_SESSION['plano']        = strtolower($usuario['Plano'] ?? 'free');
+        $_SESSION['tema']         = strtolower($usuario['Tema'] ?? 'dark');
+        $_SESSION['nav_tipo']     = strtolower($usuario['NavTipo'] ?? 'sidebar');
+
+        // Renova o próprio cookie lembrar-me — quem usa o sistema pelo menos 1x
+        // a cada 30 dias nunca perde a sessão de verdade.
+        emitirCookieLembrarMe($usuario['IDUsuario']);
+    }
+}
+
 if (!function_exists('obterNivelAcesso')) {
     function obterNivelAcesso()
     {

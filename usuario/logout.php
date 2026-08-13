@@ -6,6 +6,10 @@ session_start();
 $_SESSION = array();
 session_destroy();
 
+// Sem isso, o cookie "lembrar-me" (30 dias) sobrevivia ao logout e a próxima
+// página visitada restaurava a sessão sozinha — logout não "pegava" de verdade.
+setcookie('auralis_remember', '', time() - 3600, '/');
+
 // Redireciona o usuário de volta para a página inicial (vitrine)
 header("Location: /geral/index.php");
 exit;
