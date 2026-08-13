@@ -1899,7 +1899,7 @@ require_once 'geral/header.php';
                     <label class="form-label text-light fw-semibold mb-2 fs-5">Seu número de WhatsApp</label>
                     <div class="input-group input-group-lg mb-4 shadow-sm">
                         <span class="input-group-text bg-body-tertiary border-secondary-subtle text-secondary border-end-0"><i class="bi bi-phone"></i></span>
-                        <input type="tel" name="telefone" class="form-control bg-body-tertiary border-secondary-subtle border-start-0 text-light fw-bold shadow-none fs-5 py-3" required placeholder="(11) 91234-5678" autofocus>
+                        <input type="tel" name="telefone" class="form-control bg-body-tertiary border-secondary-subtle border-start-0 text-light fw-bold shadow-none fs-5 py-3" required placeholder="(11) 91234-5678" maxlength="15" oninput="this.value=_maskTel(this.value)" autofocus>
                     </div>
                     <button type="submit" class="btn btn-gold btn-lg w-100 fw-bold text-dark rounded-pill py-3 shadow-lg transition-hover">
                         Ativar WhatsApp <i class="bi bi-check2 ms-2"></i>
@@ -2102,6 +2102,20 @@ require_once 'geral/header.php';
         urlParams.set('mes', mes);
         urlParams.set('ano', ano);
         window.location.search = urlParams.toString();
+    }
+
+    // Máscara de telefone (mesmo padrão de usuario/cadastro.php e configuracoes.php) —
+    // usada no campo do modal de onboarding do WhatsApp abaixo.
+    function _maskTel(v) {
+        v = v.replace(/\D/g, '').slice(0, 11);
+        if (v.length > 6) {
+            v = '(' + v.slice(0,2) + ') ' + v.slice(2, v.length > 10 ? 7 : 6) + '-' + v.slice(v.length > 10 ? 7 : 6);
+        } else if (v.length > 2) {
+            v = '(' + v.slice(0,2) + ') ' + v.slice(2);
+        } else if (v.length > 0) {
+            v = '(' + v;
+        }
+        return v;
     }
 
     // =======================================================================
