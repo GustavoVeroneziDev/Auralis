@@ -1554,6 +1554,27 @@ function garantirTabelaMetaCategoria(PDO $pdo): void
     }
 }
 
+// Marca categorias que o próprio sistema cria e gerencia (hoje: "Ajuste de Saldo",
+// criada sozinha em dashboard.php/login_google.php sempre que precisa corrigir o saldo)
+// como protegidas — não editáveis, não excluíveis, fora de qualquer nagging de "defina
+// uma meta". Coluna genérica (não fica preso a comparar o nome "Ajuste de Saldo" espalhado
+// pelo código) pra já servir qualquer categoria de sistema futura também. Backfill cobre
+// quem já tinha a categoria criada antes desse fix existir.
+function garantirColunaCategoriaSistema(PDO $pdo): void
+{
+    try {
+        $chk = $pdo->query("
+            SELECT COLUMN_NAME FROM INFORMATION_SCHEMA.COLUMNS
+            WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'Categoria' AND COLUMN_NAME = 'Sistema'
+        ")->fetchColumn();
+        if (!$chk) {
+            $pdo->exec("ALTER TABLE Categoria ADD COLUMN Sistema TINYINT(1) NOT NULL DEFAULT 0 AFTER IconeCategoria");
+        }
+        $pdo->exec("UPDATE Categoria SET Sistema = 1 WHERE NomeCategoria = 'Ajuste de Saldo' AND Sistema = 0");
+    } catch (PDOException $e) {
+    }
+}
+
 // Soma efetivada de cada categoria no mês passado — base pra sugestão automática de
 // meta/orçamento ("automatizar recomendação de metas baseado no mês passado"). Recebe os
 // IDs já filtrados/escopados pelo chamador (pessoal ou de uma carteira específica), então

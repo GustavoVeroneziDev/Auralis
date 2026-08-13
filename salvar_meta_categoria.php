@@ -16,6 +16,7 @@ if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
 
 garantirTabelaMetaCategoria($pdo);
 garantirEstruturaCarteirasCompartilhadas($pdo);
+garantirColunaCategoriaSistema($pdo);
 
 $categoriaId  = trim($_POST['categoria_id'] ?? '');
 $acao         = trim($_POST['acao'] ?? 'salvar');
@@ -35,10 +36,10 @@ if ($acao === 'aplicar_sugestoes') {
                 header("Location: gerenciar_categorias.php?erro_meta=categoria_invalida");
                 exit;
             }
-            $stmtCats = $pdo->prepare("SELECT IDCategoria FROM Categoria WHERE FKCarteira = :cid");
+            $stmtCats = $pdo->prepare("SELECT IDCategoria FROM Categoria WHERE FKCarteira = :cid AND Sistema = 0");
             $stmtCats->execute([':cid' => $carteiraIdQS]);
         } else {
-            $stmtCats = $pdo->prepare("SELECT IDCategoria FROM Categoria WHERE FKUsuario = :uid AND FKCarteira IS NULL");
+            $stmtCats = $pdo->prepare("SELECT IDCategoria FROM Categoria WHERE FKUsuario = :uid AND FKCarteira IS NULL AND Sistema = 0");
             $stmtCats->execute([':uid' => $usuario_id]);
         }
         $idsCategorias = $stmtCats->fetchAll(PDO::FETCH_COLUMN);
@@ -75,7 +76,8 @@ if (empty($categoriaId)) {
 // Confirma que a categoria pertence mesmo ao usuário logado (e pega o tipo, pra saber pra qual
 // lista voltar). Numa categoria de carteira compartilhada, FKUsuario é sempre o dono da carteira
 // (definido na criação) — então essa mesma checagem já barra convidado de mexer aqui, de graça.
-$stmtCat = $pdo->prepare("SELECT IDCategoria, TipoCategoria, FKCarteira FROM Categoria WHERE IDCategoria = :id AND FKUsuario = :uid");
+// Sistema = 0 barra categoria automática (ex: "Ajuste de Saldo") de receber meta.
+$stmtCat = $pdo->prepare("SELECT IDCategoria, TipoCategoria, FKCarteira FROM Categoria WHERE IDCategoria = :id AND FKUsuario = :uid AND Sistema = 0");
 $stmtCat->execute([':id' => $categoriaId, ':uid' => $usuario_id]);
 $categoria = $stmtCat->fetch(PDO::FETCH_ASSOC);
 if (!$categoria) {

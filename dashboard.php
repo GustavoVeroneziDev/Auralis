@@ -17,6 +17,7 @@ require_once 'config/conexao.php';
 require_once 'config/funcoes.php';
 require_once 'config/funcoes_cartao.php';
 garantirEstruturaCarteirasCompartilhadas($pdo);
+garantirColunaCategoriaSistema($pdo);
 
 $usuario_id = $_SESSION['usuario_id'];
 cartao_verificarFechamentos($pdo, $usuario_id);
@@ -320,7 +321,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'])) {
                 $catId = $stmtCat->fetchColumn();
 
                 if (!$catId) {
-                    $sqlNovaCat  = "INSERT INTO Categoria (IDCategoria, NomeCategoria, TipoCategoria, IconeCategoria, FKUsuario) VALUES (:id, 'Ajuste de Saldo', :tipo, 'bi-gear-fill', :uid)";
+                    // Sistema=1: categoria de correção automática, não deve poder ser
+                    // editada/excluída nem cobrada de meta — ver garantirColunaCategoriaSistema().
+                    $sqlNovaCat  = "INSERT INTO Categoria (IDCategoria, NomeCategoria, TipoCategoria, IconeCategoria, FKUsuario, Sistema) VALUES (:id, 'Ajuste de Saldo', :tipo, 'bi-gear-fill', :uid, 1)";
                     $stmtNovaCat = $pdo->prepare($sqlNovaCat);
                     $stmtNovaCat->execute([':id' => gerarUuid(), ':tipo' => $tipoRegistro, ':uid' => $usuario_id]);
 

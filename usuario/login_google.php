@@ -119,14 +119,24 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && !empty($_POST['credential'])) {
                     ['nome' => 'Salário',         'tipo' => 'receita', 'icone' => 'bi-cash-stack'],
                     ['nome' => 'Rendimentos',     'tipo' => 'receita', 'icone' => 'bi-graph-up-arrow'],
                     ['nome' => 'Serviços/Free',   'tipo' => 'receita', 'icone' => 'bi-laptop'],
-                    ['nome' => 'Ajuste de Saldo', 'tipo' => 'receita', 'icone' => 'bi-gear'],
+                    ['nome' => 'Ajuste de Saldo', 'tipo' => 'receita', 'icone' => 'bi-gear', 'sistema' => true],
                     ['nome' => 'Outros',          'tipo' => 'receita', 'icone' => 'bi-plus-circle-dotted']
                 ];
 
-                $sqlCat = "INSERT INTO Categoria (IDCategoria, NomeCategoria, TipoCategoria, IconeCategoria, FKUsuario) VALUES (:id_cat, :nome, :tipo, :icone, :uid)";
+                // Sistema=1: categoria de correção automática — não editável/excluível nem
+                // cobrada de meta (ver garantirColunaCategoriaSistema() em config/funcoes.php).
+                if (function_exists('garantirColunaCategoriaSistema')) garantirColunaCategoriaSistema($pdo);
+                $sqlCat = "INSERT INTO Categoria (IDCategoria, NomeCategoria, TipoCategoria, IconeCategoria, FKUsuario, Sistema) VALUES (:id_cat, :nome, :tipo, :icone, :uid, :sistema)";
                 $stmtCat = $pdo->prepare($sqlCat);
                 foreach ($kitInicial as $cat) {
-                    $stmtCat->execute([':id_cat' => gerarUuid(), ':nome' => $cat['nome'], ':tipo' => $cat['tipo'], ':icone' => $cat['icone'], ':uid' => $id_novo_usuario]);
+                    $stmtCat->execute([
+                        ':id_cat'  => gerarUuid(),
+                        ':nome'    => $cat['nome'],
+                        ':tipo'    => $cat['tipo'],
+                        ':icone'   => $cat['icone'],
+                        ':uid'     => $id_novo_usuario,
+                        ':sistema' => !empty($cat['sistema']) ? 1 : 0,
+                    ]);
                 }
 
                 // E-mail de Boas Vindas

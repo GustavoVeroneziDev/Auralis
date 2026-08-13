@@ -299,10 +299,13 @@ if ($_primeiroMesComDado !== null && $_primeiroMesComDado > 0) {
 
 // ── Categorias do usuário + metas/orçamento definidos ───────────────────
 garantirTabelaMetaCategoria($pdo);
+garantirColunaCategoriaSistema($pdo);
 
+// Sistema = 0: categoria automática (ex: "Ajuste de Saldo") não faz sentido ganhar
+// meta/orçamento, então nem aparece nessa lista — evita o "sem meta definida" nela.
 $categoriasUsuario = [];
 try {
-    $stmtCatU = $pdo->prepare("SELECT IDCategoria, NomeCategoria, TipoCategoria, IconeCategoria FROM Categoria WHERE FKUsuario = :uid ORDER BY NomeCategoria ASC");
+    $stmtCatU = $pdo->prepare("SELECT IDCategoria, NomeCategoria, TipoCategoria, IconeCategoria FROM Categoria WHERE FKUsuario = :uid AND Sistema = 0 ORDER BY NomeCategoria ASC");
     $stmtCatU->execute([':uid' => $usuario_id]);
     $categoriasUsuario = $stmtCatU->fetchAll(PDO::FETCH_ASSOC);
 } catch (PDOException $e) {

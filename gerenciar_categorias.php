@@ -125,11 +125,14 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action']) && $_POST['
         $erro = "O nome da categoria não pode estar vazio.";
     } else {
         try {
+            // AND Sistema = 0 no próprio WHERE — mesmo que alguém force um POST direto
+            // pra essa ação, uma categoria do sistema (ex: "Ajuste de Saldo") nunca é
+            // afetada, sem depender só do botão de editar sumir na tela.
             if ($carteira_ctx) {
-                $sqlUpdate = "UPDATE Categoria SET NomeCategoria = :nome, TipoCategoria = :tipo, IconeCategoria = :icone WHERE IDCategoria = :id AND FKCarteira = :cid";
+                $sqlUpdate = "UPDATE Categoria SET NomeCategoria = :nome, TipoCategoria = :tipo, IconeCategoria = :icone WHERE IDCategoria = :id AND FKCarteira = :cid AND Sistema = 0";
                 $params = [':id' => $idCategoria, ':cid' => $carteira_ctx['id']];
             } else {
-                $sqlUpdate = "UPDATE Categoria SET NomeCategoria = :nome, TipoCategoria = :tipo, IconeCategoria = :icone WHERE IDCategoria = :id AND FKUsuario = :uid AND FKCarteira IS NULL";
+                $sqlUpdate = "UPDATE Categoria SET NomeCategoria = :nome, TipoCategoria = :tipo, IconeCategoria = :icone WHERE IDCategoria = :id AND FKUsuario = :uid AND FKCarteira IS NULL AND Sistema = 0";
                 $params = [':id' => $idCategoria, ':uid' => $usuario_id];
             }
             $pdo->prepare($sqlUpdate)->execute(array_merge([
@@ -152,11 +155,12 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action']) && $_POST['
         $erro = "Só o dono da carteira compartilhada pode excluir categorias nela.";
     } else {
         try {
+            // AND Sistema = 0 — mesma proteção de defesa em profundidade do editar acima.
             if ($carteira_ctx) {
-                $sqlDelete = "DELETE FROM Categoria WHERE IDCategoria = :id AND FKCarteira = :cid";
+                $sqlDelete = "DELETE FROM Categoria WHERE IDCategoria = :id AND FKCarteira = :cid AND Sistema = 0";
                 $params = [':id' => $idExcluir, ':cid' => $carteira_ctx['id']];
             } else {
-                $sqlDelete = "DELETE FROM Categoria WHERE IDCategoria = :id AND FKUsuario = :uid AND FKCarteira IS NULL";
+                $sqlDelete = "DELETE FROM Categoria WHERE IDCategoria = :id AND FKUsuario = :uid AND FKCarteira IS NULL AND Sistema = 0";
                 $params = [':id' => $idExcluir, ':uid' => $usuario_id];
             }
             $pdo->prepare($sqlDelete)->execute($params);
@@ -201,25 +205,26 @@ $categorias_despesa = [];
 $categorias_bloqueadas_ids = [];
 $categorias_trial_ids      = [];
 
+garantirColunaCategoriaSistema($pdo);
 try {
     if ($carteira_ctx) {
         $sqlBusca = "
-            SELECT c.IDCategoria, c.NomeCategoria, c.TipoCategoria, c.IconeCategoria, COUNT(r.IDRegistro) as total_usos
+            SELECT c.IDCategoria, c.NomeCategoria, c.TipoCategoria, c.IconeCategoria, c.Sistema, COUNT(r.IDRegistro) as total_usos
             FROM Categoria c
             LEFT JOIN Registro r ON c.IDCategoria = r.FKCategoria
             WHERE c.FKCarteira = :cid
-            GROUP BY c.IDCategoria, c.NomeCategoria, c.TipoCategoria, c.IconeCategoria
+            GROUP BY c.IDCategoria, c.NomeCategoria, c.TipoCategoria, c.IconeCategoria, c.Sistema
             ORDER BY c.NomeCategoria ASC
         ";
         $stmtBusca = $pdo->prepare($sqlBusca);
         $stmtBusca->execute([':cid' => $carteira_ctx['id']]);
     } else {
         $sqlBusca = "
-            SELECT c.IDCategoria, c.NomeCategoria, c.TipoCategoria, c.IconeCategoria, COUNT(r.IDRegistro) as total_usos
+            SELECT c.IDCategoria, c.NomeCategoria, c.TipoCategoria, c.IconeCategoria, c.Sistema, COUNT(r.IDRegistro) as total_usos
             FROM Categoria c
             LEFT JOIN Registro r ON c.IDCategoria = r.FKCategoria
             WHERE c.FKUsuario = :uid AND c.FKCarteira IS NULL
-            GROUP BY c.IDCategoria, c.NomeCategoria, c.TipoCategoria, c.IconeCategoria
+            GROUP BY c.IDCategoria, c.NomeCategoria, c.TipoCategoria, c.IconeCategoria, c.Sistema
             ORDER BY c.NomeCategoria ASC
         ";
         $stmtBusca = $pdo->prepare($sqlBusca);
@@ -278,6 +283,7 @@ $_todasCategoriasGC = array_merge($categorias_despesa, $categorias_receita);
 $gastoMesPassadoPorCategoria = obterGastoMesPassadoPorCategoria($pdo, array_column($_todasCategoriasGC, 'IDCategoria'));
 $_qtdSemMeta = 0;
 foreach ($_todasCategoriasGC as $_catSug) {
+    if (!empty($_catSug['Sistema'])) continue;
     if (!isset($metasPorCategoria[$_catSug['IDCategoria']]) && ($gastoMesPassadoPorCategoria[$_catSug['IDCategoria']] ?? 0) > 0) {
         $_qtdSemMeta++;
     }
@@ -617,7 +623,9 @@ require_once 'geral/header.php';
                                         </td>
                                         <td class="py-3 border-secondary-subtle text-center fs-7" style="width:150px;min-width:150px;max-width:150px;">
                                             <?php $metaCat = $metasPorCategoria[$cat['IDCategoria']] ?? null; ?>
-                                            <?php if ($_podeEditarCategoriasGC): ?>
+                                            <?php if (!empty($cat['Sistema'])): ?>
+                                                <span class="text-secondary opacity-50" title="Categoria automática do sistema — não recebe orçamento">—</span>
+                                            <?php elseif ($_podeEditarCategoriasGC): ?>
                                                 <button type="button"
                                                     class="btn btn-sm rounded-pill meta-cat-pill <?= $metaCat !== null ? 'btn-outline-info' : 'btn-outline-secondary' ?>"
                                                     style="font-size:0.72rem;"
@@ -635,7 +643,9 @@ require_once 'geral/header.php';
                                             <?php endif; ?>
                                         </td>
                                         <td class="text-end pe-3 pe-md-4 py-3 border-secondary-subtle">
-                                            <?php if (!$_podeEditarCategoriasGC): ?>
+                                            <?php if (!empty($cat['Sistema'])): ?>
+                                                <span class="text-secondary opacity-50" title="Categoria automática do sistema — não pode ser editada ou excluída"><i class="bi bi-lock-fill"></i></span>
+                                            <?php elseif (!$_podeEditarCategoriasGC): ?>
                                                 <span class="text-secondary opacity-50">—</span>
                                             <?php else: ?>
                                             <div class="d-flex align-items-center justify-content-end gap-2">
@@ -716,7 +726,9 @@ require_once 'geral/header.php';
                                         </td>
                                         <td class="py-3 border-secondary-subtle text-center fs-7" style="width:150px;min-width:150px;max-width:150px;">
                                             <?php $metaCat = $metasPorCategoria[$cat['IDCategoria']] ?? null; ?>
-                                            <?php if ($_podeEditarCategoriasGC): ?>
+                                            <?php if (!empty($cat['Sistema'])): ?>
+                                                <span class="text-secondary opacity-50" title="Categoria automática do sistema — não recebe meta">—</span>
+                                            <?php elseif ($_podeEditarCategoriasGC): ?>
                                                 <button type="button"
                                                     class="btn btn-sm rounded-pill meta-cat-pill <?= $metaCat !== null ? 'btn-outline-info' : 'btn-outline-secondary' ?>"
                                                     style="font-size:0.72rem;"
@@ -734,7 +746,9 @@ require_once 'geral/header.php';
                                             <?php endif; ?>
                                         </td>
                                         <td class="text-end pe-3 pe-md-4 py-3 border-secondary-subtle">
-                                            <?php if (!$_podeEditarCategoriasGC): ?>
+                                            <?php if (!empty($cat['Sistema'])): ?>
+                                                <span class="text-secondary opacity-50" title="Categoria automática do sistema — não pode ser editada ou excluída"><i class="bi bi-lock-fill"></i></span>
+                                            <?php elseif (!$_podeEditarCategoriasGC): ?>
                                                 <span class="text-secondary opacity-50">—</span>
                                             <?php else: ?>
                                             <div class="d-flex align-items-center justify-content-end gap-2">
