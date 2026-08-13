@@ -51,6 +51,90 @@ if (!function_exists('gerarUuid')) {
     }
 }
 
+// ── Sessão "deslizante" + cookie lembrar-me ─────────────────────────────────
+// Sem isso, ficar logado dependia só do cookie padrão de sessão do PHP (que
+// morre ao fechar o navegador/app) e do session.gc_maxlifetime do servidor
+// (em hospedagem compartilhada costuma limpar sessão inativa em poucos
+// minutos) — por isso a pessoa caía do login várias vezes no mesmo dia mesmo
+// usando o sistema normalmente. O cookie "lembrar-me" já existia, mas só era
+// checado em index.php; agora config/sessao.php chama isso em toda página
+// protegida, então ele passa a valer de verdade em qualquer lugar.
+if (!function_exists('emitirCookieLembrarMe')) {
+    function emitirCookieLembrarMe(string $usuarioId): void
+    {
+        $assinatura = hash_hmac('sha256', $usuarioId, AURALIS_COOKIE_SECRET);
+        setcookie('auralis_remember', $usuarioId . ':' . $assinatura, [
+            'expires'  => time() + (86400 * 30),
+            'path'     => '/',
+            'secure'   => isset($_SERVER['HTTPS']) && $_SERVER['HTTPS'] === 'on',
+            'httponly' => true,
+            'samesite' => 'Lax',
+        ]);
+    }
+}
+
+if (!function_exists('renovarOuRestaurarSessao')) {
+    function renovarOuRestaurarSessao(PDO $pdo): void
+    {
+        // Já logado nesta sessão — só empurra a validade do cookie de sessão pra
+        // mais 30 dias a partir de AGORA. É isso que faz "renove a cada vez que
+        // ele entrar": quem usa o sistema regularmente nunca esbarra num prazo
+        // fixo de expiração contado desde o login original.
+        if (isset($_SESSION['usuario_id'])) {
+            if (session_id()) {
+                setcookie(session_name(), session_id(), [
+                    'expires'  => time() + (86400 * 30),
+                    'path'     => '/',
+                    'secure'   => isset($_SERVER['HTTPS']) && $_SERVER['HTTPS'] === 'on',
+                    'httponly' => true,
+                    'samesite' => 'Lax',
+                ]);
+            }
+            return;
+        }
+
+        // Sem sessão ativa — tenta restaurar pelo cookie "lembrar-me". Esse
+        // cookie vive fora do mecanismo de sessão do PHP, então sobrevive
+        // mesmo que o servidor tenha limpado a sessão por inatividade.
+        if (empty($_COOKIE['auralis_remember'])) return;
+
+        $partes = explode(':', $_COOKIE['auralis_remember']);
+        if (count($partes) !== 2) return;
+
+        [$usuarioId, $assinaturaFornecida] = $partes;
+        $assinaturaEsperada = hash_hmac('sha256', $usuarioId, AURALIS_COOKIE_SECRET);
+        if (!hash_equals($assinaturaEsperada, $assinaturaFornecida)) return;
+
+        try {
+            $stmt = $pdo->prepare(
+                "SELECT IDUsuario, Nome, NivelAcesso, Plano, Tema, NavTipo, StatusConta
+                 FROM Usuario WHERE IDUsuario = :id LIMIT 1"
+            );
+            $stmt->execute([':id' => $usuarioId]);
+            $usuario = $stmt->fetch(PDO::FETCH_ASSOC);
+        } catch (PDOException $e) {
+            return;
+        }
+
+        if (!$usuario || $usuario['StatusConta'] !== 'ativo') {
+            setcookie('auralis_remember', '', time() - 3600, '/');
+            return;
+        }
+
+        session_regenerate_id(true);
+        $_SESSION['usuario_id']   = $usuario['IDUsuario'];
+        $_SESSION['usuario_nome'] = $usuario['Nome'];
+        $_SESSION['nivel_acesso'] = strtolower($usuario['NivelAcesso']);
+        $_SESSION['plano']        = strtolower($usuario['Plano'] ?? 'free');
+        $_SESSION['tema']         = strtolower($usuario['Tema'] ?? 'dark');
+        $_SESSION['nav_tipo']     = strtolower($usuario['NavTipo'] ?? 'sidebar');
+
+        // Renova o próprio cookie lembrar-me — quem usa o sistema pelo menos 1x
+        // a cada 30 dias nunca perde a sessão de verdade.
+        emitirCookieLembrarMe($usuario['IDUsuario']);
+    }
+}
+
 if (!function_exists('obterNivelAcesso')) {
     function obterNivelAcesso()
     {
@@ -882,7 +966,13 @@ if (!function_exists('mpAtivarPlano')) {
 
             $pdo->commit();
 
-            concederConquistaParaUsuario($pdo, $uid, $config['plano'] === 'vip' ? 'plano_vip' : 'plano_pro');
+            $_ehPrimeiraVezVip = concederConquistaParaUsuario($pdo, $uid, $config['plano'] === 'vip' ? 'plano_vip' : 'plano_pro');
+            // Só atribui número de Pioneiro na primeira vez de verdade que a pessoa vira VIP —
+            // a idempotência de concederConquistaParaUsuario() (retorna false se já tinha)
+            // já resolve isso sem precisar de outra checagem separada.
+            if ($_ehPrimeiraVezVip && $config['plano'] === 'vip' && function_exists('atribuirPioneiroSeElegivel')) {
+                atribuirPioneiroSeElegivel($pdo, $uid);
+            }
 
             // 8. Cancela as assinaturas antigas no Mercado Pago (fora da transação BD
             //    para que uma falha de rede não desfaça a ativação já confirmada)
@@ -1156,14 +1246,28 @@ function determinarPercentualRevendedor(PDO $pdo, array $revendedor, string $com
     $percExistente = $stmt->fetchColumn();
     if ($percExistente !== false) return (float)$percExistente;
 
-    // Primeira compra desse cliente com esse revendedor — decide a faixa agora e trava
+    // Primeira compra desse cliente com esse revendedor — decide a faixa agora e trava.
+    // GatilhoParte1 generaliza a faixa 2 pra também poder ser por tempo (dias desde que
+    // virou revendedor), não só por contagem de clientes — útil pro "normal" (50%/6meses)
+    // e pra revendedor configurado com prazo em vez de meta de vendas.
     if (($revendedor['TipoComissao'] ?? 'fixa') === 'duas_partes') {
-        $stmtOrdem = $pdo->prepare("SELECT COUNT(*) FROM RevendedorCliente WHERE FKRevendedor = :rev");
-        $stmtOrdem->execute([':rev' => $revendedor['IDRevendedor']]);
-        $numeroOrdem = (int)$stmtOrdem->fetchColumn() + 1;
+        $gatilho = $revendedor['GatilhoParte1'] ?? 'clientes';
 
-        $limite = (int)($revendedor['LimiteClientesParte1'] ?? 0);
-        $perc = ($numeroOrdem <= $limite)
+        if ($gatilho === 'dias') {
+            $numeroOrdem     = 0;
+            $limiteDias      = (int)($revendedor['LimiteDiasParte1'] ?? 0);
+            $diasDesdeInicio = (int)((time() - strtotime($revendedor['CriadoEm'])) / 86400);
+            $naFaixa1        = $diasDesdeInicio <= $limiteDias;
+        } else {
+            $stmtOrdem = $pdo->prepare("SELECT COUNT(*) FROM RevendedorCliente WHERE FKRevendedor = :rev");
+            $stmtOrdem->execute([':rev' => $revendedor['IDRevendedor']]);
+            $numeroOrdem = (int)$stmtOrdem->fetchColumn() + 1;
+
+            $limite   = (int)($revendedor['LimiteClientesParte1'] ?? 0);
+            $naFaixa1 = $numeroOrdem <= $limite;
+        }
+
+        $perc = $naFaixa1
             ? (float)$revendedor['ComissaoPercentual']
             : (float)$revendedor['ComissaoPercentualParte2'];
     } else {
@@ -1206,6 +1310,7 @@ function processarIndicacaoConversao(PDO $pdo, string $emailComprador, float $va
 {
     try {
         garantirEstruturaComissaoRevendedor($pdo);
+        garantirEstruturaComissaoExpandida($pdo);
 
         // Encontra o comprador e quem o indicou
         $stmt = $pdo->prepare("SELECT IDUsuario, FKIndicadoPor FROM Usuario WHERE LOWER(Email) = LOWER(:e) LIMIT 1");
@@ -1238,19 +1343,28 @@ function processarIndicacaoConversao(PDO $pdo, string $emailComprador, float $va
 
             $perc  = determinarPercentualRevendedor($pdo, $revendedor, $compradorId);
             $valor = round($valorPago * $perc / 100, 2);
+
+            // A 1ª comissão de qualquer indicador (normal ou revendedor) é sinalizada pra
+            // pagamento urgente — prova pra pessoa que o sistema realmente paga. As
+            // seguintes ficam represadas até bater o valor mínimo (ver admin/revendedores.php).
+            $stmtPrimeira = $pdo->prepare("SELECT COUNT(*) FROM ComissaoRevendedor WHERE FKRevendedor = :rev");
+            $stmtPrimeira->execute([':rev' => $revendedor['IDRevendedor']]);
+            $ehPrimeira = ((int)$stmtPrimeira->fetchColumn() === 0) ? 1 : 0;
+
             $pdo->prepare(
                 "INSERT INTO ComissaoRevendedor
-                     (IDComissao, FKRevendedor, FKUsuarioComprador, ValorVenda, PercentualAplicado, ValorComissao, Plano, ReferenciaPagamento)
-                 VALUES (:id, :rev, :comp, :venda, :perc, :com, :plano, :ref)"
+                     (IDComissao, FKRevendedor, FKUsuarioComprador, ValorVenda, PercentualAplicado, ValorComissao, Plano, ReferenciaPagamento, EhPrimeiraComissao)
+                 VALUES (:id, :rev, :comp, :venda, :perc, :com, :plano, :ref, :primeira)"
             )->execute([
-                ':id'    => gerarUuid(),
-                ':rev'   => $revendedor['IDRevendedor'],
-                ':comp'  => $compradorId,
-                ':venda' => $valorPago,
-                ':perc'  => $perc,
-                ':com'   => $valor,
-                ':plano' => $plano,
-                ':ref'   => $paymentRef,
+                ':id'       => gerarUuid(),
+                ':rev'      => $revendedor['IDRevendedor'],
+                ':comp'     => $compradorId,
+                ':venda'    => $valorPago,
+                ':perc'     => $perc,
+                ':com'      => $valor,
+                ':plano'    => $plano,
+                ':ref'      => $paymentRef,
+                ':primeira' => $ehPrimeira,
             ]);
             criarNotificacaoSistema(
                 $pdo,
@@ -1258,11 +1372,20 @@ function processarIndicacaoConversao(PDO $pdo, string $emailComprador, float $va
                 'Nova comissão de indicação!',
                 "Você ganhou R$ " . number_format($valor, 2, ',', '.') . " de comissão — alguém que você indicou pagou o plano " . strtoupper($plano) . ". Confira no seu painel de revendedor."
             );
+            if ($ehPrimeira && function_exists('avisarAdminComissaoUrgente')) {
+                avisarAdminComissaoUrgente($pdo, $indicadorId, $valor);
+            }
             return;
         }
 
-        // ── Caminho B: usuário comum — verifica recompensas por indicação ────
+        // ── Caminho B: usuário comum — dinheiro ou dias grátis, conforme o admin configurou ──
         concederConquistaParaUsuario($pdo, $indicadorId, 'indicou_amigo');
+
+        if (function_exists('obterModoRecompensaIndicacao') && obterModoRecompensaIndicacao($pdo) === 'dinheiro') {
+            processarComissaoUsuarioComum($pdo, $indicadorId, $compradorId, $valorPago, $plano, $paymentRef);
+            return;
+        }
+
         // Conta quantos usuários o indicador trouxe que agora têm plano ativo
         $stmtCnt = $pdo->prepare(
             "SELECT COUNT(DISTINCT u.IDUsuario)
@@ -1331,6 +1454,83 @@ function processarIndicacaoConversao(PDO $pdo, string $emailComprador, float $va
         );
     } catch (Exception $e) {
         if ($pdo->inTransaction()) $pdo->rollBack();
+    }
+}
+
+/**
+ * Comissão em dinheiro pra indicador que NÃO é revendedor atribuído pelo admin — chamada
+ * de dentro de processarIndicacaoConversao() só quando obterModoRecompensaIndicacao()
+ * está em 'dinheiro'. Autocria uma linha Revendedor Categoria='normal' na 1ª vez que esse
+ * indicador converte alguém, reaproveitando 100% da máquina de comissão/pagamento que já
+ * existe pro revendedor de verdade — só varia o parâmetro (50% nos primeiros 6 meses,
+ * 20% depois, igual ao desenho original do Programa Pioneiros).
+ */
+function processarComissaoUsuarioComum(PDO $pdo, string $indicadorId, string $compradorId, float $valorPago, string $plano, ?string $paymentRef): void
+{
+    $stmtNormal = $pdo->prepare("SELECT * FROM Revendedor WHERE FKUsuario = :uid LIMIT 1");
+    $stmtNormal->execute([':uid' => $indicadorId]);
+    $normal = $stmtNormal->fetch(PDO::FETCH_ASSOC);
+
+    if (!$normal) {
+        try {
+            $pdo->prepare(
+                "INSERT INTO Revendedor
+                     (IDRevendedor, FKUsuario, Categoria, ComissaoPercentual, TipoComissao, ComissaoPercentualParte2, GatilhoParte1, LimiteDiasParte1, Ativo)
+                 VALUES (:id, :uid, 'normal', 50.00, 'duas_partes', 20.00, 'dias', 180, 1)"
+            )->execute([':id' => gerarUuid(), ':uid' => $indicadorId]);
+        } catch (PDOException $e) {
+            // Corrida rara (2 conversões quase simultâneas do mesmo indicador) — a linha já existe
+        }
+        $stmtNormal->execute([':uid' => $indicadorId]);
+        $normal = $stmtNormal->fetch(PDO::FETCH_ASSOC);
+    }
+
+    // Se por algum motivo não conseguiu criar/achar a linha, ou ela foi desativada
+    // manualmente pelo admin (fraude, etc), não gera comissão nenhuma.
+    if (!$normal || (int)$normal['Ativo'] !== 1) return;
+
+    // Mesma idempotência do Caminho A — nunca duplica comissão do mesmo pagamento
+    if ($paymentRef === null) {
+        $jaExiste = $pdo->prepare("SELECT 1 FROM ComissaoRevendedor WHERE FKUsuarioComprador = :comp AND FKRevendedor = :rev LIMIT 1");
+        $jaExiste->execute([':comp' => $compradorId, ':rev' => $normal['IDRevendedor']]);
+    } else {
+        $jaExiste = $pdo->prepare("SELECT 1 FROM ComissaoRevendedor WHERE ReferenciaPagamento = :ref LIMIT 1");
+        $jaExiste->execute([':ref' => $paymentRef]);
+    }
+    if ($jaExiste->fetchColumn()) return;
+
+    $perc  = determinarPercentualRevendedor($pdo, $normal, $compradorId);
+    $valor = round($valorPago * $perc / 100, 2);
+
+    $stmtPrimeira = $pdo->prepare("SELECT COUNT(*) FROM ComissaoRevendedor WHERE FKRevendedor = :rev");
+    $stmtPrimeira->execute([':rev' => $normal['IDRevendedor']]);
+    $ehPrimeira = ((int)$stmtPrimeira->fetchColumn() === 0) ? 1 : 0;
+
+    $pdo->prepare(
+        "INSERT INTO ComissaoRevendedor
+             (IDComissao, FKRevendedor, FKUsuarioComprador, ValorVenda, PercentualAplicado, ValorComissao, Plano, ReferenciaPagamento, EhPrimeiraComissao)
+         VALUES (:id, :rev, :comp, :venda, :perc, :com, :plano, :ref, :primeira)"
+    )->execute([
+        ':id'       => gerarUuid(),
+        ':rev'      => $normal['IDRevendedor'],
+        ':comp'     => $compradorId,
+        ':venda'    => $valorPago,
+        ':perc'     => $perc,
+        ':com'      => $valor,
+        ':plano'    => $plano,
+        ':ref'      => $paymentRef,
+        ':primeira' => $ehPrimeira,
+    ]);
+
+    criarNotificacaoSistema(
+        $pdo,
+        $indicadorId,
+        'Nova comissão de indicação!',
+        "Você ganhou R$ " . number_format($valor, 2, ',', '.') . " de comissão — alguém que você indicou pagou o plano " . strtoupper($plano) . "."
+    );
+
+    if ($ehPrimeira && function_exists('avisarAdminComissaoUrgente')) {
+        avisarAdminComissaoUrgente($pdo, $indicadorId, $valor);
     }
 }
 
@@ -1465,6 +1665,155 @@ function garantirEstruturaComissaoRevendedor(PDO $pdo): void
             ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
         ");
     } catch (PDOException $e) {
+    }
+}
+
+// Expande comissão pra além do revendedor atribuído manualmente: Categoria distingue
+// "normal" (autocriado pra qualquer indicador quando o modo de recompensa em dinheiro
+// está ativo) de "revendedor" (atribuído pelo admin, parâmetros mais agressivos).
+// GatilhoParte1/LimiteDiasParte1 generalizam a faixa 2 de comissão pra também poder ser
+// por tempo, não só por contagem de clientes. EhPrimeiraComissao marca a comissão que
+// deve ser paga na hora (ao contrário das seguintes, que acumulam até o valor mínimo).
+// Pioneiro guarda o número permanente de quem virou VIP entre os primeiros — AUTO_INCREMENT
+// resolve concorrência sozinho, sem precisar de SELECT MAX()+1 manual.
+function garantirEstruturaComissaoExpandida(PDO $pdo): void
+{
+    try {
+        $chk = $pdo->query("
+            SELECT COLUMN_NAME FROM INFORMATION_SCHEMA.COLUMNS
+            WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'Revendedor'
+              AND COLUMN_NAME IN ('Categoria', 'GatilhoParte1', 'LimiteDiasParte1')
+        ")->fetchAll(PDO::FETCH_COLUMN);
+
+        if (!in_array('Categoria', $chk, true)) {
+            $pdo->exec("ALTER TABLE Revendedor ADD COLUMN Categoria ENUM('normal','revendedor') NOT NULL DEFAULT 'normal' AFTER FKUsuario");
+        }
+        if (!in_array('GatilhoParte1', $chk, true)) {
+            $pdo->exec("ALTER TABLE Revendedor ADD COLUMN GatilhoParte1 ENUM('clientes','dias') NOT NULL DEFAULT 'clientes' AFTER LimiteClientesParte1");
+        }
+        if (!in_array('LimiteDiasParte1', $chk, true)) {
+            $pdo->exec("ALTER TABLE Revendedor ADD COLUMN LimiteDiasParte1 INT NULL AFTER GatilhoParte1");
+        }
+    } catch (PDOException $e) {
+    }
+
+    try {
+        $chkCom = $pdo->query("
+            SELECT COLUMN_NAME FROM INFORMATION_SCHEMA.COLUMNS
+            WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'ComissaoRevendedor'
+              AND COLUMN_NAME = 'EhPrimeiraComissao'
+        ")->fetchColumn();
+        if (!$chkCom) {
+            $pdo->exec("ALTER TABLE ComissaoRevendedor ADD COLUMN EhPrimeiraComissao TINYINT(1) NOT NULL DEFAULT 0 AFTER Status");
+        }
+    } catch (PDOException $e) {
+    }
+
+    try {
+        $pdo->exec("
+            CREATE TABLE IF NOT EXISTS Pioneiro (
+              Numero      INT NOT NULL AUTO_INCREMENT PRIMARY KEY,
+              FKUsuario   CHAR(36) NOT NULL,
+              ConcedidoEm DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+              UNIQUE KEY uq_pioneiro_usuario (FKUsuario)
+            ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
+        ");
+    } catch (PDOException $e) {
+    }
+
+    // Semeia a conquista "Pioneiro" — mesmos campos das conquistas já existentes
+    // (add_conquistas_perfil.sql), pra reaproveitar 100% da exibição já pronta
+    // (perfil.php, ranking.php, admin/conquistas.php) sem o admin precisar criar na mão.
+    try {
+        $existe = $pdo->prepare("SELECT 1 FROM conquista WHERE Slug = 'pioneiro'");
+        $existe->execute();
+        if (!$existe->fetchColumn()) {
+            $pdo->prepare("
+                INSERT INTO conquista (IDConquista, Slug, Nome, Descricao, Icone, Cor, Raridade, Ordem, Ativo)
+                VALUES (:id, 'pioneiro', 'Pioneiro', 'Um dos primeiros assinantes VIP do Auralis — fez parte da história desde o início.', 'bi-rocket-takeoff-fill', '#d4af37', 'mitico', 1, 1)
+            ")->execute([':id' => gerarUuid()]);
+        }
+    } catch (PDOException $e) {
+    }
+}
+
+// 'dias' (comportamento de sempre) ou 'dinheiro' (comissão real pra usuário comum, nova).
+// Default 'dias' — sem configurar nada, o sistema continua se comportando exatamente
+// como antes; o admin muda isso explicitamente em admin/indicacoes.php.
+function obterModoRecompensaIndicacao(PDO $pdo): string
+{
+    try {
+        $stmt = $pdo->prepare("SELECT Valor FROM ConfiguracaoSistema WHERE Chave = 'indicacao_modo_recompensa' AND FKUsuario IS NULL LIMIT 1");
+        $stmt->execute();
+        $valor = $stmt->fetchColumn();
+        return in_array($valor, ['dias', 'dinheiro'], true) ? $valor : 'dias';
+    } catch (PDOException $e) {
+        return 'dias';
+    }
+}
+
+// Valor mínimo (R$) que uma comissão acumulada (não-primeira) precisa bater antes de
+// entrar na fila de pagamento — configurável pelo admin em admin/revendedores.php.
+function valorMinimoSaqueComissao(PDO $pdo): float
+{
+    static $cache = null;
+    if ($cache !== null) return $cache;
+    try {
+        $stmt = $pdo->prepare("SELECT Valor FROM ConfiguracaoSistema WHERE Chave = 'comissao_valor_minimo_saque' AND FKUsuario IS NULL LIMIT 1");
+        $stmt->execute();
+        $valor = $stmt->fetchColumn();
+        $cache = $valor !== false ? (float)$valor : 50.00;
+    } catch (PDOException $e) {
+        $cache = 50.00;
+    }
+    return $cache;
+}
+
+// Atribui o próximo número de Pioneiro disponível, se ainda houver vaga. Chamado só na
+// primeira vez de verdade que alguém vira VIP (ver gancho em mpAtivarPlano()). AUTO_INCREMENT
+// em Pioneiro.Numero resolve concorrência entre 2 pessoas virando VIP ao mesmo tempo sem
+// precisar de SELECT MAX()+1 manual; a checagem de vagas contra o INSERT não é atômica,
+// mas numa corrida raríssima o pior caso é 1-2 pioneiros a mais que o limite — aceitável,
+// mesmo padrão de "corrida rara, resolve sozinho" já usado em RevendedorCliente.
+function atribuirPioneiroSeElegivel(PDO $pdo, string $uid): void
+{
+    try {
+        $vagasStmt = $pdo->prepare("SELECT Valor FROM ConfiguracaoSistema WHERE Chave = 'pioneiros_vagas_totais' AND FKUsuario IS NULL LIMIT 1");
+        $vagasStmt->execute();
+        $vagasValor = $vagasStmt->fetchColumn();
+        $vagas = $vagasValor !== false ? (int)$vagasValor : 150;
+
+        $qtd = (int)$pdo->query("SELECT COUNT(*) FROM Pioneiro")->fetchColumn();
+        if ($qtd >= $vagas) return;
+
+        $pdo->prepare("INSERT INTO Pioneiro (FKUsuario) VALUES (:uid)")->execute([':uid' => $uid]);
+        concederConquistaParaUsuario($pdo, $uid, 'pioneiro');
+    } catch (PDOException $e) {
+        // FKUsuario já tem linha (corrida rara) — nada a fazer
+    }
+}
+
+// Aviso de alta prioridade pro admin: a primeira comissão de um indicador deve ser paga
+// na hora (é isso que prova pra pessoa que o sistema realmente paga). In-app sozinho não
+// é rápido o suficiente pra essa urgência — usa WhatsApp direto, mesmo canal que os outros
+// avisos operacionais do sistema já usam.
+function avisarAdminComissaoUrgente(PDO $pdo, string $indicadorId, float $valor): void
+{
+    try {
+        $stmt = $pdo->prepare("SELECT Nome FROM Usuario WHERE IDUsuario = :uid LIMIT 1");
+        $stmt->execute([':uid' => $indicadorId]);
+        $nome = $stmt->fetchColumn() ?: 'Alguém';
+
+        $telAdminStmt = $pdo->prepare("SELECT Valor FROM ConfiguracaoSistema WHERE Chave = 'telefone_admin_comissao' AND FKUsuario IS NULL LIMIT 1");
+        $telAdminStmt->execute();
+        $telAdmin = $telAdminStmt->fetchColumn();
+        if (!$telAdmin || !function_exists('enviarWhatsAppNotificacao')) return;
+
+        enviarWhatsAppNotificacao(
+            $telAdmin,
+            "💰 *Primeira comissão pra pagar na hora*\n\n{$nome} acabou de gerar sua primeira comissão de indicação: R$ " . number_format($valor, 2, ',', '.') . ".\n\nPra manter a confiança no programa, essa precisa ser paga o quanto antes — confira em meuauralis.com/admin/revendedores.php"
+        );
+    } catch (Throwable $e) {
     }
 }
 

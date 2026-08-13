@@ -2,7 +2,7 @@
 // ==============================================================================
 // ADMIN/NOTIFICACOES.PHP — Gestão de notificações para usuários
 // ==============================================================================
-session_start();
+require_once '../config/sessao.php';
 if (!isset($_SESSION['usuario_id'])) { header("Location: /usuario/login.php"); exit; }
 require_once '../config/conexao.php';
 require_once '../config/funcoes.php';

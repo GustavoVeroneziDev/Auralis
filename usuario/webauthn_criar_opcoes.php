@@ -10,7 +10,7 @@
 // __PHP_Incomplete_class em vez do objeto real.
 require_once '../config/conexao.php';
 require_once '../config/funcoes.php';
-session_start();
+require_once '../config/sessao.php';
 header('Content-Type: application/json');
 
 if (!isset($_SESSION['usuario_id'])) {

@@ -3,7 +3,7 @@
 // Cancela um pedido de amizade que EU enviei e ainda está pendente
 // (desfaz — não é a mesma coisa que recusar, que é resposta de quem recebeu).
 
-session_start();
+require_once '../config/sessao.php';
 if (!isset($_SESSION['usuario_id'])) {
     http_response_code(403);
     echo json_encode(['ok' => false, 'erro' => 'Sem permissão']);

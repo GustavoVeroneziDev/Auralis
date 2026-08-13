@@ -3,7 +3,7 @@
 // Desfaz uma amizade já aceita. Funciona não importa quem enviou o pedido
 // originalmente — qualquer um dos dois lados pode remover.
 
-session_start();
+require_once '../config/sessao.php';
 if (!isset($_SESSION['usuario_id'])) {
     http_response_code(403);
     echo json_encode(['ok' => false, 'erro' => 'Sem permissão']);

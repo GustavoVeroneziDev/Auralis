@@ -1,5 +1,5 @@
 <?php
-session_start();
+require_once '../config/sessao.php';
 if (!isset($_SESSION['usuario_id'])) {
     http_response_code(403);
     exit;

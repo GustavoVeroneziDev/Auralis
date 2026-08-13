@@ -2,7 +2,7 @@
 // ==============================================================================
 // 1. LÓGICA PHP (Processamento de Dados)
 // ==============================================================================
-session_start();
+require_once 'config/sessao.php';
 if (!isset($_SESSION['usuario_id'])) {
     header("Location: usuario/login.php");
     exit;

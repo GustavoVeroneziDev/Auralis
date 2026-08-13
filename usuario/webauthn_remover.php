@@ -2,7 +2,7 @@
 // ==============================================================================
 // USUARIO/WEBAUTHN_REMOVER.PHP — remove uma credencial de biometria cadastrada.
 // ==============================================================================
-session_start();
+require_once '../config/sessao.php';
 if (!isset($_SESSION['usuario_id'])) { header("Location: login.php"); exit; }
 require_once '../config/conexao.php';
 require_once '../config/funcoes.php';

@@ -2,7 +2,7 @@
 // usuario/amizade_responder.php
 // Aceita ou recusa um pedido de amizade recebido.
 
-session_start();
+require_once '../config/sessao.php';
 if (!isset($_SESSION['usuario_id'])) {
     http_response_code(403);
     echo json_encode(['ok' => false, 'erro' => 'Sem permissão']);

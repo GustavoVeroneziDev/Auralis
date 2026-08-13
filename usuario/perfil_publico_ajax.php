@@ -2,7 +2,7 @@
 // usuario/perfil_publico_ajax.php
 // Dados do perfil de outra pessoa pro modal aberto a partir do Ranking.
 
-session_start();
+require_once '../config/sessao.php';
 if (!isset($_SESSION['usuario_id'])) {
     http_response_code(403);
     echo json_encode(['ok' => false, 'erro' => 'Sem permissão']);
@@ -77,12 +77,22 @@ $totalDesbloqueadas = count(array_filter($conquistas, fn($c) => $c['DataConquist
 
 $amizade = obterStatusAmizade($pdo, $uidViewer, $uidAlvo);
 
+// Número de Pioneiro (se houver) — badge fixo, não depende de destaque manual
+$numeroPioneiro = null;
+try {
+    if (function_exists('garantirEstruturaComissaoExpandida')) garantirEstruturaComissaoExpandida($pdo);
+    $stmtPio = $pdo->prepare("SELECT Numero FROM Pioneiro WHERE FKUsuario = :uid LIMIT 1");
+    $stmtPio->execute([':uid' => $uidAlvo]);
+    $numeroPioneiro = $stmtPio->fetchColumn() ?: null;
+} catch (Throwable $e) {}
+
 echo json_encode([
     'ok'                 => true,
     'id'                 => $usuario['IDUsuario'],
     'nome'               => $usuario['Nome'],
     'avatarHtml'         => renderAvatarUsuario($usuario, 80),
     'plano'              => strtolower($usuario['Plano'] ?? 'free'),
+    'numeroPioneiro'     => $numeroPioneiro ? (int)$numeroPioneiro : null,
     'dataMembro'         => $dataMembro,
     'diasAtivo'          => $diasAtivo,
     'stats'              => [

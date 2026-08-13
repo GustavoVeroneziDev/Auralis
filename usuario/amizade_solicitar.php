@@ -3,7 +3,7 @@
 // Envia um pedido de amizade. Se a outra pessoa já tinha te mandado um pedido
 // pendente, aceita automaticamente em vez de criar um segundo pedido cruzado.
 
-session_start();
+require_once '../config/sessao.php';
 if (!isset($_SESSION['usuario_id'])) {
     http_response_code(403);
     echo json_encode(['ok' => false, 'erro' => 'Sem permissão']);

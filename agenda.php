@@ -3,7 +3,7 @@
 // AGENDA.PHP — Calendário financeiro e Resumos Sincronizados
 // ==============================================================================
 ob_start();
-session_start();
+require_once 'config/sessao.php';
 
 if (!isset($_SESSION['usuario_id'])) {
     if (isset($_GET['ajax'])) {

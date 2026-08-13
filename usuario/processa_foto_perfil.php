@@ -3,7 +3,7 @@
 // USUARIO/PROCESSA_FOTO_PERFIL.PHP — Upload/remoção de foto real de perfil
 // (separada do personagem — nunca apaga o FotoPerfil/DiceBear, só some na frente dele)
 // ==============================================================================
-session_start();
+require_once '../config/sessao.php';
 if (!isset($_SESSION['usuario_id'])) { http_response_code(403); exit; }
 require_once '../config/conexao.php';
 require_once '../config/funcoes.php';

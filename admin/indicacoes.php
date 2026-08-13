@@ -1,5 +1,5 @@
 <?php
-session_start();
+require_once '../config/sessao.php';
 if (!isset($_SESSION['usuario_id'])) { header("Location: /usuario/login.php"); exit; }
 require_once '../config/conexao.php';
 require_once '../config/funcoes.php';
@@ -51,11 +51,29 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         }
     }
 
+    // Modo de recompensa pra usuário comum: 'dias' (grátis de plano, comportamento de
+    // sempre) ou 'dinheiro' (comissão real, mesma máquina do Revendedor — ver admin/revendedores.php)
+    if ($action === 'salvar_modo') {
+        $modo   = ($_POST['modo_recompensa'] ?? 'dias') === 'dinheiro' ? 'dinheiro' : 'dias';
+        $existe = $pdo->prepare("SELECT 1 FROM ConfiguracaoSistema WHERE Chave = 'indicacao_modo_recompensa' AND FKUsuario IS NULL LIMIT 1");
+        $existe->execute();
+        if ($existe->fetchColumn()) {
+            $pdo->prepare("UPDATE ConfiguracaoSistema SET Valor = :v WHERE Chave = 'indicacao_modo_recompensa' AND FKUsuario IS NULL")
+                ->execute([':v' => $modo]);
+        } else {
+            $pdo->prepare("INSERT INTO ConfiguracaoSistema (Chave, Valor, FKUsuario) VALUES ('indicacao_modo_recompensa', :v, NULL)")
+                ->execute([':v' => $modo]);
+        }
+        $sucesso = 'Modo de recompensa atualizado.';
+    }
+
     header("Location: indicacoes.php" . ($erro ? "?erro=1" : "?ok=1")); exit;
 }
 
 $sucesso = isset($_GET['ok'])   ? 'Operação realizada com sucesso.' : null;
 $erro    = isset($_GET['erro']) ? 'Ocorreu um erro.' : null;
+
+$modoRecompensa = obterModoRecompensaIndicacao($pdo);
 
 $regras = $pdo->query(
     "SELECT c.*,
@@ -176,6 +194,32 @@ require_once '../geral/header.php';
         </div>
     </div>
 
+    <!-- Modo de recompensa (dias grátis vs dinheiro) -->
+    <div class="card-admin p-4 mb-4">
+        <div class="d-flex align-items-start justify-content-between flex-wrap gap-3">
+            <div>
+                <h6 class="fw-semibold text-light mb-1"><i class="bi bi-toggle2-on me-2" style="color:var(--accent);"></i>Modo de recompensa pra indicação comum</h6>
+                <p class="text-secondary mb-0" style="font-size:.82rem;max-width:560px;">
+                    Quando alguém sem cadastro de Revendedor indica um amigo que paga um plano, o que ele ganha é definido aqui.
+                    <strong class="text-light">Dias grátis</strong> usa as regras de marco abaixo. <strong class="text-light">Dinheiro</strong> gera comissão real (1ª venda paga na hora, as seguintes acumulam até o valor mínimo configurado em <a href="revendedores.php" style="color:var(--accent);">Revendedores</a>).
+                </p>
+            </div>
+            <form method="POST" class="d-flex align-items-center gap-2 flex-shrink-0">
+                <input type="hidden" name="action" value="salvar_modo">
+                <select name="modo_recompensa" class="form-select form-select-sm" style="width:auto;" onchange="this.form.submit()">
+                    <option value="dias" <?= $modoRecompensa === 'dias' ? 'selected' : '' ?>>Dias grátis de plano</option>
+                    <option value="dinheiro" <?= $modoRecompensa === 'dinheiro' ? 'selected' : '' ?>>Comissão em dinheiro</option>
+                </select>
+            </form>
+        </div>
+        <?php if ($modoRecompensa === 'dinheiro'): ?>
+        <div class="mt-3 p-3 rounded-3" style="background:rgba(212,175,55,.06);border:1px solid rgba(212,175,55,.15);font-size:.8rem;">
+            <i class="bi bi-cash-coin me-1" style="color:var(--accent);"></i>
+            <span class="text-secondary">Modo <strong class="text-light">dinheiro</strong> ativo — as regras de marco (dias grátis) abaixo ficam pausadas pra indicação comum; indicadores de Revendedor não são afetados por essa configuração.</span>
+        </div>
+        <?php endif; ?>
+    </div>
+
     <!-- Como funciona -->
     <div class="card-admin p-4 mb-4">
         <h6 class="fw-semibold text-light mb-3"><i class="bi bi-info-circle me-2 text-secondary"></i>Como funciona</h6>
@@ -218,9 +262,9 @@ require_once '../geral/header.php';
     </div>
 
     <!-- Regras configuradas -->
-    <div class="card-admin">
+    <div class="card-admin<?= $modoRecompensa === 'dinheiro' ? ' opacity-50' : '' ?>">
         <div class="p-4 border-bottom border-secondary-subtle">
-            <h6 class="fw-semibold text-light mb-0">Regras de recompensa</h6>
+            <h6 class="fw-semibold text-light mb-0">Regras de recompensa (dias grátis)<?= $modoRecompensa === 'dinheiro' ? ' <span class="badge rounded-pill" style="background:rgba(255,255,255,.08);color:#9ca3af;font-size:.65rem;">pausado</span>' : '' ?></h6>
             <p class="text-secondary mb-0 small mt-1">Configure marcos de indicações que desbloqueiam recompensas automáticas.</p>
         </div>
         <?php if (empty($regras)): ?>

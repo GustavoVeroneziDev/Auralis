@@ -1,5 +1,5 @@
 <?php
-session_start();
+require_once '../config/sessao.php';
 header('Content-Type: application/json');
 
 if (!isset($_SESSION['usuario_id'])) {

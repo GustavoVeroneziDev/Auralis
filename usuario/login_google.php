@@ -1,4 +1,13 @@
 <?php
+// Cookie de sessão com vida de 30 dias — mesma configuração de config/sessao.php,
+// pra login via Google também ficar "lembrado" e não cair sozinho no mesmo dia.
+session_set_cookie_params([
+    'lifetime' => 86400 * 30,
+    'path'     => '/',
+    'secure'   => isset($_SERVER['HTTPS']) && $_SERVER['HTTPS'] === 'on',
+    'httponly' => true,
+    'samesite' => 'Lax',
+]);
 session_start();
 require_once '../config/conexao.php';
 require_once '../config/funcoes.php';
@@ -53,6 +62,10 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && !empty($_POST['credential'])) {
                 $_SESSION['tema']         = strtolower($usuario['Tema'] ?? 'dark');
                 $_SESSION['nav_tipo']     = strtolower($usuario['NavTipo'] ?? 'sidebar');
 
+                // Login via Google não tem checkbox de "lembrar-me" — sempre lembra,
+                // não tem cenário de "computador compartilhado" nesse fluxo de 1 clique.
+                emitirCookieLembrarMe($usuario['IDUsuario']);
+
                 header("Location: ../dashboard.php");
                 exit;
             } else {
@@ -62,16 +75,35 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && !empty($_POST['credential'])) {
                 $senha_google = 'GOOGLE_SSO';
                 $token_recuperacao = bin2hex(random_bytes(32));
                 $expiracao = date('Y-m-d H:i:s', strtotime('+24 hours'));
+                $codigoIndicacao = gerarCodigoIndicacao($pdo);
 
-                $sqlInsert = "INSERT INTO Usuario (IDUsuario, Nome, Email, Senha, TipoPessoa, NivelAcesso, StatusConta, TokenRecuperacao, TokenRecuperacaoExpiracao, NavTipo)
-                              VALUES (:id, :nome, :email, :senha, 'PF', 'Titular', 'ativo', :token, :expiracao, 'sidebar')";
+                // Resolve quem indicou — mesmo ?ref= usado no cadastro manual
+                // (usuario/processa_cadastro.php), agora também capturado no botão do Google
+                // em usuario/cadastro.php. Sem isso, cadastro via Google nunca vinculava indicação.
+                $refCode = strtoupper(trim($_POST['ref_code'] ?? ''));
+                $fkIndicadoPor = null;
+                if ($refCode) {
+                    $stmtRef = $pdo->prepare(
+                        "SELECT IDUsuario FROM Usuario WHERE CodigoIndicacao = :c AND StatusConta = 'ativo' LIMIT 1"
+                    );
+                    $stmtRef->execute([':c' => $refCode]);
+                    $indicadorId = $stmtRef->fetchColumn();
+                    if ($indicadorId) {
+                        $fkIndicadoPor = $indicadorId;
+                    }
+                }
+
+                $sqlInsert = "INSERT INTO Usuario (IDUsuario, Nome, Email, Senha, TipoPessoa, NivelAcesso, StatusConta, TokenRecuperacao, TokenRecuperacaoExpiracao, NavTipo, CodigoIndicacao, FKIndicadoPor)
+                              VALUES (:id, :nome, :email, :senha, 'PF', 'Titular', 'ativo', :token, :expiracao, 'sidebar', :codigo, :fk_ind)";
                 $pdo->prepare($sqlInsert)->execute([
                     ':id' => $id_novo_usuario,
                     ':nome' => $nome,
                     ':email' => $email,
                     ':senha' => $senha_google,
                     ':token' => $token_recuperacao,
-                    ':expiracao' => $expiracao
+                    ':expiracao' => $expiracao,
+                    ':codigo' => $codigoIndicacao,
+                    ':fk_ind' => $fkIndicadoPor,
                 ]);
 
                 // Injeta as categorias iniciais (Google SSO) - Adicionei as 13 categorias aqui também para ficar igual ao seu kit oficial!
@@ -155,6 +187,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && !empty($_POST['credential'])) {
                 $_SESSION['plano']        = 'free';
                 $_SESSION['tema']         = 'dark';
                 $_SESSION['nav_tipo']     = 'sidebar';
+
+                emitirCookieLembrarMe($id_novo_usuario);
 
                 header("Location: ../dashboard.php");
                 exit;

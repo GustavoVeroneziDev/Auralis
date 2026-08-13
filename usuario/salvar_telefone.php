@@ -3,7 +3,7 @@
 // Salva o telefone a partir do modal de onboarding do dashboard (ex: quem entrou
 // pelo Google, que nunca passa pelo campo de telefone do cadastro normal).
 
-session_start();
+require_once '../config/sessao.php';
 
 if (!isset($_SESSION['usuario_id'])) {
     header("Location: login.php");
