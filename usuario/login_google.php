@@ -106,6 +106,10 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && !empty($_POST['credential'])) {
                     ':fk_ind' => $fkIndicadoPor,
                 ]);
 
+                if (function_exists('avisarAdminNovoUsuario')) {
+                    avisarAdminNovoUsuario($pdo, $nome, $email, null, 'Google');
+                }
+
                 // Injeta as categorias iniciais (Google SSO) - Adicionei as 13 categorias aqui também para ficar igual ao seu kit oficial!
                 $kitInicial = [
                     ['nome' => 'Alimentação', 'tipo' => 'despesa', 'icone' => 'bi-cart3'],
