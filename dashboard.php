@@ -2045,11 +2045,13 @@ require_once 'geral/header.php';
     .no-spinners::-webkit-outer-spin-button,
     .no-spinners::-webkit-inner-spin-button {
         -webkit-appearance: none;
+        appearance: none;
         margin: 0;
     }
 
     .no-spinners {
         -moz-appearance: textfield;
+        appearance: textfield;
     }
 
     /* Estilos Acrílicos do Onboarding */
