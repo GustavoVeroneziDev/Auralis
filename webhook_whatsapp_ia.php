@@ -31,7 +31,8 @@ if (str_contains($remoteJid, '@g.us')) exit;
 // pra função que sabe diferenciar os dois (ver comentário nela) e pausar a IA se for
 // intervenção manual de verdade.
 if ($data['key']['fromMe'] ?? false) {
-    _waTratarMensagemFromMe($pdo, $remoteJid);
+    $textoFromMe = $data['message']['conversation'] ?? $data['message']['extendedTextMessage']['text'] ?? '';
+    _waTratarMensagemFromMe($pdo, $remoteJid, $textoFromMe);
     exit;
 }
 
@@ -1619,7 +1620,7 @@ function _waGarantirTabela(PDO $pdo): void
 // uma linha Role='model' em MensagemWA na hora que é enviada (ver _waSaveHistory e
 // registrarMensagemWaSistema) — se não tem nenhuma bem recente pra esse cliente, foi um
 // humano de verdade digitando.
-function _waTratarMensagemFromMe(PDO $pdo, string $remoteJid): void
+function _waTratarMensagemFromMe(PDO $pdo, string $remoteJid, string $textoFromMe): void
 {
     $telefone = preg_replace('/\D/', '', explode('@', $remoteJid)[0]);
     if (strlen($telefone) < 10) return;
@@ -1629,6 +1630,16 @@ function _waTratarMensagemFromMe(PDO $pdo, string $remoteJid): void
         $stmtU->execute([':tel' => $telefone]);
         $uid = $stmtU->fetchColumn();
         if (!$uid) return;
+
+        // Comando manual pra devolver a conversa pra IA na hora, sem esperar o prazo da
+        // pausa acabar — manda só "🤖" (sozinho, nada mais) na própria conversa com o
+        // cliente. Curto de propósito: é a única forma de "comando" possível aqui, já que
+        // não existe canal separado — o que for digitado sai direto pro cliente ver.
+        if (trim($textoFromMe) === '🤖') {
+            $pdo->prepare("DELETE FROM ConfiguracaoSistema WHERE Chave = 'wa_pausado_ate' AND FKUsuario = :uid")
+                ->execute([':uid' => $uid]);
+            return;
+        }
 
         _waGarantirTabela($pdo);
 
@@ -1641,9 +1652,12 @@ function _waTratarMensagemFromMe(PDO $pdo, string $remoteJid): void
 
         // Humano de verdade assumiu a conversa — pausa a IA pra esse cliente. Cada nova
         // mensagem manual "renova" o prazo (check-then-insert-or-update, mesmo padrão do
-        // resto do arquivo — ConfiguracaoSistema não tem UNIQUE KEY em Chave+FKUsuario),
-        // então ela só volta a responder depois de um tempo sem nenhuma intervenção manual.
-        $ate = date('Y-m-d H:i:s', strtotime('+2 hours'));
+        // resto do arquivo — ConfiguracaoSistema não tem UNIQUE KEY em Chave+FKUsuario).
+        // 30min e não algo maior tipo 2h: se o cliente mandar uma pergunta nova e sem
+        // relação nenhuma horas depois de você já ter resolvido o assunto, ele não pode
+        // ficar sem nenhuma resposta até o prazo acabar — 30min cobre bem uma troca ativa
+        // de mensagens, e dá pra encerrar antes mandando "🤖" assim que terminar de atender.
+        $ate = date('Y-m-d H:i:s', strtotime('+30 minutes'));
         $stmtChk = $pdo->prepare("SELECT COUNT(*) FROM ConfiguracaoSistema WHERE Chave = 'wa_pausado_ate' AND FKUsuario = :uid");
         $stmtChk->execute([':uid' => $uid]);
         if ($stmtChk->fetchColumn() > 0) {
