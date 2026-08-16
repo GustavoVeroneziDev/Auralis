@@ -1,11 +1,26 @@
 <?php
 // webhook_whatsapp_ia.php
 // Recebe mensagens WhatsApp via Evolution API, interpreta com Gemini e executa ações.
-// Webhook: https://meuauralis.com/webhook_whatsapp_ia.php
+// Webhook: https://meuauralis.com/webhook_whatsapp_ia.php?token=... (valor real em
+// admin/webhook_ia.php — configure essa URL completa no painel da Evolution API; sem o
+// token certo, TODA chamada real é rejeitada com 403 também).
 
 require_once __DIR__ . '/config/conexao.php';
 require_once __DIR__ . '/config/funcoes.php';
 require_once __DIR__ . '/config/gemini.php';
+
+// ── 0. Verificação de segurança ────────────────────────────────────────────────
+// Sem isso, essa URL é pública — qualquer um na internet que a descobrisse podia mandar
+// POST se passando pela Evolution API. Em volume, isso sozinho já derruba a capacidade
+// do servidor (cada tentativa gasta um processo PHP + consulta ao banco antes de sair);
+// e se alguém soubesse o telefone de um cliente real, dava pra forjar payloads gerando
+// chamadas de IA (custo) e mensagens de WhatsApp reais indevidas pra essa pessoa. Confere
+// o token ANTES de fazer qualquer outra coisa — nem decodifica o payload se não bater.
+// hash_equals() em vez de "===" pra não vazar timing de quantos caracteres bateram.
+if (!hash_equals(waWebhookToken($pdo), (string)($_GET['token'] ?? ''))) {
+    http_response_code(403);
+    exit;
+}
 
 header('Content-Type: application/json');
 http_response_code(200);

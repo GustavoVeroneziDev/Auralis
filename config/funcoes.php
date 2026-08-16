@@ -2415,6 +2415,51 @@ if (!function_exists('telefoneAdminNotificacoes')) {
     }
 }
 
+// Token secreto que o webhook do WhatsApp exige (query string ?token=) antes de processar
+// qualquer requisição — sem isso, a URL é pública e qualquer um pode se passar pela
+// Evolution API. Gerado sozinho (random_bytes) na primeira vez que alguém chamar essa
+// função, sem precisar editar nada manualmente no servidor; visível/regenerável pelo admin
+// em admin/webhook_ia.php. Nunca fica hardcoded em nenhum arquivo — só existe no banco.
+if (!function_exists('waWebhookToken')) {
+    function waWebhookToken(PDO $pdo): string
+    {
+        static $cache = null;
+        if ($cache !== null) return $cache;
+        try {
+            $stmt  = $pdo->query("SELECT Valor FROM ConfiguracaoSistema WHERE Chave = 'wa_webhook_token' AND FKUsuario IS NULL LIMIT 1");
+            $valor = $stmt->fetchColumn();
+            if ($valor === false) {
+                $valor = bin2hex(random_bytes(24));
+                $pdo->prepare("INSERT INTO ConfiguracaoSistema (Chave, Valor, FKUsuario) VALUES ('wa_webhook_token', :v, NULL)")
+                    ->execute([':v' => $valor]);
+            }
+            $cache = (string)$valor;
+        } catch (Throwable $e) {
+            $cache = '';
+        }
+        return $cache;
+    }
+}
+
+// Troca o token do webhook por um novo aleatório (revoga o antigo na hora) — usado só
+// pela tela de admin, quando o admin quer regenerar por suspeita de vazamento.
+if (!function_exists('regenerarWaWebhookToken')) {
+    function regenerarWaWebhookToken(PDO $pdo): string
+    {
+        $novo = bin2hex(random_bytes(24));
+        $stmtChk = $pdo->prepare("SELECT COUNT(*) FROM ConfiguracaoSistema WHERE Chave = 'wa_webhook_token' AND FKUsuario IS NULL");
+        $stmtChk->execute();
+        if ($stmtChk->fetchColumn() > 0) {
+            $pdo->prepare("UPDATE ConfiguracaoSistema SET Valor = :v WHERE Chave = 'wa_webhook_token' AND FKUsuario IS NULL")
+                ->execute([':v' => $novo]);
+        } else {
+            $pdo->prepare("INSERT INTO ConfiguracaoSistema (Chave, Valor, FKUsuario) VALUES ('wa_webhook_token', :v, NULL)")
+                ->execute([':v' => $novo]);
+        }
+        return $novo;
+    }
+}
+
 // Avisa o admin por WhatsApp sempre que um usuário novo é criado (cadastro manual ou
 // Google) — chamado logo após o INSERT em Usuario, com os dados já em mãos (evita nova
 // consulta ao banco). Falha de envio nunca deve travar o cadastro da pessoa.
