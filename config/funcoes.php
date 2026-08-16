@@ -2459,6 +2459,34 @@ if (!function_exists('avisarAdminNovaVenda')) {
     }
 }
 
+// Registra no histórico de conversa da IA (mesma tabela MensagemWA que webhook_whatsapp_ia.php
+// usa) uma mensagem que o SISTEMA mandou por fora da conversa — lembrete de vencimento, aviso
+// de plano acabando etc. Sem isso, a IA nunca "viu" esses avisos automáticos: se a pessoa
+// responde perguntando sobre algo que só apareceu num lembrete de cron (ex: "essa conta que
+// venceu, é de qual carteira?"), a IA não tinha contexto nenhum pra entender do que se tratava,
+// mesmo o aviso estando bem ali na mesma conversa de WhatsApp que ela está vendo.
+if (!function_exists('registrarMensagemWaSistema')) {
+    function registrarMensagemWaSistema(PDO $pdo, string $uid, string $conteudo): void
+    {
+        try {
+            $pdo->exec("
+                CREATE TABLE IF NOT EXISTS MensagemWA (
+                    IDMensagem  VARCHAR(36)          NOT NULL,
+                    FKUsuario   VARCHAR(36)          NOT NULL,
+                    Role        ENUM('user','model') NOT NULL DEFAULT 'user',
+                    Conteudo    TEXT                 NOT NULL,
+                    CriadoEm   TIMESTAMP            NOT NULL DEFAULT CURRENT_TIMESTAMP,
+                    PRIMARY KEY (IDMensagem),
+                    KEY idx_usuario_data (FKUsuario, CriadoEm)
+                ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
+            ");
+            $pdo->prepare("INSERT INTO MensagemWA (IDMensagem, FKUsuario, Role, Conteudo) VALUES (:id, :uid, 'model', :msg)")
+                ->execute([':id' => gerarUuid(), ':uid' => $uid, ':msg' => mb_substr($conteudo, 0, 2000)]);
+        } catch (Throwable $e) {
+        }
+    }
+}
+
 // Colunas do reforço de vencimento (16h) — separadas de PushNotificadoEm/WhatsAppNotificadoEm
 // (aviso da manhã) pra cada lembrete controlar sua própria janela de envio, sem um interferir
 // no outro. Sem SSH no host, a migração roda sozinha aqui em vez de exigir ALTER manual.

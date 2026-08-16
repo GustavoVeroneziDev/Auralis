@@ -78,6 +78,9 @@ foreach ($assinaturas as $a) {
                 $stmtIns->execute([':ts' => $agora, ':uid' => $a['FKUsuario']]);
             }
         } catch (PDOException $e) {}
+        if (function_exists('registrarMensagemWaSistema')) {
+            registrarMensagemWaSistema($pdo, $a['FKUsuario'], $mensagem);
+        }
         $enviados++;
     }
 }

@@ -165,6 +165,9 @@ foreach ($candidatos as $u) {
     if ($ok) {
         _engajamentoSalvarConfig($pdo, $u['IDUsuario'], 'wa_ultimo_engajamento', $agora);
         _engajamentoSalvarConfig($pdo, $u['IDUsuario'], 'wa_engajamento_contagem', (string)($contagem + 1));
+        if (function_exists('registrarMensagemWaSistema')) {
+            registrarMensagemWaSistema($pdo, $u['IDUsuario'], $mensagem);
+        }
         $enviados++;
     }
 

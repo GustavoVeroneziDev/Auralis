@@ -89,6 +89,9 @@ foreach ($grupos as $grupo) {
     $ok = enviarWhatsAppNotificacao($telefone, $mensagem);
 
     if ($ok) {
+        if (function_exists('registrarMensagemWaSistema')) {
+            registrarMensagemWaSistema($pdo, $itens[0]['FKUsuario'], $mensagem);
+        }
         $enviados++;
     } else {
         foreach ($itens as $c) {
