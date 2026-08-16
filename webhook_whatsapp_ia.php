@@ -541,8 +541,14 @@ foreach ($acoes as $acao) {
 
 $resposta = implode("\n\n", $respostas);
 
-_waReply($telefone, $resposta);
+// Histórico PRIMEIRO, resposta depois — de propósito. A Evolution API ecoa de volta (como
+// fromMe=true) toda mensagem que a própria IA manda; se _waReply rodasse antes, existia uma
+// corrida real onde esse eco podia chegar (e ser processado por _waTratarMensagemFromMe) ANTES
+// dessa linha salvar o Role='model' — aí ele não achava nenhum registro recente, achava que
+// era um humano digitando de verdade, e pausava a IA pra esse mesmo cliente sem motivo (foi
+// exatamente o que aconteceu no teste: silêncio total em "ta ai?" pouco depois).
 _waSaveHistory($pdo, $uid, $texto, $resposta);
+_waReply($telefone, $resposta);
 
 // Atualiza perfil permanente se a IA aprendeu algo novo
 if (!empty($resultado['_perfil_atualizado']) && is_array($resultado['_perfil_atualizado'])) {
