@@ -35,7 +35,7 @@ if (strlen($telefone) < 10) exit;
 
 try {
     $stmtU = $pdo->prepare(
-        "SELECT IDUsuario, Nome FROM Usuario
+        "SELECT IDUsuario, Nome, CodigoIndicacao FROM Usuario
          WHERE Telefone = :tel AND StatusConta = 'ativo' LIMIT 1"
     );
     $stmtU->execute([':tel' => $telefone]);
@@ -321,6 +321,34 @@ if (count($carteiras) > 1) {
     } catch (Throwable $e) {}
 }
 
+// Código de indicação + saldo de comissão (quando o modo "dinheiro" está ativo) — direto
+// no contexto pra IA nunca ter que inventar isso; sem isso não havia de onde tirar essa
+// informação, e ela arriscava "chutar" um código ou valor.
+$indicacaoCtx = '';
+try {
+    if (!empty($usuario['CodigoIndicacao'])) {
+        $indicacaoCtx = "\nCódigo de indicação: {$usuario['CodigoIndicacao']} (link: meuauralis.com/usuario/cadastro.php?ref={$usuario['CodigoIndicacao']})";
+        if (function_exists('obterModoRecompensaIndicacao') && obterModoRecompensaIndicacao($pdo) === 'dinheiro') {
+            $stmtRevWa = $pdo->prepare("SELECT IDRevendedor FROM Revendedor WHERE FKUsuario = :uid LIMIT 1");
+            $stmtRevWa->execute([':uid' => $uid]);
+            $revIdWa = $stmtRevWa->fetchColumn();
+            if ($revIdWa) {
+                $stmtSaldoWa = $pdo->prepare("
+                    SELECT COALESCE(SUM(CASE WHEN Status = 'pendente' THEN ValorComissao ELSE 0 END), 0) AS pendente,
+                           COALESCE(SUM(CASE WHEN Status = 'paga'     THEN ValorComissao ELSE 0 END), 0) AS pago
+                    FROM ComissaoRevendedor WHERE FKRevendedor = :rid
+                ");
+                $stmtSaldoWa->execute([':rid' => $revIdWa]);
+                $rowWa = $stmtSaldoWa->fetch(PDO::FETCH_ASSOC);
+                $indicacaoCtx .= "\nSaldo de comissão: pendente=R$" . number_format((float)($rowWa['pendente'] ?? 0), 2, ',', '.') .
+                                 ", já recebido=R$" . number_format((float)($rowWa['pago'] ?? 0), 2, ',', '.');
+            } else {
+                $indicacaoCtx .= "\nSaldo de comissão: ainda não gerou nenhuma comissão.";
+            }
+        }
+    }
+} catch (Throwable $e) {}
+
 $saldoFmt    = 'R$' . number_format(abs($saldoMes), 2, ',', '.') . ($saldoMes < 0 ? ' (negativo)' : '');
 $recFmt      = 'R$' . number_format($recEfet,      2, ',', '.');
 $despFmt     = 'R$' . number_format($despEfet,     2, ',', '.');
@@ -349,7 +377,7 @@ Contexto financeiro atual de {$nomeUser}:
 - Carteiras: {$cartsList}{$carteirasResumoCtx}
 - Cofrinhos: {$cofList}
 - Categorias despesa: {$catDesp}
-- Categorias receita: {$catRec}
+- Categorias receita: {$catRec}{$indicacaoCtx}
 
 ACTIONS disponíveis (responda SEMPRE com JSON válido, sem markdown):
 
@@ -383,11 +411,21 @@ Regras:
 "cofrinho_criar":
 {"action":"cofrinho_criar","nome":"nome","meta":0.00}
 
+"cofrinho_retirar" — tirar dinheiro de um cofrinho (ex: "tira 50 do cofrinho da viagem", "usei 100 do cofrinho do carro"):
+{"action":"cofrinho_retirar","nome_cofrinho":"nome","valor":0.00}
+
+"cofrinho_editar" — mudar nome e/ou meta de um cofrinho já existente. Inclua só os campos que realmente mudam:
+{"action":"cofrinho_editar","nome_cofrinho":"nome atual","nome_novo":"novo nome|omitir","meta_nova":0.00}
+
+"cofrinho_excluir" — apagar um cofrinho PERMANENTEMENTE (junto com todo o histórico dele). Só use com pedido explícito e inequívoco ("apaga o cofrinho X", "exclui o cofrinho X", "deleta o cofrinho X") — nunca por dedução:
+{"action":"cofrinho_excluir","nome_cofrinho":"nome"}
+
 "consultar" — USE APENAS para cálculos que exigem DB: breakdown por categoria, períodos passados, totais não presentes no contexto, ou achar um lançamento específico pelo nome:
-{"action":"consultar","consulta":{"tipo":"gastos|pendentes|vencidas|saldo|ultimo|buscar","periodo":"hoje|semana|mes|ano","tipo_registro":"despesa|receita|null","id_carteira":"uuid|null","termo":"nome ou parte do nome, só com tipo=buscar"}}
+{"action":"consultar","consulta":{"tipo":"gastos|pendentes|vencidas|saldo|ultimo|buscar|meta","periodo":"hoje|semana|mes|ano","tipo_registro":"despesa|receita|null","id_carteira":"uuid|null","termo":"nome ou parte do nome, só com tipo=buscar","categoria":"nome da categoria, só com tipo=meta"}}
 - "id_carteira": preencha com o id da carteira (lista de Carteiras acima) se o cliente mencionou uma específica pelo nome. Sem menção, deixe null — soma todas.
 - "pendentes" respeita o "periodo" pedido (o que vence NESSE período, pago ou não ainda). "vencidas" IGNORA período — é sempre "já passou da data e não foi pago", pra perguntas tipo "tem conta vencida?", "o que tá atrasado?", "alguma coisa em atraso?". NÃO use "pendentes" pra essas perguntas, o período pode não cobrir a data certa — use "vencidas" direto.
 - "buscar": ache um ou mais lançamentos pelo nome/descrição (ex: "onde tá a conta da Vivo", "de qual carteira é o lançamento teste", "vc verificou a conta X?") — retorna carteira, categoria, data e status de cada um encontrado. Use "termo" com a palavra-chave, ignore "periodo"/"tipo_registro" nesse tipo.
+- "meta": consulta metas/orçamento por categoria — quanto já foi gasto nessa categoria esse mês vs a meta definida (ex: "quanto já gastei da minha meta de lazer", "tô dentro do orçamento de mercado?"). Com "categoria" preenchido, retorna só aquela; sem "categoria" (ex: "como tão minhas metas esse mês?"), lista todas as metas configuradas com o progresso de cada uma.
 
 "cancelar":
 {"action":"cancelar"}
@@ -441,7 +479,7 @@ $jaTemEscalada = false;
 foreach ($acoes as $a) {
     if (($a['action'] ?? '') === 'escalar_suporte') { $jaTemEscalada = true; break; }
 }
-if (!$jaTemEscalada && preg_match('/falar\s+com\s+(o\s+|a\s+)?(suporte|equipe|um\s+humano|humano|uma\s+pessoa|atendente|algu[ée]m)/iu', $texto)) {
+if (!$jaTemEscalada && preg_match('/falar\s+com\s+(o\s+|a\s+)?(suporte|equipe|time|atendimento|um\s+humano|humano|uma\s+pessoa|pessoa\s+real|algu[ée]m\s+real|atendente|algu[ée]m)/iu', $texto)) {
     $acoes[] = ['action' => 'escalar_suporte', 'motivo' => 'Pediu explicitamente pra falar com humano/suporte: "' . mb_substr($texto, 0, 150) . '"'];
 }
 
@@ -482,6 +520,9 @@ function _waDespachar(PDO $pdo, string $uid, array $acao, array $carteiras, arra
         'editar'             => _waEditar($pdo, $uid, $acao),
         'cofrinho_depositar' => _waCofrinhoDepositar($pdo, $uid, $acao, $cofrinhos, $carteiras, $hoje),
         'cofrinho_criar'     => _waCofinhoCriar($pdo, $uid, $acao, $carteiras, $hoje),
+        'cofrinho_retirar'   => _waCofrinhoRetirar($pdo, $uid, $acao, $cofrinhos, $hoje),
+        'cofrinho_editar'    => _waCofrinhoEditar($pdo, $uid, $acao, $cofrinhos),
+        'cofrinho_excluir'   => _waCofrinhoExcluir($pdo, $uid, $acao, $cofrinhos),
         'consultar'          => _waConsultar($pdo, $uid, $acao['consulta'] ?? [], $hoje),
         'cancelar'           => _waCancelar($pdo, $uid),
         'ajuda'              => _waAjuda($personalidade),
@@ -916,6 +957,134 @@ function _waCofinhoCriar(PDO $pdo, string $uid, array $acao, array $carteiras, s
     return "🏦 *Cofrinho \"{$nome}\" criado!*{$metaTxt}\n\nAgora você pode mandar \"deposita X no {$nome}\" para começar a guardar. 💰";
 }
 
+function _waCofrinhoRetirar(PDO $pdo, string $uid, array $acao, array $cofrinhos, string $hoje): string
+{
+    $nomeBusca = trim($acao['nome_cofrinho'] ?? '');
+    $valor     = abs((float)($acao['valor'] ?? 0));
+
+    if (!$nomeBusca || !$valor) return "❌ Informe o nome do cofrinho e o valor.";
+
+    $cofrinho = null;
+    foreach ($cofrinhos as $c) {
+        if (stripos($c['Nome'], $nomeBusca) !== false) {
+            $cofrinho = $c;
+            break;
+        }
+    }
+
+    if (!$cofrinho) {
+        $lista = implode(', ', array_map(fn($c) => "*{$c['Nome']}*", $cofrinhos));
+        return "❌ Cofrinho \"{$nomeBusca}\" não encontrado.\n\nSeus cofrinhos: " . ($lista ?: "nenhum ainda.");
+    }
+
+    try {
+        $stmtCofDet = $pdo->prepare("SELECT FKCarteira FROM Cofrinho WHERE IDCofrinho = :id AND FKUsuario = :uid AND Ativo = 1");
+        $stmtCofDet->execute([':id' => $cofrinho['IDCofrinho'], ':uid' => $uid]);
+        $cofDet = $stmtCofDet->fetch(PDO::FETCH_ASSOC);
+    } catch (Throwable $e) { return "❌ Erro ao acessar o cofrinho."; }
+
+    if (!$cofDet) return "❌ Cofrinho não encontrado ou inativo.";
+
+    try {
+        $pdo->prepare("
+            INSERT INTO Registro (IDRegistro, TipoRegistro, Valor, Descricao, MomentoRegistro, DataVencimento,
+                                  StatusRegistro, Recorrente, DiaVencimento, FKCarteira, FKUsuario, FKCofrinho)
+            VALUES (:id, 'cofrinho_retirada', :val, :desc, NOW(), :hoje,
+                    'efetivado', 0, NULL, :cart, :uid, :cof)
+        ")->execute([
+            ':id'   => gerarUuid(),
+            ':val'  => $valor,
+            ':desc' => 'Retirada via WhatsApp',
+            ':hoje' => $hoje,
+            ':cart' => $cofDet['FKCarteira'],
+            ':uid'  => $uid,
+            ':cof'  => $cofrinho['IDCofrinho'],
+        ]);
+    } catch (Throwable $e) { return "❌ Erro ao retirar do cofrinho."; }
+
+    $novoSaldo = (float)$cofrinho['Saldo'] - $valor;
+    return "💸 *Retirada do cofrinho \"{$cofrinho['Nome']}\"!*\n\nValor: R$ " . number_format($valor, 2, ',', '.') .
+           "\nNovo saldo: R$ " . number_format($novoSaldo, 2, ',', '.');
+}
+
+function _waCofrinhoEditar(PDO $pdo, string $uid, array $acao, array $cofrinhos): string
+{
+    $nomeBusca = trim($acao['nome_cofrinho'] ?? '');
+    if (!$nomeBusca) return "❌ Informe o nome do cofrinho que quer editar.";
+
+    $cofrinho = null;
+    foreach ($cofrinhos as $c) {
+        if (stripos($c['Nome'], $nomeBusca) !== false) {
+            $cofrinho = $c;
+            break;
+        }
+    }
+
+    if (!$cofrinho) {
+        $lista = implode(', ', array_map(fn($c) => "*{$c['Nome']}*", $cofrinhos));
+        return "❌ Cofrinho \"{$nomeBusca}\" não encontrado.\n\nSeus cofrinhos: " . ($lista ?: "nenhum ainda.");
+    }
+
+    // Edição parcial: só troca Nome/ValorMeta, nunca mexe em Icone/Cor/DataLimite —
+    // a IA não tem como saber esses campos, então preserva o que já estava configurado.
+    $nomeNovo = (!empty($acao['nome_novo']) && trim((string)$acao['nome_novo']) !== '')
+        ? mb_substr(trim((string)$acao['nome_novo']), 0, 100)
+        : $cofrinho['Nome'];
+    $metaNova = (array_key_exists('meta_nova', $acao) && $acao['meta_nova'] !== null && $acao['meta_nova'] !== '')
+        ? abs((float)$acao['meta_nova'])
+        : (float)$cofrinho['ValorMeta'];
+
+    try {
+        $pdo->prepare("
+            UPDATE Cofrinho SET Nome = :nome, ValorMeta = :meta
+            WHERE IDCofrinho = :id AND FKUsuario = :uid AND Ativo = 1
+        ")->execute([
+            ':nome' => $nomeNovo,
+            ':meta' => $metaNova,
+            ':id'   => $cofrinho['IDCofrinho'],
+            ':uid'  => $uid,
+        ]);
+    } catch (Throwable $e) { return "❌ Erro ao editar cofrinho."; }
+
+    $metaTxt = $metaNova > 0 ? "\n🎯 Meta: R$ " . number_format($metaNova, 2, ',', '.') : '';
+    return "✏️ *Cofrinho atualizado!*\n\nNome: *{$nomeNovo}*{$metaTxt}";
+}
+
+function _waCofrinhoExcluir(PDO $pdo, string $uid, array $acao, array $cofrinhos): string
+{
+    $nomeBusca = trim($acao['nome_cofrinho'] ?? '');
+    if (!$nomeBusca) return "❌ Informe o nome do cofrinho que quer excluir.";
+
+    $cofrinho = null;
+    foreach ($cofrinhos as $c) {
+        if (stripos($c['Nome'], $nomeBusca) !== false) {
+            $cofrinho = $c;
+            break;
+        }
+    }
+
+    if (!$cofrinho) {
+        $lista = implode(', ', array_map(fn($c) => "*{$c['Nome']}*", $cofrinhos));
+        return "❌ Cofrinho \"{$nomeBusca}\" não encontrado.\n\nSeus cofrinhos: " . ($lista ?: "nenhum ainda.");
+    }
+
+    try {
+        $pdo->beginTransaction();
+        // Mesmo padrão de cofrinho/processa_cofrinho.php (ação "excluir"): apaga o histórico
+        // vinculado antes do cofrinho em si, dentro da mesma transação.
+        $pdo->prepare("DELETE FROM Registro WHERE FKCofrinho = :id AND FKUsuario = :uid")
+            ->execute([':id' => $cofrinho['IDCofrinho'], ':uid' => $uid]);
+        $pdo->prepare("DELETE FROM Cofrinho WHERE IDCofrinho = :id AND FKUsuario = :uid")
+            ->execute([':id' => $cofrinho['IDCofrinho'], ':uid' => $uid]);
+        $pdo->commit();
+    } catch (Throwable $e) {
+        if ($pdo->inTransaction()) $pdo->rollBack();
+        return "❌ Erro ao excluir o cofrinho.";
+    }
+
+    return "🗑️ *Cofrinho \"{$cofrinho['Nome']}\" excluído* — junto com todo o histórico de aportes e retiradas dele. Isso não dá pra desfazer.";
+}
+
 function _waClarificar(array $acao): string
 {
     $pergunta = trim($acao['pergunta'] ?? 'Pode explicar melhor?');
@@ -1139,6 +1308,66 @@ function _waConsultar(PDO $pdo, string $uid, array $consulta, string $hoje): str
                 return "Último: {$icon} *{$r['Descricao']}* — R$ " . number_format($r['Valor'], 2, ',', '.') .
                        " · {$dataFmt}{$catStr} · {$r['StatusRegistro']}";
 
+            case 'meta':
+                if (function_exists('garantirTabelaMetaCategoria')) garantirTabelaMetaCategoria($pdo);
+                $catBusca = trim($consulta['categoria'] ?? '');
+
+                if ($catBusca !== '') {
+                    $stmt = $pdo->prepare("
+                        SELECT c.NomeCategoria, m.ValorMeta, COALESCE(SUM(r.Valor), 0) AS Gasto
+                        FROM MetaCategoria m
+                        JOIN Categoria c ON c.IDCategoria = m.FKCategoria
+                        LEFT JOIN Registro r ON r.FKCategoria = m.FKCategoria AND r.FKUsuario = m.FKUsuario
+                               AND r.TipoRegistro = 'despesa' AND r.StatusRegistro = 'efetivado'
+                               AND COALESCE(r.DataVencimento, DATE(r.MomentoRegistro)) BETWEEN :ini AND :fim
+                        WHERE m.FKUsuario = :uid AND c.NomeCategoria LIKE :termo
+                        GROUP BY m.FKCategoria, c.NomeCategoria, m.ValorMeta
+                        LIMIT 1
+                    ");
+                    $stmt->execute([':uid' => $uid, ':ini' => $ini, ':fim' => $fim, ':termo' => '%' . $catBusca . '%']);
+                    $r = $stmt->fetch(PDO::FETCH_ASSOC);
+
+                    if (!$r) return "Não encontrei meta de orçamento definida pra \"{$catBusca}\". Dá pra configurar em Categorias, no site.";
+
+                    $meta  = (float)$r['ValorMeta'];
+                    $gasto = (float)$r['Gasto'];
+                    $pct   = $meta > 0 ? ($gasto / $meta) * 100 : 0;
+                    $emoji = $pct >= 100 ? '🔴' : ($pct >= 80 ? '🟡' : '🟢');
+                    return "{$emoji} Meta de *{$r['NomeCategoria']}* {$label}:\n\n" .
+                           "Gasto: R$ " . number_format($gasto, 2, ',', '.') . " de R$ " . number_format($meta, 2, ',', '.') .
+                           " (" . number_format($pct, 0) . "%)";
+                }
+
+                $stmt = $pdo->prepare("
+                    SELECT c.NomeCategoria, m.ValorMeta, COALESCE(SUM(r.Valor), 0) AS Gasto
+                    FROM MetaCategoria m
+                    JOIN Categoria c ON c.IDCategoria = m.FKCategoria
+                    LEFT JOIN Registro r ON r.FKCategoria = m.FKCategoria AND r.FKUsuario = m.FKUsuario
+                           AND r.TipoRegistro = 'despesa' AND r.StatusRegistro = 'efetivado'
+                           AND COALESCE(r.DataVencimento, DATE(r.MomentoRegistro)) BETWEEN :ini AND :fim
+                    WHERE m.FKUsuario = :uid
+                    GROUP BY m.FKCategoria, c.NomeCategoria, m.ValorMeta
+                ");
+                $stmt->execute([':uid' => $uid, ':ini' => $ini, ':fim' => $fim]);
+                $rows = $stmt->fetchAll(PDO::FETCH_ASSOC);
+
+                if (!$rows) return "Você ainda não definiu nenhuma meta de orçamento por categoria. Dá pra configurar em Categorias, no site.";
+
+                usort($rows, fn($a, $b) =>
+                    ((float)$b['Gasto'] / max((float)$b['ValorMeta'], 0.01)) <=> ((float)$a['Gasto'] / max((float)$a['ValorMeta'], 0.01))
+                );
+
+                $linhas = array_map(function ($r) {
+                    $meta  = (float)$r['ValorMeta'];
+                    $gasto = (float)$r['Gasto'];
+                    $pct   = $meta > 0 ? ($gasto / $meta) * 100 : 0;
+                    $emoji = $pct >= 100 ? '🔴' : ($pct >= 80 ? '🟡' : '🟢');
+                    return "{$emoji} *{$r['NomeCategoria']}*: R$ " . number_format($gasto, 2, ',', '.') .
+                           " de R$ " . number_format($meta, 2, ',', '.') . " (" . number_format($pct, 0) . "%)";
+                }, $rows);
+
+                return "Metas de orçamento {$label}:\n\n" . implode("\n", $linhas);
+
             default: // gastos
                 $tipoQuery = $tipoReg ?? 'despesa';
                 $stmt = $pdo->prepare("
@@ -1194,10 +1423,6 @@ function _waCancelar(PDO $pdo, string $uid): string
     }
 }
 
-// Número do dono do Auralis — recebe o aviso quando a IA identifica que a situação
-// precisa de um humano de verdade (reclamação, pedido explícito de suporte etc.).
-const WA_SUPORTE_TELEFONE = '5517996660665';
-
 function _waEscalarSuporte(PDO $pdo, string $uid, array $acao, array $usuario, string $telefoneCliente): string
 {
     $motivo = trim($acao['motivo'] ?? 'Sem detalhes — a IA sinalizou que precisa de ajuda humana.');
@@ -1224,13 +1449,24 @@ function _waEscalarSuporte(PDO $pdo, string $uid, array $acao, array $usuario, s
                "Cliente: *{$usuario['Nome']}*\n" .
                "WhatsApp: {$telefoneCliente}\n\n" .
                "Situação: {$motivo}";
+    // Mesmo número/config usada pelos outros avisos de admin (novo usuário, nova venda) —
+    // um só lugar (ConfiguracaoSistema.telefone_admin_notificacoes) controla pra onde TODO
+    // aviso de admin vai, em vez de números hardcoded separados podendo divergir sem ninguém notar.
+    $numeroAdmin = function_exists('telefoneAdminNotificacoes') ? telefoneAdminNotificacoes($pdo) : '5517996660665';
+
     // Isolado num try/catch próprio: mesmo se o envio pro dono falhar por algum motivo,
     // o cliente ainda tem que receber a resposta tranquilizando ele — isso não pode
-    // derrubar a função inteira.
+    // derrubar a função inteira. Loga a falha pra dar pra investigar depois (cPanel > Error
+    // Log) em vez de ficar um "sumiço" silencioso sem nenhuma pista do que aconteceu.
     $okEnvio = false;
     try {
-        $okEnvio = enviarWhatsAppNotificacao(WA_SUPORTE_TELEFONE, $msgDono);
-    } catch (Throwable $e) {}
+        $okEnvio = enviarWhatsAppNotificacao($numeroAdmin, $msgDono);
+        if (!$okEnvio) {
+            error_log("[Auralis WA] Falha ao enviar alerta de suporte pro admin ({$numeroAdmin}) — cliente {$usuario['Nome']} ({$telefoneCliente}).");
+        }
+    } catch (Throwable $e) {
+        error_log("[Auralis WA] Exceção ao enviar alerta de suporte: " . $e->getMessage());
+    }
 
     // Só grava o cooldown se o envio realmente saiu — se falhou, mais vale deixar a
     // próxima tentativa (dessa mesma pessoa ou outra) tentar de novo do que travar 15min
