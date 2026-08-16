@@ -68,6 +68,9 @@ foreach ($candidatos as $u) {
         try {
             $stmtIns->execute([':ts' => $agora, ':uid' => $u['IDUsuario']]);
         } catch (PDOException $e) {}
+        if (function_exists('registrarMensagemWaSistema')) {
+            registrarMensagemWaSistema($pdo, $u['IDUsuario'], $mensagem);
+        }
         $enviados++;
     }
 }

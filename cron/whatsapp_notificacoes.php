@@ -123,6 +123,12 @@ foreach ($grupos as $grupo) {
     $ok = enviarWhatsAppNotificacao($telefone, $mensagem);
 
     if ($ok) {
+        // Sem isso, a IA nunca "vê" esse lembrete — se a pessoa responder perguntando
+        // sobre uma conta que só apareceu aqui, a IA não tinha contexto nenhum pra saber
+        // do que se tratava, mesmo o aviso estando na mesma conversa de WhatsApp.
+        if (function_exists('registrarMensagemWaSistema')) {
+            registrarMensagemWaSistema($pdo, $itens[0]['FKUsuario'], $mensagem);
+        }
         $enviados++;
     } else {
         // Envio falhou depois de já reivindicado — libera pra tentar de novo no cron seguinte
