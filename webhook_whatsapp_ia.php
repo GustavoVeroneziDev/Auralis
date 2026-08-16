@@ -22,11 +22,18 @@ $payload = json_decode($raw, true);
 
 if (!$payload || ($payload['event'] ?? '') !== 'messages.upsert') exit;
 
-$data = $payload['data'] ?? [];
-
-if ($data['key']['fromMe'] ?? false) exit;
+$data      = $payload['data'] ?? [];
 $remoteJid = $data['key']['remoteJid'] ?? '';
 if (str_contains($remoteJid, '@g.us')) exit;
+
+// Mensagem enviada pelo próprio número da empresa — dispara tanto quando é a IA
+// respondendo via API quanto quando um admin digita direto no WhatsApp Business. Delega
+// pra função que sabe diferenciar os dois (ver comentário nela) e pausar a IA se for
+// intervenção manual de verdade.
+if ($data['key']['fromMe'] ?? false) {
+    _waTratarMensagemFromMe($pdo, $remoteJid);
+    exit;
+}
 
 // ── 2. Identifica usuário ─────────────────────────────────────────────────────
 
@@ -48,6 +55,26 @@ $uid     = $usuario['IDUsuario'];
 $msgType = $data['messageType'] ?? 'conversation';
 
 _waGarantirTabela($pdo);
+
+// ── 2.05 IA pausada por intervenção manual do admin ───────────────────────────────
+// Se um admin assumiu essa conversa recentemente (ver _waTratarMensagemFromMe abaixo),
+// a IA fica quieta até o prazo expirar — evita ela responder "por cima" de quem já tá
+// sendo atendido de verdade por uma pessoa.
+try {
+    $stmtPause = $pdo->prepare("SELECT Valor FROM ConfiguracaoSistema WHERE Chave = 'wa_pausado_ate' AND FKUsuario = :uid");
+    $stmtPause->execute([':uid' => $uid]);
+    $pausadoAte = $stmtPause->fetchColumn();
+    if ($pausadoAte && strtotime($pausadoAte) > time()) {
+        // Ainda registra o que a pessoa mandou (contexto pro humano ver e pra própria IA
+        // quando retomar depois), só não responde nada.
+        $textoPausa = $data['message']['conversation'] ?? $data['message']['extendedTextMessage']['text'] ?? '[mídia]';
+        try {
+            $pdo->prepare("INSERT INTO MensagemWA (IDMensagem, FKUsuario, Role, Conteudo) VALUES (:id, :uid, 'user', :msg)")
+                ->execute([':id' => gerarUuid(), ':uid' => $uid, ':msg' => mb_substr($textoPausa, 0, 2000)]);
+        } catch (Throwable $e) {}
+        exit;
+    }
+} catch (Throwable $e) {}
 
 // ── 2.1 Extrai conteúdo ────────────────────────────────────────────────────────
 // Precisa vir antes da restrição de plano: o comando de "parar de mandar lembrete"
@@ -1581,6 +1608,51 @@ function _waGarantirTabela(PDO $pdo): void
                 KEY idx_usuario_data (FKUsuario, CriadoEm)
             ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
         ");
+    } catch (Throwable $e) {}
+}
+
+// Mensagem enviada pelo próprio número da empresa (fromMe=true) — dispara tanto quando é
+// a IA/um cron respondendo via API quanto quando um admin digita direto no app do
+// WhatsApp Business. Sem diferenciar os dois, qualquer resposta da própria IA se
+// autopausaria pra sempre (ela ia "ver" o próprio eco e achar que foi um humano). A pista
+// que já existe pra separar: toda resposta da IA e todo aviso automático de cron já grava
+// uma linha Role='model' em MensagemWA na hora que é enviada (ver _waSaveHistory e
+// registrarMensagemWaSistema) — se não tem nenhuma bem recente pra esse cliente, foi um
+// humano de verdade digitando.
+function _waTratarMensagemFromMe(PDO $pdo, string $remoteJid): void
+{
+    $telefone = preg_replace('/\D/', '', explode('@', $remoteJid)[0]);
+    if (strlen($telefone) < 10) return;
+
+    try {
+        $stmtU = $pdo->prepare("SELECT IDUsuario FROM Usuario WHERE Telefone = :tel AND StatusConta = 'ativo' LIMIT 1");
+        $stmtU->execute([':tel' => $telefone]);
+        $uid = $stmtU->fetchColumn();
+        if (!$uid) return;
+
+        _waGarantirTabela($pdo);
+
+        $stmtRecente = $pdo->prepare("
+            SELECT COUNT(*) FROM MensagemWA
+            WHERE FKUsuario = :uid AND Role = 'model' AND CriadoEm > DATE_SUB(NOW(), INTERVAL 15 SECOND)
+        ");
+        $stmtRecente->execute([':uid' => $uid]);
+        if ((int)$stmtRecente->fetchColumn() > 0) return; // eco da própria IA/cron, ignora
+
+        // Humano de verdade assumiu a conversa — pausa a IA pra esse cliente. Cada nova
+        // mensagem manual "renova" o prazo (check-then-insert-or-update, mesmo padrão do
+        // resto do arquivo — ConfiguracaoSistema não tem UNIQUE KEY em Chave+FKUsuario),
+        // então ela só volta a responder depois de um tempo sem nenhuma intervenção manual.
+        $ate = date('Y-m-d H:i:s', strtotime('+2 hours'));
+        $stmtChk = $pdo->prepare("SELECT COUNT(*) FROM ConfiguracaoSistema WHERE Chave = 'wa_pausado_ate' AND FKUsuario = :uid");
+        $stmtChk->execute([':uid' => $uid]);
+        if ($stmtChk->fetchColumn() > 0) {
+            $pdo->prepare("UPDATE ConfiguracaoSistema SET Valor = :ate WHERE Chave = 'wa_pausado_ate' AND FKUsuario = :uid")
+                ->execute([':ate' => $ate, ':uid' => $uid]);
+        } else {
+            $pdo->prepare("INSERT INTO ConfiguracaoSistema (Chave, Valor, FKUsuario) VALUES ('wa_pausado_ate', :ate, :uid)")
+                ->execute([':ate' => $ate, ':uid' => $uid]);
+        }
     } catch (Throwable $e) {}
 }
 
