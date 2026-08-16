@@ -337,7 +337,7 @@ REGRAS DE COMPORTAMENTO — siga sem exceção:
 3. Se a mensagem for ambígua ou você não tiver certeza do que a pessoa quer, use action "clarificar" — não tente adivinhar e errar. Isso vale especialmente pra "registrar": se o parcelamento tem datas ou valores que não são regulares (ex: "metade agora, metade só no mês que vem em outro dia"; parcelas de valores diferentes sem explicação de por quê), NÃO tente forçar num parcelamento padrão — pergunte primeiro, ou registre normal e explique que dá pra ajustar depois com "editar".
 4. Uma reação casual ("kkk", "valeu", "tá bom") merece uma resposta casual curta. Não repita dados financeiros que já foram mostrados logo antes.
 5. Nunca invente dados. Se não tiver a informação no contexto e precisar de DB, use "consultar".
-6. Múltiplas intenções na mesma mensagem → use "acoes" array. Leia a mensagem inteira antes de responder: "paguei a luz e recebi o freela de ontem" são 2 registros; "marca a academia como paga e muda o valor do aluguel pra 900" são 1 efetivar + 1 editar; "quanto gastei em mercado esse mês e quanto ainda falta pagar" são 2 consultas (tipo "gastos" + tipo "pendentes"). Cada pedido distinto na mensagem vira um item em "acoes" — nunca resolva só o primeiro e ignore o resto.
+6. Múltiplas intenções na mesma mensagem → use "acoes" array. Leia a mensagem inteira antes de responder: "paguei a luz e recebi o freela de ontem" são 2 registros; "marca a academia como paga e muda o valor do aluguel pra 900" são 1 efetivar + 1 editar; "quanto gastei em mercado esse mês e quanto ainda falta pagar" são 2 consultas (tipo "gastos" + tipo "pendentes"). Cada pedido distinto na mensagem vira um item em "acoes" — nunca resolva só o primeiro e ignore o resto. ATENÇÃO especial quando período OU tipo (receita/despesa) MUDA entre os pedidos na mesma frase — cada combinação diferente de período+tipo é uma consulta própria, nunca uma só: "gastos dessa semana e o que tenho pra receber esse mês" é 2 consultas SEPARADAS (despesa/semana + receita/mês), NUNCA uma consulta só de "pendentes do mês" — isso perde o recorte de período que a pessoa pediu especificamente pro primeiro item.
 7. Formatação do WhatsApp no campo "resposta" (texto livre): use *negrito* pra valores/nomes importantes, _itálico_ pra observações secundárias, ~riscado~ só se fizer sentido (ex: algo cancelado), e "• " no início da linha pra listas. WhatsApp NÃO tem sublinhado — não tente simular com outra coisa, use negrito no lugar quando quiser destacar.
 8. Se {$nomeUser} tiver mais de uma carteira: quando ele mencionar uma pelo nome (ou já estiver claro pelo contexto da conversa qual carteira), responda só com os dados DAQUELA carteira — use o "Resumo do mês por carteira" abaixo pra respostas diretas, ou "id_carteira" na action "consultar" pra consultas no banco. Nunca some tudo por padrão quando uma carteira específica foi indicada. Sem menção a nenhuma carteira, aí sim vale o agregado de todas. Se perguntarem de qual carteira é um lançamento específico (ex: "de qual carteira é a conta X"), use "consultar" tipo "buscar" — não tem como saber isso pelo contexto pré-carregado.
 9. NUNCA some receita com despesa num total só — são naturezas opostas (dinheiro entrando vs saindo), um total misturado não quer dizer nada pro cliente. Ao listar pendências/gastos que incluam os dois tipos, sempre separe em dois blocos com dois totais (ex: "📉 A pagar" e "📈 A receber"), nunca um "Total" único somando tudo junto.
@@ -384,9 +384,10 @@ Regras:
 {"action":"cofrinho_criar","nome":"nome","meta":0.00}
 
 "consultar" — USE APENAS para cálculos que exigem DB: breakdown por categoria, períodos passados, totais não presentes no contexto, ou achar um lançamento específico pelo nome:
-{"action":"consultar","consulta":{"tipo":"gastos|pendentes|saldo|ultimo|buscar","periodo":"hoje|semana|mes|ano","tipo_registro":"despesa|receita|null","id_carteira":"uuid|null","termo":"nome ou parte do nome, só com tipo=buscar"}}
+{"action":"consultar","consulta":{"tipo":"gastos|pendentes|vencidas|saldo|ultimo|buscar","periodo":"hoje|semana|mes|ano","tipo_registro":"despesa|receita|null","id_carteira":"uuid|null","termo":"nome ou parte do nome, só com tipo=buscar"}}
 - "id_carteira": preencha com o id da carteira (lista de Carteiras acima) se o cliente mencionou uma específica pelo nome. Sem menção, deixe null — soma todas.
-- "buscar": ache um ou mais lançamentos pelo nome/descrição (ex: "onde tá a conta da Vivo", "de qual carteira é o lançamento teste") — retorna carteira, categoria, data e status de cada um encontrado. Use "termo" com a palavra-chave, ignore "periodo"/"tipo_registro" nesse tipo.
+- "pendentes" respeita o "periodo" pedido (o que vence NESSE período, pago ou não ainda). "vencidas" IGNORA período — é sempre "já passou da data e não foi pago", pra perguntas tipo "tem conta vencida?", "o que tá atrasado?", "alguma coisa em atraso?". NÃO use "pendentes" pra essas perguntas, o período pode não cobrir a data certa — use "vencidas" direto.
+- "buscar": ache um ou mais lançamentos pelo nome/descrição (ex: "onde tá a conta da Vivo", "de qual carteira é o lançamento teste", "vc verificou a conta X?") — retorna carteira, categoria, data e status de cada um encontrado. Use "termo" com a palavra-chave, ignore "periodo"/"tipo_registro" nesse tipo.
 
 "cancelar":
 {"action":"cancelar"}
@@ -1010,9 +1011,62 @@ function _waConsultar(PDO $pdo, string $uid, array $consulta, string $hoje): str
                 }
                 return "Pendências pra {$label}:\n\n" . implode("\n\n", $blocos);
 
+            case 'vencidas':
+                // Diferente de "pendentes" (que respeita o período pedido — mês, semana etc.),
+                // "vencidas" é sempre "já passou da data e ainda não foi pago", direto, sem
+                // depender de acertar um período que cubra a data certa. É a resposta exata
+                // pra "tem conta vencida?"/"o que tá atrasado?".
+                $stmt = $pdo->prepare("
+                    SELECT r.Descricao, r.Valor, r.TipoRegistro, r.DataVencimento, c.NomeCategoria
+                    FROM Registro r LEFT JOIN Categoria c ON c.IDCategoria = r.FKCategoria
+                    WHERE r.FKUsuario = :uid AND r.StatusRegistro = 'pendente'
+                      AND r.DataVencimento < :hoje
+                      " . ($tipoReg ? "AND r.TipoRegistro = :tipo" : "") . "
+                      " . ($carteiraId ? "AND r.FKCarteira = :carteira" : "") . "
+                    ORDER BY r.DataVencimento ASC LIMIT 20
+                ");
+                $pv = [':uid' => $uid, ':hoje' => $hoje];
+                if ($tipoReg) $pv[':tipo'] = $tipoReg;
+                if ($carteiraId) $pv[':carteira'] = $carteiraId;
+                $stmt->execute($pv);
+                $rowsV = $stmt->fetchAll(PDO::FETCH_ASSOC);
+
+                if (!$rowsV) return "Nenhuma conta vencida. ✅";
+
+                $formatarLinhaVenc = fn($r) => "• " . date('d/m', strtotime($r['DataVencimento'])) .
+                    " *{$r['Descricao']}*: R$ " . number_format($r['Valor'], 2, ',', '.') .
+                    ($r['NomeCategoria'] ? " ({$r['NomeCategoria']})" : '');
+
+                if ($tipoReg) {
+                    $totalV  = array_sum(array_column($rowsV, 'Valor'));
+                    $linhasV = array_map($formatarLinhaVenc, $rowsV);
+                    $introV  = count($rowsV) === 1 ? "Só uma conta vencida:" : count($rowsV) . " contas vencidas:";
+                    return "{$introV}\n\n" . implode("\n", $linhasV) . "\n\n💰 Total: R$ " . number_format($totalV, 2, ',', '.');
+                }
+
+                $despesasV = array_values(array_filter($rowsV, fn($r) => $r['TipoRegistro'] === 'despesa'));
+                $receitasV = array_values(array_filter($rowsV, fn($r) => $r['TipoRegistro'] === 'receita'));
+                $blocosV = [];
+                if ($despesasV) {
+                    $totalDespV = array_sum(array_column($despesasV, 'Valor'));
+                    $blocosV[] = "📉 *Vencidas a pagar* (" . count($despesasV) . "):\n" . implode("\n", array_map($formatarLinhaVenc, $despesasV)) .
+                                 "\nSubtotal: R$ " . number_format($totalDespV, 2, ',', '.');
+                }
+                if ($receitasV) {
+                    $totalRecV = array_sum(array_column($receitasV, 'Valor'));
+                    $blocosV[] = "📈 *Vencidas a receber* (" . count($receitasV) . "):\n" . implode("\n", array_map($formatarLinhaVenc, $receitasV)) .
+                                 "\nSubtotal: R$ " . number_format($totalRecV, 2, ',', '.');
+                }
+                return "Contas vencidas:\n\n" . implode("\n\n", $blocosV);
+
             case 'buscar':
                 $termo = trim($consulta['termo'] ?? '');
                 if ($termo === '') return "Preciso de um nome ou parte do nome pra buscar.";
+                // Uma conta recorrente (ex: assinatura mensal) tem várias ocorrências futuras
+                // já pré-geradas no banco — "ORDER BY MomentoRegistro DESC" pegava as mais
+                // distantes no futuro em vez da atual, que é o que a pessoa quer quando
+                // pergunta "de qual carteira é a conta X" ou "verificou a conta X?". Pendente
+                // primeiro (mais próxima/vencida primeiro), efetivado como histórico depois.
                 $stmt = $pdo->prepare("
                     SELECT r.Descricao, r.Valor, r.TipoRegistro, r.DataVencimento, r.StatusRegistro,
                            c.NomeCategoria, ca.TipoCarteira AS NomeCarteira
@@ -1020,7 +1074,11 @@ function _waConsultar(PDO $pdo, string $uid, array $consulta, string $hoje): str
                     LEFT JOIN Categoria c ON c.IDCategoria = r.FKCategoria
                     LEFT JOIN Carteira  ca ON ca.IDCarteira = r.FKCarteira
                     WHERE r.FKUsuario = :uid AND r.StatusRegistro != 'cancelado' AND r.Descricao LIKE :termo
-                    ORDER BY r.MomentoRegistro DESC LIMIT 5
+                    ORDER BY
+                        CASE WHEN r.StatusRegistro = 'pendente' THEN 0 ELSE 1 END ASC,
+                        CASE WHEN r.StatusRegistro = 'pendente' THEN r.DataVencimento END ASC,
+                        r.MomentoRegistro DESC
+                    LIMIT 5
                 ");
                 $stmt->execute([':uid' => $uid, ':termo' => '%' . $termo . '%']);
                 $rows = $stmt->fetchAll(PDO::FETCH_ASSOC);
