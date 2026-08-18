@@ -54,13 +54,16 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $faturaIdDel = $stmtFid->fetchColumn();
 
         if ($scope === 'futuras' && $grupo && $parcelaAtual > 0) {
+            // Inclui faturas "futura" (não só "aberta") — uma compra parcelada de longo prazo
+            // vive espalhada por várias faturas ainda não chegadas, e "excluir essa e as
+            // futuras" precisa alcançar todas elas, não só a fatura do ciclo atual.
             $pdo->prepare(
                 "DELETE l FROM LancamentoCartao l
                  JOIN FaturaCartao f ON l.FKFatura = f.IDFatura
                  WHERE l.GrupoParcelamento = :grupo AND l.FKUsuario = :uid AND l.FKCartao = :cid
-                   AND l.ParcelaAtual >= :parc AND f.Status = 'aberta'"
+                   AND l.ParcelaAtual >= :parc AND f.Status IN ('aberta', 'futura')"
             )->execute([':grupo' => $grupo, ':uid' => $uid, ':cid' => $cartaoId, ':parc' => $parcelaAtual]);
-            $stmtFats = $pdo->prepare("SELECT IDFatura FROM FaturaCartao WHERE FKCartao = :cid AND FKUsuario = :uid AND Status = 'aberta'");
+            $stmtFats = $pdo->prepare("SELECT IDFatura FROM FaturaCartao WHERE FKCartao = :cid AND FKUsuario = :uid AND Status IN ('aberta', 'futura')");
             $stmtFats->execute([':cid' => $cartaoId, ':uid' => $uid]);
             foreach ($stmtFats->fetchAll(PDO::FETCH_COLUMN) as $fid) {
                 cartao_sincronizarPreview($pdo, $fid, $uid, $cartao);
@@ -70,7 +73,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             $pdo->prepare(
                 "DELETE l FROM LancamentoCartao l
                  JOIN FaturaCartao f ON l.FKFatura = f.IDFatura
-                 WHERE l.IDLancamento = :lid AND l.FKUsuario = :uid AND f.Status = 'aberta'"
+                 WHERE l.IDLancamento = :lid AND l.FKUsuario = :uid AND f.Status IN ('aberta', 'futura')"
             )->execute([':lid' => $lancId, ':uid' => $uid]);
             if ($faturaIdDel) {
                 cartao_sincronizarPreview($pdo, $faturaIdDel, $uid, $cartao);
@@ -96,15 +99,16 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             $faturaIdEdit = $stmtFid->fetchColumn();
 
             if ($scope === 'futuras' && $grupo && $parcelaAtual > 0) {
+                // Mesmo motivo do excluir_lancamento acima: precisa alcançar faturas "futura".
                 $pdo->prepare(
                     "UPDATE LancamentoCartao l
                      JOIN FaturaCartao f ON l.FKFatura = f.IDFatura
                      SET l.Descricao = :desc, l.Valor = :val, l.FKCategoria = :cat
                      WHERE l.GrupoParcelamento = :grupo AND l.FKUsuario = :uid AND l.FKCartao = :cid
-                       AND l.ParcelaAtual >= :parc AND f.Status = 'aberta'"
+                       AND l.ParcelaAtual >= :parc AND f.Status IN ('aberta', 'futura')"
                 )->execute([':desc' => $desc, ':val' => $valor, ':cat' => $catId,
                             ':grupo' => $grupo, ':uid' => $uid, ':cid' => $cartaoId, ':parc' => $parcelaAtual]);
-                $stmtFats = $pdo->prepare("SELECT IDFatura FROM FaturaCartao WHERE FKCartao = :cid AND FKUsuario = :uid AND Status = 'aberta'");
+                $stmtFats = $pdo->prepare("SELECT IDFatura FROM FaturaCartao WHERE FKCartao = :cid AND FKUsuario = :uid AND Status IN ('aberta', 'futura')");
                 $stmtFats->execute([':cid' => $cartaoId, ':uid' => $uid]);
                 foreach ($stmtFats->fetchAll(PDO::FETCH_COLUMN) as $fid) {
                     cartao_sincronizarPreview($pdo, $fid, $uid, $cartao);
@@ -115,7 +119,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                     "UPDATE LancamentoCartao l
                      JOIN FaturaCartao f ON l.FKFatura = f.IDFatura
                      SET l.Descricao = :desc, l.Valor = :val, l.DataCompra = :data, l.FKCategoria = :cat
-                     WHERE l.IDLancamento = :lid AND l.FKUsuario = :uid AND f.Status = 'aberta'"
+                     WHERE l.IDLancamento = :lid AND l.FKUsuario = :uid AND f.Status IN ('aberta', 'futura')"
                 )->execute([':desc' => $desc, ':val' => $valor, ':data' => $data, ':cat' => $catId,
                             ':lid' => $lancId, ':uid' => $uid]);
                 if ($faturaIdEdit) {
@@ -130,7 +134,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $faturaId  = trim($_POST['fatura_id'] ?? '');
         $novoTotal = (float)str_replace(['.', ','], ['', '.'], trim($_POST['novo_total'] ?? ''));
         if ($faturaId && $novoTotal >= 0) {
-            $pdo->prepare("UPDATE FaturaCartao SET ValorTotal = :v WHERE IDFatura = :id AND FKUsuario = :uid AND Status != 'aberta'")
+            // Só fatura já fechada/paga tem total ajustável manualmente — "futura" (placeholder
+            // ainda não chegado) e "aberta" (ainda calculam sozinhas pela soma dos lançamentos).
+            $pdo->prepare("UPDATE FaturaCartao SET ValorTotal = :v WHERE IDFatura = :id AND FKUsuario = :uid AND Status IN ('fechada', 'paga')")
                 ->execute([':v' => $novoTotal, ':id' => $faturaId, ':uid' => $uid]);
 
             // Mantém sincronizado o lançamento que representa essa fatura na agenda —
@@ -232,10 +238,12 @@ if ($faturaAberta) {
     $lancamentosAberta = $s->fetchAll(PDO::FETCH_ASSOC);
 }
 
-// Histórico de faturas fechadas/pagas (últimas 6)
+// Histórico de faturas fechadas/pagas (últimas 6) — exclui "futura" também, senão
+// placeholders de compra recorrente/parcelada de longo prazo (com DataVencimento bem lá
+// na frente) dominavam essa lista no lugar do histórico de verdade.
 $historico = [];
 $sH = $pdo->prepare(
-    "SELECT * FROM FaturaCartao WHERE FKCartao=:cid AND FKUsuario=:uid AND Status != 'aberta'
+    "SELECT * FROM FaturaCartao WHERE FKCartao=:cid AND FKUsuario=:uid AND Status NOT IN ('aberta', 'futura')
      ORDER BY DataVencimento DESC LIMIT 6"
 );
 $sH->execute([':cid' => $cartaoId, ':uid' => $uid]);

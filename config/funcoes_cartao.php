@@ -100,22 +100,65 @@ function _cc_mesRefAdiante(string $mesRefBase, int $n): string
 // OPERAÇÕES DE FATURA
 // ─────────────────────────────────────────────────────────────────────────────
 
+// Garante que o Status da fatura aceita 'futura' — precisa existir antes de qualquer
+// INSERT usar esse valor. Mantém os 3 valores originais (aberta/fechada/paga), só
+// adiciona o novo.
+function garantirStatusFaturaFutura(PDO $pdo): void
+{
+    try {
+        $col = $pdo->query("
+            SELECT COLUMN_TYPE FROM INFORMATION_SCHEMA.COLUMNS
+            WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'FaturaCartao' AND COLUMN_NAME = 'Status'
+        ")->fetchColumn();
+        if ($col && strpos($col, 'futura') === false) {
+            $pdo->exec("ALTER TABLE FaturaCartao MODIFY COLUMN Status ENUM('futura','aberta','fechada','paga') NOT NULL DEFAULT 'aberta'");
+        }
+    } catch (Throwable $e) {
+    }
+}
+
 function cartao_criarFatura(PDO $pdo, string $cartaoId, string $uid, array $cartao, string $mesRef): array
 {
+    garantirStatusFaturaFutura($pdo);
+
+    // Só o ciclo ATUAL nasce "aberta" — qualquer mês além desse é só um contêiner
+    // pré-criado pra parcela/recorrência de longo prazo (compra em 12x, assinatura
+    // recorrente etc.) e nasce "futura". Sem essa distinção, cartao_obterFaturaAberta()
+    // (que escolhe a fatura "aberta" mais RECENTE de propósito — ver docblock dela, é o
+    // que garante que reabrir uma fatura antiga pra editar não faça essa reabertura
+    // "roubar" o lugar do ciclo atual) acabava pegando a mais distante no futuro em vez
+    // do ciclo de verdade: uma compra recorrente ou parcelada de longo prazo pré-cria até
+    // 24-48 faturas futuras, todas nascendo "aberta" — a tela mostrava "fecha daqui a
+    // 680 dias" em vez do fechamento real do mês que vem.
+    $mesAtual = _cc_mesRefAtual((int)$cartao['DiaFechamento'], (int)$cartao['DiaVencimento']);
+    $status   = ($mesRef <= $mesAtual) ? 'aberta' : 'futura';
+
     $datas = _cc_datasParaMesRef((int)$cartao['DiaFechamento'], (int)$cartao['DiaVencimento'], $mesRef);
     $id    = gerarUuid();
     $pdo->prepare(
         "INSERT IGNORE INTO FaturaCartao
              (IDFatura, FKCartao, FKUsuario, MesReferencia, DataFechamento, DataVencimento, Status, ValorTotal)
-         VALUES (:id, :cid, :uid, :mr, :fech, :venc, 'aberta', 0.00)"
+         VALUES (:id, :cid, :uid, :mr, :fech, :venc, :status, 0.00)"
     )->execute([
-        ':id'   => $id,
-        ':cid'  => $cartaoId,
-        ':uid'  => $uid,
-        ':mr'   => $mesRef,
-        ':fech' => $datas['fechamento'],
-        ':venc' => $datas['vencimento'],
+        ':id'     => $id,
+        ':cid'    => $cartaoId,
+        ':uid'    => $uid,
+        ':mr'     => $mesRef,
+        ':fech'   => $datas['fechamento'],
+        ':venc'   => $datas['vencimento'],
+        ':status' => $status,
     ]);
+
+    // Promove pra "aberta" se o mês pedido já é o ciclo atual (ou passou) e a fatura já
+    // existia como "futura" de uma pré-criação anterior — o INSERT IGNORE acima não faz
+    // nada nesse caso (já existe linha pra esse MesReferencia), então sem isso ela ficaria
+    // "futura" pra sempre mesmo depois do tempo alcançar ela.
+    if ($status === 'aberta') {
+        $pdo->prepare("
+            UPDATE FaturaCartao SET Status = 'aberta'
+            WHERE FKCartao = :cid AND FKUsuario = :uid AND MesReferencia = :mr AND Status = 'futura'
+        ")->execute([':cid' => $cartaoId, ':uid' => $uid, ':mr' => $mesRef]);
+    }
 
     $stmt = $pdo->prepare("SELECT * FROM FaturaCartao WHERE FKCartao = :cid AND FKUsuario = :uid AND MesReferencia = :mr LIMIT 1");
     $stmt->execute([':cid' => $cartaoId, ':uid' => $uid, ':mr' => $mesRef]);
@@ -168,11 +211,14 @@ function cartao_sincronizarPreview(PDO $pdo, string $faturaId, string $uid, arra
 {
     if (empty($cartao['FKCarteiraDebito'])) return;
 
-    // Tenta ler FKRegistroPreview; retorna cedo se a coluna não existir (ALTER TABLE pendente)
+    // Tenta ler FKRegistroPreview; retorna cedo se a coluna não existir (ALTER TABLE pendente).
+    // Inclui 'futura' (não só 'aberta') — senão o preview de uma compra recorrente/parcelada
+    // de longo prazo nunca sincronizava pros meses ainda não chegados, e a previsão de gasto
+    // futuro no cartão sumia da agenda/saldo projetado.
     try {
         $stmtF = $pdo->prepare(
             "SELECT IDFatura, FKRegistroPreview, DataFechamento, DataVencimento
-             FROM FaturaCartao WHERE IDFatura = :id AND FKUsuario = :uid AND Status = 'aberta'"
+             FROM FaturaCartao WHERE IDFatura = :id AND FKUsuario = :uid AND Status IN ('aberta', 'futura')"
         );
         $stmtF->execute([':id' => $faturaId, ':uid' => $uid]);
         $fatura = $stmtF->fetch(PDO::FETCH_ASSOC);
@@ -374,6 +420,26 @@ function cartao_verificarFechamentos(PDO $pdo, string $uid): void
     static $rodou = false;
     if ($rodou) return;
     $rodou = true;
+
+    // Repara faturas que nasceram "aberta" por engano antes dessa distinção existir: toda
+    // fatura pré-criada por compra recorrente/parcelada de longo prazo nascia "aberta" sem
+    // checar se o mês já tinha chegado, então cartao_obterFaturaAberta() (que escolhe a
+    // "aberta" mais recente) acabava pegando a mais distante no futuro em vez do ciclo real
+    // (ex: "fecha daqui a 680 dias"). cartao_criarFatura() já não faz mais isso daqui pra
+    // frente — isso aqui só limpa o que já ficou salvo errado antes do fix.
+    try {
+        garantirStatusFaturaFutura($pdo);
+        $stmtCards = $pdo->prepare("SELECT IDCartao, DiaFechamento, DiaVencimento FROM CartaoCredito WHERE FKUsuario = :uid AND Ativo = 1");
+        $stmtCards->execute([':uid' => $uid]);
+        $stmtDemote = $pdo->prepare("
+            UPDATE FaturaCartao SET Status = 'futura'
+            WHERE FKCartao = :cid AND FKUsuario = :uid AND Status = 'aberta' AND MesReferencia > :mesAtual
+        ");
+        foreach ($stmtCards->fetchAll(PDO::FETCH_ASSOC) as $c) {
+            $mesAtualCard = _cc_mesRefAtual((int)$c['DiaFechamento'], (int)$c['DiaVencimento']);
+            $stmtDemote->execute([':cid' => $c['IDCartao'], ':uid' => $uid, ':mesAtual' => $mesAtualCard]);
+        }
+    } catch (PDOException $e) {}
 
     try {
         // Estritamente < hoje (não <=): o dia do fechamento em si ainda pertence à fatura que
