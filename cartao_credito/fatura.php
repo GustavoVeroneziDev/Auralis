@@ -255,8 +255,37 @@ foreach ($historico as $fh) {
 
 $totalAberta = array_sum(array_column($lancamentosAberta, 'Valor'));
 
-$stmtCat = $pdo->prepare("SELECT IDCategoria, NomeCategoria, IconeCategoria FROM Categoria WHERE FKUsuario = :uid ORDER BY NomeCategoria ASC");
-$stmtCat->execute([':uid' => $uid]);
+// Categorias pro dropdown de editar lançamento — antes buscava TUDO do usuário sem
+// filtro nenhum: misturava categoria de receita (não faz sentido numa compra de cartão,
+// que é sempre despesa) E categoria pessoal + de carteira compartilhada juntas, causando
+// nome duplicado na lista quando pessoal e compartilhada tinham categoria com o mesmo nome
+// (ex: "Empréstimo" pessoal + "Empréstimo" da carteira compartilhada). Agora escopa certinho
+// pela carteira de débito do cartão, igual nova_transacao.php já faz.
+if (function_exists('garantirColunaCategoriaSistema')) garantirColunaCategoriaSistema($pdo);
+
+$_carteiraDebitoCC = $cartao['FKCarteiraDebito'] ?? null;
+$_carteiraCCCompartilhada = false;
+if ($_carteiraDebitoCC) {
+    $stmtChkCC = $pdo->prepare("SELECT Compartilhada FROM Carteira WHERE IDCarteira = :id");
+    $stmtChkCC->execute([':id' => $_carteiraDebitoCC]);
+    $_carteiraCCCompartilhada = (int)$stmtChkCC->fetchColumn() === 1;
+}
+
+if ($_carteiraDebitoCC && $_carteiraCCCompartilhada) {
+    $stmtCat = $pdo->prepare("
+        SELECT IDCategoria, NomeCategoria, IconeCategoria FROM Categoria
+        WHERE FKCarteira = :cid AND TipoCategoria = 'despesa' AND Sistema = 0
+        ORDER BY NomeCategoria ASC
+    ");
+    $stmtCat->execute([':cid' => $_carteiraDebitoCC]);
+} else {
+    $stmtCat = $pdo->prepare("
+        SELECT IDCategoria, NomeCategoria, IconeCategoria FROM Categoria
+        WHERE FKUsuario = :uid AND TipoCategoria = 'despesa' AND FKCarteira IS NULL AND Sistema = 0
+        ORDER BY NomeCategoria ASC
+    ");
+    $stmtCat->execute([':uid' => $uid]);
+}
 $categorias = $stmtCat->fetchAll(PDO::FETCH_ASSOC);
 
 $bandeiras = ['visa'=>'Visa','mastercard'=>'Mastercard','elo'=>'Elo','amex'=>'Amex','hipercard'=>'Hipercard','outro'=>'Outro'];

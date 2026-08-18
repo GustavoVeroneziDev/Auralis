@@ -440,6 +440,44 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                     ]);
                 }
 
+                // ── PROPAGAÇÃO DO DIA DE VENCIMENTO (FUTUROS) ────────────────
+                // O dia de vencimento agora pode ser editado mesmo numa recorrência já
+                // existente (antes ficava travado no form, sem nenhuma forma de corrigir um
+                // dia errado). Como "editar_futuros" acima só atualiza Valor/Descricao/
+                // Carteira/Categoria, sem isso o dia novo valeria só pro registro atual —
+                // as ocorrências futuras já geradas continuariam com o dia antigo. Reclampa
+                // a data de cada uma pro dia novo, preservando o mês/ano de cada uma (mesma
+                // regra de fim de mês do motor de recorrência, só que sem avançar mês).
+                if (isset($_POST['editar_futuros']) && $grupoAtual && $tipoRecorrencia === 'meses' && $diaVencimento) {
+                    $stmtFuturasData = $pdo->prepare("
+                        SELECT IDRegistro, DataVencimento FROM Registro
+                        WHERE GrupoParcela = :grupo
+                          AND (FKUsuario = :usuario OR FKCarteira IN (SELECT IDCarteira FROM Carteira WHERE FKUsuarioDono = :usuario2))
+                          AND IDRegistro != :id_editar
+                          AND MomentoRegistro > :data_base
+                          AND StatusRegistro = 'pendente'
+                          AND TotalParcelas IS NULL
+                    ");
+                    $stmtFuturasData->execute([
+                        ':grupo'     => $grupoAtual,
+                        ':usuario'   => $usuario_id,
+                        ':usuario2'  => $usuario_id,
+                        ':id_editar' => $_POST['id_editar'],
+                        ':data_base' => $dataAtual,
+                    ]);
+                    $stmtAtualizaDia = $pdo->prepare("UPDATE Registro SET DataVencimento = :nova WHERE IDRegistro = :id");
+                    foreach ($stmtFuturasData->fetchAll(PDO::FETCH_ASSOC) as $_rowFut) {
+                        $_anoFut       = (int)date('Y', strtotime($_rowFut['DataVencimento']));
+                        $_mesFut       = (int)date('m', strtotime($_rowFut['DataVencimento']));
+                        $_ultimoDiaFut = (int)date('t', strtotime(sprintf('%04d-%02d-01', $_anoFut, $_mesFut)));
+                        $_diaClampFut  = min($diaVencimento, $_ultimoDiaFut);
+                        $stmtAtualizaDia->execute([
+                            ':nova' => sprintf('%04d-%02d-%02d', $_anoFut, $_mesFut, $_diaClampFut),
+                            ':id'   => $_rowFut['IDRegistro'],
+                        ]);
+                    }
+                }
+
                 // ── PROPAGAÇÃO PARCELADO (PRÓXIMAS PARCELAS PENDENTES) ───────
                 $parcelaAtualEdit = $transacao_edit['ParcelaAtual'] ?? null;
                 if (($_POST['editar_parcelas'] ?? 'apenas') === 'proximas'
@@ -1073,8 +1111,7 @@ require_once 'geral/header.php';
                                                                 class="form-control bg-dark border-border-color text-light-analysis form-control-sm no-spinners fs-7"
                                                                 style="max-width:100px;"
                                                                 min="1" max="31" placeholder="Ex: 10"
-                                                                value="<?= htmlspecialchars($val_dia) ?>"
-                                                                <?= $is_recorrente ? 'readonly' : '' ?>>
+                                                                value="<?= htmlspecialchars($val_dia) ?>">
                                                         </div>
                                                         <div id="texto_ancora_recorrencia" class="text-secondary mt-2" style="font-size:0.72rem;display:<?= $val_tipo_rec === 'meses' ? 'none' : 'block' ?>;">
                                                             Repete a partir da própria data deste lançamento.
