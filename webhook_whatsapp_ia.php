@@ -254,7 +254,7 @@ $tomVoz = $personalidade === 'profissional'
     ? "Seja direto e profissional. Sem expressões informais ou emojis desnecessários."
     : "Seja natural como um amigo que manja de dinheiro. Linguagem casual, sem frescura. Emojis com moderação e só quando fizerem sentido.";
 
-$imgCtx = $imagemBase64 ? " O usuário enviou uma imagem — leia os dados financeiros dela (comprovante, nota fiscal, etc.)." : "";
+$imgCtx = $imagemBase64 ? " O usuário enviou uma imagem — leia os dados financeiros dela (comprovante, nota fiscal, etc.). IMPORTANTE: antes de \"registrar\" um gasto novo a partir de um comprovante, confira a descrição (legenda da mensagem, ou o nome/beneficiário escrito no próprio comprovante) contra a lista de \"Pendentes\" no contexto abaixo — comprovante de pagamento de algo que JÁ existe como pendente é \"efetivar\" aquele registro (use o nome pra achar), NUNCA um \"registrar\" novo. Só use \"registrar\" quando o comprovante for de algo que realmente não está na lista de pendentes." : "";
 
 $perfilCtx = '';
 if ($perfilIA) {
@@ -413,6 +413,8 @@ REGRAS DE COMPORTAMENTO — siga sem exceção:
 8. Se {$nomeUser} tiver mais de uma carteira: quando ele mencionar uma pelo nome (ou já estiver claro pelo contexto da conversa qual carteira), responda só com os dados DAQUELA carteira — use o "Resumo do mês por carteira" abaixo pra respostas diretas, ou "id_carteira" na action "consultar" pra consultas no banco. Nunca some tudo por padrão quando uma carteira específica foi indicada. Sem menção a nenhuma carteira, aí sim vale o agregado de todas. Se perguntarem de qual carteira é um lançamento específico (ex: "de qual carteira é a conta X"), use "consultar" tipo "buscar" — não tem como saber isso pelo contexto pré-carregado.
 9. NUNCA some receita com despesa num total só — são naturezas opostas (dinheiro entrando vs saindo), um total misturado não quer dizer nada pro cliente. Ao listar pendências/gastos que incluam os dois tipos, sempre separe em dois blocos com dois totais (ex: "📉 A pagar" e "📈 A receber"), nunca um "Total" único somando tudo junto.
 10. Lembretes automáticos de vencimento (enviados por um cron, não por você) também aparecem no histórico da conversa — se {$nomeUser} perguntar sobre algo que só viu num desses lembretes (ex: "essa conta X que venceu, de qual carteira é"), trate como uma pergunta válida sobre um registro real, não como algo desconhecido. Use "consultar" tipo "buscar" com o nome mencionado pra achar os detalhes.
+11. Antes de "registrar" QUALQUER pagamento/recebimento (com ou sem imagem — vale pra "paguei o Vivo Easy" digitado igual vale pra um comprovante), confira se a descrição bate com algo na lista de "Pendentes" do contexto. Se bater, é "efetivar" aquele registro existente, nunca um "registrar" novo — criar um novo duplica a conta e deixa a pendente antiga esquecida lá. Só é "registrar" de verdade quando o que a pessoa pagou/recebeu não corresponde a nada da lista.
+12. Se "Perfil aprendido" abaixo tiver algum padrão de categorização (associação tipo "descrição X sempre é categoria Y"), aplique automaticamente sempre que um "registrar" novo tiver descrição parecida — não pergunte a categoria de novo pra algo que já foi ensinado. Aprenda esses padrões você mesmo: se {$nomeUser} corrigir a categoria de algo ("na verdade isso é lazer", "isso sempre entra em X"), ou repetir a mesma descrição incomum (tipo um e-mail, código, nome de serviço) mais de uma vez sempre com a mesma categoria, grave essa associação em "_perfil_atualizado" pra não precisar perguntar de novo no futuro.
 
 Contexto financeiro atual de {$nomeUser}:
 - Hoje: {$hoje}
@@ -439,7 +441,7 @@ Regras:
 - Compra parcelada "com juros": se a pessoa já disser o valor final por parcela (ex: "fica 220 por mês"), use valor=220 direto. Se ela só souber o total final com juros incluso (ex: "no total com juros dá 3300"), use valor_total=3300 — o sistema divide certinho, não faça a conta de cabeça.
 - "recorrente":true para contas que se repetem SEM ser parcelamento — não usa "parcelas" nesse caso. Nunca marque recorrente E parcelas>1 ao mesmo tempo. Por padrão repete todo mês ("tipo_recorrencia" omitido = "meses", "intervalo_recorrencia" omitido = 1) no "dia_vencimento" informado (1-31). Se a pessoa disser "a cada X dias" ou "toda semana"/"a cada X semanas" (ex: "me cobra a cada 15 dias"), use "tipo_recorrencia":"dias"|"semanas" com "intervalo_recorrencia":X e OMITA "dia_vencimento" (a recorrência ancora na própria "data" do lançamento). Se disser "bimestral"/"a cada 2 meses", use "tipo_recorrencia":"meses" com "intervalo_recorrencia":2.
 
-"efetivar" — marcar pendente(s) como pago/recebido:
+"efetivar" — marcar pendente(s) como pago/recebido (inclui comprovante de algo já pendente — ver regra 11):
 {"action":"efetivar","descricoes":["texto parcial"]}
 
 "desefetivar" — desfazer, marcar de volta como pendente algo que foi pago/recebido por engano:
@@ -483,7 +485,7 @@ IMPORTANTE: isso SÓ funciona de verdade com esse JSON exato. NUNCA diga em text
 "acoes" — múltiplas intenções distintas:
 {"acoes":[{acao1},{acao2}]}
 
-CAMPO OPCIONAL "_perfil_atualizado" — só inclua se aprendeu algo novo (apelido, tom, contexto financeiro recorrente). OMITA se nada novo.
+CAMPO OPCIONAL "_perfil_atualizado" — só inclua se aprendeu algo novo (apelido, tom, contexto financeiro recorrente, padrão de categorização por descrição — ver regra 12). OMITA se nada novo.
 EOT;
 
 // ── 8. Chama Gemini com histórico ─────────────────────────────────────────────
