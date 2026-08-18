@@ -526,7 +526,23 @@ function abrirModalExcluir(id, nome) {
     document.getElementById('excluir_cartao_nome').textContent = nome;
 }
 
+// Corrige em tempo real qualquer valor fora do min/max do próprio campo (negativo, fora
+// de faixa etc.) — validação real continua no servidor, isso aqui só evita a pessoa ver
+// ou enviar um número ilógico na tela.
+function _clampNumInput(el) {
+    if (el.value === '') return;
+    let v = parseInt(el.value, 10);
+    const min = el.min !== '' ? parseInt(el.min, 10) : null;
+    const max = el.max !== '' ? parseInt(el.max, 10) : null;
+    if (isNaN(v)) v = min ?? 0;
+    if (min !== null && v < min) v = min;
+    if (max !== null && v > max) v = max;
+    el.value = v;
+}
+
 function validarDiasCartao() {
+    _clampNumInput(document.getElementById('mc_fech'));
+    _clampNumInput(document.getElementById('mc_venc'));
     const fech  = parseInt(document.getElementById('mc_fech').value, 10);
     const venc  = parseInt(document.getElementById('mc_venc').value, 10);
     const aviso = document.getElementById('mc_aviso_datas');

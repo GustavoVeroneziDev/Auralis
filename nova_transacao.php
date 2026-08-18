@@ -905,13 +905,15 @@ require_once 'geral/header.php';
                                                 <div class="d-flex align-items-center gap-3 mb-3">
                                                     <input type="number" name="num_parcelas_cc" id="num_parcelas_cc"
                                                         class="form-control bg-dark border-border-color text-light-analysis form-control-sm no-spinners fs-7"
-                                                        style="max-width:100px;" min="2" max="48" placeholder="Ex: 3" value="2">
+                                                        style="max-width:100px;" min="2" max="48" placeholder="Ex: 3" value="2"
+                                                        oninput="_clampNumInput(this)">
                                                     <div id="preview_parc_cc" class="fs-7"></div>
                                                 </div>
                                                 <label class="form-label text-secondary-analysis fs-7 mb-1">Essa compra já vem de antes? Em qual parcela você está começando?</label>
                                                 <input type="number" name="parcela_inicial_cc" id="parcela_inicial_cc"
                                                     class="form-control bg-dark border-border-color text-light-analysis form-control-sm no-spinners fs-7"
-                                                    style="max-width:100px;" min="1" max="48" placeholder="1" value="1">
+                                                    style="max-width:100px;" min="1" max="48" placeholder="1" value="1"
+                                                    oninput="_clampNumInput(this)">
                                                 <div class="text-secondary mt-1" style="font-size:0.7rem;">
                                                     <i class="bi bi-info-circle me-1"></i>Deixe 1 se a compra é nova. Se já vinha de antes (ex: comprou em 6x mas só começou a usar o Auralis na 4ª), informe a parcela atual — só as parcelas futuras serão lançadas.
                                                 </div>
@@ -1088,6 +1090,7 @@ require_once 'geral/header.php';
                                                                 style="max-width:80px;"
                                                                 min="1" max="365"
                                                                 value="<?= htmlspecialchars($val_intervalo_rec) ?>"
+                                                                oninput="_clampNumInput(this)"
                                                                 <?= $is_recorrente ? 'readonly' : '' ?>>
                                                             <select name="tipo_recorrencia" id="tipo_recorrencia"
                                                                 class="form-select bg-dark border-border-color text-light-analysis form-control-sm fs-7"
@@ -1111,7 +1114,8 @@ require_once 'geral/header.php';
                                                                 class="form-control bg-dark border-border-color text-light-analysis form-control-sm no-spinners fs-7"
                                                                 style="max-width:100px;"
                                                                 min="1" max="31" placeholder="Ex: 10"
-                                                                value="<?= htmlspecialchars($val_dia) ?>">
+                                                                value="<?= htmlspecialchars($val_dia) ?>"
+                                                                oninput="_clampNumInput(this)">
                                                         </div>
                                                         <div id="texto_ancora_recorrencia" class="text-secondary mt-2" style="font-size:0.72rem;display:<?= $val_tipo_rec === 'meses' ? 'none' : 'block' ?>;">
                                                             Repete a partir da própria data deste lançamento.
@@ -1150,7 +1154,8 @@ require_once 'geral/header.php';
                                                             <input type="number" name="num_parcelas" id="num_parcelas"
                                                                 class="form-control bg-dark border-border-color text-light-analysis form-control-sm no-spinners fs-7"
                                                                 style="max-width:100px;" min="2" max="48" placeholder="Ex: 3"
-                                                                value="<?= htmlspecialchars($val_num_parc) ?>">
+                                                                value="<?= htmlspecialchars($val_num_parc) ?>"
+                                                                oninput="_clampNumInput(this)">
                                                             <div id="preview_parcela" class="fs-7"></div>
                                                         </div>
 
@@ -1158,7 +1163,8 @@ require_once 'geral/header.php';
                                                         <input type="number" name="parcela_inicial" id="parcela_inicial"
                                                             class="form-control bg-dark border-border-color text-light-analysis form-control-sm no-spinners fs-7"
                                                             style="max-width:100px;" min="1" max="48" placeholder="1"
-                                                            value="<?= htmlspecialchars($val_parc_ini) ?>">
+                                                            value="<?= htmlspecialchars($val_parc_ini) ?>"
+                                                            oninput="_clampNumInput(this)">
                                                         <div class="text-secondary mt-1 mb-3" style="font-size:0.7rem;">
                                                             <i class="bi bi-info-circle me-1"></i>Deixe 1 se é nova. Se já vinha de antes, informe em qual parcela você está — só as parcelas futuras serão lançadas.
                                                         </div>
@@ -1528,6 +1534,22 @@ require_once 'geral/header.php';
 </style>
 
 <script>
+    // Corrige em tempo real qualquer valor fora do min/max do próprio campo (negativo,
+    // fora de faixa, etc.) — o form usa novalidate (validação HTML5 nativa não roda),
+    // então sem isso o navegador deixava digitar/enviar qualquer número; a validação real
+    // continua no servidor, isso aqui é só pra nunca deixar a pessoa ver/enviar um valor
+    // ilógico na tela.
+    function _clampNumInput(el) {
+        if (el.value === '') return;
+        let v = parseInt(el.value, 10);
+        const min = el.min !== '' ? parseInt(el.min, 10) : null;
+        const max = el.max !== '' ? parseInt(el.max, 10) : null;
+        if (isNaN(v)) v = min ?? 0;
+        if (min !== null && v < min) v = min;
+        if (max !== null && v > max) v = max;
+        el.value = v;
+    }
+
     // ==========================================
     // 1. LÓGICA DO SWITCH DE STATUS
     // ==========================================
