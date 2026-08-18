@@ -443,12 +443,12 @@ require_once '../geral/header.php';
                     <div class="row g-2">
                         <div class="col-6">
                             <label class="form-label text-secondary small">Dia de fechamento</label>
-                            <input type="number" name="dia_fechamento" id="mc_fech" class="form-control bg-transparent text-light border-secondary" min="1" max="31" value="1" required>
+                            <input type="text" inputmode="numeric" name="dia_fechamento" id="mc_fech" class="form-control bg-transparent text-light border-secondary" min="1" max="31" value="1" required>
                             <div class="form-text text-secondary" style="font-size:0.7rem;">Entre 1 e 31</div>
                         </div>
                         <div class="col-6">
                             <label class="form-label text-secondary small">Dia de vencimento</label>
-                            <input type="number" name="dia_vencimento" id="mc_venc" class="form-control bg-transparent text-light border-secondary" min="1" max="31" value="10" required>
+                            <input type="text" inputmode="numeric" name="dia_vencimento" id="mc_venc" class="form-control bg-transparent text-light border-secondary" min="1" max="31" value="10" required>
                             <div class="form-text text-secondary" style="font-size:0.7rem;">Entre 1 e 31</div>
                         </div>
                     </div>
@@ -526,15 +526,17 @@ function abrirModalExcluir(id, nome) {
     document.getElementById('excluir_cartao_nome').textContent = nome;
 }
 
-// Corrige em tempo real qualquer valor fora do min/max do próprio campo (negativo, fora
-// de faixa etc.) — validação real continua no servidor, isso aqui só evita a pessoa ver
-// ou enviar um número ilógico na tela.
+// Corrige em tempo real qualquer caractere/valor fora do min/max do próprio campo —
+// validação real continua no servidor, isso aqui só evita a pessoa ver ou enviar algo
+// ilógico na tela. Campos são type="text" (não type="number") de propósito: "number"
+// aceita digitar "e" (notação científica) e some com o .value quando o formato fica
+// inválido, sem chance de corrigir o que tá visível.
 function _clampNumInput(el) {
-    if (el.value === '') return;
-    let v = parseInt(el.value, 10);
+    const digitos = el.value.replace(/\D/g, '');
+    if (digitos === '') { el.value = ''; return; }
+    let v = parseInt(digitos, 10);
     const min = el.min !== '' ? parseInt(el.min, 10) : null;
     const max = el.max !== '' ? parseInt(el.max, 10) : null;
-    if (isNaN(v)) v = min ?? 0;
     if (min !== null && v < min) v = min;
     if (max !== null && v > max) v = max;
     el.value = v;

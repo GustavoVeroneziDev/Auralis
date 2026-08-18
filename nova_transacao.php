@@ -903,14 +903,14 @@ require_once 'geral/header.php';
                                             <div id="bloco_parc_cc" style="display:none;" class="ps-3 border-start border-border-color">
                                                 <label class="form-label text-secondary-analysis fs-7 mb-1">Em quantas vezes?</label>
                                                 <div class="d-flex align-items-center gap-3 mb-3">
-                                                    <input type="number" name="num_parcelas_cc" id="num_parcelas_cc"
+                                                    <input type="text" inputmode="numeric" name="num_parcelas_cc" id="num_parcelas_cc"
                                                         class="form-control bg-dark border-border-color text-light-analysis form-control-sm no-spinners fs-7"
                                                         style="max-width:100px;" min="2" max="48" placeholder="Ex: 3" value="2"
                                                         oninput="_clampNumInput(this)">
                                                     <div id="preview_parc_cc" class="fs-7"></div>
                                                 </div>
                                                 <label class="form-label text-secondary-analysis fs-7 mb-1">Essa compra já vem de antes? Em qual parcela você está começando?</label>
-                                                <input type="number" name="parcela_inicial_cc" id="parcela_inicial_cc"
+                                                <input type="text" inputmode="numeric" name="parcela_inicial_cc" id="parcela_inicial_cc"
                                                     class="form-control bg-dark border-border-color text-light-analysis form-control-sm no-spinners fs-7"
                                                     style="max-width:100px;" min="1" max="48" placeholder="1" value="1"
                                                     oninput="_clampNumInput(this)">
@@ -1085,7 +1085,7 @@ require_once 'geral/header.php';
                                                             repete a cada
                                                         </label>
                                                         <div class="d-flex align-items-center gap-2">
-                                                            <input type="number" name="intervalo_recorrencia" id="intervalo_recorrencia"
+                                                            <input type="text" inputmode="numeric" name="intervalo_recorrencia" id="intervalo_recorrencia"
                                                                 class="form-control bg-dark border-border-color text-light-analysis form-control-sm no-spinners fs-7"
                                                                 style="max-width:80px;"
                                                                 min="1" max="365"
@@ -1110,7 +1110,7 @@ require_once 'geral/header.php';
                                                             <label class="form-label text-secondary-analysis fs-7 mb-1">
                                                                 vence em <span class="text-light fw-semibold">qual</span> dia do mês?
                                                             </label>
-                                                            <input type="number" name="dia_vencimento" id="dia_vencimento"
+                                                            <input type="text" inputmode="numeric" name="dia_vencimento" id="dia_vencimento"
                                                                 class="form-control bg-dark border-border-color text-light-analysis form-control-sm no-spinners fs-7"
                                                                 style="max-width:100px;"
                                                                 min="1" max="31" placeholder="Ex: 10"
@@ -1151,7 +1151,7 @@ require_once 'geral/header.php';
 
                                                         <label class="form-label text-secondary-analysis fs-7 mb-1">Em quantas vezes?</label>
                                                         <div class="d-flex align-items-center gap-3 mb-3">
-                                                            <input type="number" name="num_parcelas" id="num_parcelas"
+                                                            <input type="text" inputmode="numeric" name="num_parcelas" id="num_parcelas"
                                                                 class="form-control bg-dark border-border-color text-light-analysis form-control-sm no-spinners fs-7"
                                                                 style="max-width:100px;" min="2" max="48" placeholder="Ex: 3"
                                                                 value="<?= htmlspecialchars($val_num_parc) ?>"
@@ -1160,7 +1160,7 @@ require_once 'geral/header.php';
                                                         </div>
 
                                                         <label class="form-label text-secondary-analysis fs-7 mb-1">Já vem de antes? Em qual parcela você está começando?</label>
-                                                        <input type="number" name="parcela_inicial" id="parcela_inicial"
+                                                        <input type="text" inputmode="numeric" name="parcela_inicial" id="parcela_inicial"
                                                             class="form-control bg-dark border-border-color text-light-analysis form-control-sm no-spinners fs-7"
                                                             style="max-width:100px;" min="1" max="48" placeholder="1"
                                                             value="<?= htmlspecialchars($val_parc_ini) ?>"
@@ -1534,17 +1534,20 @@ require_once 'geral/header.php';
 </style>
 
 <script>
-    // Corrige em tempo real qualquer valor fora do min/max do próprio campo (negativo,
-    // fora de faixa, etc.) — o form usa novalidate (validação HTML5 nativa não roda),
-    // então sem isso o navegador deixava digitar/enviar qualquer número; a validação real
-    // continua no servidor, isso aqui é só pra nunca deixar a pessoa ver/enviar um valor
-    // ilógico na tela.
+    // Corrige em tempo real qualquer caractere/valor fora do min/max do próprio campo —
+    // o form usa novalidate (validação HTML5 nativa não roda), então sem isso o navegador
+    // deixava digitar/enviar qualquer coisa; a validação real continua no servidor, isso
+    // aqui é só pra nunca deixar a pessoa ver/enviar algo ilógico na tela. Campos são
+    // type="text" (não type="number") de propósito: "number" aceita digitar "e" (notação
+    // científica) e some com o .value por baixo dos panos quando o formato fica inválido,
+    // sem dar chance de corrigir o que tá visível — com texto puro, sempre dá pra ler e
+    // limpar o que a pessoa realmente digitou.
     function _clampNumInput(el) {
-        if (el.value === '') return;
-        let v = parseInt(el.value, 10);
+        const digitos = el.value.replace(/\D/g, '');
+        if (digitos === '') { el.value = ''; return; }
+        let v = parseInt(digitos, 10);
         const min = el.min !== '' ? parseInt(el.min, 10) : null;
         const max = el.max !== '' ? parseInt(el.max, 10) : null;
-        if (isNaN(v)) v = min ?? 0;
         if (min !== null && v < min) v = min;
         if (max !== null && v > max) v = max;
         el.value = v;
