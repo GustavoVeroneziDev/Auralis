@@ -389,25 +389,28 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                         TipoRegistro = :tipo, Valor = :valor, Descricao = :descricao,
                         MomentoRegistro = :momento, DataVencimento = :vencimento,
                         StatusRegistro = :status, Recorrente = :recorrente, DiaVencimento = :dia,
+                        TipoRecorrencia = :tipo_rec, IntervaloRecorrencia = :interv_rec,
                         FKCarteira = :carteira, FKCategoria = :categoria
                     WHERE IDRegistro = :id_editar
                       AND (FKUsuario = :usuario OR FKCarteira IN (SELECT IDCarteira FROM Carteira WHERE FKUsuarioDono = :usuario2))
                 ";
                 $stmt = $pdo->prepare($sql);
                 $stmt->execute([
-                    ':tipo'      => $tipoRegistro,
-                    ':valor'     => $valor,
-                    ':descricao' => $descricao,
-                    ':momento'   => $dataRegistro,
+                    ':tipo'       => $tipoRegistro,
+                    ':valor'      => $valor,
+                    ':descricao'  => $descricao,
+                    ':momento'    => $dataRegistro,
                     ':vencimento' => $dataVencimento,
-                    ':status'    => $statusRegistro,
+                    ':status'     => $statusRegistro,
                     ':recorrente' => $recorrente,
-                    ':dia'       => $diaVencimento,
-                    ':carteira'  => $carteiraId,
-                    ':categoria' => $categoriaId,
-                    ':id_editar' => $_POST['id_editar'],
-                    ':usuario'   => $usuario_id,
-                    ':usuario2'  => $usuario_id,
+                    ':dia'        => $diaVencimento,
+                    ':tipo_rec'   => $tipoRecorrencia ?? 'meses',
+                    ':interv_rec' => $intervaloRecorrencia ?? 1,
+                    ':carteira'   => $carteiraId,
+                    ':categoria'  => $categoriaId,
+                    ':id_editar'  => $_POST['id_editar'],
+                    ':usuario'    => $usuario_id,
+                    ':usuario2'   => $usuario_id,
                 ]);
 
                 // ── PROPAGAÇÃO DE EDIÇÃO (FUTUROS) ───────────────────────────
@@ -440,6 +443,76 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                     ]);
                 }
 
+                // ── MUDANÇA DE FREQUÊNCIA/INTERVALO NUMA RECORRÊNCIA JÁ EXISTENTE ─
+                // Trocar o tipo (dias/semanas/meses) ou o intervalo no meio de uma série
+                // não dá pra "consertar" reclampando as ocorrências futuras já geradas —
+                // elas foram criadas seguindo um padrão diferente do novo. Em vez disso,
+                // apaga todas as futuras pendentes da série antiga (mesmo critério do
+                // "excluir futuros" do dashboard: pendente, sem TotalParcelas, depois desse
+                // registro) e gera uma trilha nova a partir daqui com o padrão novo — sempre
+                // que a frequência/intervalo realmente mudou, independente do checkbox
+                // "editar_futuros" (que é sobre propagar valor/descrição, não sobre a cadência
+                // em si — não existe "só essa ocorrência recorre diferente das outras").
+                $tipoRecOriginal = $transacao_edit['TipoRecorrencia'] ?? 'meses';
+                $intervRecOriginal = (int)($transacao_edit['IntervaloRecorrencia'] ?? 1);
+                $frequenciaMudou = $recorrente && $grupoAtual
+                    && ($tipoRecorrencia !== $tipoRecOriginal || $intervaloRecorrencia !== $intervRecOriginal);
+
+                if ($frequenciaMudou) {
+                    $pdo->prepare("
+                        DELETE FROM Registro
+                        WHERE GrupoParcela = :grupo
+                          AND (FKUsuario = :usuario OR FKCarteira IN (SELECT IDCarteira FROM Carteira WHERE FKUsuarioDono = :usuario2))
+                          AND IDRegistro != :id_editar
+                          AND MomentoRegistro > :data_base
+                          AND StatusRegistro = 'pendente'
+                          AND TotalParcelas IS NULL
+                    ")->execute([
+                        ':grupo'     => $grupoAtual,
+                        ':usuario'   => $usuario_id,
+                        ':usuario2'  => $usuario_id,
+                        ':id_editar' => $_POST['id_editar'],
+                        ':data_base' => $dataAtual,
+                    ]);
+
+                    if (function_exists('tamanhoLoteInicialRecorrencia') && function_exists('calcularProximaOcorrenciaRecorrente')) {
+                        $qtdNovaTrilha  = tamanhoLoteInicialRecorrencia($tipoRecorrencia, $intervaloRecorrencia);
+                        $dataOcorrNova  = new DateTime($dataRegistro);
+                        $stmtOcorrNova  = $pdo->prepare("
+                            INSERT INTO Registro (
+                                IDRegistro, TipoRegistro, Valor, Descricao, MomentoRegistro, DataVencimento,
+                                StatusRegistro, Recorrente, DiaVencimento, TipoRecorrencia, IntervaloRecorrencia,
+                                RecorrenciaAtiva, FKCarteira, FKUsuario, FKCategoria, GrupoParcela
+                            ) VALUES (
+                                :id, :tipo, :valor, :desc, :momento, :venc,
+                                'pendente', 1, :dia, :tipo_rec, :interv,
+                                1, :cart, :uid, :cat, :grupo
+                            )
+                        ");
+                        // Começa em 1 (não 0): o próprio registro editado, atualizado acima
+                        // com o padrão novo, já é a primeira ocorrência da trilha nova.
+                        for ($i = 1; $i < $qtdNovaTrilha; $i++) {
+                            $dataOcorrNova = calcularProximaOcorrenciaRecorrente($dataOcorrNova, $tipoRecorrencia, $intervaloRecorrencia, $diaVencimento);
+                            $dataStrNova = $dataOcorrNova->format('Y-m-d');
+                            $stmtOcorrNova->execute([
+                                ':id'       => gerarUuid(),
+                                ':tipo'     => $tipoRegistro,
+                                ':valor'    => $valor,
+                                ':desc'     => $descricao,
+                                ':momento'  => $dataStrNova,
+                                ':venc'     => $dataStrNova,
+                                ':dia'      => $diaVencimento,
+                                ':tipo_rec' => $tipoRecorrencia,
+                                ':interv'   => $intervaloRecorrencia,
+                                ':cart'     => $carteiraId,
+                                ':uid'      => $usuario_id,
+                                ':cat'      => $categoriaId,
+                                ':grupo'    => $grupoAtual,
+                            ]);
+                        }
+                    }
+                }
+
                 // ── PROPAGAÇÃO DO DIA DE VENCIMENTO (FUTUROS) ────────────────
                 // O dia de vencimento agora pode ser editado mesmo numa recorrência já
                 // existente (antes ficava travado no form, sem nenhuma forma de corrigir um
@@ -447,8 +520,10 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 // Carteira/Categoria, sem isso o dia novo valeria só pro registro atual —
                 // as ocorrências futuras já geradas continuariam com o dia antigo. Reclampa
                 // a data de cada uma pro dia novo, preservando o mês/ano de cada uma (mesma
-                // regra de fim de mês do motor de recorrência, só que sem avançar mês).
-                if (isset($_POST['editar_futuros']) && $grupoAtual && $tipoRecorrencia === 'meses' && $diaVencimento) {
+                // regra de fim de mês do motor de recorrência, só que sem avançar mês). Só
+                // roda quando a frequência NÃO mudou — se mudou, a trilha já foi regenerada
+                // do zero acima com o dia certo em cada ocorrência nova.
+                if (!$frequenciaMudou && isset($_POST['editar_futuros']) && $grupoAtual && $tipoRecorrencia === 'meses' && $diaVencimento) {
                     $stmtFuturasData = $pdo->prepare("
                         SELECT IDRegistro, DataVencimento FROM Registro
                         WHERE GrupoParcela = :grupo
@@ -1090,20 +1165,19 @@ require_once 'geral/header.php';
                                                                 style="max-width:80px;"
                                                                 min="1" max="365"
                                                                 value="<?= htmlspecialchars($val_intervalo_rec) ?>"
-                                                                oninput="_clampNumInput(this)"
-                                                                <?= $is_recorrente ? 'readonly' : '' ?>>
+                                                                oninput="_clampNumInput(this)">
                                                             <select name="tipo_recorrencia" id="tipo_recorrencia"
                                                                 class="form-select bg-dark border-border-color text-light-analysis form-control-sm fs-7"
-                                                                style="max-width:140px;"
-                                                                <?= $is_recorrente ? 'disabled' : '' ?>>
+                                                                style="max-width:140px;">
                                                                 <option value="dias" <?= $val_tipo_rec === 'dias' ? 'selected' : '' ?>>dia(s)</option>
                                                                 <option value="semanas" <?= $val_tipo_rec === 'semanas' ? 'selected' : '' ?>>semana(s)</option>
                                                                 <option value="meses" <?= $val_tipo_rec === 'meses' ? 'selected' : '' ?>>mês(es)</option>
                                                             </select>
                                                         </div>
                                                         <?php if ($is_recorrente): ?>
-                                                            <!-- <select disabled> não envia valor no POST — replica o valor real pra não perder na edição -->
-                                                            <input type="hidden" name="tipo_recorrencia" value="<?= htmlspecialchars($val_tipo_rec) ?>">
+                                                            <div class="text-secondary mt-2" style="font-size:0.7rem;">
+                                                                <i class="bi bi-info-circle me-1"></i>Mudar a frequência ou o intervalo apaga as ocorrências futuras ainda não pagas/recebidas dessa série e gera uma trilha nova a partir de hoje, com o padrão novo.
+                                                            </div>
                                                         <?php endif; ?>
 
                                                         <div id="bloco_dia_vencimento" style="display:<?= $val_tipo_rec === 'meses' ? 'block' : 'none' ?>;" class="mt-2">
