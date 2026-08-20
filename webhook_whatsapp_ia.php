@@ -671,10 +671,19 @@ function _waRegistrar(PDO $pdo, string $uid, array $registros, array $carteiras,
         $grupoParcela = $parcelas > 1 ? gerarUuid() : null;
         $diaVenc      = null;
 
+        // calcularProximaOcorrenciaRecorrente() clampa fim de mês (dia 31 numa base +1 mês
+        // que só tem 28/30 dias) — "strtotime('+N month')" direto não clampa e estoura pro
+        // mês seguinte ao pretendido (ex: 31/01 vira 03/03, pulando fevereiro), o mesmo bug
+        // já corrigido nesse ponto no site (nova_transacao.php) e no motor de recorrência.
+        $dataBaseObj    = new DateTime($dataBase);
+        $diaAncoraParc  = (int)$dataBaseObj->format('d');
+        $dataParcelaObj = clone $dataBaseObj;
+
         for ($i = 1; $i <= $parcelas; $i++) {
-            $dataParcela = $parcelas > 1
-                ? date('Y-m-d', strtotime($dataBase . ' +' . ($i - 1) . ' month'))
-                : $dataBase;
+            if ($i > 1) {
+                $dataParcelaObj = calcularProximaOcorrenciaRecorrente($dataParcelaObj, 'meses', 1, $diaAncoraParc);
+            }
+            $dataParcela = $dataParcelaObj->format('Y-m-d');
             $valorEssaParcela = ($i === 1) ? round($valorParcela + $resto, 2) : $valorParcela;
 
             $status      = $dataParcela > $hoje ? 'pendente' : 'efetivado';
@@ -710,7 +719,8 @@ function _waRegistrar(PDO $pdo, string $uid, array $registros, array $carteiras,
 
         if ($parcelas > 1) {
             $totalFmt = 'R$ ' . number_format(($valorParcela * $parcelas) + $resto, 2, ',', '.');
-            $fimFmt   = date('d/m/Y', strtotime($dataBase . ' +' . ($parcelas - 1) . ' month'));
+            // $dataParcelaObj já está na data da última parcela gerada no loop acima.
+            $fimFmt   = $dataParcelaObj->format('d/m/Y');
             $confirmacoes[] = "{$icon} *{$descricao}*\n   {$valFmt}/mês × {$parcelas} = {$totalFmt}{$catNome} · {$cartNome}\n   📅 {$dataFmt} → {$fimFmt}\n   _Datas de cada parcela caem sempre no mesmo dia do mês seguinte — se alguma vencer em dia diferente, me fala qual parcela e a nova data que eu ajusto._";
         } else {
             $confirmacoes[] = "{$icon} *{$descricao}*: {$valFmt}{$catNome} · {$cartNome} · 📅 {$dataFmt}{$pendente}";
