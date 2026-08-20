@@ -223,6 +223,27 @@ if ($acao === 'retirar') {
         exit;
     }
 
+    // Saldo real do cofrinho, calculado a partir dos registros — nunca confiar num valor
+    // vindo do formulário. Sem isso, um POST direto com qualquer "valor" gerava uma
+    // retirada maior que o que realmente tinha guardado, fabricando saldo do nada na
+    // carteira vinculada (o depósito, mais acima nesse mesmo arquivo, já faz essa conta).
+    try {
+        $stmtSaldo = $pdo->prepare("
+            SELECT COALESCE(SUM(CASE WHEN TipoRegistro='cofrinho' THEN Valor WHEN TipoRegistro='cofrinho_retirada' THEN -Valor ELSE 0 END), 0)
+            FROM Registro WHERE FKCofrinho = :id AND FKUsuario = :uid
+        ");
+        $stmtSaldo->execute([':id' => $idCofrinho, ':uid' => $uid]);
+        $saldoAtualCof = (float)$stmtSaldo->fetchColumn();
+    } catch (PDOException $e) {
+        header("Location: {$voltar}?erro=banco");
+        exit;
+    }
+
+    if ($valor > $saldoAtualCof + 0.001) {
+        header("Location: {$voltar}?erro=saldo_insuficiente");
+        exit;
+    }
+
     try {
         $hoje = date('Y-m-d');
         $stmt = $pdo->prepare("
@@ -251,9 +272,8 @@ if ($acao === 'retirar') {
 
 // ── Reajustar saldo do cofrinho ─────────────────────────────────────────────
 if ($acao === 'reajustar') {
-    $idCofrinho   = trim($_POST['id_cofrinho'] ?? '');
-    $novoValor    = round((float) str_replace(',', '.', preg_replace('/[^\d,]/', '', $_POST['novo_valor'] ?? '0')), 2);
-    $valorAtualDB = round((float) ($_POST['valor_atual'] ?? 0), 2);
+    $idCofrinho = trim($_POST['id_cofrinho'] ?? '');
+    $novoValor  = round((float) str_replace(',', '.', preg_replace('/[^\d,]/', '', $_POST['novo_valor'] ?? '0')), 2);
 
     if (empty($idCofrinho) || $novoValor < 0) {
         header("Location: {$voltar}?erro=reajuste_invalido");
@@ -268,6 +288,16 @@ if ($acao === 'reajustar') {
             header("Location: {$voltar}?erro=cofrinho_invalido");
             exit;
         }
+
+        // Saldo atual calculado no servidor — o form manda "valor_atual" só pra UX (mostrar
+        // o campo já preenchido), nunca como fonte de verdade. Confiar nesse valor deixava
+        // fabricar saldo do nada só declarando um "valor_atual" falso mais alto que o real.
+        $stmtSaldoAj = $pdo->prepare("
+            SELECT COALESCE(SUM(CASE WHEN TipoRegistro='cofrinho' THEN Valor WHEN TipoRegistro='cofrinho_retirada' THEN -Valor ELSE 0 END), 0)
+            FROM Registro WHERE FKCofrinho = :id AND FKUsuario = :uid
+        ");
+        $stmtSaldoAj->execute([':id' => $idCofrinho, ':uid' => $uid]);
+        $valorAtualDB = round((float)$stmtSaldoAj->fetchColumn(), 2);
     } catch (PDOException $e) {
         header("Location: {$voltar}?erro=banco");
         exit;

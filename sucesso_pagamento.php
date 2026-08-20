@@ -11,7 +11,7 @@
  * Em ambos os casos, consulta a API do MP de forma ativa (saída do servidor) e ativa
  * o plano imediatamente — sem depender só do webhook.
  */
-session_start();
+require_once 'config/sessao.php';
 require_once 'config/conexao.php';
 exigirAcessoMinimo(1);
 
@@ -23,6 +23,21 @@ $preapprovalId = $_GET['preapproval_id'] ?? '';
 $status        = $_GET['status']         ?? '';
 $paymentId     = $_GET['payment_id']     ?? $_GET['collection_id'] ?? '';
 $externalRef   = $_GET['external_reference'] ?? '';
+
+// E-mail de quem está logado agora — só atualiza a SESSÃO se o pagamento confirmado pela
+// API do MP for realmente dessa mesma pessoa. mpAtivarPlano()/processarIndicacaoConversao()
+// continuam rodando pro e-mail real do pagamento (é assim que o webhook, sem sessão
+// nenhuma, também funciona) — o que muda aqui é só não aplicar o resultado de OUTRA conta
+// na sessão de quem está navegando. Sem isso, alguém logado numa conta free que completasse
+// um checkout do MP com o e-mail de outra conta Auralis (ex: e-mail de família/segunda
+// conta) via a sessão atual "herdando" o plano pago da conta que pagou de verdade.
+$emailSessaoAtual = null;
+try {
+    $stmtEmailAtual = $pdo->prepare("SELECT Email FROM Usuario WHERE IDUsuario = :uid");
+    $stmtEmailAtual->execute([':uid' => $_SESSION['usuario_id']]);
+    $emailSessaoAtual = $stmtEmailAtual->fetchColumn() ?: null;
+} catch (PDOException $e) {
+}
 
 // ── Fluxo 1: assinatura via cartão (consulta direta à API do MP) ─────────
 if ($preapprovalId && $status === 'authorized') {
@@ -41,9 +56,12 @@ if ($preapprovalId && $status === 'authorized') {
             $resultado = mpAtivarPlano($pdo, $email, $planId, $preapprovalId, $valor);
             if ($resultado) {
                 $planoAtivado = $resultado;
-                // Atualiza a sessão imediatamente — sem precisar de novo login
-                $_SESSION['plano'] = $resultado;
-                unset($_SESSION['expiracao_verificada']);
+                // Atualiza a sessão imediatamente (sem precisar de novo login) só se o
+                // pagamento confirmado for mesmo dessa conta logada — ver comentário acima.
+                if ($emailSessaoAtual !== null && strcasecmp($emailSessaoAtual, $email) === 0) {
+                    $_SESSION['plano'] = $resultado;
+                    unset($_SESSION['expiracao_verificada']);
+                }
                 // Processa comissão do revendedor ou recompensa por indicação
                 processarIndicacaoConversao($pdo, $email, (float)$valor, $resultado);
             } else {
@@ -72,8 +90,10 @@ if ($preapprovalId && $status === 'authorized') {
             $resultado = mpAtivarPlano($pdo, $email, $externalRef, "pix_{$paymentId}", $valor, $paymentId);
             if ($resultado) {
                 $planoAtivado = $resultado;
-                $_SESSION['plano'] = $resultado;
-                unset($_SESSION['expiracao_verificada']);
+                if ($emailSessaoAtual !== null && strcasecmp($emailSessaoAtual, $email) === 0) {
+                    $_SESSION['plano'] = $resultado;
+                    unset($_SESSION['expiracao_verificada']);
+                }
                 processarIndicacaoConversao($pdo, $email, (float)$valor, $resultado, $paymentId);
             } else {
                 $erro = 'plano_nao_mapeado';

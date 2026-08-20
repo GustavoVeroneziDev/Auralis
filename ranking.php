@@ -338,7 +338,7 @@ require_once 'geral/header.php';
                         <?php foreach ($ordered as $oi => $entry):
                             if (!$entry) continue;
                             $posOrig  = $oi === 0 ? 2 : ($oi === 1 ? 1 : 3);
-                            $isMe     = (int)$entry['IDUsuario'] === $uid;
+                            $isMe     = (string)$entry['IDUsuario'] === $uid;
                             $cor      = $medalColors[$oi];
                             $label    = $medalLabels[$oi];
                             $alt      = $pane['formato'] ?? 'count';
@@ -406,7 +406,7 @@ require_once 'geral/header.php';
                         <div class="rounded-4 overflow-hidden mt-4" style="border:1px solid var(--card-border-color);">
                             <?php foreach ($resto as $ri => $entry):
                                 $pos   = $ri + 4;
-                                $isMe  = (int)$entry['IDUsuario'] === $uid;
+                                $isMe  = (string)$entry['IDUsuario'] === $uid;
                                 $alt   = $pane['formato'] ?? 'count';
                                 $val   = (int)$entry['total'];
                                 $valLabel = ($alt === 'dias') ? _formatarDias($val) : number_format($val) . ' ' . ($val === 1 ? $pane['unidade'] : $pane['unidades']);

@@ -2206,6 +2206,12 @@ function logAtividadeRegistroSeCompartilhada(PDO $pdo, string $registroId, strin
         $reg = $stmt->fetch(PDO::FETCH_ASSOC);
         if (!$reg || (int)($reg['Compartilhada'] ?? 0) !== 1) return;
 
+        // Confirma que quem chamou é dono ou membro aceito dessa carteira específica —
+        // só checar "a carteira é compartilhada" deixava um estranho, mandando o ID de um
+        // registro de qualquer carteira compartilhada que ele nem participa, forjar uma
+        // linha no log de atividade dela (e essa linha inclui valor/descrição reais).
+        if (carteiraPapelDoUsuario($pdo, $reg['FKCarteira'], $usuarioId) === null) return;
+
         $detalhe = ($reg['TipoRegistro'] === 'receita' ? 'Receita' : 'Despesa')
             . ' de R$ ' . number_format((float)$reg['Valor'], 2, ',', '.') . ' — ' . $reg['Descricao'];
         logAtividadeCarteira($pdo, $reg['FKCarteira'], $usuarioId, $acao, $detalhe);
@@ -2229,8 +2235,14 @@ function podeExcluirRegistro(PDO $pdo, string $registroId, string $usuarioId): b
         $stmtCart->execute([':cid' => $carteiraId]);
         if ((int)($stmtCart->fetchColumn() ?: 0) !== 1) return true;
 
-        if (carteiraPapelDoUsuario($pdo, $carteiraId, $usuarioId) === 'dono') return true;
-        return carteiraPermiteConvidadoExcluir($pdo, $carteiraId);
+        // carteiraPermiteConvidadoExcluir() é só a flag da carteira ("convidados podem
+        // excluir?") — sem checar o papel de $usuarioId antes, um estranho que nem é
+        // membro dessa carteira compartilhada também passava, contanto que o dono tivesse
+        // ligado essa opção pra quem É convidado de verdade.
+        $papel = carteiraPapelDoUsuario($pdo, $carteiraId, $usuarioId);
+        if ($papel === 'dono') return true;
+        if ($papel === 'convidado') return carteiraPermiteConvidadoExcluir($pdo, $carteiraId);
+        return false;
     } catch (PDOException $e) {
         return true;
     }
@@ -2364,6 +2376,28 @@ if (!function_exists('sanitizarTelefone')) {
         // Valid BR numbers: 12 digits (landline) or 13 digits (mobile)
         if (strlen($digits) < 12 || strlen($digits) > 13) return null;
         return $digits;
+    }
+}
+
+// Confere se outro usuário ATIVO já está com esse telefone antes de salvar — sem isso,
+// qualquer um podia colocar o número de WhatsApp de outra pessoa na própria conta (nada
+// impedia) e, como o webhook da IA resolve "de quem é essa mensagem" só pelo telefone
+// (WHERE Telefone = :tel LIMIT 1), as mensagens/dados financeiros de quem for dono de
+// verdade daquele número passavam a cair pra dentro da conta de quem roubou o número.
+if (!function_exists('telefoneJaEmUsoPorOutro')) {
+    function telefoneJaEmUsoPorOutro(PDO $pdo, string $telefone, string $usuarioIdAtual): bool
+    {
+        try {
+            $stmt = $pdo->prepare("
+                SELECT 1 FROM Usuario
+                WHERE Telefone = :tel AND StatusConta = 'ativo' AND IDUsuario != :uid
+                LIMIT 1
+            ");
+            $stmt->execute([':tel' => $telefone, ':uid' => $usuarioIdAtual]);
+            return (bool)$stmt->fetchColumn();
+        } catch (PDOException $e) {
+            return false;
+        }
     }
 }
 

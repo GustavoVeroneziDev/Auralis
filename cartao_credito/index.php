@@ -62,12 +62,14 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                     // o Registro de preview já existente continuava com a carteira antiga
                     // até algum outro evento (novo lançamento, etc.) forçar um resync.
                     try {
+                        // Inclui 'futura' também — senão as faturas pré-criadas de uma compra
+                        // recorrente/parcelada de longo prazo ficavam com o preview apontando
+                        // pra carteira de débito antiga por meses, até cada uma ser promovida.
                         $stmtFAberta = $pdo->prepare(
-                            "SELECT IDFatura FROM FaturaCartao WHERE FKCartao = :cid AND FKUsuario = :uid AND Status = 'aberta'"
+                            "SELECT IDFatura FROM FaturaCartao WHERE FKCartao = :cid AND FKUsuario = :uid AND Status IN ('aberta', 'futura')"
                         );
                         $stmtFAberta->execute([':cid' => $id, ':uid' => $uid]);
-                        $faturaAbertaId = $stmtFAberta->fetchColumn();
-                        if ($faturaAbertaId) {
+                        foreach ($stmtFAberta->fetchAll(PDO::FETCH_COLUMN) as $faturaAbertaId) {
                             cartao_sincronizarPreview($pdo, $faturaAbertaId, $uid, ['Nome' => $nome, 'FKCarteiraDebito' => $carteiraDb]);
                         }
                     } catch (PDOException $e) {}

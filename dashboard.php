@@ -305,6 +305,15 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'])) {
         $saldo_sistema      = (float) $_POST['saldo_sistema_atual'];
         $carteira_id_ajuste = $_POST['carteira_id_ajuste'];
 
+        // Sem isso, um POST direto com o UUID de QUALQUER carteira (não só as suas)
+        // injetava um Registro de ajuste nela — o saldo é somado por FKCarteira, não por
+        // dono, então isso corrompia o saldo de outra pessoa (e vazava pros membros dela,
+        // se compartilhada). $carteiras já é só as que esse usuário pode acessar (linha 48).
+        if (!in_array($carteira_id_ajuste, array_column($carteiras, 'IDCarteira'), true)) {
+            header("Location: " . $redirectBase);
+            exit;
+        }
+
         $diferenca = $saldo_informado - $saldo_sistema;
 
         // A MÁGICA AQUI: Se for o primeiro acesso, ele SALVA o registro mesmo que o valor seja zero.

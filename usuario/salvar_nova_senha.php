@@ -12,6 +12,11 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         exit;
     }
 
+    if (mb_strlen($senha) < 6) {
+        header("Location: redefinir_senha.php?token=" . urlencode($token) . "&erro=senha_curta");
+        exit;
+    }
+
     try {
         // Verifica novamente se o token é válido e ativo
         $sql = "SELECT IDUsuario FROM Usuario WHERE TokenRecuperacao = :token AND TokenRecuperacaoExpiracao > NOW() LIMIT 1";

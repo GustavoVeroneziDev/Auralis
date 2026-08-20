@@ -45,15 +45,20 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
                 // Upload de arquivo tem prioridade sobre URL manual
                 if (!empty($_FILES['imagem_arquivo']['name'])) {
-                    $file    = $_FILES['imagem_arquivo'];
-                    $ext     = strtolower(pathinfo($file['name'], PATHINFO_EXTENSION));
-                    $allowed = ['jpg','jpeg','png','gif','svg','webp'];
-                    if (!in_array($ext, $allowed)) {
-                        throw new RuntimeException("Formato de imagem não suportado. Use: " . implode(', ', $allowed));
-                    }
+                    $file = $_FILES['imagem_arquivo'];
                     if ($file['size'] > 5 * 1024 * 1024) {
                         throw new RuntimeException("Imagem muito grande. Máximo: 5 MB.");
                     }
+                    // Detecta o tipo real pelos bytes do arquivo, nunca pela extensão que o
+                    // navegador mandou — e SVG fica de fora de propósito: é XML, pode conter
+                    // <script>, e servido do próprio domínio isso é XSS armazenado (executa se
+                    // alguém abrir a URL da imagem direto, não só dentro de uma tag <img>).
+                    $mimeParaExt = ['image/jpeg' => 'jpg', 'image/png' => 'png', 'image/gif' => 'gif', 'image/webp' => 'webp'];
+                    $mimeReal = @mime_content_type($file['tmp_name']);
+                    if (!isset($mimeParaExt[$mimeReal])) {
+                        throw new RuntimeException("Formato de imagem não suportado. Use: " . implode(', ', $mimeParaExt));
+                    }
+                    $ext = $mimeParaExt[$mimeReal];
                     $filename = $slug . '.' . $ext;
                     $destino  = $uploadDir . $filename;
                     if (!move_uploaded_file($file['tmp_name'], $destino)) {

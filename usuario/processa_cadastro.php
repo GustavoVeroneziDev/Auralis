@@ -16,6 +16,13 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         exit;
     }
 
+    // O campo no formulário já tem minlength, mas isso é só sugestão pro navegador — quem
+    // manda o POST direto (sem passar pelo form) não tinha nenhuma trava real aqui.
+    if (mb_strlen($senha) < 6) {
+        header("Location: cadastro.php?erro=senha_curta");
+        exit;
+    }
+
     if (empty($telefone)) {
         header("Location: cadastro.php?erro=telefone_obrigatorio");
         exit;
@@ -29,6 +36,14 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         
         if ($stmtCheck->fetch()) {
             header("Location: cadastro.php?erro=email_existe");
+            exit;
+        }
+
+        // Sem essa checagem, dava pra cadastrar usando o WhatsApp de outra pessoa — e a IA
+        // do WhatsApp resolve "de quem é essa mensagem" só pelo telefone, então as
+        // mensagens/dados financeiros do dono de verdade do número passavam a cair aqui.
+        if (function_exists('telefoneJaEmUsoPorOutro') && telefoneJaEmUsoPorOutro($pdo, $telefone, '')) {
+            header("Location: cadastro.php?erro=telefone_existe");
             exit;
         }
 

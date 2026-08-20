@@ -1730,13 +1730,17 @@ require_once 'geral/header.php';
                 data.arquivos.forEach(a => {
                     const isImg = a.TipoMime.startsWith('image/');
                     const url = '/comprovante/ver.php?id=' + encodeURIComponent(a.IDComprovante);
+                    // esc() só neutraliza &/</> (seguro em texto solto); "alt" é atributo,
+                    // então precisa também neutralizar aspas — senão um nome de arquivo com
+                    // " dentro escapa do atributo e injeta um atributo/evento novo na tag.
+                    const nomeSeguro = esc(a.NomeOriginal).replace(/"/g, '&quot;');
                     if (isImg) {
-                        html += `<div class="text-center"><img src="${url}" class="img-fluid rounded-3" style="max-height:380px;object-fit:contain;" alt="${a.NomeOriginal}">
-                                 <p class="text-secondary small mt-2">${a.NomeOriginal}</p></div>`;
+                        html += `<div class="text-center"><img src="${url}" class="img-fluid rounded-3" style="max-height:380px;object-fit:contain;" alt="${nomeSeguro}">
+                                 <p class="text-secondary small mt-2">${nomeSeguro}</p></div>`;
                     } else {
                         html += `<div class="d-flex align-items-center gap-3 p-3 rounded-3" style="background:var(--bg-hover);border:1px solid var(--border-color-analysis);">
                                      <i class="bi bi-file-earmark-pdf fs-2 text-danger"></i>
-                                     <div class="flex-grow-1"><p class="text-light mb-0 fw-semibold">${a.NomeOriginal}</p></div>
+                                     <div class="flex-grow-1"><p class="text-light mb-0 fw-semibold">${nomeSeguro}</p></div>
                                      <a href="${url}" target="_blank" class="btn btn-sm btn-outline-secondary rounded-pill">Abrir</a>
                                      <a href="${url}?download=1" class="btn btn-sm btn-outline-primary rounded-pill">Baixar</a>
                                  </div>`;

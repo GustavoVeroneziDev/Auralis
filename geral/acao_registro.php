@@ -41,9 +41,12 @@ $_detalheLogAR = ($reg['TipoRegistro'] === 'receita' ? 'Receita' : 'Despesa')
 
 // Dono pode restringir convidados de excluir livremente (Permissões, na página de
 // administrar carteira) — quem não é dono da carteira compartilhada fica bloqueado aqui.
-if ($acao === 'excluir' && $_carteiraLogAR && carteiraPapelDoUsuario($pdo, $_carteiraLogAR, $uid) !== 'dono' && !carteiraPermiteConvidadoExcluir($pdo, $_carteiraLogAR)) {
+// "transferir" entra na mesma trava: tirar o registro da carteira compartilhada pra uma
+// carteira própria tem o mesmo efeito prático de excluir (some da visão do dono), então
+// sem essa mesma checagem dava pra contornar a restrição de excluir só trocando de ação.
+if (($acao === 'excluir' || $acao === 'transferir') && $_carteiraLogAR && carteiraPapelDoUsuario($pdo, $_carteiraLogAR, $uid) !== 'dono' && !carteiraPermiteConvidadoExcluir($pdo, $_carteiraLogAR)) {
     http_response_code(403);
-    echo json_encode(['ok' => false, 'erro' => 'sem permissao para excluir nessa carteira']);
+    echo json_encode(['ok' => false, 'erro' => 'sem permissao para essa ação nessa carteira']);
     exit;
 }
 

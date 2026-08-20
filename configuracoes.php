@@ -23,7 +23,13 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $nome     = trim($_POST['nome']);
         $telefone = function_exists('sanitizarTelefone') ? sanitizarTelefone(trim($_POST['telefone'] ?? '')) : null;
 
-        if (!empty($nome)) {
+        // Sem essa checagem, dava pra colocar o WhatsApp de outra pessoa na própria conta —
+        // e a IA do WhatsApp resolve "de quem é essa mensagem" só pelo telefone, então as
+        // mensagens/dados financeiros do dono de verdade do número passavam a cair aqui.
+        if ($telefone && function_exists('telefoneJaEmUsoPorOutro') && telefoneJaEmUsoPorOutro($pdo, $telefone, $usuario_id)) {
+            $mensagem = "Esse telefone já está em uso por outra conta.";
+            $tipo_mensagem = "warning";
+        } elseif (!empty($nome)) {
             try {
                 $sqlUpd = "UPDATE Usuario SET Nome = :nome, Telefone = :tel WHERE IDUsuario = :uid";
                 $stmtUpd = $pdo->prepare($sqlUpd);

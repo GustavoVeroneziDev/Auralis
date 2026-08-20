@@ -1,5 +1,5 @@
 <?php
-session_start();
+require_once 'config/sessao.php';
 require_once 'config/conexao.php';
 exigirAcessoMinimo(1);
 

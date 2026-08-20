@@ -16,6 +16,11 @@ require_once '../config/funcoes.php';
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $telefone = sanitizarTelefone(trim($_POST['telefone'] ?? ''));
 
+    if ($telefone && telefoneJaEmUsoPorOutro($pdo, $telefone, $_SESSION['usuario_id'])) {
+        header("Location: ../dashboard.php?erro=telefone_em_uso");
+        exit;
+    }
+
     if ($telefone) {
         try {
             $pdo->prepare("UPDATE Usuario SET Telefone = :tel WHERE IDUsuario = :uid")

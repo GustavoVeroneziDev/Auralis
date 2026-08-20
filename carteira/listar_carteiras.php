@@ -145,6 +145,15 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action']) && $_POST['
     if (empty($carteira_destino) || $carteira_origem === $carteira_destino) {
         $erro = "Escolha uma carteira de destino válida e diferente da origem.";
     } else {
+        // Confere que a carteira de destino também é do usuário — sem isso, dava pra
+        // mandar os próprios registros pra dentro da carteira de qualquer outra pessoa
+        // (só precisava saber o UUID), corrompendo o saldo dela e, se compartilhada,
+        // vazando pros outros membros.
+        $stmtChkDestino = $pdo->prepare("SELECT 1 FROM Carteira WHERE IDCarteira = :cid AND FKUsuarioDono = :uid");
+        $stmtChkDestino->execute([':cid' => $carteira_destino, ':uid' => $usuario_id]);
+        if (!$stmtChkDestino->fetchColumn()) {
+            $erro = "Carteira de destino inválida.";
+        } else {
         try {
             $pdo->beginTransaction(); // Inicia uma transação segura
 
@@ -169,6 +178,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action']) && $_POST['
         } catch (PDOException $e) {
             $pdo->rollBack(); // Se der erro no meio, desfaz tudo
             $erro = "Erro ao mesclar as carteiras.";
+        }
         }
     }
 }
@@ -462,7 +472,7 @@ require_once '../geral/header.php';
                                     <?php endif; ?>
                                     <li>
                                         <button type="button" class="dropdown-item text-info d-flex align-items-center transition-hover py-2"
-                                            onclick="abrirModalMescla('<?= $cart['IDCarteira'] ?>', '<?= htmlspecialchars($cart['TipoCarteira']) ?>')">
+                                            onclick="abrirModalMescla('<?= $cart['IDCarteira'] ?>', '<?= htmlspecialchars($cart['TipoCarteira'], ENT_QUOTES) ?>')">
                                             <i class="bi bi-shuffle me-2"></i> Mesclar / Transferir
                                         </button>
                                     </li>

@@ -443,6 +443,32 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                     ]);
                 }
 
+                // ── SINCRONIZA METADADO DA SÉRIE EM TODAS AS LINHAS DO GRUPO ─────
+                // TipoRecorrencia/IntervaloRecorrencia/DiaVencimento descrevem o padrão da
+                // SÉRIE, não o histórico de uma ocorrência (valor/data/status de uma parcela
+                // já paga não muda por causa disso). reabastecerRecorrencias() agrupa por
+                // esses 3 campos pra decidir "que padrão continuar" — se só as futuras
+                // pendentes fossem atualizadas, as linhas passadas ficavam com o padrão
+                // antigo, o motor via 2 padrões diferentes dentro do mesmo GrupoParcela e
+                // recriava pendências fantasmas seguindo o padrão velho pra sempre. Roda
+                // pra QUALQUER edição de recorrência (mudou tipo/intervalo ou só o dia).
+                if ($recorrente && $grupoAtual) {
+                    $pdo->prepare("
+                        UPDATE Registro SET TipoRecorrencia = :tipo_rec, IntervaloRecorrencia = :interv_rec, DiaVencimento = :dia
+                        WHERE GrupoParcela = :grupo
+                          AND (FKUsuario = :usuario OR FKCarteira IN (SELECT IDCarteira FROM Carteira WHERE FKUsuarioDono = :usuario2))
+                          AND IDRegistro != :id_editar
+                    ")->execute([
+                        ':tipo_rec'   => $tipoRecorrencia,
+                        ':interv_rec' => $intervaloRecorrencia,
+                        ':dia'        => $diaVencimento,
+                        ':grupo'      => $grupoAtual,
+                        ':usuario'    => $usuario_id,
+                        ':usuario2'   => $usuario_id,
+                        ':id_editar'  => $_POST['id_editar'],
+                    ]);
+                }
+
                 // ── MUDANÇA DE FREQUÊNCIA/INTERVALO NUMA RECORRÊNCIA JÁ EXISTENTE ─
                 // Trocar o tipo (dias/semanas/meses) ou o intervalo no meio de uma série
                 // não dá pra "consertar" reclampando as ocorrências futuras já geradas —
@@ -583,7 +609,18 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                         ':parcela_atual' => $parcelaAtualEdit,
                     ]);
                 }
-                processarComprovantes($pdo, $_POST['id_editar'], $usuario_id);
+                // Confirma dono antes de anexar o comprovante — a UPDATE acima já é
+                // escopada, mas roda mesmo se não achar nada pra atualizar (0 linhas não
+                // gera erro). Sem checar de novo aqui, um POST direto com "id_editar" de
+                // outra pessoa anexava o arquivo no registro dela mesmo assim.
+                $stmtDonoComprov = $pdo->prepare("
+                    SELECT 1 FROM Registro WHERE IDRegistro = :id
+                      AND (FKUsuario = :usuario OR FKCarteira IN (SELECT IDCarteira FROM Carteira WHERE FKUsuarioDono = :usuario2))
+                ");
+                $stmtDonoComprov->execute([':id' => $_POST['id_editar'], ':usuario' => $usuario_id, ':usuario2' => $usuario_id]);
+                if ($stmtDonoComprov->fetchColumn()) {
+                    processarComprovantes($pdo, $_POST['id_editar'], $usuario_id);
+                }
                 if ($_carteiraAlvoCompartilhada) {
                     logAtividadeCarteira($pdo, $carteiraId, $usuario_id, 'lancamento_editado', _descLogRegistroNT($tipoRegistro, $valor, $descricao));
                 }
@@ -819,7 +856,7 @@ require_once 'geral/header.php';
 
             <div class="d-flex justify-content-between align-items-center mb-4 border-bottom border-secondary-subtle pb-3">
                 <h2 class="fw-bold text-light mb-0"><?= $id_editar ? 'Editar Transação' : 'Nova Transação' ?></h2>
-                <a href="<?= htmlspecialchars($_GET['voltar'] ?? 'dashboard.php') ?>" class="btn btn-outline-secondary btn-sm">
+                <a href="<?= htmlspecialchars($_urlVoltar) ?>" class="btn btn-outline-secondary btn-sm">
                     <i class="bi bi-arrow-left me-1"></i> Voltar
                 </a>
             </div>

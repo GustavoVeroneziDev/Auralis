@@ -5,7 +5,11 @@ require_once '../config/conexao.php';
 require_once '../config/funcoes.php';
 require_once '../config/permissoes.php';
 
-exigirAdmin();
+// Supremo, não só admin — essa tela edita chave PIX de pagamento de comissão e marca
+// pagamentos reais como feitos; mesmo nível de exigência que admin/configuracoes_planos.php
+// já usa pra outras coisas financeiras. Um admin comum aqui podia redirecionar pra própria
+// chave PIX e depois marcar como "já pago", sem nenhuma trava.
+exigirSupremo();
 garantirEstruturaComissaoRevendedor($pdo);
 garantirEstruturaComissaoExpandida($pdo);
 

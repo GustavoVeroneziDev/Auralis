@@ -74,8 +74,12 @@ function _cc_mesRefAtual(int $diaFech, int $diaVenc): string
     // Dia de fechamento efetivo no mês atual (29/30/31 vira último dia do mês)
     $diaFechEfetivo = min($diaFech, _cc_diasNoMes($mesAtual, $anoAtual));
 
-    // Mês onde o PRÓXIMO fechamento vai ocorrer
-    $mesFech = clone $hoje;
+    // Mês onde o PRÓXIMO fechamento vai ocorrer — ancora no dia 1 antes de somar mês, não
+    // no dia de hoje. clone($hoje) mantinha o dia atual (pode ser 29/30/31) e "+1 month"
+    // nisso estoura pro mês seguinte ao pretendido quando o mês de destino é mais curto
+    // (ex: 31/01 + 1 mês vira 03/03, pulando fevereiro inteiro) — mesmo cuidado que
+    // _cc_datasParaMesRef()/_cc_mesRefAdiante() já tomam.
+    $mesFech = new DateTime(sprintf('%04d-%02d-01', $anoAtual, $mesAtual));
     if ($diaHoje > $diaFechEfetivo) {
         $mesFech->modify('+1 month');
     }

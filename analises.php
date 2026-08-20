@@ -2,7 +2,7 @@
 // ==============================================================================
 // 1. LÓGICA PHP (Processamento de Navegação e Dados)
 // ==============================================================================
-session_start();
+require_once 'config/sessao.php';
 if (! isset($_SESSION['usuario_id'])) {
     header("Location: usuario/login.php");
     exit;
@@ -1232,6 +1232,15 @@ require_once 'geral/header.php';
     }
 </script>
 <script>
+    // Escapa texto do usuário (descrição de transação/cofrinho) antes de injetar via
+    // innerHTML — numa carteira compartilhada, essa descrição vem de outra pessoa, então
+    // sem isso era XSS de verdade (não só self-XSS) pra quem visse a mesma carteira.
+    function esc(str) {
+        const d = document.createElement('div');
+        d.innerText = str ?? '';
+        return d.innerHTML;
+    }
+
     const transacoesBrutas = <?php echo $dadosJsonTransacoes ?>;
     const gastosCatAnt = <?php echo json_encode($gastosPorCategoriaAnt) ?>;
     const receitasCatAnt = <?php echo json_encode($receitasPorCategoriaAnt) ?>;
@@ -1791,7 +1800,7 @@ require_once 'geral/header.php';
                     <div class="d-flex align-items-center">
                         <i class="bi ${t.Icone} text-secondary fs-4 me-3"></i>
                         <div>
-                            <h6 class="text-light fw-semibold mb-0">${t.Descricao}</h6>
+                            <h6 class="text-light fw-semibold mb-0">${esc(t.Descricao)}</h6>
                             <small class="text-secondary">${dataStr}</small>
                         </div>
                     </div>
@@ -2372,7 +2381,7 @@ function abrirHistorico(id, nome, cor, valAtual, valMeta, icone, histJSON, dataL
                     '<span class="rounded-circle d-flex align-items-center justify-content-center flex-shrink-0"' +
                     ' style="width:34px;height:34px;background:' + cor2 + '18;">' +
                     '<i class="bi ' + icone2 + '" style="color:' + cor2 + ';font-size:1rem;"></i></span>' +
-                    '<div class="flex-grow-1 min-w-0"><div class="text-light fw-semibold small text-truncate">' + desc + '</div>' +
+                    '<div class="flex-grow-1 min-w-0"><div class="text-light fw-semibold small text-truncate">' + esc(desc) + '</div>' +
                     '<div class="text-secondary" style="font-size:0.72rem;">' + data + '</div></div>' +
                     '<div class="d-flex align-items-center gap-1 flex-shrink-0">' +
                     '<span class="fw-bold me-1" style="color:' + cor2 + ';font-size:0.92rem;">' + sinal + ' R$ ' + val + '</span>' +
