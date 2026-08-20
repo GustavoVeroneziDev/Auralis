@@ -1836,11 +1836,15 @@ function _waGemini(string $sysPrompt, array $historico, string $textoAtual, ?str
 
 function _waFetchBase64(array $data): ?string
 {
+    global $pdo;
+    $apiKey = evolutionApiKey($pdo);
+    if ($apiKey === '') return null;
+
     $url  = 'https://evolution.meuauralis.com/chat/getBase64FromMediaMessage/Auralis';
     $body = json_encode(['message' => ['key' => $data['key'] ?? [], 'message' => $data['message'] ?? []]]);
     $ctx  = stream_context_create(['http' => [
         'method' => 'POST',
-        'header' => "Content-Type: application/json\r\napikey: 44c816e1478a4754e859bd609e4099aaab417cf60bf07bf9\r\n",
+        'header' => "Content-Type: application/json\r\napikey: {$apiKey}\r\n",
         'content' => $body, 'timeout' => 15, 'ignore_errors' => true,
     ]]);
     $resp = @file_get_contents($url, false, $ctx);

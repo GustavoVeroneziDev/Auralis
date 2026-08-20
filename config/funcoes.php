@@ -2367,14 +2367,37 @@ if (!function_exists('sanitizarTelefone')) {
     }
 }
 
+// Chave da Evolution API — nunca hardcoded em arquivo versionado (achado da auditoria de
+// segurança: a chave real ficava em texto puro em 2 arquivos do Git). Vive só no banco,
+// configurável/visível em admin/webhook_ia.php. Sem ela configurada, envio de WhatsApp
+// simplesmente falha (retorna false) em vez de mandar uma requisição sem autenticação.
+if (!function_exists('evolutionApiKey')) {
+    function evolutionApiKey(PDO $pdo): string
+    {
+        static $cache = null;
+        if ($cache !== null) return $cache;
+        try {
+            $stmt = $pdo->query("SELECT Valor FROM ConfiguracaoSistema WHERE Chave = 'evolution_api_key' AND FKUsuario IS NULL LIMIT 1");
+            $cache = (string)($stmt->fetchColumn() ?: '');
+        } catch (Throwable $e) {
+            $cache = '';
+        }
+        return $cache;
+    }
+}
+
 if (!function_exists('enviarWhatsAppNotificacao')) {
     function enviarWhatsAppNotificacao(string $numero, string $mensagem): bool
     {
+        global $pdo;
+        $apiKey = evolutionApiKey($pdo);
+        if ($apiKey === '') return false;
+
         $url     = 'https://evolution.meuauralis.com/message/sendText/Auralis';
         $payload = json_encode(['number' => $numero, 'text' => $mensagem]);
         $ctx = stream_context_create(['http' => [
             'method'        => 'POST',
-            'header'        => "Content-Type: application/json\r\napikey: 44c816e1478a4754e859bd609e4099aaab417cf60bf07bf9\r\n",
+            'header'        => "Content-Type: application/json\r\napikey: {$apiKey}\r\n",
             'content'       => $payload,
             'timeout'       => 10,
             'ignore_errors' => true,
