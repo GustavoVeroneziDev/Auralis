@@ -109,6 +109,42 @@ if (!function_exists('whereRegistroPermitido')) {
     }
 }
 
+// Quebra por categoria dos gastos de fatura de cartão já pagos (efetivados) num mês —
+// achado testando o sistema: cada LancamentoCartao tem sua própria categoria, mas o
+// Registro de cobrança que a fatura gera ao fechar é um valor único sem categoria (a
+// fatura pode ter lançamentos de categorias diferentes, não dá pra escolher uma só pro
+// Registro). Sem isso, Análises jogava 100% do gasto do cartão em "Sem Categoria",
+// perdendo a categorização feita lançamento por lançamento. Não precisa separar a
+// fatura em várias transações visíveis (dashboard/agenda continuam mostrando "Fatura
+// X" como uma linha só) — só a soma por categoria usa essa quebra.
+// Retorna [IDRegistroPagamento => ['NomeCategoria' => totalDaCategoriaNessaFatura, ...]]
+if (!function_exists('categoriaBreakdownFaturas')) {
+    function categoriaBreakdownFaturas(PDO $pdo, string $carteiraId, int $mes, int $ano): array
+    {
+        $breakdown = [];
+        try {
+            $stmt = $pdo->prepare("
+                SELECT f.FKRegistroPagamento AS IDRegistroFatura,
+                       COALESCE(cat.NomeCategoria, 'Sem Categoria') AS Categoria,
+                       SUM(l.Valor) AS Total
+                FROM FaturaCartao f
+                JOIN LancamentoCartao l ON l.FKFatura = f.IDFatura
+                JOIN Registro rp ON rp.IDRegistro = f.FKRegistroPagamento
+                LEFT JOIN Categoria cat ON l.FKCategoria = cat.IDCategoria
+                WHERE rp.FKCarteira = :cid AND rp.StatusRegistro = 'efetivado'
+                  AND MONTH(rp.MomentoRegistro) = :mes AND YEAR(rp.MomentoRegistro) = :ano
+                GROUP BY f.FKRegistroPagamento, cat.IDCategoria, cat.NomeCategoria
+            ");
+            $stmt->execute([':cid' => $carteiraId, ':mes' => $mes, ':ano' => $ano]);
+            foreach ($stmt->fetchAll(PDO::FETCH_ASSOC) as $r) {
+                $breakdown[$r['IDRegistroFatura']][$r['Categoria']] = (float)$r['Total'];
+            }
+        } catch (PDOException $e) {
+        }
+        return $breakdown;
+    }
+}
+
 if (!function_exists('gerarUuid')) {
     function gerarUuid()
     {

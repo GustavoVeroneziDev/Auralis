@@ -119,6 +119,9 @@ if ($carteira_selecionada) {
         ]);
         $transacoes = $stmt->fetchAll(PDO::FETCH_ASSOC);
 
+        // Quebra por categoria das faturas de cartão pagas nesse mês — ver categoriaBreakdownFaturas().
+        $breakdownFaturas = categoriaBreakdownFaturas($pdo, $carteira_selecionada, $mes_atual, $ano_atual);
+
         foreach ($transacoes as $t) {
             $valor = (float) $t['Valor'];
             $cat   = $t['Categoria'];
@@ -128,10 +131,15 @@ if ($carteira_selecionada) {
             // desta página), é exatamente esse o efeito real no saldo dela.
             if ($t['TipoRegistro'] === 'despesa' || $t['TipoRegistro'] === 'transferencia_saida') {
                 $totalDespesas += $valor;
-                if (!isset($gastosPorCategoria[$cat])) {
-                    $gastosPorCategoria[$cat] = 0;
+                if (isset($breakdownFaturas[$t['IDRegistro']])) {
+                    // É o pagamento de uma fatura de cartão — soma cada categoria dos
+                    // lançamentos dela em vez de jogar tudo em "Sem Categoria".
+                    foreach ($breakdownFaturas[$t['IDRegistro']] as $catFatura => $valorCatFatura) {
+                        $gastosPorCategoria[$catFatura] = ($gastosPorCategoria[$catFatura] ?? 0) + $valorCatFatura;
+                    }
+                } else {
+                    $gastosPorCategoria[$cat] = ($gastosPorCategoria[$cat] ?? 0) + $valor;
                 }
-                $gastosPorCategoria[$cat] += $valor;
             } else {
                 $totalReceitas += $valor;
                 if (!isset($receitasPorCategoria[$cat])) {
@@ -160,7 +168,7 @@ if ($carteira_selecionada) {
     try {
         $sqlAnt = "
                 SELECT
-                    r.Valor, r.TipoRegistro,
+                    r.IDRegistro, r.Valor, r.TipoRegistro,
                     COALESCE(c.NomeCategoria, 'Sem Categoria') as Categoria
                 FROM Registro r
                 LEFT JOIN Categoria c ON r.FKCategoria = c.IDCategoria
@@ -176,10 +184,17 @@ if ($carteira_selecionada) {
             ':mes'         => $mes_ant,
             ':ano'         => $ano_ant,
         ]);
+        $breakdownFaturasAnt = categoriaBreakdownFaturas($pdo, $carteira_selecionada, $mes_ant, $ano_ant);
         foreach ($stmtAnt->fetchAll(PDO::FETCH_ASSOC) as $t) {
             $cat = $t['Categoria'];
             if ($t['TipoRegistro'] === 'despesa' || $t['TipoRegistro'] === 'transferencia_saida') {
-                $gastosPorCategoriaAnt[$cat] = ($gastosPorCategoriaAnt[$cat] ?? 0) + (float)$t['Valor'];
+                if (isset($breakdownFaturasAnt[$t['IDRegistro']])) {
+                    foreach ($breakdownFaturasAnt[$t['IDRegistro']] as $catFatura => $valorCatFatura) {
+                        $gastosPorCategoriaAnt[$catFatura] = ($gastosPorCategoriaAnt[$catFatura] ?? 0) + $valorCatFatura;
+                    }
+                } else {
+                    $gastosPorCategoriaAnt[$cat] = ($gastosPorCategoriaAnt[$cat] ?? 0) + (float)$t['Valor'];
+                }
             } else {
                 $receitasPorCategoriaAnt[$cat] = ($receitasPorCategoriaAnt[$cat] ?? 0) + (float)$t['Valor'];
             }
