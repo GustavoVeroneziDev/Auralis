@@ -64,9 +64,9 @@ function _cc_datasParaMesRef(int $diaFech, int $diaVenc, string $mesRef): array
  * Exemplos (diaFech=25, diaVenc=3, hoje=14/06):
  *   → próximo fechamento = 25/06 → diaVenc(3) < diaFech(25) → MesRef = 2026-07
  */
-function _cc_mesRefAtual(int $diaFech, int $diaVenc): string
+function _cc_mesRefAtual(int $diaFech, int $diaVenc, ?DateTime $dataRef = null): string
 {
-    $hoje      = new DateTime('today');
+    $hoje      = $dataRef ? clone $dataRef : new DateTime('today');
     $diaHoje   = (int)$hoje->format('j');
     $mesAtual  = (int)$hoje->format('n');
     $anoAtual  = (int)$hoje->format('Y');
@@ -121,7 +121,7 @@ function garantirStatusFaturaFutura(PDO $pdo): void
     }
 }
 
-function cartao_criarFatura(PDO $pdo, string $cartaoId, string $uid, array $cartao, string $mesRef): array
+function cartao_criarFatura(PDO $pdo, string $cartaoId, string $uid, array $cartao, string $mesRef, ?DateTime $dataRef = null): array
 {
     garantirStatusFaturaFutura($pdo);
 
@@ -134,7 +134,7 @@ function cartao_criarFatura(PDO $pdo, string $cartaoId, string $uid, array $cart
     // do ciclo de verdade: uma compra recorrente ou parcelada de longo prazo pré-cria até
     // 24-48 faturas futuras, todas nascendo "aberta" — a tela mostrava "fecha daqui a
     // 680 dias" em vez do fechamento real do mês que vem.
-    $mesAtual = _cc_mesRefAtual((int)$cartao['DiaFechamento'], (int)$cartao['DiaVencimento']);
+    $mesAtual = _cc_mesRefAtual((int)$cartao['DiaFechamento'], (int)$cartao['DiaVencimento'], $dataRef);
     $status   = ($mesRef <= $mesAtual) ? 'aberta' : 'futura';
 
     $datas = _cc_datasParaMesRef((int)$cartao['DiaFechamento'], (int)$cartao['DiaVencimento'], $mesRef);
@@ -177,7 +177,7 @@ function cartao_criarFatura(PDO $pdo, string $cartaoId, string $uid, array $cart
  * DataFechamento mais RECENTE garante que a tela de cartões/fatura sempre mostre o ciclo atual,
  * não a antiga que foi reaberta só pra corrigir um lançamento esquecido.
  */
-function cartao_obterFaturaAberta(PDO $pdo, string $cartaoId, string $uid, array $cartao): array
+function cartao_obterFaturaAberta(PDO $pdo, string $cartaoId, string $uid, array $cartao, ?DateTime $dataRef = null): array
 {
     $stmt = $pdo->prepare(
         "SELECT * FROM FaturaCartao WHERE FKCartao = :cid AND FKUsuario = :uid AND Status = 'aberta'
@@ -187,8 +187,8 @@ function cartao_obterFaturaAberta(PDO $pdo, string $cartaoId, string $uid, array
     $f = $stmt->fetch(PDO::FETCH_ASSOC);
     if ($f) return $f;
 
-    $mesRef = _cc_mesRefAtual((int)$cartao['DiaFechamento'], (int)$cartao['DiaVencimento']);
-    return cartao_criarFatura($pdo, $cartaoId, $uid, $cartao, $mesRef);
+    $mesRef = _cc_mesRefAtual((int)$cartao['DiaFechamento'], (int)$cartao['DiaVencimento'], $dataRef);
+    return cartao_criarFatura($pdo, $cartaoId, $uid, $cartao, $mesRef, $dataRef);
 }
 
 /**
@@ -298,7 +298,7 @@ function cartao_sincronizarPreview(PDO $pdo, string $faturaId, string $uid, arra
 /**
  * Fecha uma fatura: remove preview, congela valor, cria lembrete de pagamento e abre próxima.
  */
-function cartao_fecharFatura(PDO $pdo, array $fatura, string $uid, ?float $valorManual = null): void
+function cartao_fecharFatura(PDO $pdo, array $fatura, string $uid, ?float $valorManual = null, ?DateTime $dataRef = null): void
 {
     $stmt = $pdo->prepare("SELECT COALESCE(SUM(Valor), 0) FROM LancamentoCartao WHERE FKFatura = :id");
     $stmt->execute([':id' => $fatura['IDFatura']]);
@@ -343,7 +343,7 @@ function cartao_fecharFatura(PDO $pdo, array $fatura, string $uid, ?float $valor
     $cartao = $stmtC->fetch(PDO::FETCH_ASSOC);
     if ($cartao) {
         $proximoMes = _cc_mesRefAdiante($fatura['MesReferencia'], 1);
-        cartao_criarFatura($pdo, $cartao['IDCartao'], $uid, $cartao, $proximoMes);
+        cartao_criarFatura($pdo, $cartao['IDCartao'], $uid, $cartao, $proximoMes, $dataRef);
     }
 }
 
@@ -419,11 +419,16 @@ function cartao_reabrirFatura(PDO $pdo, array $fatura, string $uid, array $carta
 /**
  * Verificação automática: fecha faturas cujo DataFechamento já passou.
  */
-function cartao_verificarFechamentos(PDO $pdo, string $uid): void
+function cartao_verificarFechamentos(PDO $pdo, string $uid, ?DateTime $dataRef = null): void
 {
+    // O guard "1x por request" só faz sentido no uso real (produção, sem $dataRef) — o
+    // simulador de fatura (admin/simulador_fatura.php) precisa chamar isso várias vezes
+    // seguidas na MESMA requisição, uma por mês simulado.
     static $rodou = false;
-    if ($rodou) return;
-    $rodou = true;
+    if ($dataRef === null) {
+        if ($rodou) return;
+        $rodou = true;
+    }
 
     // Repara faturas que nasceram "aberta" por engano antes dessa distinção existir: toda
     // fatura pré-criada por compra recorrente/parcelada de longo prazo nascia "aberta" sem
@@ -440,7 +445,7 @@ function cartao_verificarFechamentos(PDO $pdo, string $uid): void
             WHERE FKCartao = :cid AND FKUsuario = :uid AND Status = 'aberta' AND MesReferencia > :mesAtual
         ");
         foreach ($stmtCards->fetchAll(PDO::FETCH_ASSOC) as $c) {
-            $mesAtualCard = _cc_mesRefAtual((int)$c['DiaFechamento'], (int)$c['DiaVencimento']);
+            $mesAtualCard = _cc_mesRefAtual((int)$c['DiaFechamento'], (int)$c['DiaVencimento'], $dataRef);
             $stmtDemote->execute([':cid' => $c['IDCartao'], ':uid' => $uid, ':mesAtual' => $mesAtualCard]);
         }
     } catch (PDOException $e) {}
@@ -455,7 +460,7 @@ function cartao_verificarFechamentos(PDO $pdo, string $uid): void
         // mesmo de qualquer edição ser feita — desfazendo a reabertura silenciosamente.
         // Só fecha automaticamente quando é mesmo a fatura "da vez" do cartão (não existe
         // outra aberta mais recente pra esse mesmo cartão).
-        $hoje = date('Y-m-d');
+        $hoje = ($dataRef ?? new DateTime('today'))->format('Y-m-d');
         $stmt = $pdo->prepare(
             "SELECT f.*, c.DiaVencimento, c.FKCarteiraDebito, c.Nome AS NomeCartao
              FROM FaturaCartao f
@@ -468,10 +473,19 @@ function cartao_verificarFechamentos(PDO $pdo, string $uid): void
                      AND f2.DataFechamento > f.DataFechamento
                )"
         );
-        $stmt->execute([':uid' => $uid, ':hoje' => $hoje]);
-        foreach ($stmt->fetchAll(PDO::FETCH_ASSOC) as $fatura) {
-            cartao_fecharFatura($pdo, $fatura, $uid);
-        }
+        // Fecha em cascata até não sobrar fatura vencida, em vez de só uma por chamada — sem
+        // esse loop, a consulta acima só enxerga a fatura 'aberta' atual (a próxima só vira
+        // 'aberta' DEPOIS que essa fechar, ver cartao_criarFatura()), então se o usuário
+        // ficasse meses sem abrir o app, cada carregamento de página só fechava UM ciclo por
+        // vez — a fatura ficava "presa" até a pessoa recarregar várias vezes seguidas.
+        $travaSeguranca = 60; // nunca deveria disparar de verdade; evita loop infinito num bug futuro
+        do {
+            $stmt->execute([':uid' => $uid, ':hoje' => $hoje]);
+            $pendentes = $stmt->fetchAll(PDO::FETCH_ASSOC);
+            foreach ($pendentes as $fatura) {
+                cartao_fecharFatura($pdo, $fatura, $uid, null, $dataRef);
+            }
+        } while (count($pendentes) > 0 && --$travaSeguranca > 0);
     } catch (PDOException $e) {}
 
     // Auto-repara faturas fechadas/pagas que ficaram órfãs (fecharam antes do cartão ter
