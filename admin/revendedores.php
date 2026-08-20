@@ -19,7 +19,7 @@ $sucesso = $erro = null;
 function _lerCamposComissao(array $post): array
 {
     $tipo = ($post['tipo_comissao'] ?? 'fixa') === 'duas_partes' ? 'duas_partes' : 'fixa';
-    $perc = max(1, min(100, (float)str_replace(',', '.', $post['comissao'] ?? '20')));
+    $perc = max(1, min(100, parseValorBr($post['comissao'] ?? '20')));
     $pix  = trim($post['chave_pix'] ?? '');
     $obs  = trim($post['observacoes'] ?? '');
     $categoria = ($post['categoria'] ?? 'revendedor') === 'normal' ? 'normal' : 'revendedor';
@@ -29,7 +29,7 @@ function _lerCamposComissao(array $post): array
     $limiteD = null;
     $gatilho = 'clientes';
     if ($tipo === 'duas_partes') {
-        $perc2   = max(1, min(100, (float)str_replace(',', '.', $post['comissao_parte2'] ?? '0')));
+        $perc2   = max(1, min(100, parseValorBr($post['comissao_parte2'] ?? '0')));
         $gatilho = ($post['gatilho_parte1'] ?? 'clientes') === 'dias' ? 'dias' : 'clientes';
         if ($gatilho === 'dias') {
             $limiteD = max(1, (int)($post['limite_dias_parte1'] ?? 0));
@@ -44,6 +44,11 @@ function _lerCamposComissao(array $post): array
 // ── POST HANDLERS ─────────────────────────────────────────────────────────────
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $action = $_POST['action'] ?? '';
+
+    if (!csrfValido()) {
+        header("Location: revendedores.php?erro=1");
+        exit;
+    }
 
     // Atribuir revendedor
     if ($action === 'atribuir') {
@@ -85,7 +90,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
     // Salvar valor mínimo de saque (config global)
     if ($action === 'salvar_valor_minimo') {
-        $valor    = max(0, (float)str_replace(',', '.', $_POST['valor_minimo'] ?? '50'));
+        $valor    = max(0, parseValorBr($_POST['valor_minimo'] ?? '50'));
         $valorStr = number_format($valor, 2, '.', '');
         $existe   = $pdo->prepare("SELECT 1 FROM ConfiguracaoSistema WHERE Chave = 'comissao_valor_minimo_saque' AND FKUsuario IS NULL LIMIT 1");
         $existe->execute();
@@ -304,6 +309,7 @@ require_once '../geral/header.php';
             </div>
             <form method="POST" class="d-flex align-items-center gap-2">
                 <input type="hidden" name="action" value="salvar_valor_minimo">
+                <?= csrfCampo() ?>
                 <span class="text-secondary">R$</span>
                 <input type="number" name="valor_minimo" class="form-control" style="width:120px;" value="<?= number_format($valorMinimoSaque, 2, '.', '') ?>" min="0" step="0.01" required>
                 <button type="submit" class="btn btn-sm fw-semibold rounded-pill px-3"
@@ -369,6 +375,7 @@ require_once '../geral/header.php';
                 </button>
                 <form method="POST" onsubmit="return confirm('Pagar TODAS as comissões pendentes?');">
                     <input type="hidden" name="action" value="pagar_todas">
+                    <?= csrfCampo() ?>
                     <input type="hidden" name="revendedor_id" value="<?= $revSelecionado['IDRevendedor'] ?>">
                     <button class="btn btn-sm rounded-pill px-3"
                         style="background:rgba(34,197,94,.1);color:#86efac;border:1px solid rgba(34,197,94,.3);">
@@ -475,6 +482,7 @@ require_once '../geral/header.php';
                             <?php if ($c['Status'] === 'pendente'): ?>
                             <form method="POST" class="d-inline">
                                 <input type="hidden" name="action" value="marcar_paga">
+                                <?= csrfCampo() ?>
                                 <input type="hidden" name="comissao_id" value="<?= $c['IDComissao'] ?>">
                                 <button class="btn btn-sm rounded-pill px-2 py-0"
                                     style="background:rgba(34,197,94,.1);color:#86efac;border:1px solid rgba(34,197,94,.25);font-size:.72rem;">
@@ -578,6 +586,7 @@ require_once '../geral/header.php';
                             <?php else: ?>
                             <form method="POST" class="d-inline">
                                 <input type="hidden" name="action" value="reativar">
+                                <?= csrfCampo() ?>
                                 <input type="hidden" name="revendedor_id" value="<?= $r['IDRevendedor'] ?>">
                                 <button class="btn btn-sm rounded-pill px-3"
                                     style="background:rgba(34,197,94,.08);color:#86efac;border:1px solid rgba(34,197,94,.2);font-size:.75rem;">
@@ -602,6 +611,7 @@ require_once '../geral/header.php';
         <div class="modal-content border-secondary-subtle shadow-lg" style="background:#1a1d27;">
             <form method="POST">
                 <input type="hidden" name="action" value="atribuir">
+                <?= csrfCampo() ?>
                 <div class="modal-header border-secondary-subtle px-4 py-3">
                     <h6 class="modal-title fw-bold text-light mb-0"><i class="bi bi-person-plus-fill me-2" style="color:var(--accent);"></i>Atribuir revendedor</h6>
                     <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
@@ -704,6 +714,7 @@ require_once '../geral/header.php';
         <div class="modal-content border-secondary-subtle shadow-lg" style="background:#1a1d27;">
             <form method="POST">
                 <input type="hidden" name="action" value="editar">
+                <?= csrfCampo() ?>
                 <input type="hidden" name="revendedor_id" id="editarRevId">
                 <div class="modal-header border-secondary-subtle px-4 py-3">
                     <h6 class="modal-title fw-bold text-light mb-0">Editar revendedor</h6>
@@ -787,6 +798,7 @@ require_once '../geral/header.php';
         <div class="modal-content border-secondary-subtle shadow-lg" style="background:#1a1d27;">
             <form method="POST">
                 <input type="hidden" name="action" value="desativar">
+                <?= csrfCampo() ?>
                 <input type="hidden" name="revendedor_id" id="desativarRevId">
                 <div class="modal-header border-secondary-subtle px-4 py-3">
                     <h6 class="modal-title fw-bold text-light mb-0">Desativar revendedor</h6>

@@ -38,7 +38,7 @@ cartao_verificarFechamentos($pdo, $usuario_id);
 
 // Quem lançou o registro pode mexer nele; o dono da carteira compartilhada onde ele está
 // também pode — reaproveitado em todo UPDATE/DELETE de Registro feito por esta página.
-$_whereRegPermitido = "(FKUsuario = :uid OR FKCarteira IN (SELECT IDCarteira FROM Carteira WHERE FKUsuarioDono = :uid2))";
+$_whereRegPermitido = whereRegistroPermitido();
 
 // ==============================================================================
 // AJAX
@@ -92,7 +92,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && ($_POST['action'] ?? '') === 'exclu
             logAtividadeRegistroSeCompartilhada($pdo, $id, $usuario_id, 'lancamento_excluido');
         }
         $ph   = implode(',', array_fill(0, count($ids), '?'));
-        $stmt = $pdo->prepare("DELETE FROM Registro WHERE IDRegistro IN ($ph) AND (FKUsuario = ? OR FKCarteira IN (SELECT IDCarteira FROM Carteira WHERE FKUsuarioDono = ?))");
+        $stmt = $pdo->prepare("DELETE FROM Registro WHERE IDRegistro IN ($ph) AND " . whereRegistroPermitido('?', '?'));
         $stmt->execute(array_merge($ids, [$usuario_id, $usuario_id]));
         echo json_encode(['ok' => true, 'deletados' => $stmt->rowCount()]);
     } catch (PDOException $e) {

@@ -38,7 +38,7 @@ if ($id_editar) {
     $sqlEdit = "
         SELECT * FROM Registro
         WHERE IDRegistro = :id
-          AND (FKUsuario = :uid OR FKCarteira IN (SELECT IDCarteira FROM Carteira WHERE FKUsuarioDono = :uid2))
+          AND " . whereRegistroPermitido() . "
     ";
     $stmtEdit = $pdo->prepare($sqlEdit);
     $stmtEdit->execute([':id' => $id_editar, ':uid' => $usuario_id, ':uid2' => $usuario_id]);
@@ -216,14 +216,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && trim($_POST['tipo_registro'] ?? '')
     // app na 4ª) — gera só as parcelas restantes, mantendo o total/numeração corretos.
     $parcelaInicial = $parcelado ? max(1, min($numParcelas, intval($_POST['parcela_inicial_cc'] ?? 1))) : 1;
 
-    $valorPost  = trim($_POST['valor'] ?? '');
-    $valorLimpo = preg_replace('/[^\d.,]/', '', $valorPost);
-    if (strpos($valorLimpo, ',') !== false) {
-        $valorLimpo = str_replace('.', '', $valorLimpo);
-        $valorRaw   = str_replace(',', '.', $valorLimpo);
-    } else {
-        $valorRaw = $valorLimpo;
-    }
+    $valorPost = trim($_POST['valor'] ?? '');
+    $valorRaw  = parseValorBr($valorPost);
 
     if (empty($cartaoId))                     $erro = 'Selecione um cartão.';
     elseif (empty($descricao))                $erro = 'A descrição não pode ficar em branco.';
@@ -288,19 +282,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $tipoRegistro   = trim($_POST['tipo_registro'] ?? '');
 
     // ── LIMPEZA DA MÁSCARA ──────────────────────────────────────────
-    $valorPost  = trim($_POST['valor'] ?? '');
-
-    // 1. Remove letras, "R$", espaços normais e espaços invisíveis!
-    // Sobram apenas números, pontos e vírgulas (Ex: 1.500,50)
-    $valorLimpo = preg_replace('/[^\d.,]/', '', $valorPost);
-
-    // 2. Converte para o padrão americano de Banco de Dados (1500.50)
-    if (strpos($valorLimpo, ',') !== false) {
-        $valorLimpo = str_replace('.', '', $valorLimpo); // Remove pontos de milhar
-        $valorRaw   = str_replace(',', '.', $valorLimpo); // Troca vírgula por ponto
-    } else {
-        $valorRaw   = $valorLimpo; // Já está no formato certo ou é número inteiro
-    }
+    $valorPost = trim($_POST['valor'] ?? '');
+    $valorRaw  = parseValorBr($valorPost);
     // ────────────────────────────────────────────────────────────────
 
     $descricao      = trim($_POST['descricao'] ?? '');
@@ -392,7 +375,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                         TipoRecorrencia = :tipo_rec, IntervaloRecorrencia = :interv_rec,
                         FKCarteira = :carteira, FKCategoria = :categoria
                     WHERE IDRegistro = :id_editar
-                      AND (FKUsuario = :usuario OR FKCarteira IN (SELECT IDCarteira FROM Carteira WHERE FKUsuarioDono = :usuario2))
+                      AND " . whereRegistroPermitido(':usuario', ':usuario2') . "
                 ";
                 $stmt = $pdo->prepare($sql);
                 $stmt->execute([
@@ -423,7 +406,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                             Valor = :valor, Descricao = :descricao,
                             FKCarteira = :carteira, FKCategoria = :categoria
                         WHERE GrupoParcela = :grupo
-                          AND (FKUsuario = :usuario OR FKCarteira IN (SELECT IDCarteira FROM Carteira WHERE FKUsuarioDono = :usuario2))
+                          AND " . whereRegistroPermitido(':usuario', ':usuario2') . "
                           AND IDRegistro != :id_editar
                           AND MomentoRegistro > :data_base
                           AND StatusRegistro = 'pendente'
@@ -456,7 +439,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                     $pdo->prepare("
                         UPDATE Registro SET TipoRecorrencia = :tipo_rec, IntervaloRecorrencia = :interv_rec, DiaVencimento = :dia
                         WHERE GrupoParcela = :grupo
-                          AND (FKUsuario = :usuario OR FKCarteira IN (SELECT IDCarteira FROM Carteira WHERE FKUsuarioDono = :usuario2))
+                          AND " . whereRegistroPermitido(':usuario', ':usuario2') . "
                           AND IDRegistro != :id_editar
                     ")->execute([
                         ':tipo_rec'   => $tipoRecorrencia,
@@ -488,7 +471,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                     $pdo->prepare("
                         DELETE FROM Registro
                         WHERE GrupoParcela = :grupo
-                          AND (FKUsuario = :usuario OR FKCarteira IN (SELECT IDCarteira FROM Carteira WHERE FKUsuarioDono = :usuario2))
+                          AND " . whereRegistroPermitido(':usuario', ':usuario2') . "
                           AND IDRegistro != :id_editar
                           AND MomentoRegistro > :data_base
                           AND StatusRegistro = 'pendente'
@@ -553,7 +536,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                     $stmtFuturasData = $pdo->prepare("
                         SELECT IDRegistro, DataVencimento FROM Registro
                         WHERE GrupoParcela = :grupo
-                          AND (FKUsuario = :usuario OR FKCarteira IN (SELECT IDCarteira FROM Carteira WHERE FKUsuarioDono = :usuario2))
+                          AND " . whereRegistroPermitido(':usuario', ':usuario2') . "
                           AND IDRegistro != :id_editar
                           AND MomentoRegistro > :data_base
                           AND StatusRegistro = 'pendente'
@@ -590,7 +573,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                             Valor = :valor, Descricao = :descricao,
                             FKCarteira = :carteira, FKCategoria = :categoria
                         WHERE GrupoParcela = :grupo
-                          AND (FKUsuario = :usuario OR FKCarteira IN (SELECT IDCarteira FROM Carteira WHERE FKUsuarioDono = :usuario2))
+                          AND " . whereRegistroPermitido(':usuario', ':usuario2') . "
                           AND IDRegistro != :id_editar
                           AND ParcelaAtual > :parcela_atual
                           AND StatusRegistro = 'pendente'
@@ -615,7 +598,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 // outra pessoa anexava o arquivo no registro dela mesmo assim.
                 $stmtDonoComprov = $pdo->prepare("
                     SELECT 1 FROM Registro WHERE IDRegistro = :id
-                      AND (FKUsuario = :usuario OR FKCarteira IN (SELECT IDCarteira FROM Carteira WHERE FKUsuarioDono = :usuario2))
+                      AND " . whereRegistroPermitido(':usuario', ':usuario2') . "
                 ");
                 $stmtDonoComprov->execute([':id' => $_POST['id_editar'], ':usuario' => $usuario_id, ':usuario2' => $usuario_id]);
                 if ($stmtDonoComprov->fetchColumn()) {
@@ -644,15 +627,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
                 // 2. LÓGICA DE JUROS (COM TRAVA DE SEGURANÇA) — só calcula; não insere ainda
                 if ($acessoLiberadoJuros && isset($_POST['tipo_juros']) && $_POST['tipo_juros'] === 'com') {
-                    $valJurosLimpo = preg_replace('/[^\d.,]/', '', $_POST['valor_parcela_juros'] ?? '0');
-                    if (strpos($valJurosLimpo, ',') !== false) {
-                        $valJurosLimpo = str_replace('.', '', $valJurosLimpo);
-                        $valJurosRaw   = str_replace(',', '.', $valJurosLimpo);
-                    } else {
-                        $valJurosRaw = $valJurosLimpo;
-                    }
-
-                    $parcelaComJuros = (float)$valJurosRaw;
+                    $parcelaComJuros = parseValorBr($_POST['valor_parcela_juros'] ?? '0');
 
                     if ($parcelaComJuros > 0) {
                         $valorTotalComJuros = $parcelaComJuros * $numParcelas;
@@ -697,23 +672,24 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                     $dataVencBase = new DateTime($dataVencimento);
 
                     $primeiroIdParc = null;
+                    // Dia-do-mês fixo de cada série (registro e vencimento podem ser dias
+                    // diferentes) — ancora o clamping de fim de mês em calcularProximaOcorrenciaRecorrente()
+                    // pra evitar deriva (Jan 31 → Fev 28 → Mar 28 em vez de Mar 31).
+                    $diaAncoraReg  = (int)$dataBase->format('d');
+                    $diaAncoraVenc = (int)$dataVencBase->format('d');
+                    $dataRegAtualObj  = clone $dataBase;
+                    $dataVencAtualObj = clone $dataVencBase;
+
                     // Se a compra já vinha de antes ($parcelaInicial > 1), gera só as parcelas
                     // que ainda faltam a partir da data informada, sem duplicar as que já passaram.
                     $vezesRestantes = $numParcelas - $parcelaInicial + 1;
                     for ($i = 0; $i < $vezesRestantes; $i++) {
-                        $mesAlvo    = (int)$dataBase->format('m') + $i;
-                        $anoAlvo    = (int)$dataBase->format('Y') + (int)floor(($mesAlvo - 1) / 12);
-                        $mesAlvo    = (($mesAlvo - 1) % 12) + 1;
-                        $diaAlvo    = (int)$dataBase->format('d');
-                        $diaCorreto = min($diaAlvo, (int)date('t', strtotime(sprintf('%04d-%02d-01', $anoAlvo, $mesAlvo))));
-                        $dataStr    = sprintf('%04d-%02d-%02d', $anoAlvo, $mesAlvo, $diaCorreto);
-
-                        $mesVenc     = (int)$dataVencBase->format('m') + $i;
-                        $anoVenc     = (int)$dataVencBase->format('Y') + (int)floor(($mesVenc - 1) / 12);
-                        $mesVenc     = (($mesVenc - 1) % 12) + 1;
-                        $diaVencAlvo = (int)$dataVencBase->format('d');
-                        $diaVencCorreto = min($diaVencAlvo, (int)date('t', strtotime(sprintf('%04d-%02d-01', $anoVenc, $mesVenc))));
-                        $dataVencStr = sprintf('%04d-%02d-%02d', $anoVenc, $mesVenc, $diaVencCorreto);
+                        if ($i > 0) {
+                            $dataRegAtualObj  = calcularProximaOcorrenciaRecorrente($dataRegAtualObj, 'meses', 1, $diaAncoraReg);
+                            $dataVencAtualObj = calcularProximaOcorrenciaRecorrente($dataVencAtualObj, 'meses', 1, $diaAncoraVenc);
+                        }
+                        $dataStr     = $dataRegAtualObj->format('Y-m-d');
+                        $dataVencStr = $dataVencAtualObj->format('Y-m-d');
 
                         $valAtual = ($i === 0 && $parcelaInicial === 1) ? ($valorParcela + $resto) : $valorParcela;
                         $statusP  = ($i === 0) ? $statusRegistro : 'pendente';

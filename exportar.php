@@ -30,8 +30,16 @@ function csvHeaders(string $filename): void
     echo "\xEF\xBB\xBF"; // UTF-8 BOM — garante acentos no Excel
 }
 
-$meses = ['Janeiro','Fevereiro','Março','Abril','Maio','Junho',
-          'Julho','Agosto','Setembro','Outubro','Novembro','Dezembro'];
+// Descrição/categoria/nome vêm de texto livre digitado pelo usuário — um valor começando
+// com =, +, -, ou @ vira fórmula executável quando o CSV é aberto no Excel/LibreOffice
+// (CSV/Formula Injection). Prefixa com aspa simples pra forçar texto puro nesse caso.
+function _csvSafe(string $valor): string
+{
+    if ($valor !== '' && in_array($valor[0], ['=', '+', '-', '@'], true)) {
+        return "'" . $valor;
+    }
+    return $valor;
+}
 
 // ── TRANSAÇÕES ─────────────────────────────────────────────────────────────
 if ($tipo === 'transacoes') {
@@ -60,7 +68,7 @@ if ($tipo === 'transacoes') {
     $stmt->execute([':cid' => $carteiraId, ':uid' => $uid, ':mes' => $mes, ':ano' => $ano]);
     $rows = $stmt->fetchAll(PDO::FETCH_ASSOC);
 
-    $nomeMes  = $meses[$mes - 1];
+    $nomeMes  = nomeMesPt($mes);
     $nomeCart = preg_replace('/[^a-zA-Z0-9]/', '-', $carteira['TipoCarteira']);
     csvHeaders("auralis-{$nomeCart}-{$nomeMes}-{$ano}.csv");
 
@@ -72,9 +80,9 @@ if ($tipo === 'transacoes') {
             ? "{$r['ParcelaAtual']}/{$r['TotalParcelas']}" : '-';
         fputcsv($out, [
             date('d/m/Y', strtotime($r['MomentoRegistro'])),
-            $r['Descricao'],
+            _csvSafe($r['Descricao']),
             $r['TipoRegistro'] === 'receita' ? 'Receita' : 'Despesa',
-            $r['Categoria'],
+            _csvSafe($r['Categoria']),
             $sinal . number_format(abs($r['Valor']), 2, ',', '.'),
             ucfirst($r['StatusRegistro']),
             $parcela,
@@ -115,7 +123,7 @@ if ($tipo === 'fatura') {
 
     $out   = fopen('php://output', 'w');
     $venc  = date('d/m/Y', strtotime($fatura['DataVencimento']));
-    fputcsv($out, ["Fatura: {$fatura['NomeCartao']} — Vencimento {$venc}"], ';');
+    fputcsv($out, [_csvSafe("Fatura: {$fatura['NomeCartao']} — Vencimento {$venc}")], ';');
     fputcsv($out, [], ';');
     fputcsv($out, ['Data da Compra', 'Descrição', 'Categoria', 'Valor (R$)', 'Parcela'], ';');
     $total = 0.0;
@@ -124,8 +132,8 @@ if ($tipo === 'fatura') {
             ? "{$r['ParcelaAtual']}/{$r['TotalParcelas']}" : '-';
         fputcsv($out, [
             date('d/m/Y', strtotime($r['DataCompra'])),
-            $r['Descricao'],
-            $r['Categoria'],
+            _csvSafe($r['Descricao']),
+            _csvSafe($r['Categoria']),
             'R$ ' . number_format($r['Valor'], 2, ',', '.'),
             $parcela,
         ], ';');
@@ -166,7 +174,7 @@ if ($tipo === 'analises') {
     $rows = $stmt->fetchAll(PDO::FETCH_ASSOC);
 
     $totalGeral = array_sum(array_column($rows, 'Total')) ?: 1;
-    $nomeMes    = $meses[$mes - 1];
+    $nomeMes    = nomeMesPt($mes);
     csvHeaders("auralis-analises-{$nomeMes}-{$ano}.csv");
 
     $out = fopen('php://output', 'w');
@@ -174,7 +182,7 @@ if ($tipo === 'analises') {
     foreach ($rows as $r) {
         $pct = round($r['Total'] / $totalGeral * 100, 1);
         fputcsv($out, [
-            $r['Categoria'],
+            _csvSafe($r['Categoria']),
             $r['TipoRegistro'] === 'receita' ? 'Receita' : 'Despesa',
             number_format($r['Total'], 2, ',', '.'),
             $r['Quantidade'],

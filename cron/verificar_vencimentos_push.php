@@ -42,7 +42,9 @@ try {
     exit(1);
 }
 
-$marcarProcessado = $pdo->prepare("UPDATE Registro SET PushNotificadoEm = NOW() WHERE IDRegistro = :id");
+// Guard "AND PushNotificadoEm IS NULL" torna isso uma reivindicação atômica — só quem
+// conseguir o UPDATE primeiro (rowCount > 0) segue pra mandar o push.
+$marcarProcessado = $pdo->prepare("UPDATE Registro SET PushNotificadoEm = NOW() WHERE IDRegistro = :id AND PushNotificadoEm IS NULL");
 
 // Agrupa por usuário + tipo — quem tem várias contas vencendo hoje recebe UMA notificação por
 // tipo (despesa/receita não se misturam na mesma notificação, pra não confundir sinal).
@@ -54,29 +56,37 @@ foreach ($contas as $c) {
 
 $usuariosNotificados = [];
 foreach ($grupos as $grupo) {
-    $usuarioId  = $grupo[0]['FKUsuario'];
-    $ehDespesa  = $grupo[0]['TipoRegistro'] === 'despesa';
+    // Reivindica ANTES de mandar, não depois — sem isso, duas execuções simultâneas do cron
+    // podiam as duas verem a mesma conta como "ainda não notificada" e mandar o push duas vezes.
+    $grupoReivindicado = [];
+    foreach ($grupo as $c) {
+        $marcarProcessado->execute([':id' => $c['IDRegistro']]);
+        if ($marcarProcessado->rowCount() > 0) {
+            $grupoReivindicado[] = $c;
+        }
+    }
+    if (!$grupoReivindicado) continue; // outro processo já reivindicou tudo desse grupo
+
+    $usuarioId  = $grupoReivindicado[0]['FKUsuario'];
+    $ehDespesa  = $grupoReivindicado[0]['TipoRegistro'] === 'despesa';
     $sinal      = $ehDespesa ? '-' : '+';
-    $totalValor = array_sum(array_map(fn($c) => (float)$c['Valor'], $grupo));
+    $totalValor = array_sum(array_map(fn($c) => (float)$c['Valor'], $grupoReivindicado));
     // Parênteses em volta do valor evitam confundir o sinal (+/-) com um traço separador.
     $totalFmt   = '(' . $sinal . ' R$ ' . number_format($totalValor, 2, ',', '.') . ')';
 
-    if (count($grupo) === 1) {
+    if (count($grupoReivindicado) === 1) {
         $tipoLabel = $ehDespesa ? 'Conta' : 'Recebimento';
         $titulo    = $tipoLabel . ' vence hoje';
-        $corpo     = $grupo[0]['Descricao'] . ' ' . $totalFmt;
+        $corpo     = $grupoReivindicado[0]['Descricao'] . ' ' . $totalFmt;
     } else {
         $tipoLabel  = $ehDespesa ? 'contas' : 'recebimentos';
-        $descricoes = array_map(fn($c) => $c['Descricao'], $grupo);
+        $descricoes = array_map(fn($c) => $c['Descricao'], $grupoReivindicado);
         $listaDesc  = implode(', ', array_slice($descricoes, 0, 3)) . (count($descricoes) > 3 ? '…' : '');
-        $titulo     = count($grupo) . ' ' . $tipoLabel . ' vencem hoje';
+        $titulo     = count($grupoReivindicado) . ' ' . $tipoLabel . ' vencem hoje';
         $corpo      = $listaDesc . ' ' . $totalFmt . ' no total';
     }
 
     $enviados = enviarPushParaUsuario($pdo, $usuarioId, $titulo, $corpo, '/agenda.php');
-    foreach ($grupo as $c) {
-        $marcarProcessado->execute([':id' => $c['IDRegistro']]);
-    }
     if ($enviados > 0) $usuariosNotificados[$usuarioId] = true;
 }
 

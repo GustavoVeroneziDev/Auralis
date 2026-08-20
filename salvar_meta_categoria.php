@@ -96,14 +96,8 @@ try {
         exit;
     }
 
-    $valorPost  = trim($_POST['valor_meta'] ?? '');
-    $valorLimpo = preg_replace('/[^\d.,]/', '', $valorPost);
-    if (strpos($valorLimpo, ',') !== false) {
-        $valorLimpo = str_replace('.', '', $valorLimpo);
-        $valorRaw   = str_replace(',', '.', $valorLimpo);
-    } else {
-        $valorRaw = $valorLimpo;
-    }
+    $valorPost = trim($_POST['valor_meta'] ?? '');
+    $valorRaw  = parseValorBr($valorPost);
 
     if (empty($valorRaw) || !is_numeric($valorRaw) || (float)$valorRaw <= 0) {
         header("Location: gerenciar_categorias.php?erro_meta=valor_invalido{$qsCarteira}#{$ancora}");

@@ -200,6 +200,10 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
     // AÇÃO 7: EXCLUIR CONTA (A ZONA DE PERIGO)
     if (isset($_POST['action']) && $_POST['action'] === 'delete_account') {
+        if (!csrfValido()) {
+            $mensagem = "Sessão expirada. Recarregue a página e tente novamente.";
+            $tipo_mensagem = "danger";
+        } else {
         $senha_confirmacao = $_POST['senha_confirmacao'] ?? '';
 
         try {
@@ -245,7 +249,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 $pdo->commit();
 
                 session_destroy();
-                setcookie('auralis_remember', '', time() - 3600, '/');
+                limparCookieLembrarMe();
                 header("Location: usuario/login.php?conta=excluida");
                 exit;
             }
@@ -255,6 +259,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             }
             $mensagem = "Erro ao limpar dados do usuário: " . $e->getMessage();
             $tipo_mensagem = "danger";
+        }
         }
     }
 }
@@ -1156,6 +1161,7 @@ document.addEventListener('DOMContentLoaded', function() {
             <form method="POST" action="">
                 <div class="modal-body p-4">
                     <input type="hidden" name="action" value="delete_account">
+                    <?= csrfCampo() ?>
 
                     <?php if ($isGoogleUser): ?>
                         <p class="text-light mb-4">Como você acessa o sistema via Google, digite a palavra <strong class="text-danger">EXCLUIR</strong> abaixo para confirmar a exclusão definitiva da conta:</p>

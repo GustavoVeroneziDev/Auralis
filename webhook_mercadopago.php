@@ -71,8 +71,11 @@ try {
                 processarIndicacaoConversao($pdo, $email, (float)$valor, $resultado, $id);
             }
 
-        } elseif (in_array($mpStatus, ['cancelled', 'paused', 'pending'])) {
-            // Cancelamento ou inadimplência — rebaixa para free
+        } elseif (in_array($mpStatus, ['cancelled', 'paused'])) {
+            // Cancelamento ou inadimplência — rebaixa para free. "pending" fica de fora de
+            // propósito: é um estado transitório normal (assinatura recém-criada, ou uma
+            // renovação em confirmação), não falha — tratar igual a cancelamento derrubava
+            // pra Free um assinante que continuava pagando normalmente.
             $stmtU = $pdo->prepare("SELECT IDUsuario FROM Usuario WHERE Email = :e LIMIT 1");
             $stmtU->execute([':e' => strtolower(trim($email))]);
             $usuario = $stmtU->fetch();

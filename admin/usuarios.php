@@ -30,14 +30,16 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     // Ações que mexem em plano/nível/exclusão de conta são restritas ao Supremo.
     $acoesSupremo = ['dar_acesso', 'revogar', 'editar', 'excluir'];
 
-    if (in_array($action, $acoesSupremo, true) && !ehSupremo()) {
+    if (in_array($action, $acoesSupremo, true) && !csrfValido()) {
+        $erro = "Sessão expirada. Recarregue a página e tente novamente.";
+    } elseif (in_array($action, $acoesSupremo, true) && !ehSupremo()) {
         $erro = "Apenas o Supremo pode executar esta ação.";
     } elseif (empty($uid)) {
         $erro = "ID de usuário inválido.";
     } elseif ($action === 'dar_acesso') {
         $plano = in_array($_POST['plano'] ?? '', ['pro', 'vip']) ? $_POST['plano'] : '';
         $dias  = max(1, min(3650, (int)($_POST['dias'] ?? 30)));
-        $valor = max(0.0, (float) str_replace(',', '.', preg_replace('/[^\d,]/', '', $_POST['valor_pago'] ?? '0')));
+        $valor = max(0.0, parseValorBr($_POST['valor_pago'] ?? '0'));
 
         if (!$plano) {
             $erro = "Selecione um plano válido.";
@@ -616,6 +618,7 @@ require_once '../geral/header.php';
             <form method="POST" action="">
                 <div class="modal-body p-4">
                     <input type="hidden" name="action" value="dar_acesso">
+                    <?= csrfCampo() ?>
                     <input type="hidden" name="usuario_id" id="dar_usuario_id">
 
                     <!-- Info do usuário alvo -->
@@ -704,6 +707,7 @@ require_once '../geral/header.php';
             <form method="POST" action="">
                 <div class="modal-body p-4 text-center">
                     <input type="hidden" name="action" value="revogar">
+                    <?= csrfCampo() ?>
                     <input type="hidden" name="usuario_id" id="revogar_usuario_id">
                     <p class="text-secondary mb-1">
                         Rebaixar <strong class="text-light" id="revogar_nome"></strong> para o plano <strong class="text-secondary">Free</strong>?
@@ -736,6 +740,7 @@ require_once '../geral/header.php';
             <form method="POST" action="">
                 <div class="modal-body p-4">
                     <input type="hidden" name="action" value="editar">
+                    <?= csrfCampo() ?>
                     <input type="hidden" name="usuario_id" id="editar_usuario_id">
 
                     <div class="mb-3">
@@ -783,6 +788,7 @@ require_once '../geral/header.php';
             <form method="POST" action="" id="formExcluirUsuario">
                 <div class="modal-body p-4">
                     <input type="hidden" name="action" value="excluir">
+                    <?= csrfCampo() ?>
                     <input type="hidden" name="usuario_id" id="excluir_usuario_id">
                     <p class="text-secondary mb-3">
                         Isso vai apagar <strong class="text-light" id="excluir_nome"></strong> e <strong class="text-danger">todos os dados</strong> (transações, carteiras, cartões, cofrinhos, comprovantes etc) permanentemente. Não tem como desfazer.

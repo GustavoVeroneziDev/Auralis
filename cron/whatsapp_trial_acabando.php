@@ -48,11 +48,22 @@ try {
 // ConfiguracaoSistema não tem UNIQUE KEY em (Chave, FKUsuario).
 $stmtChk = $pdo->prepare("SELECT COUNT(*) FROM ConfiguracaoSistema WHERE Chave = 'wa_trial_avisado' AND FKUsuario = :uid");
 $stmtIns = $pdo->prepare("INSERT INTO ConfiguracaoSistema (Chave, Valor, FKUsuario) VALUES ('wa_trial_avisado', :ts, :uid)");
+$stmtDel = $pdo->prepare("DELETE FROM ConfiguracaoSistema WHERE Chave = 'wa_trial_avisado' AND FKUsuario = :uid");
 
 $enviados = 0;
 $agora    = date('Y-m-d H:i:s');
 
 foreach ($candidatos as $u) {
+    // Reivindica ANTES de mandar, não depois — reduz a janela de corrida de "a chamada
+    // HTTP inteira de envio" pra só esse check+insert. Sem isso, dois disparos do mesmo
+    // cron rodando ao mesmo tempo (cPanel duplicado, ou reexecução manual) podiam os dois
+    // verem essa pessoa como "ainda não avisada" e mandar a mesma mensagem duas vezes.
+    try {
+        $stmtChk->execute([':uid' => $u['IDUsuario']]);
+        if ($stmtChk->fetchColumn() > 0) continue; // outro processo já reivindicou
+        $stmtIns->execute([':ts' => $agora, ':uid' => $u['IDUsuario']]);
+    } catch (PDOException $e) { continue; }
+
     $horasRestantes = max(1, $horasTrial - (int)$u['HorasDecorridas']);
     $primeiroNome   = explode(' ', $u['Nome'])[0];
 
@@ -65,13 +76,13 @@ foreach ($candidatos as $u) {
     $ok = enviarWhatsAppNotificacao($u['Telefone'], $mensagem);
 
     if ($ok) {
-        try {
-            $stmtIns->execute([':ts' => $agora, ':uid' => $u['IDUsuario']]);
-        } catch (PDOException $e) {}
         if (function_exists('registrarMensagemWaSistema')) {
             registrarMensagemWaSistema($pdo, $u['IDUsuario'], $mensagem);
         }
         $enviados++;
+    } else {
+        // Envio falhou depois de já reivindicado — libera pra tentar de novo no cron seguinte.
+        try { $stmtDel->execute([':uid' => $u['IDUsuario']]); } catch (PDOException $e) {}
     }
 }
 

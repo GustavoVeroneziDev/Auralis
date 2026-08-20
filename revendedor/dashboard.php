@@ -136,6 +136,7 @@ require_once '../geral/header.php';
                         <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
                     </div>
                     <div class="modal-body px-4 py-3">
+                        <?= csrfCampo() ?>
                         <label class="form-label text-secondary small fw-semibold">Chave PIX (CPF, e-mail, telefone ou aleatória)</label>
                         <input type="text" name="chave_pix" class="form-control bg-dark border-secondary-subtle text-light"
                             value="<?= htmlspecialchars($revendedor['ChavePix'] ?? '') ?>" maxlength="140" required>

@@ -137,9 +137,14 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $assunto = "Confirme sua conta no Auralis";
         
         // ── INTELIGÊNCIA DE DOMÍNIO (BETA OU MAIN) ──
-        $protocolo = (isset($_SERVER['HTTPS']) && $_SERVER['HTTPS'] === 'on') ? "https://" : "http://";
-        $dominioAtual = $_SERVER['HTTP_HOST'];
-        
+        // Domínio fixo, nunca o Host da requisição (que dá pra forjar) — mesma detecção de
+        // ambiente que config/conexao.php já usa: caminho físico do arquivo no servidor,
+        // não cabeçalho de requisição. Sem isso, um POST direto com Host forjado gerava um
+        // e-mail de ativação real, mandado pelo nosso próprio servidor, com o link apontando
+        // pro domínio que o atacante quiser.
+        $protocolo = "https://";
+        $dominioAtual = strpos(__DIR__, 'beta.meuauralis.com') !== false ? 'beta.meuauralis.com' : 'meuauralis.com';
+
         // Monta os links com base em onde o usuário está acessando no momento
         $link_ativacao = $protocolo . $dominioAtual . "/usuario/ativar_conta.php?token=" . $token_ativacao;
         $link_logo     = $protocolo . $dominioAtual . "/geral/img/LogoAuralisSemEscudo.png";

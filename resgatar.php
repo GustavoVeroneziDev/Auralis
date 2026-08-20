@@ -15,11 +15,19 @@ $pageTitle = 'Resgatar Código — Auralis';
 
 $codigoGet = strtoupper(trim($_GET['codigo'] ?? ''));
 
+$ipResgate = $_SERVER['REMOTE_ADDR'] ?? '0.0.0.0';
+
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $codigo = strtoupper(trim($_POST['codigo'] ?? ''));
 
+    // Códigos promocionais são strings curtas e memorizáveis (ex: "BLACKFRIDAY26"), não
+    // tokens de alta entropia — sem limite de tentativas, dava pra tentar adivinhar um
+    // válido sem nenhum bloqueio (login e esqueci-senha já têm essa trava, aqui faltava).
     if (!$codigo) {
         $erro = 'Digite um código de ativação.';
+    } elseif (contarTentativasSeguranca($pdo, 'resgatar_codigo', $uid, 15) >= 8
+           || contarTentativasSeguranca($pdo, 'resgatar_codigo_ip', $ipResgate, 15) >= 20) {
+        $erro = 'Muitas tentativas. Aguarde alguns minutos e tente de novo.';
     } else {
         try {
             // Busca o código (case-insensitive)
@@ -32,6 +40,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
             if (!$cod) {
                 $erro = 'Código inválido ou inativo.';
+                registrarTentativaSeguranca($pdo, 'resgatar_codigo', $uid);
+                registrarTentativaSeguranca($pdo, 'resgatar_codigo_ip', $ipResgate);
             } elseif ($cod['DataExpiracao'] && $cod['DataExpiracao'] < date('Y-m-d')) {
                 $erro = 'Este código expirou.';
             } elseif ($cod['MaxUsos'] !== null && $cod['UsoAtual'] >= $cod['MaxUsos']) {
@@ -68,48 +78,61 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
                     $pdo->beginTransaction();
 
-                    // Cancela assinatura ativa atual
-                    $pdo->prepare("UPDATE Assinatura SET Status = 'cancelada' WHERE FKUsuario = :uid AND Status = 'ativa'")
-                        ->execute([':uid' => $uid]);
+                    // Incrementa o contador de uso JÁ com a condição de limite embutida (não
+                    // um SELECT-checa-depois-UPDATE) — sem isso, duas pessoas resgatando o
+                    // mesmo código de MaxUsos=1 ao mesmo tempo podiam as duas passar pela
+                    // checagem lá em cima antes de qualquer uma commitar, e as duas ganhavam
+                    // o plano de um código pensado pra valer só uma vez.
+                    $stmtInc = $pdo->prepare("
+                        UPDATE codigos_ativacao SET UsoAtual = UsoAtual + 1
+                        WHERE IDCodigo = :id AND (MaxUsos IS NULL OR UsoAtual < MaxUsos)
+                    ");
+                    $stmtInc->execute([':id' => $cod['IDCodigo']]);
 
-                    // Cria nova assinatura
-                    $pdo->prepare("
-                        INSERT INTO Assinatura
-                            (IDAssinatura, FKUsuario, Plano, Status, Ciclo, ValorPago,
-                             DataInicio, DataExpiracao, IDAssinaturaGW, EmailGateway, FontePagamento)
-                        VALUES
-                            (:id, :uid, :plano, 'ativa', 'codigo', 0,
-                             :inicio, :exp, NULL, NULL, 'codigo_ativacao')
-                    ")->execute([
-                        ':id'     => gerarUuid(),
-                        ':uid'    => $uid,
-                        ':plano'  => $planoFinal,
-                        ':inicio' => date('Y-m-d'),
-                        ':exp'    => $novaExpiracao,
-                    ]);
+                    if ($stmtInc->rowCount() === 0) {
+                        // Alguém bateu o limite entre a checagem lá em cima e agora.
+                        $pdo->rollBack();
+                        $erro = 'Este código já atingiu o limite de usos.';
+                    } else {
+                        // Cancela assinatura ativa atual
+                        $pdo->prepare("UPDATE Assinatura SET Status = 'cancelada' WHERE FKUsuario = :uid AND Status = 'ativa'")
+                            ->execute([':uid' => $uid]);
 
-                    // Atualiza plano do usuário
-                    $pdo->prepare("UPDATE Usuario SET Plano = :plano WHERE IDUsuario = :uid")
-                        ->execute([':plano' => $planoFinal, ':uid' => $uid]);
+                        // Cria nova assinatura
+                        $pdo->prepare("
+                            INSERT INTO Assinatura
+                                (IDAssinatura, FKUsuario, Plano, Status, Ciclo, ValorPago,
+                                 DataInicio, DataExpiracao, IDAssinaturaGW, EmailGateway, FontePagamento)
+                            VALUES
+                                (:id, :uid, :plano, 'ativa', 'codigo', 0,
+                                 :inicio, :exp, NULL, NULL, 'codigo_ativacao')
+                        ")->execute([
+                            ':id'     => gerarUuid(),
+                            ':uid'    => $uid,
+                            ':plano'  => $planoFinal,
+                            ':inicio' => date('Y-m-d'),
+                            ':exp'    => $novaExpiracao,
+                        ]);
 
-                    // Registra uso
-                    $pdo->prepare("
-                        INSERT INTO codigos_ativacao_usos (IDUso, FKCodigo, FKUsuario)
-                        VALUES (:id, :cid, :uid)
-                    ")->execute([':id' => gerarUuid(), ':cid' => $cod['IDCodigo'], ':uid' => $uid]);
+                        // Atualiza plano do usuário
+                        $pdo->prepare("UPDATE Usuario SET Plano = :plano WHERE IDUsuario = :uid")
+                            ->execute([':plano' => $planoFinal, ':uid' => $uid]);
 
-                    // Incrementa contador
-                    $pdo->prepare("UPDATE codigos_ativacao SET UsoAtual = UsoAtual + 1 WHERE IDCodigo = :id")
-                        ->execute([':id' => $cod['IDCodigo']]);
+                        // Registra uso
+                        $pdo->prepare("
+                            INSERT INTO codigos_ativacao_usos (IDUso, FKCodigo, FKUsuario)
+                            VALUES (:id, :cid, :uid)
+                        ")->execute([':id' => gerarUuid(), ':cid' => $cod['IDCodigo'], ':uid' => $uid]);
 
-                    $pdo->commit();
+                        $pdo->commit();
 
-                    // Atualiza sessão
-                    $_SESSION['plano'] = $planoFinal;
-                    unset($_SESSION['expiracao_verificada']);
+                        // Atualiza sessão
+                        $_SESSION['plano'] = $planoFinal;
+                        unset($_SESSION['expiracao_verificada']);
 
-                    $planoLabel = strtoupper($planoFinal);
-                    $sucesso = "🎉 Código ativado! Você ganhou {$cod['DuracaoDias']} dias de {$planoLabel} — válido até " . date('d/m/Y', strtotime($novaExpiracao)) . '.';
+                        $planoLabel = strtoupper($planoFinal);
+                        $sucesso = "🎉 Código ativado! Você ganhou {$cod['DuracaoDias']} dias de {$planoLabel} — válido até " . date('d/m/Y', strtotime($novaExpiracao)) . '.';
+                    }
                 }
             }
         } catch (PDOException $e) {

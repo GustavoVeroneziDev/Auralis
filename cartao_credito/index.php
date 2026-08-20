@@ -37,8 +37,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $bandeira    = in_array($_POST['bandeira'] ?? '', ['visa','mastercard','elo','amex','hipercard','outro'])
                        ? $_POST['bandeira'] : 'outro';
         $cor         = preg_match('/^#[0-9a-fA-F]{6}$/', $_POST['cor'] ?? '') ? $_POST['cor'] : '#7c3aed';
-        $limiteRaw   = preg_replace('/[^\d,]/', '', $_POST['limite'] ?? '');
-        $limite      = $limiteRaw !== '' ? (float) str_replace(',', '.', $limiteRaw) : null;
+        $limiteRaw   = trim($_POST['limite'] ?? '');
+        $limite      = $limiteRaw !== '' ? parseValorBr($limiteRaw) : null;
         $diaFech     = max(1, min(31, (int)($_POST['dia_fechamento'] ?? 1)));
         $diaVenc     = max(1, min(31, (int)($_POST['dia_vencimento'] ?? 10)));
         $carteiraDb  = trim($_POST['carteira_debito'] ?? '') ?: null;

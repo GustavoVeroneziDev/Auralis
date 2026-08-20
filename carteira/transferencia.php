@@ -28,7 +28,7 @@ try {
 if ($acao === 'criar') {
     $de         = trim($_POST['de']    ?? '');
     $para       = trim($_POST['para']  ?? '');
-    $valor      = (float) str_replace(',', '.', $_POST['valor'] ?? '0');
+    $valor      = parseValorBr($_POST['valor'] ?? '0');
     $desc       = trim($_POST['desc']  ?? 'Transferência entre carteiras');
     $data       = trim($_POST['data']  ?? date('Y-m-d'));
     $status     = in_array($_POST['status'] ?? '', ['pendente','efetivado']) ? $_POST['status'] : 'efetivado';

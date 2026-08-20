@@ -132,8 +132,7 @@ if ($mes_prox > 12) {
     $ano_prox++;
 }
 
-$meses_pt = [1 => 'Janeiro', 2 => 'Fevereiro', 3 => 'Março', 4 => 'Abril', 5 => 'Maio', 6 => 'Junho', 7 => 'Julho', 8 => 'Agosto', 9 => 'Setembro', 10 => 'Outubro', 11 => 'Novembro', 12 => 'Dezembro'];
-$nome_mes = $meses_pt[$mes_atual];
+$nome_mes = nomeMesPt($mes_atual);
 
 // --- LÓGICA DE AÇÃO: ALTERAR STATUS, EXCLUIR OU AJUSTAR SALDO ---
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'])) {
@@ -143,7 +142,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'])) {
 
     // Quem lançou o registro pode mexer nele; o dono da carteira compartilhada onde ele
     // está também pode — usado em todo UPDATE/DELETE de Registro nesta seção.
-    $_whereRegPermitido = "(FKUsuario = :uid OR FKCarteira IN (SELECT IDCarteira FROM Carteira WHERE FKUsuarioDono = :uid2))";
+    $_whereRegPermitido = whereRegistroPermitido();
 
     if ($_POST['action'] === 'toggle_status') {
         $id_registro = $_POST['registro_id'];
@@ -301,7 +300,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'])) {
     }
 
     if ($_POST['action'] === 'ajustar_saldo') {
-        $saldo_informado    = (float) str_replace(',', '.', preg_replace('/[^\d,]/', '', $_POST['saldo_real'] ?? '0'));
+        $saldo_informado    = parseValorBr($_POST['saldo_real'] ?? '0');
         $saldo_sistema      = (float) $_POST['saldo_sistema_atual'];
         $carteira_id_ajuste = $_POST['carteira_id_ajuste'];
 

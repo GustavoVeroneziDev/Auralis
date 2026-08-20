@@ -17,14 +17,14 @@ if (!$id || !$acao) { echo json_encode(['ok' => false, 'erro' => 'parametros inv
 $stmtCheck = $pdo->prepare("
     SELECT IDRegistro, StatusRegistro, TipoRegistro, Valor, Descricao, FKCarteira FROM Registro
     WHERE IDRegistro = :id
-      AND (FKUsuario = :uid OR FKCarteira IN (SELECT IDCarteira FROM Carteira WHERE FKUsuarioDono = :uid2))
+      AND " . whereRegistroPermitido() . "
     LIMIT 1
 ");
 $stmtCheck->execute([':id' => $id, ':uid' => $uid, ':uid2' => $uid]);
 $reg = $stmtCheck->fetch(PDO::FETCH_ASSOC);
 if (!$reg) { http_response_code(404); echo json_encode(['ok' => false, 'erro' => 'nao encontrado']); exit; }
 
-$_whereAcao = "IDRegistro = :id AND (FKUsuario = :uid OR FKCarteira IN (SELECT IDCarteira FROM Carteira WHERE FKUsuarioDono = :uid2))";
+$_whereAcao = "IDRegistro = :id AND " . whereRegistroPermitido();
 
 // Se a carteira do registro for compartilhada, cada ação vira uma linha no log de
 // atividade (visível pro dono em "Atividade" na página de administrar carteira) — sem

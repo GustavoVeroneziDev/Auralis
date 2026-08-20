@@ -12,8 +12,15 @@ $resgatado    = $_GET['resgatado'] ?? '';
 
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && ($_POST['action'] ?? '') === 'resgatar_codigo') {
     $codigo = strtoupper(trim($_POST['codigo'] ?? ''));
+    $ipResgatePl = $_SERVER['REMOTE_ADDR'] ?? '0.0.0.0';
     if (empty($codigo)) {
         $msg_resgate  = 'Digite um código válido.';
+        $tipo_resgate = 'danger';
+    } elseif (contarTentativasSeguranca($pdo, 'resgatar_codigo', $usuario_id, 15) >= 8
+           || contarTentativasSeguranca($pdo, 'resgatar_codigo_ip', $ipResgatePl, 15) >= 20) {
+        // Mesmo balde de tentativas do resgatar.php — os dois resgatam código, então
+        // contam pro mesmo limite, não importa por qual tela a pessoa tentou.
+        $msg_resgate  = 'Muitas tentativas. Aguarde alguns minutos e tente de novo.';
         $tipo_resgate = 'danger';
     } else {
         try {
@@ -24,6 +31,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && ($_POST['action'] ?? '') === 'resga
             if (!$cod) {
                 $msg_resgate  = 'Código inválido ou inativo.';
                 $tipo_resgate = 'danger';
+                registrarTentativaSeguranca($pdo, 'resgatar_codigo', $usuario_id);
+                registrarTentativaSeguranca($pdo, 'resgatar_codigo_ip', $ipResgatePl);
             } elseif ($cod['DataExpiracao'] && $cod['DataExpiracao'] < date('Y-m-d')) {
                 $msg_resgate  = 'Este código já expirou.';
                 $tipo_resgate = 'danger';
@@ -56,18 +65,33 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && ($_POST['action'] ?? '') === 'resga
                                     ? $planoRecomp : $planoAtualS;
 
                     $pdo->beginTransaction();
-                    $pdo->prepare("UPDATE Assinatura SET Status = 'cancelada' WHERE FKUsuario = :uid AND Status = 'ativa'")->execute([':uid' => $usuario_id]);
-                    $pdo->prepare("INSERT INTO Assinatura (IDAssinatura, FKUsuario, Plano, Status, Ciclo, ValorPago, DataInicio, DataExpiracao, IDAssinaturaGW, EmailGateway, FontePagamento) VALUES (:id, :uid, :plano, 'ativa', 'codigo', 0, :inicio, :exp, NULL, NULL, 'codigo_ativacao')")
-                        ->execute([':id' => gerarUuid(), ':uid' => $usuario_id, ':plano' => $planoFinal, ':inicio' => date('Y-m-d'), ':exp' => $novaExpiracao]);
-                    $pdo->prepare("UPDATE Usuario SET Plano = :plano WHERE IDUsuario = :uid")->execute([':plano' => $planoFinal, ':uid' => $usuario_id]);
-                    $pdo->prepare("INSERT INTO codigos_ativacao_usos (IDUso, FKCodigo, FKUsuario) VALUES (:id, :cid, :uid)")->execute([':id' => gerarUuid(), ':cid' => $cod['IDCodigo'], ':uid' => $usuario_id]);
-                    $pdo->prepare("UPDATE codigos_ativacao SET UsoAtual = UsoAtual + 1 WHERE IDCodigo = :id")->execute([':id' => $cod['IDCodigo']]);
-                    $pdo->commit();
 
-                    $_SESSION['plano'] = $planoFinal;
-                    unset($_SESSION['expiracao_verificada']);
-                    header('Location: planos.php?resgatado=' . urlencode($planoFinal));
-                    exit;
+                    // Incrementa com a condição de limite embutida (não SELECT-checa-depois-
+                    // UPDATE) — mesmo motivo do resgatar.php: duas pessoas resgatando o mesmo
+                    // código de MaxUsos=1 ao mesmo tempo não podem as duas passar.
+                    $stmtIncPl = $pdo->prepare("
+                        UPDATE codigos_ativacao SET UsoAtual = UsoAtual + 1
+                        WHERE IDCodigo = :id AND (MaxUsos IS NULL OR UsoAtual < MaxUsos)
+                    ");
+                    $stmtIncPl->execute([':id' => $cod['IDCodigo']]);
+
+                    if ($stmtIncPl->rowCount() === 0) {
+                        $pdo->rollBack();
+                        $msg_resgate  = 'Este código já atingiu o limite de usos.';
+                        $tipo_resgate = 'danger';
+                    } else {
+                        $pdo->prepare("UPDATE Assinatura SET Status = 'cancelada' WHERE FKUsuario = :uid AND Status = 'ativa'")->execute([':uid' => $usuario_id]);
+                        $pdo->prepare("INSERT INTO Assinatura (IDAssinatura, FKUsuario, Plano, Status, Ciclo, ValorPago, DataInicio, DataExpiracao, IDAssinaturaGW, EmailGateway, FontePagamento) VALUES (:id, :uid, :plano, 'ativa', 'codigo', 0, :inicio, :exp, NULL, NULL, 'codigo_ativacao')")
+                            ->execute([':id' => gerarUuid(), ':uid' => $usuario_id, ':plano' => $planoFinal, ':inicio' => date('Y-m-d'), ':exp' => $novaExpiracao]);
+                        $pdo->prepare("UPDATE Usuario SET Plano = :plano WHERE IDUsuario = :uid")->execute([':plano' => $planoFinal, ':uid' => $usuario_id]);
+                        $pdo->prepare("INSERT INTO codigos_ativacao_usos (IDUso, FKCodigo, FKUsuario) VALUES (:id, :cid, :uid)")->execute([':id' => gerarUuid(), ':cid' => $cod['IDCodigo'], ':uid' => $usuario_id]);
+                        $pdo->commit();
+
+                        $_SESSION['plano'] = $planoFinal;
+                        unset($_SESSION['expiracao_verificada']);
+                        header('Location: planos.php?resgatado=' . urlencode($planoFinal));
+                        exit;
+                    }
                 }
             }
         } catch (PDOException $e) {

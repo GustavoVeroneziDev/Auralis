@@ -11,6 +11,11 @@ if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
     exit;
 }
 
+if (!csrfValido()) {
+    header("Location: dashboard.php?erro=sessao_expirada");
+    exit;
+}
+
 $chavePix = trim($_POST['chave_pix'] ?? '');
 
 if (empty($chavePix)) {

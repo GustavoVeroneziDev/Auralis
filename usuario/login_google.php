@@ -47,8 +47,20 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && !empty($_POST['credential'])) {
             if ($usuario) {
                 // JÁ EXISTE! 
                 if ($usuario['StatusConta'] === 'pendente') {
-                    $pdo->prepare("UPDATE Usuario SET StatusConta = 'ativo', TokenAtivacao = NULL WHERE IDUsuario = :uid")
-                        ->execute([':uid' => $usuario['IDUsuario']]);
+                    // O e-mail já foi verificado pelo próprio Google — isso pesa mais que uma
+                    // senha que nunca chegou a ser confirmada. Se alguém pré-cadastrou esse
+                    // e-mail com senha própria antes do dono de verdade ativar via Google,
+                    // reseta essa senha (hash aleatório que ninguém conhece — se quiser voltar
+                    // a logar com senha, passa por "esqueci minha senha") e limpa o telefone,
+                    // que também podia ter sido setado por quem pré-cadastrou.
+                    $pdo->prepare("
+                        UPDATE Usuario SET StatusConta = 'ativo', TokenAtivacao = NULL,
+                            Senha = :senha_bloqueada, Telefone = NULL
+                        WHERE IDUsuario = :uid
+                    ")->execute([
+                        ':senha_bloqueada' => password_hash(bin2hex(random_bytes(32)), PASSWORD_DEFAULT),
+                        ':uid' => $usuario['IDUsuario'],
+                    ]);
                 }
 
                 // Cria as sessões e entra

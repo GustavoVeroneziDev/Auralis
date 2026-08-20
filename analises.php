@@ -37,8 +37,7 @@ if ($mes_prox > 12) {
     $ano_prox++;
 }
 
-$meses_pt = [1 => 'Janeiro', 2 => 'Fevereiro', 3 => 'Março', 4 => 'Abril', 5 => 'Maio', 6 => 'Junho', 7 => 'Julho', 8 => 'Agosto', 9 => 'Setembro', 10 => 'Outubro', 11 => 'Novembro', 12 => 'Dezembro'];
-$nome_mes = $meses_pt[$mes_atual];
+$nome_mes = nomeMesPt($mes_atual);
 
 
 // ==============================================================================
@@ -269,7 +268,7 @@ if ($carteira_selecionada) {
             $saldoAcumuladoHist += $rec - $desp - $cofDep + $cofRet + $transfIn - $transfOut;
 
             $historicoMensal[] = [
-                'label'    => mb_substr($meses_pt[(int)$cursorHist->format('n')], 0, 3) . '/' . $cursorHist->format('y'),
+                'label'    => mb_substr(nomeMesPt((int)$cursorHist->format('n')), 0, 3) . '/' . $cursorHist->format('y'),
                 'receita'  => $rec,
                 'despesa'  => $desp,
                 'saldo'    => $saldoAcumuladoHist,
@@ -1246,7 +1245,7 @@ require_once 'geral/header.php';
     const receitasCatAnt = <?php echo json_encode($receitasPorCategoriaAnt) ?>;
     const gastosCatAtual = <?php echo json_encode($gastosPorCategoria) ?>;
     const receitasCatAtual = <?php echo json_encode($receitasPorCategoria) ?>;
-    const nomeMesAnterior = "<?php echo $meses_pt[$mes_ant] ?>";
+    const nomeMesAnterior = "<?php echo nomeMesPt($mes_ant) ?>";
 
     // Badge de variação JS-side
     function badgeVarJS(atual, anterior, invertido = false) {

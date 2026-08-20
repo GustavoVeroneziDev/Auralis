@@ -30,8 +30,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
     if ($action === 'fechar_fatura') {
         $faturaId    = trim($_POST['fatura_id'] ?? '');
-        $valorRaw    = preg_replace('/[^\d,]/', '', trim($_POST['valor_manual'] ?? ''));
-        $valorManual = $valorRaw !== '' ? (float) str_replace(',', '.', $valorRaw) : null;
+        $valorRaw    = trim($_POST['valor_manual'] ?? '');
+        $valorManual = $valorRaw !== '' ? parseValorBr($valorRaw) : null;
         $stmt = $pdo->prepare("SELECT f.*, c.DiaVencimento, c.FKCarteiraDebito, c.Nome AS NomeCartao
                                 FROM FaturaCartao f JOIN CartaoCredito c ON f.FKCartao = c.IDCartao
                                 WHERE f.IDFatura = :id AND f.FKUsuario = :uid AND f.Status = 'aberta'");
@@ -88,8 +88,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $grupo        = trim($_POST['grupo'] ?? '');
         $parcelaAtual = (int)($_POST['parcela_atual'] ?? 0);
         $desc         = trim($_POST['descricao'] ?? '');
-        $valorRaw     = preg_replace('/[^\d,]/', '', trim($_POST['valor'] ?? '0'));
-        $valor        = (float) str_replace(',', '.', $valorRaw);
+        $valor        = parseValorBr(trim($_POST['valor'] ?? '0'));
         $data         = trim($_POST['data_compra'] ?? '');
         $catId        = trim($_POST['categoria_id'] ?? '') ?: null;
 

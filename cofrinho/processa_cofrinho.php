@@ -41,7 +41,7 @@ if ($acao === 'criar') {
     $icone      = trim($_POST['icone'] ?? 'bi-piggy-bank');
     $cor        = trim($_POST['cor'] ?? '#f59e0b');
     $carteira   = trim($_POST['carteira'] ?? '');
-    $meta       = (isset($_POST['meta']) && $_POST['meta'] !== '') ? (float) str_replace(',', '.', preg_replace('/[^\d,]/', '', $_POST['meta'])) : null;
+    $meta       = (isset($_POST['meta']) && $_POST['meta'] !== '') ? parseValorBr($_POST['meta']) : null;
     $dataLimite = trim($_POST['data_limite'] ?? '') ?: null;
 
     $iconesPermitidos = ['bi-piggy-bank','bi-house','bi-car-front','bi-airplane','bi-heart','bi-stars','bi-trophy','bi-gift'];
@@ -94,7 +94,7 @@ if ($acao === 'editar') {
     $nome       = trim($_POST['nome'] ?? '');
     $icone      = trim($_POST['icone'] ?? 'bi-piggy-bank');
     $cor        = trim($_POST['cor'] ?? '#f59e0b');
-    $meta       = (isset($_POST['meta']) && $_POST['meta'] !== '') ? (float) str_replace(',', '.', preg_replace('/[^\d,]/', '', $_POST['meta'])) : null;
+    $meta       = (isset($_POST['meta']) && $_POST['meta'] !== '') ? parseValorBr($_POST['meta']) : null;
     $dataLimite = trim($_POST['data_limite'] ?? '') ?: null;
 
     $iconesPermitidos = ['bi-piggy-bank','bi-house','bi-car-front','bi-airplane','bi-heart','bi-stars','bi-trophy','bi-gift'];
@@ -131,7 +131,7 @@ if ($acao === 'editar') {
 // ── Depositar no cofrinho ───────────────────────────────────────────────────
 if ($acao === 'depositar') {
     $idCofrinho = trim($_POST['id_cofrinho'] ?? '');
-    $valor      = round((float) str_replace(',', '.', preg_replace('/[^\d,]/', '', $_POST['valor'] ?? '0')), 2);
+    $valor      = round(parseValorBr($_POST['valor'] ?? '0'), 2);
     $descricao  = trim($_POST['descricao'] ?? '') ?: null;
 
     if (empty($idCofrinho) || $valor <= 0) {
@@ -202,7 +202,7 @@ if ($acao === 'depositar') {
 // ── Retirar do cofrinho ─────────────────────────────────────────────────────
 if ($acao === 'retirar') {
     $idCofrinho = trim($_POST['id_cofrinho'] ?? '');
-    $valor      = round((float) str_replace(',', '.', preg_replace('/[^\d,]/', '', $_POST['valor'] ?? '0')), 2);
+    $valor      = round(parseValorBr($_POST['valor'] ?? '0'), 2);
     $descricao  = trim($_POST['descricao'] ?? '') ?: null;
 
     if (empty($idCofrinho) || $valor <= 0) {
@@ -273,7 +273,7 @@ if ($acao === 'retirar') {
 // ── Reajustar saldo do cofrinho ─────────────────────────────────────────────
 if ($acao === 'reajustar') {
     $idCofrinho = trim($_POST['id_cofrinho'] ?? '');
-    $novoValor  = round((float) str_replace(',', '.', preg_replace('/[^\d,]/', '', $_POST['novo_valor'] ?? '0')), 2);
+    $novoValor  = round(parseValorBr($_POST['novo_valor'] ?? '0'), 2);
 
     if (empty($idCofrinho) || $novoValor < 0) {
         header("Location: {$voltar}?erro=reajuste_invalido");
@@ -386,7 +386,7 @@ if ($acao === 'excluir_registro') {
 if ($acao === 'editar_registro') {
     header('Content-Type: application/json; charset=utf-8');
     $idReg    = trim($_POST['id_registro'] ?? '');
-    $valor    = round((float) str_replace(',', '.', preg_replace('/[^\d,]/', '', $_POST['valor'] ?? '0')), 2);
+    $valor    = round(parseValorBr($_POST['valor'] ?? '0'), 2);
     $descricao= trim($_POST['descricao'] ?? '') ?: null;
     if (empty($idReg) || $valor <= 0) { echo json_encode(['ok'=>false,'erro'=>'Dados inválidos']); exit; }
     try {

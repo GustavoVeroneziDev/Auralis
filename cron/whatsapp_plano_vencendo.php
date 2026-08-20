@@ -54,6 +54,19 @@ $enviados = 0;
 $agora    = date('Y-m-d H:i:s');
 
 foreach ($assinaturas as $a) {
+    // Reivindica ANTES de mandar, não depois — reduz a janela de corrida de "a chamada
+    // HTTP inteira de envio" pra só esse check+insert/update. Sem isso, dois disparos do
+    // mesmo cron rodando ao mesmo tempo podiam os dois ver essa assinatura como "ainda não
+    // avisada hoje" e mandar a mesma mensagem duas vezes.
+    try {
+        $stmtChk->execute([':uid' => $a['FKUsuario']]);
+        if ($stmtChk->fetchColumn() > 0) {
+            $stmtUpd->execute([':ts' => $agora, ':uid' => $a['FKUsuario']]);
+        } else {
+            $stmtIns->execute([':ts' => $agora, ':uid' => $a['FKUsuario']]);
+        }
+    } catch (PDOException $e) { continue; }
+
     $plano        = strtoupper($a['Plano']);
     $primeiroNome = explode(' ', $a['Nome'])[0];
     $ehPix        = strncmp((string)$a['IDAssinaturaGW'], 'pix_', 4) === 0;
@@ -70,19 +83,13 @@ foreach ($assinaturas as $a) {
     $ok = enviarWhatsAppNotificacao($a['Telefone'], $mensagem);
 
     if ($ok) {
-        try {
-            $stmtChk->execute([':uid' => $a['FKUsuario']]);
-            if ($stmtChk->fetchColumn() > 0) {
-                $stmtUpd->execute([':ts' => $agora, ':uid' => $a['FKUsuario']]);
-            } else {
-                $stmtIns->execute([':ts' => $agora, ':uid' => $a['FKUsuario']]);
-            }
-        } catch (PDOException $e) {}
         if (function_exists('registrarMensagemWaSistema')) {
             registrarMensagemWaSistema($pdo, $a['FKUsuario'], $mensagem);
         }
         $enviados++;
     }
+    // Se falhar, não desfaz a marcação — pior caso é não reavisar hoje, o que é aceitável
+    // (a assinatura ainda vence "em 2 dias", sobra tempo do próprio ciclo diário do cron).
 }
 
 echo "Plano vencendo: " . count($assinaturas) . " assinatura(s), {$enviados} aviso(s) enviado(s)." . PHP_EOL;

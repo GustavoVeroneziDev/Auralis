@@ -34,6 +34,81 @@ if (!function_exists('contarTentativasSeguranca')) {
     }
 }
 
+// ── CSRF (proteção contra forjar POST de outro site) ────────────────────────
+// Token por sessão (não por formulário) — mais simples e já suficiente, já
+// que o objetivo é só provar que o POST veio de uma página nossa carregada
+// com a sessão do próprio usuário, não de um site malicioso terceiro.
+if (!function_exists('csrfToken')) {
+    function csrfToken(): string
+    {
+        if (empty($_SESSION['csrf_token'])) {
+            $_SESSION['csrf_token'] = bin2hex(random_bytes(32));
+        }
+        return $_SESSION['csrf_token'];
+    }
+}
+
+if (!function_exists('csrfCampo')) {
+    function csrfCampo(): string
+    {
+        return '<input type="hidden" name="csrf_token" value="' . htmlspecialchars(csrfToken(), ENT_QUOTES) . '">';
+    }
+}
+
+if (!function_exists('csrfValido')) {
+    function csrfValido(): bool
+    {
+        return isset($_SESSION['csrf_token'], $_POST['csrf_token'])
+            && hash_equals($_SESSION['csrf_token'], $_POST['csrf_token']);
+    }
+}
+
+// ── Parse de valor digitado em formato BR ("1.500,50" ou "1500,50") ─────────
+// Único lugar que converte string digitada em float. Só remove os pontos de
+// milhar quando há vírgula decimal na string — sem essa condição, um valor já
+// em formato US sem vírgula (ex: "12.50") perderia o ponto decimal por engano
+// e viraria 1250. Os ~20 pontos do sistema que faziam esse parse cada um do
+// seu jeito (alguns sem essa condição) foram unificados aqui.
+if (!function_exists('parseValorBr')) {
+    function parseValorBr(?string $raw): float
+    {
+        $limpo = preg_replace('/[^\d.,]/', '', (string)$raw);
+        if (strpos($limpo, ',') !== false) {
+            $limpo = str_replace('.', '', $limpo);
+            $limpo = str_replace(',', '.', $limpo);
+        }
+        return (float)$limpo;
+    }
+}
+
+// Único lugar com a lista de meses por extenso em PT-BR — existiam 2 cópias com
+// indexação diferente (1-indexado em analises.php/dashboard.php, 0-indexado em
+// exportar.php), risco de uma delas ficar desalinhada num mês errado ao editar só uma.
+if (!function_exists('nomeMesPt')) {
+    function nomeMesPt(int $mes): string
+    {
+        $meses = [
+            1 => 'Janeiro', 2 => 'Fevereiro', 3 => 'Março', 4 => 'Abril',
+            5 => 'Maio', 6 => 'Junho', 7 => 'Julho', 8 => 'Agosto',
+            9 => 'Setembro', 10 => 'Outubro', 11 => 'Novembro', 12 => 'Dezembro',
+        ];
+        return $meses[$mes] ?? '';
+    }
+}
+
+// Fragmento SQL repetido em toda query que precisa confirmar posse de um Registro —
+// libera pra quem lançou OU pro dono da carteira compartilhada onde o lançamento está.
+// Existiam 11 cópias manuais desse texto (nova_transacao.php, agenda.php, dashboard.php,
+// geral/acao_registro.php); um placeholder diferente digitado errado numa dessas cópias
+// não dá erro de sintaxe, só vaza (ou nega) acesso silenciosamente — daí valer centralizar
+// mesmo sendo "só" texto de SQL, não uma função que executa nada.
+if (!function_exists('whereRegistroPermitido')) {
+    function whereRegistroPermitido(string $paramUsuario = ':uid', string $paramUsuario2 = ':uid2'): string
+    {
+        return "(FKUsuario = {$paramUsuario} OR FKCarteira IN (SELECT IDCarteira FROM Carteira WHERE FKUsuarioDono = {$paramUsuario2}))";
+    }
+}
+
 if (!function_exists('gerarUuid')) {
     function gerarUuid()
     {
@@ -65,6 +140,19 @@ if (!function_exists('emitirCookieLembrarMe')) {
         $assinatura = hash_hmac('sha256', $usuarioId, AURALIS_COOKIE_SECRET);
         setcookie('auralis_remember', $usuarioId . ':' . $assinatura, [
             'expires'  => time() + (86400 * 30),
+            'path'     => '/',
+            'secure'   => isset($_SERVER['HTTPS']) && $_SERVER['HTTPS'] === 'on',
+            'httponly' => true,
+            'samesite' => 'Lax',
+        ]);
+    }
+}
+
+if (!function_exists('limparCookieLembrarMe')) {
+    function limparCookieLembrarMe(): void
+    {
+        setcookie('auralis_remember', '', [
+            'expires'  => time() - 3600,
             'path'     => '/',
             'secure'   => isset($_SERVER['HTTPS']) && $_SERVER['HTTPS'] === 'on',
             'httponly' => true,
@@ -117,7 +205,7 @@ if (!function_exists('renovarOuRestaurarSessao')) {
         }
 
         if (!$usuario || $usuario['StatusConta'] !== 'ativo') {
-            setcookie('auralis_remember', '', time() - 3600, '/');
+            limparCookieLembrarMe();
             return;
         }
 
@@ -578,7 +666,12 @@ if (!function_exists('mpVerificarAssinatura')) {
             return true; // Chave ainda não configurada — não bloqueia (ver mercadopago_keys.php)
         }
         if (empty($xSignature)) {
-            return true; // Notificação legada (IPN) não tem esse header — sem como verificar
+            // Notificação legada (IPN) não tem esse header — sem como verificar, mas loga
+            // toda vez que isso acontece de propósito: se nunca aparecer no log, dá pra
+            // trocar esse "aceita sem assinatura" por uma rejeição de verdade mais pra
+            // frente, sem risco de quebrar uma notificação real que ainda dependa disso.
+            error_log("[Auralis MP] Webhook recebido sem X-Signature (tratado como IPN legado) — dataId={$dataId}");
+            return true;
         }
 
         $ts = null;
@@ -2401,14 +2494,37 @@ if (!function_exists('telefoneJaEmUsoPorOutro')) {
     }
 }
 
+// Chave da Evolution API — nunca hardcoded em arquivo versionado (achado da auditoria de
+// segurança: a chave real ficava em texto puro em 2 arquivos do Git). Vive só no banco,
+// configurável/visível em admin/webhook_ia.php. Sem ela configurada, envio de WhatsApp
+// simplesmente falha (retorna false) em vez de mandar uma requisição sem autenticação.
+if (!function_exists('evolutionApiKey')) {
+    function evolutionApiKey(PDO $pdo): string
+    {
+        static $cache = null;
+        if ($cache !== null) return $cache;
+        try {
+            $stmt = $pdo->query("SELECT Valor FROM ConfiguracaoSistema WHERE Chave = 'evolution_api_key' AND FKUsuario IS NULL LIMIT 1");
+            $cache = (string)($stmt->fetchColumn() ?: '');
+        } catch (Throwable $e) {
+            $cache = '';
+        }
+        return $cache;
+    }
+}
+
 if (!function_exists('enviarWhatsAppNotificacao')) {
     function enviarWhatsAppNotificacao(string $numero, string $mensagem): bool
     {
+        global $pdo;
+        $apiKey = evolutionApiKey($pdo);
+        if ($apiKey === '') return false;
+
         $url     = 'https://evolution.meuauralis.com/message/sendText/Auralis';
         $payload = json_encode(['number' => $numero, 'text' => $mensagem]);
         $ctx = stream_context_create(['http' => [
             'method'        => 'POST',
-            'header'        => "Content-Type: application/json\r\napikey: 44c816e1478a4754e859bd609e4099aaab417cf60bf07bf9\r\n",
+            'header'        => "Content-Type: application/json\r\napikey: {$apiKey}\r\n",
             'content'       => $payload,
             'timeout'       => 10,
             'ignore_errors' => true,
