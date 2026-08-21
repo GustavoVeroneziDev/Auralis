@@ -440,11 +440,16 @@ Regras:
 - "valor" = valor de CADA parcela, quando a pessoa já fala o valor por parcela (ex: "12x de 150" → valor=150). "valor_total" = preço cheio a dividir (ex: "comprei uma TV de 3000 em 10x" → valor_total=3000, sem valor). Use SÓ um dos dois.
 - Compra parcelada "com juros": se a pessoa já disser o valor final por parcela (ex: "fica 220 por mês"), use valor=220 direto. Se ela só souber o total final com juros incluso (ex: "no total com juros dá 3300"), use valor_total=3300 — o sistema divide certinho, não faça a conta de cabeça.
 - "recorrente":true para contas que se repetem SEM ser parcelamento — não usa "parcelas" nesse caso. Nunca marque recorrente E parcelas>1 ao mesmo tempo. Por padrão repete todo mês ("tipo_recorrencia" omitido = "meses", "intervalo_recorrencia" omitido = 1) no "dia_vencimento" informado (1-31). Se a pessoa disser "a cada X dias" ou "toda semana"/"a cada X semanas" (ex: "me cobra a cada 15 dias"), use "tipo_recorrencia":"dias"|"semanas" com "intervalo_recorrencia":X e OMITA "dia_vencimento" (a recorrência ancora na própria "data" do lançamento). Se disser "bimestral"/"a cada 2 meses", use "tipo_recorrencia":"meses" com "intervalo_recorrencia":2.
+- Categoria: SÓ preencha "id_categoria" com um id que está DE VERDADE numa das listas abaixo (Categorias despesa/receita) — nunca invente um id nem escreva um "nome_categoria" bonito/corrigido sem ter certeza de qual categoria real da lista é essa. Se o nome que a pessoa disse não bate claramente com nenhuma da lista (erro de digitação forte, nome ambíguo, ou simplesmente não existe uma parecida), NÃO registre chutando — use "clarificar" perguntando qual categoria da lista é (ou se quer deixar sem categoria por agora). Registrar com a categoria errada, ou registrar sem avisar que não achou, é pior do que perguntar uma vez a mais.
+
+"desfazer" — reverte a ÚLTIMA transação (ou lote de transações) que VOCÊ registrou nessa conversa, quando a pessoa perceber que saiu errado (ex: "desfaz isso", "cancela isso que você acabou de colocar", "tira essa última que eu falei errado", "volta atrás"). NÃO peça confirmação extra pra isso, nem pergunte qual — sempre se refere à última coisa que você mesma acabou de fazer:
+{"action":"desfazer"}
+Isso só reverte o que a IA criou (registrar). Pra excluir algo mais antigo ou lançado manualmente no site, é uma exclusão normal — pergunte o nome e confirme antes (regra geral de exclusão).
 
 "efetivar" — marcar pendente(s) como pago/recebido (inclui comprovante de algo já pendente — ver regra 11):
 {"action":"efetivar","descricoes":["texto parcial"]}
 
-"desefetivar" — desfazer, marcar de volta como pendente algo que foi pago/recebido por engano:
+"desefetivar" — marcar de volta como pendente algo que foi pago/recebido por engano (isso é sobre STATUS pendente↔pago; pra desfazer uma transação que a IA acabou de CRIAR por engano, use "desfazer" acima):
 {"action":"desefetivar","descricoes":["texto parcial"]}
 
 "editar" — mudar nome, valor, data, tipo ou categoria de um registro já existente (ex: "era outra coisa, muda o nome pra X", "muda a data da parcela 2 pra dia 5", "esse valor tá errado, era 80"). Inclua só os campos que realmente mudam. Parcelas ficam salvas com sufixo "nome N/total" (ex: "TV 2/2") — se a pessoa falar de uma parcela específica, inclua esse número no "descricao_busca" pra achar a certa (ex: "TV 2/2" em vez de só "TV"):
@@ -535,7 +540,7 @@ if (!$jaTemEscalada && preg_match('/falar\s+com\s+(o\s+|a\s+)?(suporte|equipe|ti
 $respostas = [];
 foreach ($acoes as $acao) {
     try {
-        $respostas[] = _waDespachar($pdo, $uid, $acao, $carteiras, $cofrinhos, $hoje, $personalidade, $usuario, $telefone);
+        $respostas[] = _waDespachar($pdo, $uid, $acao, $carteiras, $cofrinhos, $categorias, $hoje, $personalidade, $usuario, $telefone);
     } catch (Throwable $e) {
         $respostas[] = "❌ Deu um erro aqui do meu lado processando isso. Tenta de novo, ou me chama que eu aciono o suporte.";
     }
@@ -561,14 +566,15 @@ exit;
 
 // ── Despachante central ───────────────────────────────────────────────────────
 
-function _waDespachar(PDO $pdo, string $uid, array $acao, array $carteiras, array $cofrinhos, string $hoje, string $personalidade, array $usuario, string $telefoneCliente): string
+function _waDespachar(PDO $pdo, string $uid, array $acao, array $carteiras, array $cofrinhos, array $categorias, string $hoje, string $personalidade, array $usuario, string $telefoneCliente): string
 {
     $action = $acao['action'] ?? 'conversar';
     return match($action) {
-        'registrar'          => _waRegistrar($pdo, $uid, $acao['registros'] ?? [], $carteiras, $hoje),
+        'registrar'          => _waRegistrar($pdo, $uid, $acao['registros'] ?? [], $carteiras, $categorias, $hoje),
+        'desfazer'           => _waDesfazer($pdo, $uid),
         'efetivar'           => _waEfetivar($pdo, $uid, $acao['descricoes'] ?? []),
         'desefetivar'        => _waDesefetivar($pdo, $uid, $acao['descricoes'] ?? []),
-        'editar'             => _waEditar($pdo, $uid, $acao),
+        'editar'             => _waEditar($pdo, $uid, $acao, $categorias),
         'cofrinho_depositar' => _waCofrinhoDepositar($pdo, $uid, $acao, $cofrinhos, $carteiras, $hoje),
         'cofrinho_criar'     => _waCofinhoCriar($pdo, $uid, $acao, $carteiras, $hoje),
         'cofrinho_retirar'   => _waCofrinhoRetirar($pdo, $uid, $acao, $cofrinhos, $hoje),
@@ -586,9 +592,16 @@ function _waDespachar(PDO $pdo, string $uid, array $acao, array $carteiras, arra
 
 // ── Handlers ──────────────────────────────────────────────────────────────────
 
-function _waRegistrar(PDO $pdo, string $uid, array $registros, array $carteiras, string $hoje): string
+function _waRegistrar(PDO $pdo, string $uid, array $registros, array $carteiras, array $categorias, string $hoje): string
 {
     if (!$registros) return "❌ Não identifiquei nenhuma transação. Tente com mais detalhes.";
+
+    garantirColunasAcaoIA($pdo);
+    // Uma "ação" = uma chamada de registrar (pode criar várias linhas: parcelas, ou vários
+    // itens numa mesma mensagem). Todas as linhas dessa chamada saem com o MESMO IDAcaoWA —
+    // é isso que faz "desfaz isso" (action "desfazer") saber exatamente o que reverter, sem
+    // arriscar apagar algo de outra ação ou algo lançado manualmente no site.
+    $idAcaoWA = gerarUuid();
 
     $confirmacoes = [];
     $erros        = 0;
@@ -601,9 +614,9 @@ function _waRegistrar(PDO $pdo, string $uid, array $registros, array $carteiras,
         INSERT INTO Registro
             (IDRegistro, Valor, Descricao, FKCarteira, FKUsuario, FKCategoria,
              TipoRegistro, MomentoRegistro, DataVencimento, StatusRegistro, Recorrente, DiaVencimento,
-             GrupoParcela, ParcelaAtual, TotalParcelas)
+             GrupoParcela, ParcelaAtual, TotalParcelas, OrigemCriacao, IDAcaoWA)
         VALUES (:id, :val, :desc, :cart, :uid, :cat, :tipo, :momento, :data, :status, :recorrente, :dia,
-                :grupo, :parc_atual, :total_parc)
+                :grupo, :parc_atual, :total_parc, 'ia', :id_acao_wa)
     ");
 
     foreach ($registros as $r) {
@@ -611,7 +624,13 @@ function _waRegistrar(PDO $pdo, string $uid, array $registros, array $carteiras,
         $tipo      = in_array($r['tipo'] ?? '', ['receita', 'despesa']) ? $r['tipo'] : 'despesa';
         $dataBase  = $r['data'] ?? $hoje;
         $cart      = $r['id_carteira'] ?? $carteiras[0]['IDCarteira'];
-        $cat       = !empty($r['id_categoria']) ? $r['id_categoria'] : null;
+        // Nunca confia cegamente no id_categoria que a IA mandou (nem inventa categoria a
+        // partir só do nome) — valida contra a lista REAL do usuário, com tolerância a erro
+        // de digitação. Sem isso, a mensagem de confirmação podia dizer uma categoria (o
+        // nome_categoria que a IA escreveu) enquanto o banco salvava outra coisa (ou nada) —
+        // exatamente o tipo de erro silencioso que não pode acontecer.
+        $catResolvida = _waResolverCategoria($categorias, $r['id_categoria'] ?? null, $r['nome_categoria'] ?? null, $tipo);
+        $cat          = $catResolvida['id'];
         $parcelas  = max(1, (int)($r['parcelas'] ?? 1));
         // Recorrente e parcelado não fazem sentido juntos — recorrente vence sempre que
         // ambos vierem preenchidos, igual ao toggle do app (nova_transacao.php:1641-1644).
@@ -655,12 +674,14 @@ function _waRegistrar(PDO $pdo, string $uid, array $registros, array $carteiras,
                     'tipo_recorrencia'      => $tipoRec,
                     'intervalo_recorrencia' => $intervRec,
                     'dia_vencimento'        => $diaVenc,
+                    'origem_criacao'        => 'ia',
+                    'id_acao_wa'            => $idAcaoWA,
                 ]);
             } catch (Throwable $e) { $erros++; continue; }
 
             $icon     = $tipo === 'receita' ? '📈' : '📉';
             $valFmt   = 'R$ ' . number_format($valorParcela, 2, ',', '.');
-            $catNome  = !empty($r['nome_categoria']) ? " · " . $r['nome_categoria'] : '';
+            $catNome  = $catResolvida['nome'] ? " · " . $catResolvida['nome'] : (!empty($r['nome_categoria']) ? " · categoria não identificada (fala qual é que eu ajusto)" : '');
             $cartNome = $r['nome_carteira'] ?? $carteiras[0]['NomeCarteira'];
             $confirmacoes[] = "{$icon} *{$descricao}* 🔁 _" . descreverRecorrencia($tipoRec, $intervRec, $diaVenc) . "_\n   {$valFmt}{$catNome} · {$cartNome}";
             continue;
@@ -706,6 +727,7 @@ function _waRegistrar(PDO $pdo, string $uid, array $registros, array $carteiras,
                     ':grupo'      => $grupoParcela,
                     ':parc_atual' => $parcelas > 1 ? $i : null,
                     ':total_parc' => $parcelas > 1 ? $parcelas : null,
+                    ':id_acao_wa' => $idAcaoWA,
                 ]);
             } catch (Throwable $e) { $erros++; continue 2; }
         }
@@ -713,7 +735,7 @@ function _waRegistrar(PDO $pdo, string $uid, array $registros, array $carteiras,
         $icon    = $tipo === 'receita' ? '📈' : '📉';
         $valFmt  = 'R$ ' . number_format($valorParcela, 2, ',', '.');
         $dataFmt = date('d/m/Y', strtotime($dataBase));
-        $catNome = !empty($r['nome_categoria']) ? " · " . $r['nome_categoria'] : '';
+        $catNome = $catResolvida['nome'] ? " · " . $catResolvida['nome'] : (!empty($r['nome_categoria']) ? " · categoria não identificada (fala qual é que eu ajusto)" : '');
         $cartNome = $r['nome_carteira'] ?? $carteiras[0]['NomeCarteira'];
         $pendente = $dataBase > $hoje ? ' _(pendente)_' : '';
 
@@ -733,6 +755,96 @@ function _waRegistrar(PDO $pdo, string $uid, array $registros, array $carteiras,
     $erroTxt = $erros ? "\n\n⚠️ {$erros} item(ns) não salvo(s)." : '';
 
     return $header . "\n\n" . implode("\n", $confirmacoes) . $erroTxt . "\n\n_meuauralis.com_ 👆";
+}
+
+// Remove tudo (letras/números só) e acentos — forma canônica pra comparar nome de categoria
+// tolerando maiúscula/minúscula, acento e digitação (ex: "Alimentação" e "alimnetação" viram
+// a mesma coisa depois de normalizado, sobrando só a distância de edição real do typo).
+function _waNormalizarTexto(string $s): string
+{
+    $s = mb_strtolower(trim($s), 'UTF-8');
+    $s = strtr($s, [
+        'á'=>'a','à'=>'a','ã'=>'a','â'=>'a','ä'=>'a',
+        'é'=>'e','è'=>'e','ê'=>'e','ë'=>'e',
+        'í'=>'i','ì'=>'i','î'=>'i','ï'=>'i',
+        'ó'=>'o','ò'=>'o','õ'=>'o','ô'=>'o','ö'=>'o',
+        'ú'=>'u','ù'=>'u','û'=>'u','ü'=>'u',
+        'ç'=>'c','ñ'=>'n',
+    ]);
+    return preg_replace('/[^a-z0-9]/', '', $s);
+}
+
+// Confirma que a categoria que a IA mandou existe DE VERDADE na lista do usuário antes de
+// gravar — nunca confia só no texto que a IA escreveu. Sem isso, a mensagem de confirmação
+// podia mostrar um nome de categoria "corrigido" (a IA arrumando um erro de digitação só no
+// texto) enquanto o FKCategoria real ficava vazio ou errado no banco — a mensagem dizia uma
+// coisa, o sistema salvava outra. Também serve de rede de segurança pra quando a IA não
+// seguiu a instrução de perguntar e mandou um id_categoria chutado ou vazio mesmo assim.
+function _waResolverCategoria(array $categorias, ?string $idCategoria, ?string $nomeCategoria, string $tipo): array
+{
+    if ($idCategoria) {
+        foreach ($categorias as $c) {
+            if ($c['IDCategoria'] === $idCategoria && $c['TipoCategoria'] === $tipo) {
+                return ['id' => $c['IDCategoria'], 'nome' => $c['NomeCategoria']];
+            }
+        }
+    }
+
+    if ($nomeCategoria) {
+        $alvo = _waNormalizarTexto($nomeCategoria);
+        if ($alvo !== '') {
+            foreach ($categorias as $c) {
+                if ($c['TipoCategoria'] !== $tipo) continue;
+                $comp = _waNormalizarTexto($c['NomeCategoria']);
+                // <= 2 cobre erro de digitação leve (uma letra trocada/faltando, ou duas letras
+                // invertidas de lugar — exatamente o caso "alimentação" vs "alimnetação").
+                if ($comp === $alvo || levenshtein($comp, $alvo) <= 2) {
+                    return ['id' => $c['IDCategoria'], 'nome' => $c['NomeCategoria']];
+                }
+            }
+        }
+    }
+
+    // Não achou nada confiável — não inventa categoria nem finge que achou.
+    return ['id' => null, 'nome' => null];
+}
+
+// Reverte a ÚLTIMA ação da IA que criou registro(s) (ver REGRAS no prompt sobre quando usar) —
+// pega o IDAcaoWA mais recente desse usuário e apaga só as linhas daquela ação específica, não
+// qualquer coisa lançada manualmente no site nem de uma ação anterior.
+function _waDesfazer(PDO $pdo, string $uid): string
+{
+    garantirColunasAcaoIA($pdo);
+    $stmtAcao = $pdo->prepare("
+        SELECT IDAcaoWA FROM Registro
+        WHERE FKUsuario = :uid AND OrigemCriacao = 'ia' AND IDAcaoWA IS NOT NULL
+        ORDER BY CriadoEm DESC LIMIT 1
+    ");
+    $stmtAcao->execute([':uid' => $uid]);
+    $idAcao = $stmtAcao->fetchColumn();
+
+    if (!$idAcao) {
+        return "❌ Não achei nenhuma ação recente minha pra desfazer. Se for algo mais antigo, me fala o nome que eu excluo normalmente.";
+    }
+
+    $stmtItens = $pdo->prepare("SELECT Descricao, Valor, TipoRegistro FROM Registro WHERE FKUsuario = :uid AND IDAcaoWA = :acao");
+    $stmtItens->execute([':uid' => $uid, ':acao' => $idAcao]);
+    $itens = $stmtItens->fetchAll(PDO::FETCH_ASSOC);
+
+    if (!$itens) {
+        return "❌ Não achei nenhuma ação recente minha pra desfazer. Se for algo mais antigo, me fala o nome que eu excluo normalmente.";
+    }
+
+    $stmtDel = $pdo->prepare("DELETE FROM Registro WHERE FKUsuario = :uid AND IDAcaoWA = :acao");
+    $stmtDel->execute([':uid' => $uid, ':acao' => $idAcao]);
+
+    $linhas = array_map(function ($i) {
+        $icon = $i['TipoRegistro'] === 'receita' ? '📈' : '📉';
+        return "{$icon} {$i['Descricao']}: R$ " . number_format((float)$i['Valor'], 2, ',', '.');
+    }, $itens);
+
+    $header = count($itens) === 1 ? "↩️ *Desfeito!*" : "↩️ *" . count($itens) . " itens desfeitos!*";
+    return $header . "\n\n" . implode("\n", $linhas);
 }
 
 function _waDesefetivar(PDO $pdo, string $uid, array $descricoes): string
@@ -786,7 +898,7 @@ function _waDesefetivar(PDO $pdo, string $uid, array $descricoes): string
     return $msg ?: "❌ Nenhum registro efetivado encontrado com esse nome.";
 }
 
-function _waEditar(PDO $pdo, string $uid, array $acao): string
+function _waEditar(PDO $pdo, string $uid, array $acao, array $categorias): string
 {
     $desc = trim($acao['descricao_busca'] ?? '');
     if (!$desc) return "❌ Não identifiquei qual registro editar.";
@@ -853,10 +965,16 @@ function _waEditar(PDO $pdo, string $uid, array $acao): string
         $params[':novo_tipo'] = $acao['tipo_novo'];
         $mudancas[] = "tipo → {$acao['tipo_novo']}";
     }
-    if (!empty($acao['id_categoria_nova'])) {
-        $sets[] = 'FKCategoria = :nova_cat';
-        $params[':nova_cat'] = $acao['id_categoria_nova'];
-        $mudancas[] = "categoria → " . ($acao['nome_categoria_nova'] ?? '(nova)');
+    if (!empty($acao['id_categoria_nova']) || !empty($acao['nome_categoria_nova'])) {
+        $tipoParaCategoria = $acao['tipo_novo'] ?? $row['TipoRegistro'];
+        $catResolvida = _waResolverCategoria($categorias, $acao['id_categoria_nova'] ?? null, $acao['nome_categoria_nova'] ?? null, $tipoParaCategoria);
+        if ($catResolvida['id']) {
+            $sets[] = 'FKCategoria = :nova_cat';
+            $params[':nova_cat'] = $catResolvida['id'];
+            $mudancas[] = "categoria → " . $catResolvida['nome'];
+        } else {
+            return "🤔 Não achei a categoria \"" . ($acao['nome_categoria_nova'] ?? '') . "\" na sua lista. Qual delas você quis dizer?";
+        }
     }
 
     if (!$sets) return "❌ Não identifiquei nenhuma mudança válida pra \"{$desc}\".";

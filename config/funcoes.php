@@ -2718,6 +2718,35 @@ if (!function_exists('registrarMensagemWaSistema')) {
     }
 }
 
+// Marca a ORIGEM de cada Registro (IA do WhatsApp vs lançamento manual no site) e agrupa tudo
+// que uma mesma chamada da IA criou de uma vez (IDAcaoWA) — sem isso não dava pra "desfazer"
+// direito quando a IA registra algo errado: o cliente falava "desfaz isso" e não existia
+// nenhum jeito de saber COM CERTEZA quais linhas vieram daquela última ação específica pra
+// reverter só elas. CriadoEm é quando a linha foi INSERIDA (não confundir com MomentoRegistro,
+// que é a data da própria transação) — é isso que define qual foi "a última ação".
+if (!function_exists('garantirColunasAcaoIA')) {
+    function garantirColunasAcaoIA(PDO $pdo): void
+    {
+        $colunas = [
+            'OrigemCriacao' => "VARCHAR(10) NOT NULL DEFAULT 'manual'",
+            'IDAcaoWA'      => "CHAR(36) NULL DEFAULT NULL",
+            'CriadoEm'      => "DATETIME NULL DEFAULT CURRENT_TIMESTAMP",
+        ];
+        foreach ($colunas as $coluna => $definicao) {
+            try {
+                $chk = $pdo->query("
+                    SELECT COLUMN_NAME FROM INFORMATION_SCHEMA.COLUMNS
+                    WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'Registro' AND COLUMN_NAME = '$coluna'
+                ")->fetchColumn();
+                if (!$chk) {
+                    $pdo->exec("ALTER TABLE Registro ADD COLUMN $coluna $definicao");
+                }
+            } catch (PDOException $e) {
+            }
+        }
+    }
+}
+
 // Colunas do reforço de vencimento (16h) — separadas de PushNotificadoEm/WhatsAppNotificadoEm
 // (aviso da manhã) pra cada lembrete controlar sua própria janela de envio, sem um interferir
 // no outro. Sem SSH no host, a migração roda sozinha aqui em vez de exigir ALTER manual.
@@ -2861,15 +2890,23 @@ if (!function_exists('criarSerieRecorrente')) {
         $qtd    = (int)($dados['quantidade_lote'] ?? tamanhoLoteInicialRecorrencia($tipoRecorrencia, $intervalo));
         $grupo  = gerarUuid();
 
+        // Rastreio de origem — só usado quando quem chama passa isso (ex: IA do WhatsApp); o
+        // form web (nova_transacao.php) não passa nada e cai no default 'manual' das colunas.
+        garantirColunasAcaoIA($pdo);
+        $origem   = $dados['origem_criacao'] ?? 'manual';
+        $idAcaoWA = $dados['id_acao_wa'] ?? null;
+
         $stmt = $pdo->prepare("
             INSERT INTO Registro (
                 IDRegistro, TipoRegistro, Valor, Descricao, MomentoRegistro, DataVencimento,
                 StatusRegistro, Recorrente, DiaVencimento, TipoRecorrencia, IntervaloRecorrencia,
-                RecorrenciaAtiva, FKCarteira, FKUsuario, FKCategoria, GrupoParcela
+                RecorrenciaAtiva, FKCarteira, FKUsuario, FKCategoria, GrupoParcela,
+                OrigemCriacao, IDAcaoWA
             ) VALUES (
                 :id, :tipo, :valor, :desc, :momento, :venc,
                 :status, 1, :dia, :tipo_rec, :interv,
-                1, :cart, :uid, :cat, :grupo
+                1, :cart, :uid, :cat, :grupo,
+                :origem, :id_acao_wa
             )
         ");
 
@@ -2901,6 +2938,8 @@ if (!function_exists('criarSerieRecorrente')) {
                     ':uid'      => $dados['usuario_id'],
                     ':cat'      => $dados['categoria_id'] ?? null,
                     ':grupo'    => $grupo,
+                    ':origem'      => $origem,
+                    ':id_acao_wa'  => $idAcaoWA,
                 ]);
             }
             $pdo->commit();
