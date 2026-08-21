@@ -18,6 +18,7 @@ require_once 'config/funcoes.php';
 require_once 'config/funcoes_cartao.php';
 garantirEstruturaCarteirasCompartilhadas($pdo);
 garantirColunaCategoriaSistema($pdo);
+garantirColunasAcaoIA($pdo);
 
 $usuario_id = $_SESSION['usuario_id'];
 cartao_verificarFechamentos($pdo, $usuario_id);
@@ -476,7 +477,7 @@ if ($carteira_selecionada) {
                 SELECT
                     r.IDRegistro, r.MomentoRegistro, r.Valor, r.Descricao, r.TipoRegistro, r.StatusRegistro,
                     r.DataVencimento, r.Recorrente, r.DiaVencimento,
-                    r.GrupoParcela, r.ParcelaAtual, r.TotalParcelas,
+                    r.GrupoParcela, r.ParcelaAtual, r.TotalParcelas, r.OrigemCriacao,
                     c.NomeCategoria, c.IconeCategoria,
                     (SELECT COUNT(*) FROM Comprovante WHERE FKRegistro = r.IDRegistro AND FKUsuario = r.FKUsuario) AS qtd_comprovantes,
                     cart_par.TipoCarteira AS NomeCarteiraTransferencia,
@@ -1317,6 +1318,12 @@ require_once 'geral/header.php';
                                             <?php if ($_carteiraAtualCompartilhada && !empty($t['NomeLancador'])): ?>
                                                 <span class="badge bg-opacity-10 px-2 py-1" style="font-size:0.6rem;background:rgba(96,165,250,0.12);color:#60a5fa;" title="Lançado por">
                                                     <i class="bi bi-person-fill"></i> <?php echo htmlspecialchars($t['NomeLancador']) ?>
+                                                </span>
+                                            <?php endif; ?>
+
+                                            <?php if (($t['OrigemCriacao'] ?? 'manual') === 'ia'): ?>
+                                                <span class="badge bg-opacity-10 px-2 py-1" style="font-size:0.6rem;background:rgba(212,175,55,0.12);color:#d4af37;" title="Lançado pela IA do WhatsApp">
+                                                    🤖 IA
                                                 </span>
                                             <?php endif; ?>
 
